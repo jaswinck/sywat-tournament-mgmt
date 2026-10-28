@@ -1,7 +1,11 @@
 <?php
 /**
- * SYWAT Score Entry & Results Portal (Hybrid Local Draft + Background Auto-Save + True Multi-Line CSV Download)
+ * Module: SYWAT Score Management & Entry App (Snippet 37)
+ * Description: Front-end scoring interface featuring real-time AJAX auto-save, score validation (0-300),
+ *              X-count tie-breakers, division/style sorting, and CSV score export generation.
  * Shortcode: [sywat_scores]
+ * Author: SYWAT Archery
+ * Version: 1.0.0
  */
 
 if (!defined('ABSPATH')) exit;
