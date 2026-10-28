@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.6.3
+ * Version: 1.6.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -464,9 +464,9 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                         <thead>
                             <tr>
                                 <th style="width:22%;">Shop Name & ID</th>
-                                <th style="width:30%;">Contact Info</th>
+                                <th style="width:28%;">Contact Info</th>
                                 <th style="width:15%;">Phone</th>
-                                <th style="width:13%;">Linked Staff</th>
+                                <th style="width:15%;">Linked Staff</th>
                                 <th style="text-align:right; width:20%;">Actions</th>
                             </tr>
                         </thead>
@@ -505,23 +505,23 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                     <td>
                                         <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" style="text-decoration:none;">
-                                            <span class="sywat-badge sywat-badge-prereg" style="font-size:12px;">👤 <?php echo $linked_count; ?> Staff User(s)</span>
+                                            <span class="sywat-badge sywat-badge-prereg" style="font-size:12px;">👥 <?php echo $linked_count; ?> Staff User(s)</span>
                                         </a>
                                     </td>
                                     <td style="text-align:right;">
                                         <div class="sywat-action-btn-group">
-                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">👤 Staff</a>
-                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">✏️ Edit</a>
+                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-secondary" style="font-size:12px; height:30px; padding:0 10px;">👥 Link Staff</a>
+                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="font-size:12px; height:30px; padding:0 10px;">✏️ Edit Shop</a>
                                             
                                             <?php if ( $s_id !== 'shop_ccr' ): ?>
                                                 <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                                     <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                                    <button type="submit" class="sywat-btn-danger">Delete</button>
+                                                    <button type="submit" class="sywat-btn-danger" style="font-size:12px; height:30px; padding:0 10px;">Delete</button>
                                                 </form>
                                             <?php else: ?>
-                                                <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
+                                                <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1; padding:6px 10px;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
                                             <?php endif; ?>
                                         </div>
                                     </td>
