@@ -29,8 +29,13 @@ function sywat_archery_enqueue_assets() {
     wp_enqueue_script('jquery');
 }
 
-// Load the 4 core modules
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tournaments.php'; // Snippet 25
+// Load Core Portal & Management Sub-Modules (Refactored Snippet 25)
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tournament-config.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-registration.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';
+
+// Load Supporting App Modules
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-checkin.php';     // Snippet 22
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-scores.php';      // Snippet 37
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tfaa-sync.php';   // Snippet 38
