@@ -1,7 +1,7 @@
 <?php
 /**
- * Module: Tournament Configuration & Volunteer Hub
- * Description: Shortcode routing, tournament CRUD, line slot limits, and Volunteer Hub portal.
+ * Module: Tournament Configuration, Master Portal & Volunteer Hub
+ * Description: Shortcode routing, master admin portal shell, tournament CRUD, and Volunteer Hub portal view.
  * Author: SYWAT Archery
  * Version: 1.0.0
  */
@@ -19,7 +19,7 @@ add_shortcode( 'sywat_manage',             'render_sywat_master_portal' );
 add_shortcode( 'sywat_manage_tournaments', 'render_sywat_master_portal' );
 add_shortcode( 'sywat_volunteer_hub',      'render_sywat_volunteer_hub' );
 
-// Helper Functions
+// Core Helper Functions
 if ( ! function_exists( 'sywat_normalize_dist' ) ) {
     function sywat_normalize_dist( $dist_str ) {
         return ( strcasecmp( trim( $dist_str ), 'cub' ) === 0 || strcasecmp( trim( $dist_str ), '10yd' ) === 0 || strcasecmp( trim( $dist_str ), '10 yards' ) === 0 ) ? 'Cub' : '20yd';
@@ -59,6 +59,521 @@ if ( ! function_exists( 'sywat_get_tournament_count' ) ) {
             }
         }
         return $count;
+    }
+}
+
+// Master Admin Portal Controller
+if ( ! function_exists( 'render_sywat_master_portal' ) ) {
+    function render_sywat_master_portal() {
+        $user = wp_get_current_user();
+        if ( is_user_logged_in() && ! array_intersect( array( 'administrator', 'management' ), (array) $user->roles ) ) {
+            return '<p style="color:red; padding:20px;">Access denied. Management access required.</p>';
+        }
+
+        ob_start();
+        global $wpdb;
+
+        $tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( ! is_array( $tournaments ) ) $tournaments = array();
+
+        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
+        if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
+
+        $registrations = array();
+        $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+        foreach ($results as $row) {
+            $reg_data = maybe_unserialize($row->option_value);
+            if (is_array($reg_data) && isset($reg_data['id'])) {
+                $registrations[] = $reg_data;
+            }
+        }
+
+        $notice = '';
+        $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( $_REQUEST['tab'] ) : 'manage';
+
+        $default_lines = array(
+            array( 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+        );
+
+        $edit_target      = isset( $_REQUEST['edit_tournament'] ) ? sanitize_text_field( $_REQUEST['edit_tournament'] ) : '';
+        $form_name        = ! empty( $edit_target ) ? $edit_target : '';
+        $form_lines       = ( ! empty( $edit_target ) && isset( $tournaments[$edit_target] ) ) ? $tournaments[$edit_target] : $default_lines;
+        $form_line_count  = isset( $_POST['line_count'] ) ? intval( $_POST['line_count'] ) : count( $form_lines );
+        if ( $form_line_count < 1 ) $form_line_count = 1;
+        if ( $form_line_count > 6 ) $form_line_count = 6;
+
+        $selected_tournament = isset( $_REQUEST['view_tournament'] ) ? sanitize_text_field( $_REQUEST['view_tournament'] ) : '';
+        $modal_action        = isset( $_REQUEST['modal_action'] ) ? sanitize_text_field( $_REQUEST['modal_action'] ) : 'manage';
+        $open_modal          = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] );
+
+        $available_lines = $open_modal ? $tournaments[$selected_tournament] : array();
+        $filter_line_idx = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( $_REQUEST['filter_line_idx'] ) : 'all';
+        $search_query    = isset( $_REQUEST['search_shooter'] ) ? trim( sanitize_text_field( $_REQUEST['search_shooter'] ) ) : '';
+        $is_specific_line = ($filter_line_idx !== 'all' && $filter_line_idx !== '' && $filter_line_idx !== null);
+
+        // POST Action Handlers
+        $is_valid_nonce = (isset($_POST['sywat_nonce']) && wp_verify_nonce($_POST['sywat_nonce'], 'sywat_desk_action'));
+        $action = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action && !$is_valid_nonce && $action !== 'cancel') {
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce) {
+            
+            if ( $action === 'sync_tfaa_now' ) {
+                if ( function_exists( 'sywat_sync_tfaa_standings' ) ) {
+                    $res = sywat_sync_tfaa_standings();
+                    $notice = ! empty( $res['success'] ) 
+                        ? '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 <strong>TFAA Standings Synced!</strong> Successfully cached ' . intval($res['count']) . ' active shooters from TFAA.</div>'
+                        : '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
+                }
+            }
+
+            if ( $action === 'toggle_active_tournament' ) {
+                $target_t = sanitize_text_field( $_POST['tournament_name'] );
+                if ( in_array( $target_t, $active_tournaments ) ) {
+                    $active_tournaments = array_diff( $active_tournaments, array( $target_t ) );
+                } else {
+                    $active_tournaments[] = $target_t;
+                }
+                $active_tournaments = array_values( array_unique( $active_tournaments ) );
+                update_option( 'sywat_active_tournaments', $active_tournaments );
+                $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Updated Volunteer Hub status for <strong>' . esc_html( $target_t ) . '</strong>.</div>';
+            }
+
+            if ( $action === 'save_tournament' ) {
+                $t_name   = sanitize_text_field( $_POST['tournament_name'] );
+                $old_name = sanitize_text_field( $_POST['original_tournament_name'] );
+                $new_slug = sanitize_title( $t_name );
+                
+                $new_dates = isset($_POST['tournament_dates']) ? sanitize_text_field($_POST['tournament_dates']) : '';
+                update_option('sywat_dates_' . $new_slug, $new_dates);
+
+                $new_lines = array();
+                if ( ! empty( $_POST['line_names'] ) ) {
+                    foreach ( $_POST['line_names'] as $index => $name ) {
+                        if ( $index < $form_line_count ) {
+                            $new_lines[] = array(
+                                'name'     => sanitize_text_field( $name ),
+                                'cap_20yd' => intval( $_POST['cap_20yd'][$index] ),
+                                'cap_cub'  => intval( $_POST['cap_cub'][$index] ),
+                            );
+                        }
+                    }
+                }
+
+                if ( ! empty( $old_name ) && $old_name !== $t_name && isset( $tournaments[$old_name] ) ) {
+                    unset( $tournaments[$old_name] );
+                    $old_slug = sanitize_title( $old_name );
+
+                    foreach ( $registrations as &$reg ) {
+                        if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
+                            delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
+                            $reg['tournament'] = $t_name;
+                            update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
+                        }
+                    }
+                    unset($reg);
+
+                    if ( in_array( $old_name, $active_tournaments ) ) {
+                        $active_tournaments = array_diff( $active_tournaments, array( $old_name ) );
+                        $active_tournaments[] = $t_name;
+                    }
+                } else {
+                    if ( ! in_array( $t_name, $active_tournaments ) ) {
+                        $active_tournaments[] = $t_name;
+                    }
+                }
+
+                $tournaments[$t_name] = $new_lines;
+                update_option( 'sywat_tournaments_list', $tournaments );
+                update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
+                update_option( 'sywat_current_tournament', $t_name );
+                update_option( 'sywat_line_config', $new_lines );
+
+                $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully!</div>';
+                $active_tab = 'manage';
+            }
+
+            if ( $action === 'delete_tournament' ) {
+                $del_tournament = sanitize_text_field( $_POST['tournament_name'] );
+                if ( isset( $tournaments[$del_tournament] ) ) {
+                    unset( $tournaments[$del_tournament] );
+                    update_option( 'sywat_tournaments_list', $tournaments );
+
+                    $active_tournaments = array_diff( $active_tournaments, array( $del_tournament ) );
+                    update_option( 'sywat_active_tournaments', array_values( $active_tournaments ) );
+
+                    $del_slug = sanitize_title( $del_tournament );
+                    delete_option('sywat_dates_' . $del_slug);
+
+                    foreach ( $registrations as $reg ) {
+                        if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $del_tournament ) === 0 ) {
+                            delete_option( 'sywat_t_' . $del_slug . '_' . $reg['id'] );
+                        }
+                    }
+
+                    $registrations = array_values( array_filter( $registrations, function( $reg ) use ( $del_tournament ) {
+                        return ! ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $del_tournament ) === 0 );
+                    }) );
+
+                    $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted tournament <strong>' . esc_html( $del_tournament ) . '</strong> and purged all archers.</div>';
+                }
+            }
+
+            // Sub-Module Delegated Action Handlers
+            if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
+                $notice = sywat_handle_register_shooter( $tournaments, $registrations );
+                $open_modal = true; $modal_action = 'prereg';
+            }
+
+            if ( $action === 'import_shooters' && function_exists( 'sywat_handle_import_shooters' ) ) {
+                $target_line_idx = isset( $_POST['target_line_idx'] ) ? sanitize_text_field( $_POST['target_line_idx'] ) : '0';
+                $notice = sywat_handle_import_shooters( $selected_tournament, $target_line_idx, $tournaments, $registrations );
+                $open_modal = true; $modal_action = 'prereg';
+            }
+
+            if ( $action === 'save_edit' && function_exists( 'sywat_handle_save_edit' ) ) {
+                $notice = sywat_handle_save_edit( $tournaments, $registrations );
+                $open_modal = true; $modal_action = 'manage';
+            }
+
+            if ( $action === 'delete_shooter' && function_exists( 'sywat_handle_delete_shooter' ) ) {
+                $notice = sywat_handle_delete_shooter( $registrations );
+                $open_modal = true; $modal_action = 'manage';
+            }
+
+            if ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
+                $notice = sywat_handle_purge_line( $tournaments, $registrations );
+                $open_modal = true; $modal_action = isset( $_POST['redirect_action'] ) ? sanitize_text_field( $_POST['redirect_action'] ) : 'prereg';
+            }
+        }
+
+        $modal_edit_id = isset( $_REQUEST['open_edit_id'] ) ? sanitize_text_field( $_REQUEST['open_edit_id'] ) : '';
+        $modal_edit_archer = null;
+        if ( $modal_edit_id ) {
+            foreach ( $registrations as $reg ) {
+                if ( isset( $reg['id'] ) && $reg['id'] === $modal_edit_id ) {
+                    $modal_edit_archer = $reg; break;
+                }
+            }
+        }
+
+        $existing_families = array();
+        if ($open_modal) {
+            foreach ($registrations as $reg) {
+                if (isset($reg['tournament']) && strcasecmp($reg['tournament'], $selected_tournament) === 0) {
+                    if (isset($reg['paid']) && $reg['paid'] === 'Family' && !empty($reg['family_id'])) {
+                        $fam_id = $reg['family_id'];
+                        $fam_label = !empty($reg['family_name']) ? $reg['family_name'] : (!empty($reg['booking_id']) ? 'Booking ' . $reg['booking_id'] : 'Family ID ' . substr($fam_id, -6));
+                        $existing_families[$fam_id] = $fam_label;
+                    }
+                }
+            }
+        }
+
+        $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
+        $tfaa_count = isset( $tfaa_cache['count'] ) ? $tfaa_cache['count'] : 0;
+        $tfaa_updated = isset( $tfaa_cache['updated_at'] ) ? $tfaa_cache['updated_at'] : 'Never';
+        ?>
+
+        <style>
+            .sywat-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #2c3338; max-width: 1100px; margin: 0 auto; }
+            .sywat-nav-tabs { display: flex; border-bottom: 1px solid #c3c4c7; margin-bottom: 20px; gap: 5px; }
+            .sywat-tab-item { padding: 10px 18px; font-weight: 600; text-decoration: none; color: #50575e; background: #f6f7f7; border: 1px solid #c3c4c7; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 14px; }
+            .sywat-tab-item.active { background: #ffffff; color: #1d2327; border-bottom: 1px solid #ffffff; margin-bottom: -1px; }
+            
+            .sywat-card { background: #ffffff; border: 1px solid #c3c4c7; border-radius: 4px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); padding: 20px; margin-bottom: 20px; }
+            .sywat-card-title { font-size: 1.1em; font-weight: 600; color: #1d2327; margin: 0 0 15px 0; border-bottom: 1px solid #dcdcde; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+            .sywat-subtitle { font-size: 13px; color: #646970; margin-top: -10px; margin-bottom: 15px; }
+            
+            .sywat-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+            .sywat-table th { background-color: #f6f7f7; text-align: left; padding: 10px 12px; font-weight: 600; color: #1d2327; border-bottom: 1px solid #c3c4c7; }
+            .sywat-table td { padding: 12px; border-bottom: 1px solid #f0f0f1; color: #2c3338; vertical-align: middle; }
+            
+            .sywat-btn-primary { background-color: #2271b1; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-primary:hover { background-color: #135e96; border-color: #135e96; color: #ffffff !important; }
+            
+            .sywat-btn-secondary { background-color: #ffffff; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #2271b1 !important; }
+            .sywat-btn-secondary:hover { background-color: #2271b1; color: #ffffff !important; }
+
+            .sywat-btn-success { background-color: #008a20; border: 1px solid #008a20; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-success:hover { background-color: #007017; border-color: #007017; color: #ffffff !important; }
+
+            .sywat-btn-danger { background-color: #dc3545; border: 1px solid #dc3545; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-danger:hover { background-color: #bd2130; border-color: #b21f2d; color: #ffffff !important; }
+
+            .sywat-badge { display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 700; border-radius: 3px; }
+            .sywat-badge-prereg { background-color: #e5f5fa; color: #0073aa; border: 1px solid #bfe7f3; }
+            .sywat-badge-walkin { background-color: #fcf8e3; color: #8a6d3b; border: 1px solid #faebcc; }
+            .sywat-badge-open { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .sywat-badge-full { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+            .sywat-alert { padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
+            .sywat-alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .sywat-alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+            .sywat-modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.55); z-index: 99999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+            .sywat-modal-backdrop.active { display: flex; }
+            .sywat-modal-content { background: #fff; width: 100%; max-width: 900px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+            .sywat-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #dcdcde; background: #f6f7f7; }
+            .sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
+            .sywat-modal-close { background: none; border: none; font-size: 22px; font-weight: bold; color: #646970; cursor: pointer; line-height: 1; }
+            .sywat-modal-close:hover { color: #d63638; }
+            .sywat-modal-body { padding: 20px; overflow-y: auto; }
+
+            @media print {
+                @page { size: letter <?php echo ( $modal_action === 'print' ) ? 'landscape' : 'portrait'; ?>; margin: 0.4in; }
+                #wpadminbar, #adminmenumain, #wpfooter, header, footer, nav, aside, iframe, .no-print, .ast-site-header, .site-header, .ast-footer, .site-footer { display: none !important; }
+                html, body, #wpwrap, #wpcontent, #wpbody, #wpbody-content, #page, #content, .sywat-wrap, .sywat-modal-backdrop, .sywat-modal-content, .sywat-modal-body {
+                    position: static !important; display: block !important; float: none !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; background: #ffffff !important; box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important;
+                }
+                .sywat-modal-header, .sywat-modal-body > :not(#sywat_print_area) { display: none !important; }
+                #sywat_print_area { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+                .sywat-table, .invoice-fee-table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; page-break-after: auto !important; }
+                .sywat-table thead, .invoice-fee-table thead { display: table-header-group !important; }
+                .sywat-table tr, .invoice-fee-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+                .sywat-table th, .invoice-fee-table th { background-color: #f1f5f9 !important; border: 1px solid #000 !important; padding: 4px 6px !important; font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .sywat-table td, .invoice-fee-table td { border: 1px solid #000 !important; padding: 3px 5px !important; font-size: 9px !important; vertical-align: middle !important; }
+            }
+        </style>
+
+        <div class="sywat-wrap">
+            <div class="no-print"><?php echo $notice; ?></div>
+
+            <div class="sywat-nav-tabs no-print">
+                <a href="?tab=manage" class="sywat-tab-item <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournaments & Rosters</a>
+                <a href="?tab=create" class="sywat-tab-item <?php echo $active_tab === 'create' ? 'active' : ''; ?>"><?php echo ! empty( $edit_target ) ? 'Edit Tournament Config' : 'Create New Tournament'; ?></a>
+            </div>
+
+            <?php if ( $active_tab === 'manage' ): ?>
+                <div class="sywat-card no-print">
+                    <div class="sywat-card-title">
+                        <span>Configured Tournaments</span>
+                        <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
+                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                            <input type="hidden" name="sywat_action" value="sync_tfaa_now">
+                            <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings Cache: <strong><?php echo $tfaa_count; ?></strong> Shooters (Updated: <?php echo esc_html($tfaa_updated); ?>)</span>
+                            <button type="submit" class="sywat-btn-secondary" style="height: 30px; font-size: 12px;">🔄 Sync TFAA Standings Now</button>
+                        </form>
+                    </div>
+                    <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
+
+                    <?php if ( empty( $tournaments ) ): ?>
+                        <p style="color:#646970; font-style:italic;">No tournaments created yet. Click on <strong>"Create New Tournament"</strong> to configure your first tournament.</p>
+                    <?php else: ?>
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%;">Tournament Name</th>
+                                    <th style="width: 14%;">Volunteer Hub</th>
+                                    <th style="width: 35%;">Line Slot Availability (20yd / Cub)</th>
+                                    <th style="width: 17%;">Shooter Management</th>
+                                    <th style="width: 14%; text-align: right;">Tournament Management</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $tournaments as $t_name => $t_lines ): ?>
+                                    <?php 
+                                        $line_count = is_array( $t_lines ) ? count( $t_lines ) : 0;
+                                        $reg_count  = sywat_get_tournament_count( $t_name, $registrations );
+                                        $is_active_hub = in_array( $t_name, $active_tournaments );
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html( $t_name ); ?></strong>
+                                            <div style="font-size: 12px; color: #646970; margin-top: 2px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
+                                        </td>
+                                        <td>
+                                            <form method="post" style="margin: 0;">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="sywat_action" value="toggle_active_tournament">
+                                                <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                <?php if ( $is_active_hub ): ?>
+                                                    <button type="submit" class="sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
+                                                <?php else: ?>
+                                                    <button type="submit" class="sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
+                                                <?php endif; ?>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <?php if ( ! empty( $t_lines ) && is_array( $t_lines ) ): ?>
+                                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                                    <?php foreach ( $t_lines as $idx => $line ): ?>
+                                                        <?php 
+                                                            $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ($idx + 1);
+                                                            $c_20 = sywat_count_registered( $t_name, $idx, '20yd', $registrations );
+                                                            $m_20 = sywat_get_line_max_cap( $line, '20yd' );
+                                                            $rem_20 = max( 0, $m_20 - $c_20 );
+                                                            $c_cub = sywat_count_registered( $t_name, $idx, 'Cub', $registrations );
+                                                            $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
+                                                            $rem_cub = max( 0, $m_cub - $c_cub );
+                                                        ?>
+                                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #f8f9fa; padding: 5px 10px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 12px;">
+                                                            <strong style="color: #1d2327;"><?php echo esc_html( $line_title ); ?></strong>
+                                                            <div style="display: flex; gap: 10px; color: #50575e; align-items: center;">
+                                                                <span>20yd: <strong><?php echo $c_20; ?>/<?php echo $m_20; ?></strong> <span style="color: <?php echo ($rem_20 > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_20; ?> open)</span></span>
+                                                                <span>Cub: <strong><?php echo $c_cub; ?>/<?php echo $m_cub; ?></strong> <span style="color: <?php echo ($rem_cub > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_cub; ?> open)</span></span>
+                                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print&filter_line_idx=<?php echo $idx; ?>" style="margin-left:5px; color:#2271b1; text-decoration:none; font-weight:bold;">🖨️ Print Line</a>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #c3c4c7; font-size: 12px; color: #1d2327;">
+                                                <strong>Total Registered:</strong> <?php echo $reg_count; ?> <?php echo ( $reg_count === 1 ? 'archer' : 'archers' ); ?>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Manage Shooters</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Add Pre-Reg / CSV</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Print Roster</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn-primary" style="width: 100%; justify-content: center; background:#0284c7; border-color:#0284c7;">📄 Generate Invoice</a>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                                                <a href="/sywat-desk/" class="sywat-btn-success" style="width: 100%; max-width: 130px; justify-content: center;">Check-In Desk</a>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Enter Scores</a>
+                                                <a href="?tab=create&edit_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Edit Config</a>
+                                                <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
+                                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                    <input type="hidden" name="sywat_action" value="delete_tournament">
+                                                    <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                    <button type="submit" class="sywat-btn-danger" style="width: 100%; justify-content: center;">Delete</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+
+            <?php else: ?>
+                <!-- TAB 2: CREATE / EDIT TOURNAMENT FORM -->
+                <div class="sywat-card no-print">
+                    <h2 class="sywat-card-title"><?php echo ! empty( $edit_target ) ? 'Edit Tournament: ' . esc_html( $edit_target ) : 'Create New Tournament'; ?></h2>
+                    <form method="post" action="?tab=create<?php echo ! empty( $edit_target ) ? '&edit_tournament=' . urlencode($edit_target) : ''; ?>">
+                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                        <input type="hidden" name="sywat_action" value="save_tournament">
+                        <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $form_name ); ?>">
+
+                        <div style="margin-bottom: 20px;">
+                            <label style="display:block; font-weight:600; margin-bottom:5px;">Tournament Name</label>
+                            <input type="text" name="tournament_name" value="<?php echo esc_attr( $form_name ); ?>" placeholder="e.g. CCR October 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                        </div>
+
+                        <?php $t_dates = get_option('sywat_dates_' . sanitize_title($form_name), ''); ?>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display:block; font-weight:600; margin-bottom:5px;">Tournament Dates (For Invoice)</label>
+                            <input type="text" name="tournament_dates" value="<?php echo esc_attr( $t_dates ); ?>" placeholder="e.g. Oct 24 & 25, 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <label style="display:block; font-weight:600; margin-bottom:5px;">Number of Shooting Lines (1 - 6)</label>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <select name="line_count" style="padding:6px 10px; border:1px solid #8c8f94; border-radius:4px; width:130px; height:34px;">
+                                    <?php for ($i = 1; $i <= 6; $i++): ?>
+                                        <option value="<?php echo $i; ?>" <?php selected( $form_line_count, $i ); ?>><?php echo $i; ?> Line<?php echo $i > 1 ? 's' : ''; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                                <button type="submit" class="sywat-btn-primary">Update Line Rows</button>
+                            </div>
+                        </div>
+
+                        <h3 style="font-size: 15px; font-weight: 600; margin-top: 25px; margin-bottom: 10px;">Shooting Lines & Capacity Configuration</h3>
+                        <table class="sywat-table" style="margin-bottom: 20px;">
+                            <thead>
+                                <tr>
+                                    <th>Line Day / Time</th>
+                                    <th style="width: 180px;">20yd Capacity</th>
+                                    <th style="width: 180px;">Cub Capacity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php for ($i = 0; $i < $form_line_count; $i++): ?>
+                                    <?php 
+                                        $fallback  = isset($default_lines[$i]) ? $default_lines[$i] : array( 'name' => 'Line ' . ($i + 1), 'cap_20yd' => 20, 'cap_cub' => 5 );
+                                        $line_name = isset($form_lines[$i]['name']) ? $form_lines[$i]['name'] : $fallback['name'];
+                                        $cap_20yd  = isset($form_lines[$i]['cap_20yd']) ? $form_lines[$i]['cap_20yd'] : $fallback['cap_20yd'];
+                                        $cap_cub   = isset($form_lines[$i]['cap_cub']) ? $form_lines[$i]['cap_cub'] : $fallback['cap_cub'];
+                                    ?>
+                                    <tr>
+                                        <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $line_name ); ?>" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                        <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                        <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                    </tr>
+                                <?php endfor; ?>
+                            </tbody>
+                        </table>
+
+                        <button type="submit" class="sywat-btn-primary" style="height: auto; padding: 10px 20px; font-size: 14px;">Save Tournament & Config</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+
+            <!-- MODAL DELEGATION SHELL -->
+            <div class="sywat-modal-backdrop <?php echo $open_modal ? 'active' : ''; ?>" id="sywat_modal">
+                <div class="sywat-modal-content">
+                    <div class="sywat-modal-header no-print">
+                        <h3>
+                            <?php 
+                                if ($modal_action === 'invoice') echo 'TFAA Tournament Invoice';
+                                elseif ($modal_action === 'print') echo 'Print Checked In Roster';
+                                elseif ($modal_action === 'prereg') echo 'Add Pre-Registrations & Bulk Import';
+                                else echo 'Manage Archers';
+                            ?>: <?php echo esc_html( $selected_tournament ); ?>
+                        </h3>
+                        <button type="button" class="sywat-modal-close" onclick="closeSywatModal()">&times;</button>
+                    </div>
+                    <div class="sywat-modal-body">
+                        <?php if ( $open_modal ): ?>
+                            <?php 
+                                if ( $modal_action === 'prereg' && function_exists( 'sywat_render_registration_modal' ) ) {
+                                    sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
+                                } elseif ( $modal_action === 'manage' && function_exists( 'sywat_render_roster_modal' ) ) {
+                                    sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer, $existing_families );
+                                } elseif ( $modal_action === 'invoice' && function_exists( 'sywat_render_invoice_modal' ) ) {
+                                    sywat_render_invoice_modal( $selected_tournament, $registrations );
+                                } elseif ( $modal_action === 'print' && function_exists( 'sywat_render_print_modal' ) ) {
+                                    sywat_render_print_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $is_specific_line );
+                                }
+                            ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function closeSywatModal() {
+            const modal = document.getElementById('sywat_modal');
+            if (modal) modal.classList.remove('active');
+            const url = new URL(window.location.href);
+            url.searchParams.delete('view_tournament');
+            url.searchParams.delete('modal_action');
+            url.searchParams.delete('filter_line_idx');
+            url.searchParams.delete('search_shooter');
+            window.history.replaceState({}, document.title, url.toString());
+        }
+        document.addEventListener("DOMContentLoaded", function() {
+            const notice = document.getElementById('sywat-notice');
+            if (notice) {
+                setTimeout(function() {
+                    notice.style.transition = "opacity 0.5s ease";
+                    notice.style.opacity = "0";
+                    setTimeout(function() { notice.remove(); }, 500);
+                }, 5000);
+            }
+        });
+        </script>
+        <?php
+        return ob_get_clean();
     }
 }
 
@@ -127,9 +642,7 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
 
         <div class="sywat-vhub-wrap">
             <?php if ( empty( $display_tournaments ) ): ?>
-                <div class="sywat-vhub-card">
-                    <p style="color:#646970; font-style:italic; margin:0;">No active tournaments currently enabled for the Volunteer Hub.</p>
-                </div>
+                <div class="sywat-vhub-card"><p style="color:#646970; font-style:italic; margin:0;">No active tournaments currently enabled for the Volunteer Hub.</p></div>
             <?php else: ?>
                 <?php foreach ( $display_tournaments as $t_name => $t_lines ): ?>
                     <div class="sywat-vhub-card">
@@ -194,8 +707,6 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
                                     <?php endforeach; ?>
                                 </div>
                             <?php endforeach; ?>
-                        <?php else: ?>
-                            <p style="color:#646970; font-style:italic; margin:0;">No shooting lines configured for this tournament.</p>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
