@@ -1,7 +1,11 @@
 <?php
 /**
- * SYWAT Shortcode Registration (High Concurrency, Secured & Optimized)
+ * Module: Check-In Desk Portal (Snippet 22)
+ * Description: Front-end desk interface for verifying archer line times, updating payment 
+ *              statuses, assigning target lanes onsite, and managing event line check-ins.
  * Shortcode: [sywat_desk]
+ * Author: SYWAT Archery
+ * Version: 1.0.0
  */
 
 if (!defined('ABSPATH')) exit;
