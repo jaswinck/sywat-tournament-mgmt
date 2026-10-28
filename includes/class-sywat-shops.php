@@ -194,7 +194,8 @@ function sywat_handle_shop_actions() {
         if ( $target_user_id > 0 && isset( $shops[$target_shop_id] ) ) {
             update_user_meta( $target_user_id, 'sywat_shop_id', $target_shop_id );
             $u = get_userdata( $target_user_id );
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Assigned <strong>' . esc_html( $u->display_name ) . '</strong> to <strong>' . esc_html( $shops[$target_shop_id]['name'] ) . '</strong>.</div>';
+            $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Assigned <strong>' . esc_html( $u_name ) . '</strong> to <strong>' . esc_html( $shops[$target_shop_id]['name'] ) . '</strong>.</div>';
         }
     }
 
@@ -203,7 +204,8 @@ function sywat_handle_shop_actions() {
         if ( $target_user_id > 0 ) {
             update_user_meta( $target_user_id, 'sywat_shop_id', 'shop_ccr' );
             $u = get_userdata( $target_user_id );
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Removed <strong>' . esc_html( $u->display_name ) . '</strong> from shop assignment (reassigned to default).</div>';
+            $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Removed <strong>' . esc_html( $u_name ) . '</strong> from shop assignment (reassigned to default).</div>';
         }
     }
 
