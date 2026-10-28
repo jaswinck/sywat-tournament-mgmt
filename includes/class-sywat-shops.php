@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.6.2
+ * Version: 1.6.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -408,7 +408,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                         <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required></td>
                                         <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required></td>
                                     </tr>
-                                <?php endfor; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
