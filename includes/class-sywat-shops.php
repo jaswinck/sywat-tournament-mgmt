@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.5.0
+ * Version: 1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -265,7 +265,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>👤 Linked Staff for Shop: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></span>
-                    <a href="?tab=shops" class="sywat-btn-secondary" style="font-size:12px; height:28px;">✖ Back to Shops List</a>
+                    <a href="?tab=shops" class="sywat-btn-secondary">✖ Back to Shops List</a>
                 </div>
                 <div class="sywat-subtitle">Manage user accounts with Shop Manager or Shop User roles assigned to this location.</div>
 
@@ -274,12 +274,12 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     <?php if ( empty( $unlinked_staff ) ): ?>
                         <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to this shop.</p>
                     <?php else: ?>
-                        <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="display:flex; gap:10px; align-items:flex-end;">
+                        <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                             <input type="hidden" name="sywat_shop_action" value="assign_staff_to_shop">
                             <input type="hidden" name="target_shop_id" value="<?php echo esc_attr( $managing_shop['id'] ); ?>">
 
-                            <div class="sywat-form-group" style="flex:1; max-width:350px; margin-bottom:0;">
+                            <div class="sywat-form-group" style="flex:1; min-width:250px; margin-bottom:0;">
                                 <label>Select Available Staff User</label>
                                 <select name="staff_user_id" required>
                                     <?php foreach ( $unlinked_staff as $un_user ): ?>
@@ -323,7 +323,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                                 <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
-                                                <button type="submit" class="sywat-btn-danger" style="padding:3px 8px; font-size:11px; height:auto;">Unlink Staff</button>
+                                                <button type="submit" class="sywat-btn-danger">Unlink Staff</button>
                                             </form>
                                         </td>
                                     </tr>
@@ -339,7 +339,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>✏️ Edit Archery Shop: <?php echo esc_html( $editing_shop['name'] ); ?></span>
-                    <a href="?tab=shops" class="sywat-btn-secondary" style="font-size:12px; height:28px;">✖ Cancel Editing</a>
+                    <a href="?tab=shops" class="sywat-btn-secondary">✖ Cancel Editing</a>
                 </div>
                 <div class="sywat-subtitle">Update contact details and default tournament line schedule templates for this location.</div>
 
@@ -373,8 +373,8 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                             <thead>
                                 <tr>
                                     <th>Line Day / Time</th>
-                                    <th style="width:150px;">Default 20yd Cap</th>
-                                    <th style="width:150px;">Default Cub Cap</th>
+                                    <th style="width:180px;">Default 20yd Cap</th>
+                                    <th style="width:180px;">Default Cub Cap</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -400,7 +400,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     </div>
 
                     <div style="display:flex; gap:10px;">
-                        <button type="submit" class="sywat-btn-primary" style="height:auto; padding:8px 16px;">💾 Save Shop Changes</button>
+                        <button type="submit" class="sywat-btn-primary" style="height:auto; padding:10px 20px; font-size:14px;">Save Shop Changes</button>
                         <a href="?tab=shops" class="sywat-btn-secondary">Cancel</a>
                     </div>
                 </form>
@@ -437,7 +437,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                         </div>
                     </div>
 
-                    <button type="submit" class="sywat-btn-primary" style="height:auto; padding:8px 16px;">➕ Create Shop Profile</button>
+                    <button type="submit" class="sywat-btn-primary" style="height:auto; padding:10px 20px; font-size:14px;">➕ Create Shop Profile</button>
                 </form>
             </div>
 
@@ -496,15 +496,15 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     </td>
                                     <td style="text-align:right;">
                                         <div class="sywat-action-btn-group">
-                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#0284c7; border-color:#0284c7; padding:4px 8px; font-size:11px; height:auto;">👤 Staff</a>
-                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding:4px 8px; font-size:11px; height:auto;">✏️ Edit</a>
+                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">👤 Staff</a>
+                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">✏️ Edit</a>
                                             
                                             <?php if ( $s_id !== 'shop_ccr' ): ?>
                                                 <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $shop['name'] ); ?>\'? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                                     <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                                    <button type="submit" class="sywat-btn-danger" style="padding:4px 8px; font-size:11px; height:auto;">Delete</button>
+                                                    <button type="submit" class="sywat-btn-danger">Delete</button>
                                                 </form>
                                             <?php else: ?>
                                                 <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
