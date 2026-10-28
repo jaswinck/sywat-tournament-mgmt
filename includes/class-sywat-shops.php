@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Shop Management & Multi-Tenant Permissions
- * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, user shop mapping, and staff assignment UI.
+ * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -55,13 +55,12 @@ function sywat_get_current_user_shop_id() {
     return ! empty( $shop_id ) ? $shop_id : 'shop_ccr';
 }
 
-// WP Admin User Profile Hooks (Users > Edit User) - Restricted to Shop Roles Only
+// WP Admin User Profile Hooks (Users > Edit User)
 add_action( 'show_user_profile', 'sywat_render_user_profile_shop_field' );
 add_action( 'edit_user_profile', 'sywat_render_user_profile_shop_field' );
 function sywat_render_user_profile_shop_field( $user ) {
     if ( ! current_user_can( 'administrator' ) ) return;
     
-    // Only display on profiles for Shop Manager and Shop User roles
     if ( ! array_intersect( array( 'sywat_shop_manager', 'sywat_shop_user' ), (array) $user->roles ) ) {
         return;
     }
@@ -98,7 +97,7 @@ function sywat_save_user_profile_shop_field( $user_id ) {
     }
 }
 
-// Shop Management Action Handler (Create, Update, Delete, Staff Assign)
+// Shop Action Handlers
 function sywat_handle_shop_actions() {
     if ( ! current_user_can( 'administrator' ) ) return '';
     if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) return '';
@@ -136,7 +135,7 @@ function sywat_handle_shop_actions() {
         );
 
         update_option( 'sywat_shops_list', $shops );
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created shop <strong>' . esc_html( $shop_name ) . '</strong> (ID: <code>' . esc_html($shop_slug) . '</code>).</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created shop <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
     }
 
     if ( $action === 'update_shop' ) {
@@ -184,24 +183,34 @@ function sywat_handle_shop_actions() {
                 update_user_meta( $u->ID, 'sywat_shop_id', 'shop_ccr' );
             }
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted shop <strong>' . esc_html( $deleted_name ) . '</strong>. Reassigned associated staff to Cinnamon Creek Ranch.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted shop <strong>' . esc_html( $deleted_name ) . '</strong>. Staff reassigned to Cinnamon Creek Ranch.</div>';
         }
     }
 
-    if ( $action === 'assign_staff_shop' ) {
+    if ( $action === 'assign_staff_to_shop' ) {
         $target_user_id = intval( $_POST['staff_user_id'] );
-        $target_shop_id = sanitize_text_field( $_POST['staff_shop_id'] );
+        $target_shop_id = sanitize_text_field( $_POST['target_shop_id'] );
 
-        if ( $target_user_id > 0 ) {
+        if ( $target_user_id > 0 && isset( $shops[$target_shop_id] ) ) {
             update_user_meta( $target_user_id, 'sywat_shop_id', $target_shop_id );
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Updated shop assignment for user.</div>';
+            $u = get_userdata( $target_user_id );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Assigned <strong>' . esc_html( $u->display_name ) . '</strong> to <strong>' . esc_html( $shops[$target_shop_id]['name'] ) . '</strong>.</div>';
+        }
+    }
+
+    if ( $action === 'remove_staff_from_shop' ) {
+        $target_user_id = intval( $_POST['staff_user_id'] );
+        if ( $target_user_id > 0 ) {
+            update_user_meta( $target_user_id, 'sywat_shop_id', 'shop_ccr' );
+            $u = get_userdata( $target_user_id );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Removed <strong>' . esc_html( $u->display_name ) . '</strong> from shop assignment (reassigned to default).</div>';
         }
     }
 
     return '';
 }
 
-// Render Shops & Staff Tab UI
+// Render Shops UI Tab
 if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
     function sywat_render_shops_tab() {
         if ( ! current_user_can( 'administrator' ) ) {
@@ -212,21 +221,119 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         $notice = sywat_handle_shop_actions();
         $shops  = sywat_get_shops();
 
-        $edit_target_id = isset( $_REQUEST['edit_shop'] ) ? sanitize_text_field( $_REQUEST['edit_shop'] ) : '';
-        $editing_shop   = ( ! empty( $edit_target_id ) && isset( $shops[$edit_target_id] ) ) ? $shops[$edit_target_id] : null;
+        $edit_target_id   = isset( $_REQUEST['edit_shop'] ) ? sanitize_text_field( $_REQUEST['edit_shop'] ) : '';
+        $editing_shop     = ( ! empty( $edit_target_id ) && isset( $shops[$edit_target_id] ) ) ? $shops[$edit_target_id] : null;
 
-        // Strictly query ONLY users with SYWAT Shop Manager or SYWAT Shop User roles
-        $staff_users = get_users( array(
+        $manage_staff_id  = isset( $_REQUEST['manage_staff'] ) ? sanitize_text_field( $_REQUEST['manage_staff'] ) : '';
+        $managing_shop    = ( ! empty( $manage_staff_id ) && isset( $shops[$manage_staff_id] ) ) ? $shops[$manage_staff_id] : null;
+
+        // Query all users eligible for shop assignments
+        $eligible_users = get_users( array(
             'role__in' => array( 'sywat_shop_manager', 'sywat_shop_user' ),
             'orderby'  => 'display_name'
         ) );
         ?>
+        <style>
+            .sywat-table-wrap { overflow-x: auto; margin-bottom: 10px; }
+            .sywat-table td, .sywat-table th { vertical-align: middle; }
+            .sywat-action-btn-group { display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+        </style>
+
         <div class="no-print">
             <?php echo $notice; ?>
         </div>
 
-        <?php if ( $editing_shop ): ?>
-            <!-- EDIT EXISTING SHOP CARD -->
+        <?php if ( $managing_shop ): ?>
+            <!-- VIEW 1: MANAGE STAFF LINKED TO SPECIFIC SHOP -->
+            <?php 
+                $linked_staff = array();
+                $unlinked_staff = array();
+
+                foreach ( $eligible_users as $u ) {
+                    $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
+                    if ( empty( $u_shop ) ) $u_shop = 'shop_ccr';
+
+                    if ( $u_shop === $managing_shop['id'] ) {
+                        $linked_staff[] = $u;
+                    } else {
+                        $unlinked_staff[] = $u;
+                    }
+                }
+            ?>
+            <div class="sywat-card no-print">
+                <div class="sywat-card-title">
+                    <span>👤 Linked Staff for Shop: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></span>
+                    <a href="?tab=shops" class="sywat-btn-secondary" style="font-size:12px; height:28px;">✖ Back to Shops List</a>
+                </div>
+                <div class="sywat-subtitle">Manage user accounts with Shop Manager or Shop User roles assigned to this location.</div>
+
+                <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
+                    <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600;">Link Additional Staff User to This Shop</h4>
+                    <?php if ( empty( $unlinked_staff ) ): ?>
+                        <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to this shop.</p>
+                    <?php else: ?>
+                        <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="display:flex; gap:10px; align-items:flex-end;">
+                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                            <input type="hidden" name="sywat_shop_action" value="assign_staff_to_shop">
+                            <input type="hidden" name="target_shop_id" value="<?php echo esc_attr( $managing_shop['id'] ); ?>">
+
+                            <div class="sywat-form-group" style="flex:1; max-width:350px; margin-bottom:0;">
+                                <label>Select Available Staff User</label>
+                                <select name="staff_user_id" required>
+                                    <?php foreach ( $unlinked_staff as $un_user ): ?>
+                                        <?php 
+                                            $curr_s_id = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
+                                            $curr_s_name = isset( $shops[$curr_s_id]['name'] ) ? $shops[$curr_s_id]['name'] : 'Default Shop';
+                                        ?>
+                                        <option value="<?php echo esc_attr( $un_user->ID ); ?>">
+                                            <?php echo esc_html( $un_user->display_name ); ?> (Currently: <?php echo esc_html( $curr_s_name ); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <button type="submit" class="sywat-btn-primary">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+
+                <h4 style="margin:15px 0 10px 0; font-size:14px; font-weight:600;">Currently Linked Staff Accounts (<?php echo count($linked_staff); ?>)</h4>
+                <?php if ( empty( $linked_staff ) ): ?>
+                    <p style="color:#646970; font-style:italic; margin-bottom:15px;">No Shop Manager or Shop User accounts are currently linked to this location.</p>
+                <?php else: ?>
+                    <div class="sywat-table-wrap">
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th>User Display Name</th>
+                                    <th>Username / Email</th>
+                                    <th>WP Role</th>
+                                    <th style="text-align:right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $linked_staff as $ls_user ): ?>
+                                    <tr>
+                                        <td><strong><?php echo esc_html( $ls_user->display_name ); ?></strong></td>
+                                        <td><?php echo esc_html( $ls_user->user_login ); ?><br><span style="font-size:11px; color:#646970;"><?php echo esc_html( $ls_user->user_email ); ?></span></td>
+                                        <td><span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( implode( ', ', $ls_user->roles ) ); ?></span></td>
+                                        <td style="text-align:right;">
+                                            <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="margin:0;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this shop?');">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
+                                                <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
+                                                <button type="submit" class="sywat-btn-danger" style="padding:3px 8px; font-size:11px; height:auto;">Unlink Staff</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+        <?php elseif ( $editing_shop ): ?>
+            <!-- VIEW 2: EDIT SHOP DETAILS & LINE DEFAULT SCHEDULING -->
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>✏️ Edit Archery Shop: <?php echo esc_html( $editing_shop['name'] ); ?></span>
@@ -259,34 +366,36 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     </div>
 
                     <h4 style="margin:20px 0 10px 0; font-size:14px; font-weight:600;">Default Shooting Lines & Capacity Templates</h4>
-                    <table class="sywat-table" style="margin-bottom:15px;">
-                        <thead>
-                            <tr>
-                                <th>Line Day / Time</th>
-                                <th style="width:150px;">Default 20yd Cap</th>
-                                <th style="width:150px;">Default Cub Cap</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                                $lines = isset( $editing_shop['default_lines'] ) && is_array( $editing_shop['default_lines'] ) 
-                                    ? $editing_shop['default_lines'] 
-                                    : array(
-                                        array( 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                        array( 'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                        array( 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                        array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                    );
-                                foreach ( $lines as $i => $l ): 
-                            ?>
+                    <div class="sywat-table-wrap">
+                        <table class="sywat-table" style="margin-bottom:15px;">
+                            <thead>
                                 <tr>
-                                    <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $l['name'] ); ?>" required></td>
-                                    <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required></td>
-                                    <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required></td>
+                                    <th>Line Day / Time</th>
+                                    <th style="width:150px;">Default 20yd Cap</th>
+                                    <th style="width:150px;">Default Cub Cap</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                    $lines = isset( $editing_shop['default_lines'] ) && is_array( $editing_shop['default_lines'] ) 
+                                        ? $editing_shop['default_lines'] 
+                                        : array(
+                                            array( 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                            array( 'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                            array( 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                            array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                        );
+                                    foreach ( $lines as $i => $l ): 
+                                ?>
+                                    <tr>
+                                        <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $l['name'] ); ?>" required></td>
+                                        <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required></td>
+                                        <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div style="display:flex; gap:10px;">
                         <button type="submit" class="sywat-btn-primary" style="height:auto; padding:8px 16px;">💾 Save Shop Changes</button>
@@ -294,8 +403,9 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     </div>
                 </form>
             </div>
+
         <?php else: ?>
-            <!-- CREATE NEW SHOP CARD -->
+            <!-- VIEW 3: MAIN SHOPS DIRECTORY & CREATE SHOP FORM -->
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>🏬 Create New Archery Shop</span>
@@ -328,110 +438,71 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     <button type="submit" class="sywat-btn-primary" style="height:auto; padding:8px 16px;">➕ Create Shop Profile</button>
                 </form>
             </div>
-        <?php endif; ?>
 
-        <!-- SHOP DIRECTORY TABLE -->
-        <div class="sywat-card no-print">
-            <div class="sywat-card-title">
-                <span>📋 Configured Archery Shops</span>
-            </div>
-            <table class="sywat-table">
-                <thead>
-                    <tr>
-                        <th>Shop Name & ID</th>
-                        <th>Contact Info</th>
-                        <th>Phone</th>
-                        <th>Created Date</th>
-                        <th style="text-align:right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ( $shops as $s_id => $shop ): ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo esc_html( $shop['name'] ); ?></strong><br>
-                                <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
-                            </td>
-                            <td>
-                                <?php echo esc_html( isset($shop['contact']) ? $shop['contact'] : 'N/A' ); ?><br>
-                                <span style="font-size:12px; color:#646970;"><?php echo esc_html( isset($shop['email']) ? $shop['email'] : '' ); ?></span>
-                            </td>
-                            <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                            <td style="font-size:12px; color:#646970;"><?php echo esc_html( isset($shop['created_at']) ? $shop['created_at'] : 'Default' ); ?></td>
-                            <td style="text-align:right;">
-                                <div style="display:inline-flex; gap:6px; justify-content:flex-end;">
-                                    <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding:3px 8px; font-size:11px; height:auto;">✏️ Edit</a>
-                                    
-                                    <?php if ( $s_id !== 'shop_ccr' ): ?>
-                                        <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $shop['name'] ); ?>\'? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                            <input type="hidden" name="sywat_shop_action" value="delete_shop">
-                                            <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                            <button type="submit" class="sywat-btn-danger" style="padding:3px 8px; font-size:11px; height:auto;">Delete</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- STAFF ASSIGNMENTS TABLE -->
-        <div class="sywat-card no-print">
-            <div class="sywat-card-title">
-                <span>👤 Shop Staff Assignments</span>
-            </div>
-            <div class="sywat-subtitle">Map users with the SYWAT Shop Manager or SYWAT Shop User roles to their assigned archery shop.</div>
-
-            <?php if ( empty( $staff_users ) ): ?>
-                <p style="color: #646970; font-style: italic; margin-top: 10px;">No user accounts with <strong>SYWAT Shop Manager</strong> or <strong>SYWAT Shop User</strong> roles currently exist. Assign those roles to user accounts under <strong>WP Admin > Users</strong> to manage their shop context here.</p>
-            <?php else: ?>
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th>User Display Name</th>
-                            <th>Username / Email</th>
-                            <th>WP Role</th>
-                            <th>Assigned Shop</th>
-                            <th style="text-align:right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $staff_users as $s_user ): ?>
-                            <?php 
-                                $assigned_s = get_user_meta( $s_user->ID, 'sywat_shop_id', true );
-                                if ( empty( $assigned_s ) ) $assigned_s = 'shop_ccr';
-                                $user_roles = implode( ', ', $s_user->roles );
-                            ?>
+            <div class="sywat-card no-print">
+                <div class="sywat-card-title">
+                    <span>📋 Configured Archery Shops</span>
+                </div>
+                <div class="sywat-table-wrap">
+                    <table class="sywat-table">
+                        <thead>
                             <tr>
-                                <td><strong><?php echo esc_html( $s_user->display_name ); ?></strong></td>
-                                <td><?php echo esc_html( $s_user->user_login ); ?><br><span style="font-size:11px; color:#646970;"><?php echo esc_html( $s_user->user_email ); ?></span></td>
-                                <td><span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $user_roles ); ?></span></td>
-                                <td>
-                                    <form method="post" style="margin:0; display:flex; gap:8px; align-items:center;">
-                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                        <input type="hidden" name="sywat_shop_action" value="assign_staff_shop">
-                                        <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $s_user->ID ); ?>">
-                                        <select name="staff_shop_id" style="padding:4px 8px; font-size:12px; border-radius:4px; height:30px;">
-                                            <?php foreach ( $shops as $s_id => $shop ): ?>
-                                                <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $assigned_s, $s_id ); ?>>
-                                                    <?php echo esc_html( $shop['name'] ); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                </td>
-                                <td style="text-align:right;">
-                                        <button type="submit" class="sywat-btn-primary" style="height:30px; font-size:12px; padding:0 10px;">Update</button>
-                                    </form>
-                                </td>
+                                <th>Shop Name & ID</th>
+                                <th>Contact Info</th>
+                                <th>Phone</th>
+                                <th>Linked Staff</th>
+                                <th style="text-align:right;">Actions</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
-        </div>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $shops as $s_id => $shop ): ?>
+                                <?php 
+                                    $linked_count = 0;
+                                    foreach ( $eligible_users as $u ) {
+                                        $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
+                                        if ( empty( $u_shop ) ) $u_shop = 'shop_ccr';
+                                        if ( $u_shop === $s_id ) $linked_count++;
+                                    }
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo esc_html( $shop['name'] ); ?></strong><br>
+                                        <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
+                                    </td>
+                                    <td>
+                                        <?php echo esc_html( isset($shop['contact']) ? $shop['contact'] : 'N/A' ); ?><br>
+                                        <span style="font-size:12px; color:#646970;"><?php echo esc_html( isset($shop['email']) ? $shop['email'] : '' ); ?></span>
+                                    </td>
+                                    <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
+                                    <td>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" style="text-decoration:none;">
+                                            <span class="sywat-badge sywat-badge-prereg" style="font-size:12px;">👤 <?php echo $linked_count; ?> Staff User(s)</span>
+                                        </a>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <div class="sywat-action-btn-group">
+                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#0284c7; border-color:#0284c7; padding:4px 8px; font-size:11px; height:auto;">👤 Manage Staff</a>
+                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding:4px 8px; font-size:11px; height:auto;">✏️ Edit Info</a>
+                                            
+                                            <?php if ( $s_id !== 'shop_ccr' ): ?>
+                                                <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $shop['name'] ); ?>\'? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
+                                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                    <input type="hidden" name="sywat_shop_action" value="delete_shop">
+                                                    <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
+                                                    <button type="submit" class="sywat-btn-danger" style="padding:4px 8px; font-size:11px; height:auto;">Delete</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1;" title="Primary seed shop cannot be deleted">🔒 Seed Shop</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <?php endif; ?>
         <?php
     }
 }
