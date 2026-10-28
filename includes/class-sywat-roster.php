@@ -1,7 +1,7 @@
 <?php
 /**
  * Module: Archer Roster Management & Validation
- * Description: Roster filtering, archer editing forms, family group assignments, and style/division validation.
+ * Description: Archer editing logic, division/style restrictions, family group assignments, line purges, and manage modal HTML.
  * Author: SYWAT Archery
  * Version: 1.0.0
  */
@@ -37,5 +37,411 @@ if ( ! function_exists( 'sywat_sanitize_style_for_division' ) ) {
             return 'FS – Freestyle';
         }
         return $style;
+    }
+}
+
+if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
+    function sywat_handle_save_edit( $tournaments, &$registrations ) {
+        $edit_id       = sanitize_text_field( $_POST['registration_id'] );
+        $tourn_context = sanitize_text_field( $_POST['view_tournament'] );
+        $t_slug        = sanitize_title( $tourn_context );
+        
+        $opt_key = 'sywat_t_' . $t_slug . '_' . $edit_id;
+        $reg = get_option($opt_key);
+        
+        if ($reg) {
+            $line_idx  = sanitize_text_field($_POST['edit_line_index']);
+            $line_name = isset($tournaments[$tourn_context][$line_idx]['name']) ? $tournaments[$tourn_context][$line_idx]['name'] : 'N/A';
+            $division  = sanitize_text_field($_POST['edit_division']);
+            $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
+            $pay_opt   = sanitize_text_field($_POST['edit_pay_option']);
+            $style     = sanitize_text_field($_POST['edit_style']);
+            $due_val   = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
+
+            $reg['name']        = sanitize_text_field($_POST['edit_name']);
+            $reg['line_index']  = $line_idx;
+            $reg['line_name']   = $line_name;
+            $reg['distance']    = $distance;
+            $reg['division']    = $division;
+            $reg['gender']      = sanitize_text_field($_POST['edit_gender']);
+            $reg['style']       = sywat_sanitize_style_for_division($style, $division);
+            $reg['paid']        = sywat_calculate_paid_status($pay_opt, $division);
+            $reg['balance_due'] = $due_val;
+
+            if ($reg['paid'] === 'Family') {
+                if (!empty($_POST['edit_family_group_id'])) {
+                    $reg['family_id'] = sanitize_text_field($_POST['edit_family_group_id']);
+                } elseif (!empty($_POST['edit_new_family_name'])) {
+                    $reg['family_id']   = 'fam_' . sanitize_title($_POST['edit_new_family_name']);
+                    $reg['family_name'] = sanitize_text_field($_POST['edit_new_family_name']);
+                } elseif (empty($reg['family_id'])) {
+                    $reg['family_id']   = uniqid('fam_');
+                }
+            } else {
+                unset($reg['family_id']);
+                unset($reg['family_name']);
+            }
+
+            update_option($opt_key, $reg, false);
+
+            foreach ($registrations as &$r) {
+                if (isset($r['id']) && $r['id'] === $edit_id) {
+                    $r = $reg; break;
+                }
+            }
+            unset($r);
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated archer: <strong>' . esc_html($reg['name']) . '</strong>.</div>';
+        }
+        return '';
+    }
+}
+
+if ( ! function_exists( 'sywat_handle_delete_shooter' ) ) {
+    function sywat_handle_delete_shooter( &$registrations ) {
+        $delete_id     = sanitize_text_field( $_POST['registration_id'] );
+        $tourn_context = sanitize_text_field( $_POST['view_tournament'] );
+        $t_slug        = sanitize_title( $tourn_context );
+        
+        $deleted_name = '';
+        $new_registrations = array();
+
+        foreach ( $registrations as $reg ) {
+            if ( isset( $reg['id'] ) && $reg['id'] === $delete_id ) {
+                $deleted_name = isset( $reg['name'] ) ? $reg['name'] : 'Archer';
+                delete_option( 'sywat_t_' . $t_slug . '_' . $delete_id );
+                continue;
+            }
+            $new_registrations[] = $reg;
+        }
+
+        $registrations = $new_registrations;
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully removed <strong>' . esc_html( $deleted_name ) . '</strong> from the roster.</div>';
+    }
+}
+
+if ( ! function_exists( 'sywat_handle_purge_line' ) ) {
+    function sywat_handle_purge_line( $tournaments, &$registrations ) {
+        $tourn_name = sanitize_text_field( $_POST['selected_tournament'] );
+        $line_idx   = sanitize_text_field( $_POST['target_line_idx'] );
+        $t_slug     = sanitize_title( $tourn_name );
+
+        $line_data = isset( $tournaments[$tourn_name][$line_idx] ) ? $tournaments[$tourn_name][$line_idx] : array();
+        $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line ' . ((int)$line_idx + 1);
+
+        $purged_count = 0;
+        foreach ( $registrations as $k => $reg ) {
+            if ( isset( $reg['tournament'], $reg['line_index'] )
+                && strcasecmp( $reg['tournament'], $tourn_name ) === 0
+                && (string)$reg['line_index'] === (string)$line_idx ) {
+                
+                delete_option( 'sywat_t_' . $t_slug . '_' . $reg['id'] );
+                $purged_count++;
+                unset($registrations[$k]);
+            }
+        }
+
+        $registrations = array_values($registrations);
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully cleared <strong>' . $purged_count . '</strong> archer(s) from <strong>' . esc_html( $line_name ) . '</strong>.</div>';
+    }
+}
+
+// Manage Archers Modal UI Renderer
+if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
+    function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer, $existing_families ) {
+        $divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)', 'Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)');
+        $genders = array('Male', 'Female');
+        $sywat_styles = array('FS – Freestyle', 'FS Pro – Freestyle Pro', 'FSL – Freestyle Limited', 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)', 'BHFS – Bowhunter Freestyle', 'MBH – Modern Bowhunter', 'BB Barebow', 'BBC – Barebow Compound', 'BBR – Barebow Recurve', 'TRAD – Traditional', 'LB – Longbow', 'Genesis');
+
+        $filtered_registrations = array_filter( $registrations, function( $reg ) use ( $selected_tournament, $filter_line_idx, $available_lines ) {
+            if ( ! isset( $reg['tournament'] ) || strcasecmp( $reg['tournament'], $selected_tournament ) !== 0 ) return false;
+            if ( $filter_line_idx !== 'all' ) {
+                $match_idx  = isset( $reg['line_index'] ) && (string)$reg['line_index'] === (string)$filter_line_idx;
+                $match_name = isset( $available_lines[$filter_line_idx]['name'] ) && isset( $reg['line_name'] ) && strcasecmp( trim( $reg['line_name'] ), trim( $available_lines[$filter_line_idx]['name'] ) ) === 0;
+                if ( ! $match_idx && ! $match_name ) return false;
+            }
+            return true;
+        });
+
+        usort( $filtered_registrations, function( $a, $b ) {
+            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
+        });
+        ?>
+        <div class="no-print">
+            <?php if ( $modal_edit_archer ): ?>
+                <div style="background:#f6f7f7; padding:15px; border:1px solid #c3c4c7; border-radius:4px; margin-bottom:15px;">
+                    <h4 style="margin:0 0 15px 0; font-size:15px; font-weight:600;">Edit Archer Registration</h4>
+                    <form method="post">
+                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                        <input type="hidden" name="sywat_action" value="save_edit">
+                        <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                        <input type="hidden" name="modal_action" value="manage">
+                        <input type="hidden" name="registration_id" value="<?php echo esc_attr( $modal_edit_archer['id'] ); ?>">
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                            <div class="sywat-form-group">
+                                <label>Full Name</label>
+                                <input type="text" name="edit_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" required>
+                            </div>
+                            <div class="sywat-form-group">
+                                <label>Shooting Line</label>
+                                <select name="edit_line_index" required>
+                                    <?php $curr_line = isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : ''; ?>
+                                    <?php foreach ($available_lines as $idx => $line): ?>
+                                        <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>><?php echo esc_html(isset($line['name']) ? $line['name'] : 'Line ' . ($idx + 1)); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-form-group">
+                                <label>Division</label>
+                                <select name="edit_division" id="edit_division" required onchange="handleDivisionChange('edit');">
+                                    <?php
+                                    $curr_div = isset($modal_edit_archer['division']) ? $modal_edit_archer['division'] : 'Adult (18 - 49)';
+                                    foreach ($divs as $d) echo '<option value="' . esc_attr($d) . '" ' . selected($curr_div, $d, false) . '>' . esc_html($d) . '</option>';
+                                    ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-form-group">
+                                <label>Gender</label>
+                                <select name="edit_gender" required>
+                                    <?php
+                                    $curr_gen = isset($modal_edit_archer['gender']) ? $modal_edit_archer['gender'] : 'Male';
+                                    foreach ($genders as $g) echo '<option value="' . esc_attr($g) . '" ' . selected($curr_gen, $g, false) . '>' . esc_html($g) . '</option>';
+                                    ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-form-group" style="grid-column: 1 / -1;">
+                                <label>Style</label>
+                                <select name="edit_style" id="edit_style" required>
+                                    <?php
+                                    $curr_sty = isset($modal_edit_archer['style']) ? $modal_edit_archer['style'] : '';
+                                    foreach ($sywat_styles as $s) echo '<option value="' . esc_attr($s) . '" ' . selected($curr_sty, $s, false) . '>' . esc_html($s) . '</option>';
+                                    ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-form-group">
+                                <label>Paid Option</label>
+                                <select name="edit_pay_option" id="edit_pay_option" required onchange="updatePaidStatusDisplay('edit');">
+                                    <?php
+                                    $curr_paid = isset($modal_edit_archer['paid']) ? $modal_edit_archer['paid'] : '';
+                                    $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
+                                    ?>
+                                    <option value="Individual" <?php selected($curr_pay_opt, 'Individual'); ?>>Individual</option>
+                                    <option value="Family" <?php selected($curr_pay_opt, 'Family'); ?>>Family</option>
+                                    <option value="Field Governor" <?php selected($curr_pay_opt, 'Field Governor'); ?>>Field Governor</option>
+                                </select>
+                            </div>
+
+                            <div class="sywat-form-group" id="edit_family_group_box" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>">
+                                <label>Assign to Family Group</label>
+                                <select name="edit_family_group_id">
+                                    <option value="">[ + Create New Family Group ]</option>
+                                    <?php
+                                    $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
+                                    foreach ($existing_families as $fid => $flabel) echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                                    ?>
+                                </select>
+                                <input type="text" name="edit_new_family_name" placeholder="Or type new family name..." style="margin-top:5px;">
+                            </div>
+
+                            <div class="sywat-form-group">
+                                <label>Balance Due ($)</label>
+                                <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>">
+                            </div>
+
+                            <div class="sywat-form-group">
+                                <label>Distance (Calculated)</label>
+                                <input type="text" id="edit_distance_display" value="<?php echo ($curr_div === 'Cub (8 - 11)') ? 'Cub' : '20yd'; ?>" disabled style="background:#f9f9f9; font-weight:bold;">
+                            </div>
+                        </div>
+
+                        <div style="background:#e5f5fa; padding:10px; border-radius:4px; border:1px solid #bfe7f3; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; color:#0073aa; font-weight:600;">Calculated Paid Status:</span>
+                            <span id="edit_paid_status_display" style="font-size:15px; font-weight:bold; color:#1d2327;"><?php echo esc_html($curr_paid ?: 'Adult'); ?></span>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; gap:10px;">
+                            <a href="?tab=manage&view_tournament=<?php echo urlencode($selected_tournament); ?>&modal_action=manage" class="sywat-btn-secondary">Cancel</a>
+                            <button type="submit" class="sywat-btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            <?php else: ?>
+                <div style="margin-bottom: 15px; display:flex; gap:12px; align-items:flex-end;">
+                    <form method="get" style="display: flex; gap: 12px; flex: 1; align-items: flex-end; margin: 0;">
+                        <input type="hidden" name="tab" value="manage">
+                        <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                        <input type="hidden" name="modal_action" value="manage">
+
+                        <div class="sywat-form-group">
+                            <label for="filter_line_idx">Filter by Line</label>
+                            <select name="filter_line_idx" id="filter_line_idx" onchange="this.form.submit()">
+                                <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>(All Lines)</option>
+                                <?php foreach ( $available_lines as $idx => $line ): ?>
+                                    <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </form>
+
+                    <div class="sywat-form-group" style="flex: 2;">
+                        <label for="search_shooter">Search Archer Name</label>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="width:100%;">
+                            <button type="button" class="sywat-btn-secondary" style="height:34px; padding:0 12px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
+                        </div>
+                    </div>
+
+                    <?php if ( $filter_line_idx !== 'all' && ! empty( $filtered_registrations ) ): ?>
+                        <div class="sywat-form-group" style="flex: 0 0 auto;">
+                            <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to clear ALL archers from this line?');">
+                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                <input type="hidden" name="sywat_action" value="purge_line">
+                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
+                                <input type="hidden" name="redirect_action" value="manage">
+                                <button type="submit" class="sywat-btn-danger">Clear Line Roster</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ( empty( $filtered_registrations ) ): ?>
+                    <p style="color: #646970; font-style: italic; font-size: 13px; margin: 20px 0;">No archers found matching your filter criteria.</p>
+                <?php else: ?>
+                    <table class="sywat-table">
+                        <thead>
+                            <tr>
+                                <th>Shooter Name</th>
+                                <th>Type</th>
+                                <th>Line</th>
+                                <th>Distance</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $filtered_registrations as $reg ): ?>
+                                <?php 
+                                    $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
+                                    $badge_type  = isset( $reg['status'] ) ? $reg['status'] : ( isset( $reg['type'] ) ? $reg['type'] : 'Pre-Reg' );
+                                    $badge_class = ( strcasecmp( $badge_type, 'Walk-In' ) === 0 ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                ?>
+                                <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
+                                    <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
+                                    <td><span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span></td>
+                                    <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
+                                    <td><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
+                                    <td style="text-align: right; display:flex; gap:6px; justify-content:flex-end;">
+                                        <form method="post" style="margin: 0;">
+                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                            <input type="hidden" name="modal_action" value="manage">
+                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                            <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
+                                            <button type="submit" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding: 4px 10px; font-size: 12px; height: auto;">✏️ Edit</button>
+                                        </form>
+
+                                        <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
+                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                            <input type="hidden" name="sywat_action" value="delete_shooter">
+                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                            <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                            <button type="submit" class="sywat-btn-danger" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <script>
+        function updatePaidStatusDisplay(type) {
+            const payOption  = document.getElementById(type + '_pay_option');
+            const division   = document.getElementById(type + '_division');
+            const displayEl  = document.getElementById(type + '_paid_status_display');
+            const familyBox  = document.getElementById(type + '_family_group_box');
+            if(!payOption || !division || !displayEl) return;
+
+            let calculatedStatus = 'Adult';
+            if (payOption.value === 'Family') {
+                calculatedStatus = 'Family';
+                if (familyBox) familyBox.style.display = '';
+            } else {
+                if (familyBox) familyBox.style.display = 'none';
+                if (payOption.value === 'Field Governor') {
+                    calculatedStatus = 'Field Governor';
+                } else {
+                    const youthDivs = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
+                    calculatedStatus = youthDivs.includes(division.value) ? 'Youth' : 'Adult';
+                }
+            }
+            displayEl.textContent = calculatedStatus;
+        }
+
+        function handleStyleRestrictions(type) {
+            const divisionEl = document.getElementById(type + '_division');
+            const styleEl    = document.getElementById(type + '_style');
+            if (!divisionEl || !styleEl) return;
+
+            const currentDiv = divisionEl.value;
+
+            for (let i = 0; i < styleEl.options.length; i++) {
+                const opt = styleEl.options[i];
+                const val = opt.value;
+                let isDisabled = false;
+
+                if (val.indexOf('Genesis') !== -1 && currentDiv !== 'Cub (8 - 11)') isDisabled = true;
+
+                const isFSPro = val.indexOf('FS Pro') !== -1;
+                const isFSL   = val.indexOf('FSL –') !== -1;
+                const isTRAD  = val.indexOf('TRAD') !== -1 || val.toLowerCase().indexOf('traditional') !== -1;
+
+                if ((isFSPro || isFSL || isTRAD) && !['Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)'].includes(currentDiv)) {
+                    isDisabled = true;
+                }
+
+                const isLB = val.indexOf('LB') !== -1 || val.toLowerCase().indexOf('longbow') !== -1;
+                if (isLB && currentDiv !== 'Adult (18 - 49)') isDisabled = true;
+
+                opt.disabled = isDisabled;
+                if (isDisabled && styleEl.value === val) styleEl.value = 'FS – Freestyle';
+            }
+        }
+
+        function handleDivisionChange(type) {
+            const divisionEl = document.getElementById(type + '_division');
+            const distDispEl = document.getElementById(type + '_distance_display');
+            if (!divisionEl) return;
+
+            const calculatedDist = (divisionEl.value === 'Cub (8 - 11)') ? 'Cub' : '20yd';
+            if (distDispEl) distDispEl.value = calculatedDist;
+
+            updatePaidStatusDisplay(type);
+            handleStyleRestrictions(type);
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            if (document.getElementById('edit_division')) handleDivisionChange('edit');
+
+            const manageSearchInput = document.getElementById('search_shooter');
+            if (manageSearchInput) {
+                manageSearchInput.addEventListener('input', function() {
+                    const filter = this.value.toLowerCase();
+                    document.querySelectorAll('.sywat-manage-row').forEach(row => {
+                        const name = row.getAttribute('data-name');
+                        row.style.display = (name && name.includes(filter)) ? '' : 'none';
+                    });
+                });
+            }
+        });
+        </script>
+        <?php
     }
 }
