@@ -1,8 +1,13 @@
 <?php
 /**
- * SYWAT Master Tournament Portal & Volunteer Hub
+ * Module: Master Tournament Portal & Management (Snippet 25)
+ * Description: Handles tournament creation, line capacity configuration, FareHarbor/CSV roster
+ *              import engine, archer roster editing, host vs. TFAA fee split accounting,
+ *              Zelle QR rendering, and print invoice generation.
  * Admin Shortcodes: [sywat_admin], [sywat_manage], or [sywat_manage_tournaments]
  * Volunteer Shortcode: [sywat_volunteer_hub]
+ * Author: SYWAT Archery
+ * Version: 1.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
