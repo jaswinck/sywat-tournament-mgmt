@@ -1,7 +1,10 @@
 <?php
 /**
- * SYWAT TFAA Standings Sync Engine
- * Standalone background engine for scraping and caching active TFAA standings.
+ * Module: TFAA Data & Standings Sync Engine (Snippet 38)
+ * Description: Synchronizes archer membership records, caches state standings data, 
+ *              and verifies TFAA shooter eligibility across active tournament rosters.
+ * Author: SYWAT Archery
+ * Version: 1.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
