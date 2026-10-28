@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,7 +24,7 @@ function sywat_ensure_default_shop_exists() {
                 'id'            => 'shop_ccr',
                 'name'          => 'Cinnamon Creek Ranch',
                 'contact'       => 'Hannah Lange / Beau Brennan',
-                'email'         => 'events@cinnamoncreekranch.com',
+                'email'         => 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com',
                 'phone'         => '817-439-8998',
                 'default_lines' => $default_lines,
                 'created_at'    => current_time( 'mysql' ),
@@ -128,7 +128,7 @@ function sywat_handle_shop_actions() {
             'id'            => $shop_slug,
             'name'          => $shop_name,
             'contact'       => sanitize_text_field( $_POST['shop_contact'] ),
-            'email'         => sanitize_email( $_POST['shop_email'] ),
+            'email'         => sanitize_text_field( $_POST['shop_email'] ),
             'phone'         => sanitize_text_field( $_POST['shop_phone'] ),
             'default_lines' => $default_lines,
             'created_at'    => current_time( 'mysql' ),
@@ -143,7 +143,7 @@ function sywat_handle_shop_actions() {
         if ( isset( $shops[$shop_id] ) ) {
             $shops[$shop_id]['name']    = sanitize_text_field( $_POST['shop_name'] );
             $shops[$shop_id]['contact'] = sanitize_text_field( $_POST['shop_contact'] );
-            $shops[$shop_id]['email']   = sanitize_email( $_POST['shop_email'] );
+            $shops[$shop_id]['email']   = sanitize_text_field( $_POST['shop_email'] );
             $shops[$shop_id]['phone']   = sanitize_text_field( $_POST['shop_phone'] );
 
             if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
@@ -234,9 +234,11 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         ) );
         ?>
         <style>
-            .sywat-table-wrap { overflow-x: auto; margin-bottom: 10px; }
-            .sywat-table td, .sywat-table th { vertical-align: middle; }
+            .sywat-table-wrap { overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
+            .sywat-table td, .sywat-table th { vertical-align: middle; padding: 10px 12px; }
             .sywat-action-btn-group { display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+            .sywat-email-link { font-size: 12px; color: #2271b1; word-break: break-all; display: block; line-height: 1.4; text-decoration: none; }
+            .sywat-email-link:hover { text-decoration: underline; }
         </style>
 
         <div class="no-print">
@@ -356,8 +358,8 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                             <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>">
                         </div>
                         <div class="sywat-form-group">
-                            <label>Contact Email</label>
-                            <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>">
+                            <label>Contact Email(s)</label>
+                            <input type="text" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. events@domain.com, beau@domain.com">
                         </div>
                         <div class="sywat-form-group">
                             <label>Contact Phone</label>
@@ -392,7 +394,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                         <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required></td>
                                         <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required></td>
                                     </tr>
-                                <?php endforeach; ?>
+                                <?php endfor; ?>
                             </tbody>
                         </table>
                     </div>
@@ -426,8 +428,8 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                             <input type="text" name="shop_contact" placeholder="e.g. Hannah Lange / Beau Brennan">
                         </div>
                         <div class="sywat-form-group">
-                            <label>Contact Email</label>
-                            <input type="email" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com">
+                            <label>Contact Email(s)</label>
+                            <input type="text" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com, beau@cinnamoncreekranch.com">
                         </div>
                         <div class="sywat-form-group">
                             <label>Contact Phone</label>
@@ -447,11 +449,11 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     <table class="sywat-table">
                         <thead>
                             <tr>
-                                <th>Shop Name & ID</th>
-                                <th>Contact Info</th>
-                                <th>Phone</th>
-                                <th>Linked Staff</th>
-                                <th style="text-align:right;">Actions</th>
+                                <th style="width:22%;">Shop Name & ID</th>
+                                <th style="width:30%;">Contact Info</th>
+                                <th style="width:15%;">Phone</th>
+                                <th style="width:13%;">Linked Staff</th>
+                                <th style="text-align:right; width:20%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -470,8 +472,21 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                         <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
                                     </td>
                                     <td>
-                                        <?php echo esc_html( isset($shop['contact']) ? $shop['contact'] : 'N/A' ); ?><br>
-                                        <span style="font-size:12px; color:#646970;"><?php echo esc_html( isset($shop['email']) ? $shop['email'] : '' ); ?></span>
+                                        <strong><?php echo esc_html( isset($shop['contact']) ? $shop['contact'] : 'N/A' ); ?></strong><br>
+                                        <?php 
+                                            $raw_email = isset($shop['email']) ? $shop['email'] : '';
+                                            if ( ! empty( $raw_email ) ) {
+                                                $email_parts = preg_split( '/[\s,\/]+/', $raw_email );
+                                                foreach ( $email_parts as $e_part ) {
+                                                    $e_clean = trim( $e_part );
+                                                    if ( $e_clean ) {
+                                                        echo '<a href="mailto:' . esc_attr($e_clean) . '" class="sywat-email-link">' . esc_html($e_clean) . '</a>';
+                                                    }
+                                                }
+                                            } else {
+                                                echo '<span style="font-size:12px; color:#94a3b8;">No email provided</span>';
+                                            }
+                                        ?>
                                     </td>
                                     <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                     <td>
@@ -481,8 +496,8 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     </td>
                                     <td style="text-align:right;">
                                         <div class="sywat-action-btn-group">
-                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#0284c7; border-color:#0284c7; padding:4px 8px; font-size:11px; height:auto;">👤 Manage Staff</a>
-                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding:4px 8px; font-size:11px; height:auto;">✏️ Edit Info</a>
+                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#0284c7; border-color:#0284c7; padding:4px 8px; font-size:11px; height:auto;">👤 Staff</a>
+                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding:4px 8px; font-size:11px; height:auto;">✏️ Edit</a>
                                             
                                             <?php if ( $s_id !== 'shop_ccr' ): ?>
                                                 <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $shop['name'] ); ?>\'? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
@@ -492,7 +507,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                                     <button type="submit" class="sywat-btn-danger" style="padding:4px 8px; font-size:11px; height:auto;">Delete</button>
                                                 </form>
                                             <?php else: ?>
-                                                <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1;" title="Primary seed shop cannot be deleted">🔒 Seed Shop</span>
+                                                <span class="sywat-badge" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
                                             <?php endif; ?>
                                         </div>
                                     </td>
