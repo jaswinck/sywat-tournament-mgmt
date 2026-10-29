@@ -50,6 +50,6 @@ require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-shops.php';       // Phase 2 Multi-Shop Engine
 
 // Load Supporting App Modules
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-checkin.php';     // Snippet 22
+require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php'; // Updated checkin subfolder path
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-scores.php';      // Snippet 37
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tfaa-sync.php';   // Snippet 38
