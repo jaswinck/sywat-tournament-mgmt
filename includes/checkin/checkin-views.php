@@ -245,15 +245,17 @@ function sywat_desk_render_archers_table($data) {
                         ?>
                         <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                             <td>
-                                <strong><?php echo esc_html($reg['name']); ?></strong>
+                                <div style="font-weight:bold; color:#0f172a;"><?php echo esc_html($reg['name']); ?></div>
                                 <?php if ($balance_due > 0): ?>
-                                    <span style="font-size:11px; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:2px 6px; border-radius:10px; font-weight:bold; margin-left:4px;">
-                                        <?php if ($is_family_due): ?>
-                                            ⚠️ OWE: FAMILY
-                                        <?php else: ?>
-                                            ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
-                                        <?php endif; ?>
-                                    </span>
+                                    <div style="margin-top:3px;">
+                                        <span style="font-size:11px; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:2px 6px; border-radius:10px; font-weight:bold; white-space:nowrap; display:inline-block;">
+                                            <?php if ($is_family_due): ?>
+                                                ⚠️ OWE: FAMILY
+                                            <?php else: ?>
+                                                ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
                                 <?php endif; ?>
                             </td>
                             <td style="text-align:center;">
