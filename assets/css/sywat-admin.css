@@ -92,7 +92,7 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Primary & Secondary Action Buttons (White Background, Highlights Solid Blue on Hover for High Icon Contrast) */
+/* Primary & Secondary Action Buttons (White BG, Blue Border, Solid Blue Hover) */
 .sywat-btn-primary,
 .sywat-btn-secondary {
     background-color: #ffffff;
@@ -106,19 +106,31 @@
     color: #ffffff !important;
 }
 
-/* Success / Add Button (Solid Green) */
+/* Success / Add / Check-In Button (White BG, Green Border, Solid Green Hover) */
 .sywat-btn-success {
-    background-color: #008a20;
+    background-color: #ffffff;
     border: 1px solid #008a20;
-    color: #ffffff !important;
+    color: #008a20 !important;
 }
 .sywat-btn-success:hover {
-    background-color: #007017;
-    border-color: #007017;
+    background-color: #008a20;
+    border-color: #008a20;
     color: #ffffff !important;
 }
 
-/* Checked-In Active Button (Light Green) */
+/* Danger / Delete / Purge Button (White BG, Red Border, Solid Red Hover) */
+.sywat-btn-danger {
+    background-color: #ffffff;
+    border: 1px solid #dc3545;
+    color: #dc3545 !important;
+}
+.sywat-btn-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #ffffff !important;
+}
+
+/* Checked-In Active Indicator Button (Soft Muted Green Fill) */
 .sywat-btn-checkedin {
     background-color: #d4edda;
     border: 1px solid #c3e6cb;
@@ -128,18 +140,6 @@
     background-color: #c3e6cb;
     border-color: #b1dfbb;
     color: #155724 !important;
-}
-
-/* Danger / Delete Button (Solid Red) */
-.sywat-btn-danger {
-    background-color: #dc3545;
-    border: 1px solid #dc3545;
-    color: #ffffff !important;
-}
-.sywat-btn-danger:hover {
-    background-color: #bd2130;
-    border-color: #b21f2d;
-    color: #ffffff !important;
 }
 
 /* Gray Button (Muted Dark Neutral) */
