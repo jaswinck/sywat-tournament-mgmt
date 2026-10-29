@@ -3,7 +3,7 @@
  * Module: Tournament Configuration, Master Portal & Volunteer Hub
  * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, live tournament name search, and Volunteer Hub portal view.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -368,16 +368,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             .sywat-table th { background-color: #f6f7f7; text-align: center; padding: 10px 12px; font-weight: 600; color: #1d2327; border-bottom: 1px solid #c3c4c7; }
             .sywat-table td { padding: 12px; border-bottom: 1px solid #f0f0f1; color: #2c3338; vertical-align: middle; }
             
-            .sywat-btn-primary { background-color: #2271b1; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-primary { background-color: #2271b1; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
             .sywat-btn-primary:hover { background-color: #135e96; border-color: #135e96; color: #ffffff !important; }
             
-            .sywat-btn-secondary { background-color: #ffffff; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #2271b1 !important; }
+            .sywat-btn-secondary { background-color: #ffffff; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #2271b1 !important; }
             .sywat-btn-secondary:hover { background-color: #2271b1; color: #ffffff !important; }
 
-            .sywat-btn-success { background-color: #008a20; border: 1px solid #008a20; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-success { background-color: #008a20; border: 1px solid #008a20; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
             .sywat-btn-success:hover { background-color: #007017; border-color: #007017; color: #ffffff !important; }
 
-            .sywat-btn-danger { background-color: #dc3545; border: 1px solid #dc3545; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
+            .sywat-btn-danger { background-color: #dc3545; border: 1px solid #dc3545; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
             .sywat-btn-danger:hover { background-color: #bd2130; border-color: #b21f2d; color: #ffffff !important; }
 
             .sywat-badge { display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 700; border-radius: 3px; }
@@ -421,16 +421,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <span>Configured Tournaments</span>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <div style="display:flex; gap:5px; margin:0; align-items:center;">
-                                <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn-secondary" style="font-size:13px; line-height:22px; height:30px;" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                                <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
                             </div>
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
                                 <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings: <strong><?php echo $tfaa_count; ?></strong> Shooters</span>
-                                <button type="submit" class="sywat-btn-secondary" style="height: 30px; font-size: 12px;">🔄 Sync TFAA</button>
+                                <button type="submit" class="sywat-btn-secondary" style="height: 32px;">🔄 Sync TFAA</button>
                             </form>
-                            <button type="button" class="sywat-btn-success" style="height: 30px; font-size: 12px;" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                            <button type="button" class="sywat-btn-success" style="height: 32px;" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
                     <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
@@ -632,8 +632,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             </table>
 
                             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                                <button type="button" class="sywat-btn-secondary" onclick="closeAddTournamentModal()">Cancel</button>
-                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn-success" style="height:auto; padding:8px 16px;">Save Tournament Configuration</button>
+                                <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="closeAddTournamentModal()">Cancel</button>
+                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn-success" style="height:32px; padding:8px 16px;">Save Tournament Configuration</button>
                             </div>
                         </form>
                     </div>
