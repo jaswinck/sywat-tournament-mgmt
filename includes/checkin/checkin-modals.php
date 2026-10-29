@@ -37,7 +37,7 @@ function sywat_desk_render_modals($data) {
     <?php if ($modal_archer): ?>
     <?php 
         $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
-        $is_family = (isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family') || !empty($modal_archer['family_id']);
+        $is_family = isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family';
     ?>
     <div class="sywat-modal-backdrop active">
         <div class="sywat-modal-content" style="max-width:480px;">
