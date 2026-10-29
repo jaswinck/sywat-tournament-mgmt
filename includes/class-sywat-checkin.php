@@ -5,7 +5,7 @@
  *              statuses, assigning target lanes onsite, and managing event line check-ins with multi-tenant shop scoping.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 2.3.1
+ * Version: 2.3.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -499,10 +499,10 @@ function render_sywat_desk_app() {
                     Is there another family member to register under this same payment group?
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" class="sywat-btn sywat-btn-success" onclick="continueFamilyLoop('<?php echo esc_js($added_family_prompt['family_id']); ?>', '<?php echo esc_js($added_family_prompt['line_idx']); ?>')">
-                        + Yes, Add Next Family Member
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js($added_family_prompt['family_id']); ?>', '<?php echo esc_js($added_family_prompt['line_idx']); ?>')">
+                        Yes, Add Next Family Member
                     </button>
-                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="this.parentElement.parentElement.remove();">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="this.parentElement.parentElement.remove();">
                         Done / Finish Family
                     </button>
                 </div>
@@ -535,7 +535,7 @@ function render_sywat_desk_app() {
             </div>
 
             <div style="margin-left:auto;">
-                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary">← Back to Volunteer Hub</a>
+                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
             </div>
         </form>
 
@@ -626,7 +626,7 @@ function render_sywat_desk_app() {
                                             <input type="hidden" name="sywat_action" value="reopen_line">
                                             <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-secondary" style="font-size:11px; height:26px; padding:2px 8px;">Reopen Line</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" style="font-size:11px; height:26px; padding:2px 8px;">Reopen Line</button>
                                         </form>
                                     <?php else: ?>
                                         <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to close this line? All un-checked-in archers will be permanently marked as No Show.');">
@@ -634,7 +634,7 @@ function render_sywat_desk_app() {
                                             <input type="hidden" name="sywat_action" value="close_line">
                                             <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:11px; height:26px; padding:2px 8px;">Close Line</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-lock" style="font-size:11px; height:26px; padding:2px 8px;">Close Line</button>
                                         </form>
                                     <?php endif; ?>
                                 </div>
@@ -654,9 +654,9 @@ function render_sywat_desk_app() {
                 <div style="display:flex; gap:8px; align-items:center;">
                     <div style="display:flex; gap:5px; margin:0; align-items:center;">
                         <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                        <button type="button" class="sywat-btn sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                     </div>
-                    <button type="button" class="sywat-btn sywat-btn-success" style="height:32px;" onclick="openWalkinModal()">+ Add Walk-In</button>
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:32px;" onclick="openWalkinModal()">Add Walk-In</button>
                 </div>
             </div>
 
@@ -710,7 +710,7 @@ function render_sywat_desk_app() {
                                             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                             <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-primary" style="height:28px; padding:2px 8px; font-size:12px;">✏️ Edit</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="height:28px; padding:2px 8px; font-size:12px;">Edit</button>
                                         </form>
 
                                         <?php if (!empty($reg['checked_in'])): ?>
@@ -721,7 +721,7 @@ function render_sywat_desk_app() {
                                                 <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                                 <input type="hidden" name="sywat_action" value="undo_checkin">
                                                 <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-checkedin" style="height:28px; padding:2px 8px; font-size:12px;">Checked In ✓</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin" style="height:28px; padding:2px 8px; font-size:12px;">Checked In</button>
                                             </form>
                                         <?php else: ?>
                                             <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
@@ -732,7 +732,7 @@ function render_sywat_desk_app() {
                                                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                                     <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-success" style="height:28px; padding:2px 8px; font-size:12px;">Check In</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="height:28px; padding:2px 8px; font-size:12px;">Check In</button>
                                                 </form>
                                             <?php endif; ?>
                                         <?php endif; ?>
@@ -848,8 +848,8 @@ function render_sywat_desk_app() {
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                        <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary" formnovalidate>Cancel</button>
-                        <button type="submit" name="sywat_action" value="save_checkin" class="sywat-btn sywat-btn-success">Complete Check-In</button>
+                        <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
+                        <button type="submit" name="sywat_action" value="save_checkin" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Complete Check-In</button>
                     </div>
                 </form>
             </div>
@@ -973,11 +973,11 @@ function render_sywat_desk_app() {
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
-                        <button type="submit" name="sywat_action" value="delete_archer" class="sywat-btn sywat-btn-danger" onclick="return confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?');" formnovalidate>🗑️ Delete</button>
+                        <button type="submit" name="sywat_action" value="delete_archer" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="return confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?');" formnovalidate>Delete</button>
                         
                         <div style="display:flex; gap:10px;">
-                            <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary" formnovalidate>Cancel</button>
-                            <button type="submit" name="sywat_action" value="save_edit" class="sywat-btn sywat-btn-primary">Save Changes</button>
+                            <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
+                            <button type="submit" name="sywat_action" value="save_edit" class="sywat-btn sywat-btn-primary sywat-btn-icon-save">Save Changes</button>
                         </div>
                     </div>
                 </form>
@@ -1073,8 +1073,8 @@ function render_sywat_desk_app() {
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeWalkinModal()">Cancel</button>
-                        <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary">Register & Check In</button>
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeWalkinModal()">Cancel</button>
+                        <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Register & Check In</button>
                     </div>
                 </form>
             </div>
