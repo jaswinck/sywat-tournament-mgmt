@@ -28,6 +28,8 @@ function sywat_desk_render_family_banner($added_family_prompt) {
 }
 
 function sywat_desk_render_filter_bar($data) {
+    $active_hubs = get_option('sywat_active_tournaments', array());
+    $is_hub_enabled = !empty($data['selected_tournament']) && in_array($data['selected_tournament'], (array)$active_hubs);
     ?>
     <form method="post" id="sywat_filter_form" class="no-print sywat-card" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; padding:15px; margin-bottom:20px;">
         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
@@ -55,7 +57,11 @@ function sywat_desk_render_filter_bar($data) {
         </div>
 
         <div style="margin-left:auto;">
-            <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
+            <?php if ($is_hub_enabled): ?>
+                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
+            <?php else: ?>
+                <a href="/sywat-manage-tournaments/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Manage Tournaments</a>
+            <?php endif; ?>
         </div>
     </form>
     <?php
