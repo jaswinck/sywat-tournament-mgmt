@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
- * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering with dynamic API fallback, dynamic shop header metadata, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.0
+ * Version: 2.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -112,20 +112,16 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email  = ! empty( $shop_info['email'] ) ? $shop_info['email'] : 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com';
         $shop_phone  = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '817-439-8998';
 
-        // Zelle QR Code Image Resolution with Dynamic Fallback
-        $raw_qr_path = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
-        $zelle_qr_url = '';
-
-        if ( strpos( $raw_qr_path, 'http' ) === 0 ) {
-            $zelle_qr_url = $raw_qr_path;
-        } else {
-            $local_file = ABSPATH . ltrim( $raw_qr_path, '/' );
-            if ( file_exists( $local_file ) ) {
-                $zelle_qr_url = site_url( $raw_qr_path );
+        // Strictly serve the uploaded Zelle QR code image path
+        $raw_qr_path = get_option( 'sywat_zelle_qr_url', '' );
+        if ( ! empty( $raw_qr_path ) ) {
+            if ( strpos( $raw_qr_path, 'http' ) === 0 ) {
+                $zelle_qr_url = $raw_qr_path;
             } else {
-                // Fallback: Dynamically generate Zelle QR code for tfaachecking
-                $zelle_qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=tfaachecking';
+                $zelle_qr_url = site_url( '/' . ltrim( $raw_qr_path, '/' ) );
             }
+        } else {
+            $zelle_qr_url = site_url( '/wp-content/uploads/zelle-qr.png' );
         }
         ?>
 
@@ -299,7 +295,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                     • <strong>Family Category:</strong> <?php echo $acct['group3_families']; ?> Unique Paid Families (<?php echo $acct['family_archers']; ?> Checked-In Archers)<br>
                     • <strong>Field Governor:</strong> <?php echo $acct['group4_fg']; ?> Transactions (Free)<br>
                     • <strong>No Show:</strong> <?php echo $acct['group5_noshow']; ?> Archers (Not Checked In)<br>
-                    <div style="margin-top: 3px; border-top: 1px dashed #94a3b8; padding-top: 3px; font-weight: bold; color: #1e293b;">
+                    <div style="margin-top: 3px; border-top: 1px dashed #94a3b8; padding-top: 3px; font-weight: bold; color: #1e3a8a;">
                         Total Processed Transactions: <?php echo $acct['total_transactions']; ?> &nbsp;|&nbsp; Checked-In Archers: <?php echo $acct['total_checked_in']; ?> / <?php echo $acct['total_archers']; ?> Total Roster
                     </div>
                 </div>
