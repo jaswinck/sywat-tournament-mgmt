@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
- * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -96,11 +96,27 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $t_dates = get_option('sywat_dates_' . sanitize_title($selected_tournament), '');
         $tourn_dates_str = !empty($t_dates) ? $t_dates : $selected_tournament;
 
+        // Fetch Shop Info dynamically based on Tournament Assignment
+        $tournaments = get_option( 'sywat_tournaments_list', array() );
+        $all_shops   = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        
+        $shop_id     = 'shop_ccr';
+        if ( isset( $tournaments[$selected_tournament] ) ) {
+            $t_data  = $tournaments[$selected_tournament];
+            $shop_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+        }
+
+        $shop_info   = isset( $all_shops[$shop_id] ) ? $all_shops[$shop_id] : array();
+        $shop_name   = ! empty( $shop_info['name'] ) ? $shop_info['name'] : 'Cinnamon Creek Ranch';
+        $shop_cont   = ! empty( $shop_info['contact'] ) ? $shop_info['contact'] : 'Hannah Lange / Beau Brennan';
+        $shop_email  = ! empty( $shop_info['email'] ) ? $shop_info['email'] : 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com';
+        $shop_phone  = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '817-439-8998';
+
         $raw_qr_path  = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
         $zelle_qr_url = ( strpos( $raw_qr_path, 'http' ) === 0 ) ? $raw_qr_path : site_url( $raw_qr_path );
         ?>
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
-            <button type="button" class="sywat-btn-primary" onclick="window.print()" style="height: 34px;">Print / Save Invoice PDF</button>
+            <button type="button" class="sywat-btn-primary" onclick="window.print()">Print / Save Invoice PDF</button>
         </div>
 
         <div id="sywat_print_area">
@@ -128,10 +144,10 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
 
                 <table class="invoice-header-table">
                     <tr><td class="invoice-header-label">SYWAT Tournament Date:</td><td class="invoice-header-val"><?php echo esc_html($tourn_dates_str); ?></td></tr>
-                    <tr><td class="invoice-header-label">Archery Shop/Club Name:</td><td class="invoice-header-val">Cinnamon Creek Ranch</td></tr>
-                    <tr><td class="invoice-header-label">Contact Name:</td><td class="invoice-header-val">Hannah Lange / Beau Brennan</td></tr>
-                    <tr><td class="invoice-header-label">Email Address:</td><td class="invoice-header-val">events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com</td></tr>
-                    <tr><td class="invoice-header-label">Phone:</td><td class="invoice-header-val">817-439-8998</td></tr>
+                    <tr><td class="invoice-header-label">Archery Shop/Club Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_name); ?></td></tr>
+                    <tr><td class="invoice-header-label">Contact Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_cont); ?></td></tr>
+                    <tr><td class="invoice-header-label">Email Address:</td><td class="invoice-header-val"><?php echo esc_html($shop_email); ?></td></tr>
+                    <tr><td class="invoice-header-label">Phone:</td><td class="invoice-header-val"><?php echo esc_html($shop_phone); ?></td></tr>
                 </table>
 
                 <div style="font-weight:bold; font-size:13px; margin-bottom:6px;">Registration Tournament Fees:</div>
@@ -224,9 +240,9 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="modal_action" value="print">
 
-                <div class="sywat-form-group" style="min-width: 220px;">
-                    <label for="filter_line_idx_print">Filter Roster by Line</label>
-                    <select name="filter_line_idx" id="filter_line_idx_print" onchange="this.form.submit()">
+                <div style="min-width: 220px;">
+                    <label for="filter_line_idx_print" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Filter Roster by Line</label>
+                    <select name="filter_line_idx" id="filter_line_idx_print" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="this.form.submit()">
                         <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>Entire Weekend (All Lines)</option>
                         <?php foreach ( $available_lines as $idx => $line ): ?>
                             <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
@@ -234,7 +250,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                     </select>
                 </div>
             </form>
-            <button type="button" class="sywat-btn-primary" onclick="window.print()" style="height: 34px;">Print / Save PDF</button>
+            <button type="button" class="sywat-btn-primary" onclick="window.print()">Print / Save PDF</button>
         </div>
 
         <div id="sywat_print_area">
