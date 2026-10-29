@@ -239,7 +239,9 @@ function sywat_desk_render_archers_table($data) {
                             $paid_disp  = !empty($reg['paid']) ? $reg['paid'] : '—';
                             $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
                             $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
-                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || !empty($reg['family_id']);
+                            
+                            // Check if family cap was applied to THIS archer's line
+                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family');
                         ?>
                         <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                             <td>
