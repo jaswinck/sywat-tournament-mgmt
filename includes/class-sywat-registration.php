@@ -3,7 +3,7 @@
  * Module: Archer Registration & Intake Engine
  * Description: Simplified phone group intake with full 7 TFAA age divisions, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
  * Author: SYWAT Archery
- * Version: 2.3.0
+ * Version: 2.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -34,7 +34,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $amount_paid     = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
         $t_slug          = sanitize_title( $tourn_name );
 
-        $archers_raw     = isset($_POST['archers']) && is_array($_POST['archers']) ? $_POST['archers'] : array();
+        $t_data  = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
+        $t_lines = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
+
+        $archers_raw = isset($_POST['archers']) && is_array($_POST['archers']) ? $_POST['archers'] : array();
 
         if ( empty( $archers_raw ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please add at least one archer name.</div>';
@@ -96,7 +99,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
         foreach ($valid_archers as $archer) {
             $line_idx  = $archer['line_idx'];
-            $line_data = isset( $tournaments[$tourn_name][$line_idx] ) ? $tournaments[$tourn_name][$line_idx] : array();
+            $line_data = isset( $t_lines[$line_idx] ) ? $t_lines[$line_idx] : array();
             $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line ' . ((int)$line_idx + 1);
             $distance  = $archer['distance'];
             $name      = $archer['name'];
@@ -131,7 +134,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'line_name'   => $line_name,
                 'name'        => $name,
                 'distance'    => $distance,
-                'division'    => $archer['division'], // Direct flow-through to Check-In
+                'division'    => $archer['division'],
                 'gender'      => '', // Captured at Desk Check-In
                 'style'       => '', // Captured at Desk Check-In
                 'paid'        => $paid_status,
@@ -158,7 +161,8 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 // Action: Handle CSV / Text File Import
 if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
     function sywat_handle_import_shooters( $tourn_name, $target_line_idx, $tournaments, &$registrations ) {
-        $t_lines        = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
+        $t_data         = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
+        $t_lines        = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
         $t_slug         = sanitize_title( $tourn_name );
         $imported_count = 0;
         $skipped_dup    = 0;
@@ -493,7 +497,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
                                 <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
                                 <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
-                                <option value="Master Senior (70+)">Master Senior (70+) [$30]</option>
+                                <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
                             </select>
 
                             <!-- Line Override Selection -->
