@@ -349,7 +349,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 <a href="?tab=manage" class="sywat-tab-item <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournaments & Rosters</a>
                 <a href="?tab=create" class="sywat-tab-item <?php echo $active_tab === 'create' ? 'active' : ''; ?>"><?php echo ! empty( $edit_target ) ? 'Edit Tournament Config' : 'Create New Tournament'; ?></a>
                 <?php if ( $is_admin ): ?>
-                    <a href="?tab=shops" class="sywat-tab-item <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">🏬 Shops & Staff</a>
+                    <a href="?tab=shops" class="sywat-tab-item <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
                 <?php endif; ?>
             </div>
 
