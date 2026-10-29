@@ -3,7 +3,7 @@
  * Module: Archer Registration & Intake Engine
  * Description: Quick-add phone registration form, FareHarbor CSV parser, text report handling, and intake modal UI.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -79,7 +79,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
         $registrations[] = $new_reg;
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully added ' . esc_html( $shooter_name ) . ' to ' . esc_html( $line_name ) . ' (' . esc_html( $distance ) . ')!</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully added <strong>' . esc_html( $shooter_name ) . '</strong> to ' . esc_html( $line_name ) . ' (' . esc_html( $distance ) . ')!</div>';
     }
 }
 
@@ -337,8 +337,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
     function sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations ) {
         ?>
         <div class="no-print" style="display:flex; flex-direction:column; gap:20px;">
-            <div style="background:#f6f7f7; padding:15px; border:1px solid #c3c4c7; border-radius:4px;">
-                <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600;">1. Quick Add Single Archer</h4>
+            <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
+                <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600; color:#1e293b;">1. Quick Add Single Archer</h4>
                 <form method="post">
                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                     <input type="hidden" name="sywat_action" value="register_shooter">
@@ -347,41 +347,41 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <input type="hidden" name="modal_action" value="prereg">
 
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-                        <div class="sywat-form-group" style="flex:2; min-width:140px;">
-                            <label>Archer Name *</label>
-                            <input type="text" name="shooter_name" placeholder="Full Name" required>
+                        <div style="flex:2; min-width:140px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Archer Name *</label>
+                            <input type="text" name="shooter_name" placeholder="Full Name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                         </div>
-                        <div class="sywat-form-group" style="min-width:120px;">
-                            <label>Line</label>
-                            <select name="target_line_idx" required>
+                        <div style="min-width:120px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line</label>
+                            <select name="target_line_idx" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="sywat-form-group" style="min-width:90px; flex:0.8;">
-                            <label>Distance</label>
-                            <select name="shooter_distance" required>
+                        <div style="min-width:90px; flex:0.8;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Distance</label>
+                            <select name="shooter_distance" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                                 <option value="20yd">20yd</option>
                                 <option value="Cub">Cub</option>
                             </select>
                         </div>
-                        <div class="sywat-form-group" style="min-width:95px; flex:1;">
-                            <label>Status</label>
-                            <select name="shooter_type" required>
+                        <div style="min-width:95px; flex:1;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Status</label>
+                            <select name="shooter_type" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                                 <option value="Pre-Reg">Pre-Reg</option>
                                 <option value="Walk-In">Walk-In</option>
                             </select>
                         </div>
-                        <div class="sywat-form-group" style="flex:0 0 auto;">
+                        <div style="flex:0 0 auto;">
                             <button type="submit" class="sywat-btn-primary">Add Archer</button>
                         </div>
                     </div>
                 </form>
             </div>
 
-            <div style="background:#f6f7f7; padding:15px; border:1px solid #c3c4c7; border-radius:4px;">
-                <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600;">2. Bulk Upload Roster File (FareHarbor CSV)</h4>
+            <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
+                <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600; color:#1e293b;">2. Bulk Upload Roster File (FareHarbor CSV)</h4>
                 <form method="post" enctype="multipart/form-data" id="sywat_import_form">
                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                     <input type="hidden" name="sywat_action" value="import_shooters">
@@ -390,17 +390,17 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <input type="hidden" name="modal_action" value="prereg">
 
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom: 10px;">
-                        <div class="sywat-form-group" style="flex:1; min-width:200px;">
-                            <label>Select Target Shooting Line</label>
-                            <select name="target_line_idx" required>
+                        <div style="flex:1; min-width:200px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select Target Shooting Line</label>
+                            <select name="target_line_idx" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="sywat-form-group" style="flex:2; min-width:250px;">
-                            <label>Select File (.csv, .txt)</label>
-                            <input type="file" id="import_file_input" name="import_file" accept=".csv,.txt" style="padding:4px;">
+                        <div style="flex:2; min-width:250px;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select File (.csv, .txt)</label>
+                            <input type="file" id="import_file_input" name="import_file" accept=".csv,.txt" style="width:100%; padding:4px; font-size:13px;">
                         </div>
                         <button type="submit" id="sywat_upload_btn" class="sywat-btn-primary">Upload & Parse File</button>
                     </div>
@@ -408,21 +408,21 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <details style="margin-top: 10px;">
                         <summary style="font-size: 12px; font-weight: 600; color: #2271b1; cursor: pointer;">Or paste shop report text directly...</summary>
                         <div style="margin-top: 8px;">
-                            <textarea name="pasted_text" rows="5" placeholder="Paste report text directly here if preferred..." style="width: 100%; font-family: monospace; font-size: 12px;"></textarea>
+                            <textarea name="pasted_text" rows="5" placeholder="Paste report text directly here if preferred..." style="width: 100%; font-family: monospace; font-size: 12px; border:1px solid #ccc; border-radius:4px; padding:6px;"></textarea>
                         </div>
                     </details>
                 </form>
             </div>
 
             <div>
-                <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600;">Current Line Slot Usage</h4>
+                <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#1e293b;">Current Line Slot Usage</h4>
                 <table class="sywat-table">
                     <thead>
                         <tr>
-                            <th>Line Name</th>
-                            <th>20yd Capacity</th>
-                            <th>Cub Capacity</th>
-                            <th style="text-align: right;">Action</th>
+                            <th style="text-align:left;">Line Name</th>
+                            <th style="text-align:center;">20yd Capacity</th>
+                            <th style="text-align:center;">Cub Capacity</th>
+                            <th style="text-align:right;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -437,15 +437,15 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
-                                <td>
+                                <td style="text-align:center;">
                                     <?php echo $c_20 . ' / ' . $m_20; ?>
                                     <span class="sywat-badge <?php echo ($c_20 >= $m_20) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_20 >= $m_20) ? 'Full' : 'Open'; ?></span>
                                 </td>
-                                <td>
+                                <td style="text-align:center;">
                                     <?php echo $c_cub . ' / ' . $m_cub; ?>
                                     <span class="sywat-badge <?php echo ($c_cub >= $m_cub) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_cub >= $m_cub) ? 'Full' : 'Open'; ?></span>
                                 </td>
-                                <td style="text-align: right;">
+                                <td style="text-align:right;">
                                     <?php if ( $total_line_shooters > 0 ): ?>
                                         <form method="post" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to clear ALL <?php echo $total_line_shooters; ?> archers from <?php echo esc_js( $line_title ); ?>?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
