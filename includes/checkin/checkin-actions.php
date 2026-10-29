@@ -147,7 +147,7 @@ function sywat_desk_handle_actions(&$data) {
             $verified = !empty($_POST['checkin_payment_verified']);
 
             if ($due_amt > 0 && !$verified) {
-                return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance of $' . number_format($due_amt, 2) . '. Please see event staff for payment and check the verification box.</div>';
+                return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance. Please see event staff for payment and check the verification box.</div>';
             } else {
                 $division = sanitize_text_field($_POST['checkin_division']);
                 $distance = ($division === 'Cub (8 - 11)' || $division === 'No Show') ? 'Cub' : '20yd';
@@ -165,6 +165,27 @@ function sywat_desk_handle_actions(&$data) {
                 $reg['balance_due'] = 0;
                 
                 update_option($opt_key, $reg, false);
+
+                // Multi-Archer Family Balance Sync: Clear balance_due for all family members
+                $fam_id  = !empty($reg['family_id']) ? $reg['family_id'] : '';
+                $book_id = !empty($reg['booking_id']) ? $reg['booking_id'] : '';
+
+                foreach ($registrations as &$r) {
+                    if (isset($r['id']) && $r['id'] === $target_id) {
+                        $r = $reg;
+                    }
+                    if (!empty($fam_id) || !empty($book_id)) {
+                        if (isset($r['tournament']) && strcasecmp($r['tournament'], $selected_tournament) === 0) {
+                            $is_fam_match = (!empty($fam_id) && isset($r['family_id']) && $r['family_id'] === $fam_id) ||
+                                            (!empty($book_id) && isset($r['booking_id']) && $r['booking_id'] === $book_id);
+                            if ($is_fam_match) {
+                                $r['balance_due'] = 0;
+                                update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
+                            }
+                        }
+                    }
+                }
+                unset($r);
             }
         }
     }
@@ -177,6 +198,13 @@ function sywat_desk_handle_actions(&$data) {
         if ($reg) {
             $reg['checked_in'] = 0;
             update_option($opt_key, $reg, false);
+
+            foreach ($registrations as &$r) {
+                if (isset($r['id']) && $r['id'] === $target_id) {
+                    $r['checked_in'] = 0;
+                }
+            }
+            unset($r);
         }
     }
 
@@ -220,6 +248,13 @@ function sywat_desk_handle_actions(&$data) {
             }
 
             update_option($opt_key, $reg, false);
+
+            foreach ($registrations as &$r) {
+                if (isset($r['id']) && $r['id'] === $target_id) {
+                    $r = $reg;
+                }
+            }
+            unset($r);
         }
     }
 
@@ -227,6 +262,10 @@ function sywat_desk_handle_actions(&$data) {
     if ($action === 'delete_archer') {
         $target_id = sanitize_text_field($_POST['reg_id']);
         delete_option('sywat_t_' . $active_t_slug . '_' . $target_id);
+
+        $registrations = array_values(array_filter($registrations, function($r) use ($target_id) {
+            return !(isset($r['id']) && $r['id'] === $target_id);
+        }));
     }
 
     return '';
