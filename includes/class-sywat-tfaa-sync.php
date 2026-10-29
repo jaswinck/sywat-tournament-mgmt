@@ -1,10 +1,10 @@
 <?php
 /**
- * Module: TFAA Data & Standings Sync Engine (Snippet 38)
+ * Module: TFAA Data & Standings Sync Engine
  * Description: Synchronizes archer membership records, caches state standings data, 
  *              and verifies TFAA shooter eligibility across active tournament rosters.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -27,11 +27,9 @@ function render_sywat_tfaa_sync_btn() {
     if ( isset($_POST['sywat_tfaa_action']) && $_POST['sywat_tfaa_action'] === 'sync_now' && check_admin_referer('sywat_tfaa_sync_nonce') ) {
         $res = sywat_sync_tfaa_standings();
         if ( ! empty($res['success']) ) {
-            $msg_color = $res['count'] > 0 ? '#155724' : '#856404';
-            $msg_bg    = $res['count'] > 0 ? '#d4edda' : '#fff3cd';
-            $msg_border= $res['count'] > 0 ? '#c3e6cb' : '#ffeeba';
+            $msg_class = $res['count'] > 0 ? 'sywat-alert-success' : 'sywat-alert-danger';
             
-            $message = '<div style="background:' . $msg_bg . '; color:' . $msg_color . '; padding:8px 12px; border:1px solid ' . $msg_border . '; border-radius:4px; font-weight:bold; margin-bottom:10px; font-size:12px;">';
+            $message = '<div class="sywat-alert ' . $msg_class . '">';
             $message .= $res['count'] > 0 ? '🟢 Synced ' : '⚠️ Synced ';
             $message .= intval($res['count']) . ' shooters from TFAA! ';
             if (isset($res['debug'])) {
@@ -39,7 +37,7 @@ function render_sywat_tfaa_sync_btn() {
             }
             $message .= '</div>';
         } else {
-            $message = '<div style="background:#f8d7da; color:#721c24; padding:8px 12px; border:1px solid #f5c6cb; border-radius:4px; font-weight:bold; margin-bottom:10px; font-size:12px;">⚠️ Sync failed: ' . esc_html($res['message']) . '</div>';
+            $message = '<div class="sywat-alert sywat-alert-danger">⚠️ Sync failed: ' . esc_html($res['message']) . '</div>';
         }
     }
 
@@ -56,7 +54,7 @@ function render_sywat_tfaa_sync_btn() {
         <span style="font-size: 12px; color: #646970;">
             TFAA Cache: <strong><?php echo $tfaa_count; ?></strong> Shooters (Updated: <?php echo esc_html($tfaa_updated); ?>)
         </span>
-        <button type="submit" style="background:#fff; border:1px solid #2271b1; color:#2271b1; padding:4px 10px; border-radius:4px; font-weight:600; cursor:pointer; font-size:12px;">🔄 Sync TFAA Standings Now</button>
+        <button type="submit" class="sywat-btn-secondary" style="height: 32px;">🔄 Sync TFAA Standings Now</button>
     </form>
     <?php
     return ob_get_clean();
@@ -66,7 +64,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
     function sywat_parse_tfaa_div_gen( $text ) {
         if ( strlen( $text ) > 80 ) return array( 'division' => '', 'gender' => '' );
 
-        // CRITICAL FIX 1: Strict word boundaries so "Female" doesn't falsely trigger "Male"
+        // Strict word boundaries so "Female" doesn't falsely trigger "Male"
         $has_female = preg_match( '/\bfemale\b/i', $text );
         $has_male   = preg_match( '/\bmale\b/i', $text );
 
@@ -96,7 +94,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
         $style = '';
         $is_pro = ( stripos( $text, 'Pro' ) !== false );
 
-        // CRITICAL FIX 2: Check "Modern Bowhunter" BEFORE "Bowhunter Freestyle"
+        // Check "Modern Bowhunter" BEFORE "Bowhunter Freestyle"
         if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSL-R – Freestyle Limited Recurve (or Olympic Recurve)';
         elseif ( stripos( $text, 'Freestyle Limited' ) !== false || stripos( $text, 'FSL' ) !== false ) $style = 'FSL – Freestyle Limited';
         elseif ( stripos( $text, 'Modern Bowhunter' ) !== false || stripos( $text, 'MBH' ) !== false ) $style = 'MBH – Modern Bowhunter';
@@ -204,7 +202,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
                 continue;
             }
 
-            // CRITICAL FIX 3: Reverted to the Regex that successfully extracted all 384+ archers
             // Looks for: Number + Space + (Last Name, First Name) + Space + Score Number
             if ( preg_match( '/^\d+\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 
