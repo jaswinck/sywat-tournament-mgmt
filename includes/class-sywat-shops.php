@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD, modal shop creation, optional address fields, phone auto-formatting (XXX-XXX-XXXX), line templates, explicit staff linking UI.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -530,7 +530,7 @@ function sywat_render_shops_tab() {
                                 <td style="padding:8px;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                 <td style="padding:8px; text-align:left;">
                                     <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-blue">Staff (<?php echo $linked_count; ?>)</a>
                                         <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">Edit Shop</a>
                                         
                                         <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop?');">
