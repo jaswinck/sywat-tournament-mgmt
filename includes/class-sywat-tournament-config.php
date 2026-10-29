@@ -3,7 +3,7 @@
  * Module: Tournament Configuration, Master Portal & Volunteer Hub
  * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, live tournament name search, and Volunteer Hub portal view.
  * Author: SYWAT Archery
- * Version: 2.2.2
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -203,7 +203,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 $end_date   = sanitize_text_field( $_POST['end_date'] );
                 if ( empty( $end_date ) ) $end_date = $start_date;
 
-                // Enforce shop assignment: Admins can assign to any shop, non-admins auto-lock to their own shop
                 $assigned_shop_id = $is_admin ? sanitize_text_field( $_POST['shop_id'] ) : $user_shop_id;
                 if ( empty( $assigned_shop_id ) ) $assigned_shop_id = $user_shop_id;
                 
@@ -354,55 +353,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $tfaa_updated = isset( $tfaa_cache['updated_at'] ) ? $tfaa_cache['updated_at'] : 'Never';
         ?>
 
-        <style>
-            .sywat-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #2c3338; max-width: 1100px; margin: 0 auto; }
-            .sywat-nav-tabs { display: flex; border-bottom: 1px solid #c3c4c7; margin-bottom: 20px; gap: 5px; }
-            .sywat-tab-item { padding: 10px 18px; font-weight: 600; text-decoration: none; color: #50575e; background: #f6f7f7; border: 1px solid #c3c4c7; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 14px; }
-            .sywat-tab-item.active { background: #ffffff; color: #1d2327; border-bottom: 1px solid #ffffff; margin-bottom: -1px; }
-            
-            .sywat-card { background: #ffffff; border: 1px solid #c3c4c7; border-radius: 4px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); padding: 20px; margin-bottom: 20px; }
-            .sywat-card-title { font-size: 1.1em; font-weight: 600; color: #1d2327; margin: 0 0 15px 0; border-bottom: 1px solid #dcdcde; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-            .sywat-subtitle { font-size: 13px; color: #646970; margin-top: -10px; margin-bottom: 15px; }
-            
-            .sywat-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-            .sywat-table th { background-color: #f6f7f7; text-align: center; padding: 10px 12px; font-weight: 600; color: #1d2327; border-bottom: 1px solid #c3c4c7; }
-            .sywat-table td { padding: 12px; border-bottom: 1px solid #f0f0f1; color: #2c3338; vertical-align: middle; }
-            
-            .sywat-btn-primary { background-color: #2271b1; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
-            .sywat-btn-primary:hover { background-color: #135e96; border-color: #135e96; color: #ffffff !important; }
-            
-            .sywat-btn-secondary { background-color: #ffffff; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #2271b1 !important; }
-            .sywat-btn-secondary:hover { background-color: #2271b1; color: #ffffff !important; }
-
-            .sywat-btn-gray { background-color: #6c757d; border: 1px solid #6c757d; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
-            .sywat-btn-gray:hover { background-color: #5a6268; border-color: #545b62; color: #ffffff !important; }
-
-            .sywat-btn-success { background-color: #008a20; border: 1px solid #008a20; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
-            .sywat-btn-success:hover { background-color: #007017; border-color: #007017; color: #ffffff !important; }
-
-            .sywat-btn-danger { background-color: #dc3545; border: 1px solid #dc3545; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
-            .sywat-btn-danger:hover { background-color: #bd2130; border-color: #b21f2d; color: #ffffff !important; }
-
-            .sywat-badge { display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 700; border-radius: 3px; }
-            .sywat-badge-prereg { background-color: #e5f5fa; color: #0073aa; border: 1px solid #bfe7f3; }
-            .sywat-badge-walkin { background-color: #fcf8e3; color: #8a6d3b; border: 1px solid #faebcc; }
-            .sywat-badge-open { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-            .sywat-badge-full { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-
-            .sywat-alert { padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
-            .sywat-alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-            .sywat-alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-
-            .sywat-modal-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.55); z-index: 99999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-            .sywat-modal-backdrop.active { display: flex; }
-            .sywat-modal-content { background: #fff; width: 100%; max-width: 900px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-            .sywat-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #dcdcde; background: #f6f7f7; }
-            .sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
-            .sywat-modal-close { background: none; border: none; font-size: 22px; font-weight: bold; color: #646970; cursor: pointer; line-height: 1; }
-            .sywat-modal-close:hover { color: #d63638; }
-            .sywat-modal-body { padding: 20px; overflow-y: auto; }
-        </style>
-
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
@@ -425,15 +375,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <div style="display:flex; gap:5px; margin:0; align-items:center;">
                                 <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn-gray" style="height:32px;" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                                <button type="button" class="sywat-btn-secondary" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
                             </div>
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
                                 <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings: <strong><?php echo $tfaa_count; ?></strong> Shooters</span>
-                                <button type="submit" class="sywat-btn-secondary" style="height: 32px;">🔄 Sync TFAA</button>
+                                <button type="submit" class="sywat-btn-secondary">🔄 Sync TFAA</button>
                             </form>
-                            <button type="button" class="sywat-btn-success" style="height: 32px;" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                            <button type="button" class="sywat-btn-success" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
                     <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
@@ -522,22 +472,22 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         </td>
                                         <td>
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Manage Shooters</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Add Pre-Reg / CSV</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn-primary" style="width: 100%; justify-content: center;">Print Roster</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn-primary" style="width: 100%; justify-content: center; background:#0284c7; border-color:#0284c7;">📄 Generate Invoice</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn-primary" style="width: 100%;">Manage Shooters</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn-primary" style="width: 100%;">Add Pre-Reg / CSV</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn-primary" style="width: 100%;">Print Roster</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn-primary" style="width: 100%; background:#0284c7; border-color:#0284c7;">📄 Generate Invoice</a>
                                             </div>
                                         </td>
                                         <td style="text-align: right;">
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                <a href="/sywat-desk/" class="sywat-btn-success" style="width: 100%; max-width: 130px; justify-content: center;">Check-In Desk</a>
-                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Enter Scores</a>
-                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Edit Config</a>
+                                                <a href="/sywat-desk/" class="sywat-btn-success" style="width: 100%; max-width: 130px;">Check-In Desk</a>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px;">Enter Scores</a>
+                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px;">Edit Config</a>
                                                 <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="delete_tournament">
                                                     <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                    <button type="submit" class="sywat-btn-danger" style="width: 100%; justify-content: center;">Delete</button>
+                                                    <button type="submit" class="sywat-btn-danger" style="width: 100%;">Delete</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -635,7 +585,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             </table>
 
                             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                                <button type="button" class="sywat-btn-gray" style="height:32px;" onclick="closeAddTournamentModal()">Cancel</button>
+                                <button type="button" class="sywat-btn-secondary" onclick="closeAddTournamentModal()">Cancel</button>
                                 <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn-success" style="height:32px; padding:8px 16px;">Save Tournament Configuration</button>
                             </div>
                         </form>
