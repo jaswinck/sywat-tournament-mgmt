@@ -374,7 +374,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             </select>
                         </div>
                         <div style="flex:0 0 auto;">
-                            <button type="submit" class="sywat-btn sywat-btn-primary">Add Archer</button>
+                            <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-add">Add Archer</button>
                         </div>
                     </div>
                 </form>
@@ -402,7 +402,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select File (.csv, .txt)</label>
                             <input type="file" id="import_file_input" name="import_file" accept=".csv,.txt" style="width:100%; padding:4px; font-size:13px;">
                         </div>
-                        <button type="submit" id="sywat_upload_btn" class="sywat-btn sywat-btn-primary">Upload & Parse File</button>
+                        <button type="submit" id="sywat_upload_btn" class="sywat-btn sywat-btn-primary sywat-btn-icon-export">Upload & Parse File</button>
                     </div>
 
                     <details style="margin-top: 10px;">
@@ -454,7 +454,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                             <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                             <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
                                             <input type="hidden" name="redirect_action" value="prereg">
-                                            <button type="submit" class="sywat-btn sywat-btn-danger" style="padding: 3px 8px; font-size: 11px; height: auto;">Clear Line</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding: 3px 8px; font-size: 11px; height: auto;">Clear Line</button>
                                         </form>
                                     <?php else: ?>
                                         <span style="font-size: 12px; color: #94a3b8;">(Empty)</span>
