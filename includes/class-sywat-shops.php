@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Shop Management & Multi-Tenant Permissions
- * Description: Shop CRUD, modal shop creation, optional address fields, phone auto-formatting (XXX-XXX-XXXX), line templates, explicit staff linking UI.
+ * Description: Shop CRUD, modal shop creation, optional address fields with dropdown state selection (TX, OK, LA), phone auto-formatting (XXX-XXX-XXXX), line templates, explicit staff linking UI.
  * Author: SYWAT Archery
- * Version: 2.2.1
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -423,7 +423,13 @@ function sywat_render_shops_tab() {
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                         <div class="sywat-shop-field">
                             <label>State</label>
-                            <input type="text" name="shop_state" value="<?php echo esc_attr( isset($editing_shop['state']) ? $editing_shop['state'] : '' ); ?>" placeholder="e.g. TX">
+                            <?php $curr_st = isset($editing_shop['state']) ? $editing_shop['state'] : ''; ?>
+                            <select name="shop_state">
+                                <option value="" <?php selected( empty($curr_st), true ); ?>>-- Select State --</option>
+                                <option value="TX" <?php selected( $curr_st, 'TX' ); ?>>TX - Texas</option>
+                                <option value="OK" <?php selected( $curr_st, 'OK' ); ?>>OK - Oklahoma</option>
+                                <option value="LA" <?php selected( $curr_st, 'LA' ); ?>>LA - Louisiana</option>
+                            </select>
                         </div>
                         <div class="sywat-shop-field">
                             <label>ZIP Code</label>
@@ -596,7 +602,12 @@ function sywat_render_shops_tab() {
                         </div>
                         <div class="sywat-shop-field">
                             <label>State</label>
-                            <input type="text" name="shop_state" placeholder="e.g. TX">
+                            <select name="shop_state">
+                                <option value="">-- Select State --</option>
+                                <option value="TX">TX - Texas</option>
+                                <option value="OK">OK - Oklahoma</option>
+                                <option value="LA">LA - Louisiana</option>
+                            </select>
                         </div>
                         <div class="sywat-shop-field">
                             <label>ZIP</label>
