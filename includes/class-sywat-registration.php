@@ -481,13 +481,13 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <?php endforeach; ?>
                             </select>
 
-                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer">&times;</button>
+                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
                         </div>
                     </div>
 
                     <!-- Add Row & Live Payment Total Display -->
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px dashed #cbd5e1; flex-wrap:wrap; gap:10px;">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addArcherRow()">+ Add Another Archer</button>
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addArcherRow()">Add Another Archer</button>
 
                         <div style="text-align:right;">
                             <div style="font-size:13px; font-weight:bold; color:#1e293b;">
@@ -499,7 +499,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             </div>
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin" style="height:34px;">Save & Register Group</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin" style="height:34px;">Save & Register Shooters</button>
                     </div>
                 </form>
             </div>
@@ -638,7 +638,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
                     ${lineOptionsHtml}
                 </select>
-                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer">&times;</button>
+                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
             `;
 
             container.appendChild(rowDiv);
@@ -669,7 +669,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 }
             });
 
-            if (archerCount === 0) archerCount = tierSelects.length; // fallback for initial load
+            if (archerCount === 0) archerCount = tierSelects.length;
 
             const isCapped = (rawTotal >= 75 || archerCount >= 3);
             const finalFee = isCapped ? 75.00 : rawTotal;
