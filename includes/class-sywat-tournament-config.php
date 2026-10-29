@@ -375,15 +375,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <div style="display:flex; gap:5px; margin:0; align-items:center;">
                                 <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn-secondary" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
                             </div>
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
                                 <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings: <strong><?php echo $tfaa_count; ?></strong> Shooters</span>
-                                <button type="submit" class="sywat-btn-secondary">🔄 Sync TFAA</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary">🔄 Sync TFAA</button>
                             </form>
-                            <button type="button" class="sywat-btn-success" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-success" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
                     <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
@@ -433,9 +433,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <input type="hidden" name="sywat_action" value="toggle_active_tournament">
                                                     <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
                                                     <?php if ( $is_active_hub ): ?>
-                                                        <button type="submit" class="sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
                                                     <?php else: ?>
-                                                        <button type="submit" class="sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
                                                     <?php endif; ?>
                                                 </form>
                                             <?php else: ?>
@@ -472,22 +472,22 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         </td>
                                         <td>
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn-primary" style="width: 100%;">Manage Shooters</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn-primary" style="width: 100%;">Add Pre-Reg / CSV</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn-primary" style="width: 100%;">Print Roster</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn-primary" style="width: 100%; background:#0284c7; border-color:#0284c7;">📄 Generate Invoice</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary" style="width: 100%;">Manage Shooters</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn sywat-btn-primary" style="width: 100%;">Add Pre-Reg / CSV</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary" style="width: 100%;">Print Roster</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary" style="width: 100%; background:#0284c7; border-color:#0284c7;">📄 Generate Invoice</a>
                                             </div>
                                         </td>
                                         <td style="text-align: right;">
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                <a href="/sywat-desk/" class="sywat-btn-success" style="width: 100%; max-width: 130px;">Check-In Desk</a>
-                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px;">Enter Scores</a>
-                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px;">Edit Config</a>
+                                                <a href="/sywat-desk/" class="sywat-btn sywat-btn-success" style="width: 100%; max-width: 130px;">Check-In Desk</a>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="width: 100%; max-width: 130px;">Enter Scores</a>
+                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="width: 100%; max-width: 130px;">Edit Config</a>
                                                 <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="delete_tournament">
                                                     <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                    <button type="submit" class="sywat-btn-danger" style="width: 100%;">Delete</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-danger" style="width: 100%;">Delete</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -554,7 +554,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <option value="<?php echo $i; ?>" <?php selected( $form_line_count, $i ); ?>><?php echo $i; ?> Line<?php echo $i > 1 ? 's' : ''; ?></option>
                                         <?php endfor; ?>
                                     </select>
-                                    <button type="submit" name="sywat_action" value="update_line_rows" class="sywat-btn-primary" formnovalidate>Update Line Rows</button>
+                                    <button type="submit" name="sywat_action" value="update_line_rows" class="sywat-btn sywat-btn-primary" formnovalidate>Update Line Rows</button>
                                 </div>
                             </div>
 
@@ -585,8 +585,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             </table>
 
                             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                                <button type="button" class="sywat-btn-secondary" onclick="closeAddTournamentModal()">Cancel</button>
-                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn-success" style="height:32px; padding:8px 16px;">Save Tournament Configuration</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeAddTournamentModal()">Cancel</button>
+                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn sywat-btn-success" style="height:32px; padding:8px 16px;">Save Tournament Configuration</button>
                             </div>
                         </form>
                     </div>
