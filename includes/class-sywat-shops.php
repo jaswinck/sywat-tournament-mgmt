@@ -1,14 +1,23 @@
 <?php
 /**
  * Module: Shop Management & Multi-Tenant Permissions
- * Description: Shop CRUD (Create, Read, Update, Delete), modal shop creation, optional address fields, default line templates, contextual staff linking UI.
+ * Description: Shop CRUD, modal shop creation, optional address fields, phone auto-formatting (XXX-XXX-XXXX), line templates, explicit staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.9.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Ensure default shop exists upon loading
+// Helper: Standardize Phone Number Formatting (XXX-XXX-XXXX)
+function sywat_format_phone_number( $phone ) {
+    $digits = preg_replace( '/\D/', '', $phone );
+    if ( strlen( $digits ) === 10 ) {
+        return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6, 4 );
+    }
+    return sanitize_text_field( $phone );
+}
+
+// Ensure default seed shop exists upon loading
 add_action( 'init', 'sywat_ensure_default_shop_exists' );
 function sywat_ensure_default_shop_exists() {
     $shops = get_option( 'sywat_shops_list', array() );
@@ -71,7 +80,6 @@ function sywat_render_user_profile_shop_field( $user ) {
     }
 
     $current_shop = get_user_meta( $user->ID, 'sywat_shop_id', true );
-    if ( empty( $current_shop ) ) $current_shop = 'shop_ccr';
     $shops = sywat_get_shops();
     ?>
     <h3>SYWAT Tournament Shop Assignment</h3>
@@ -80,6 +88,7 @@ function sywat_render_user_profile_shop_field( $user ) {
             <th><label for="sywat_shop_id">Assigned Archery Shop</label></th>
             <td>
                 <select name="sywat_shop_id" id="sywat_shop_id">
+                    <option value="" <?php selected( empty( $current_shop ), true ); ?>>-- Unassigned (No Shop Linked) --</option>
                     <?php foreach ( $shops as $s_id => $shop ): ?>
                         <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $current_shop, $s_id ); ?>>
                             <?php echo esc_html( $shop['name'] ); ?> (ID: <?php echo esc_html( $s_id ); ?>)
@@ -98,7 +107,12 @@ add_action( 'edit_user_profile_update', 'sywat_save_user_profile_shop_field' );
 function sywat_save_user_profile_shop_field( $user_id ) {
     if ( ! current_user_can( 'administrator' ) ) return;
     if ( isset( $_POST['sywat_shop_id'] ) ) {
-        update_user_meta( $user_id, 'sywat_shop_id', sanitize_text_field( $_POST['sywat_shop_id'] ) );
+        $val = sanitize_text_field( $_POST['sywat_shop_id'] );
+        if ( empty( $val ) ) {
+            delete_user_meta( $user_id, 'sywat_shop_id' );
+        } else {
+            update_user_meta( $user_id, 'sywat_shop_id', $val );
+        }
     }
 }
 
@@ -134,7 +148,7 @@ function sywat_handle_shop_actions() {
             'name'          => $shop_name,
             'contact'       => sanitize_text_field( $_POST['shop_contact'] ),
             'email'         => sanitize_text_field( $_POST['shop_email'] ),
-            'phone'         => sanitize_text_field( $_POST['shop_phone'] ),
+            'phone'         => sywat_format_phone_number( $_POST['shop_phone'] ),
             'address_1'     => sanitize_text_field( $_POST['shop_address_1'] ),
             'address_2'     => sanitize_text_field( $_POST['shop_address_2'] ),
             'city'          => sanitize_text_field( $_POST['shop_city'] ),
@@ -154,7 +168,7 @@ function sywat_handle_shop_actions() {
             $shops[$shop_id]['name']      = sanitize_text_field( $_POST['shop_name'] );
             $shops[$shop_id]['contact']   = sanitize_text_field( $_POST['shop_contact'] );
             $shops[$shop_id]['email']     = sanitize_text_field( $_POST['shop_email'] );
-            $shops[$shop_id]['phone']     = sanitize_text_field( $_POST['shop_phone'] );
+            $shops[$shop_id]['phone']     = sywat_format_phone_number( $_POST['shop_phone'] );
             $shops[$shop_id]['address_1'] = sanitize_text_field( $_POST['shop_address_1'] );
             $shops[$shop_id]['address_2'] = sanitize_text_field( $_POST['shop_address_2'] );
             $shops[$shop_id]['city']      = sanitize_text_field( $_POST['shop_city'] );
@@ -193,12 +207,13 @@ function sywat_handle_shop_actions() {
             unset( $shops[$shop_id] );
             update_option( 'sywat_shops_list', $shops );
 
+            // Unlink all assigned staff completely without reassigning
             $assigned_users = get_users( array( 'meta_key' => 'sywat_shop_id', 'meta_value' => $shop_id ) );
             foreach ( $assigned_users as $u ) {
-                update_user_meta( $u->ID, 'sywat_shop_id', 'shop_ccr' );
+                delete_user_meta( $u->ID, 'sywat_shop_id' );
             }
 
-            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully deleted shop ' . esc_html( $deleted_name ) . '. Staff reassigned to Cinnamon Creek Ranch.</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully deleted shop ' . esc_html( $deleted_name ) . '.</div>';
         }
     }
 
@@ -217,10 +232,10 @@ function sywat_handle_shop_actions() {
     if ( $action === 'remove_staff_from_shop' ) {
         $target_user_id = intval( $_POST['staff_user_id'] );
         if ( $target_user_id > 0 ) {
-            update_user_meta( $target_user_id, 'sywat_shop_id', 'shop_ccr' );
+            delete_user_meta( $target_user_id, 'sywat_shop_id' );
             $u = get_userdata( $target_user_id );
             $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
-            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Removed ' . esc_html( $u_name ) . ' from shop assignment (reassigned to default).</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Unlinked ' . esc_html( $u_name ) . ' from shop assignment.</div>';
         }
     }
 
@@ -284,7 +299,6 @@ function sywat_render_shops_tab() {
 
             foreach ( $eligible_users as $u ) {
                 $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
-                if ( empty( $u_shop ) ) $u_shop = 'shop_ccr';
 
                 if ( $u_shop === $managing_shop['id'] ) {
                     $linked_staff[] = $u;
@@ -302,7 +316,7 @@ function sywat_render_shops_tab() {
             <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:bold;">Link Additional Staff User to This Shop</h4>
                 <?php if ( empty( $unlinked_staff ) ): ?>
-                    <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to this shop.</p>
+                    <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to a shop.</p>
                 <?php else: ?>
                     <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -315,7 +329,7 @@ function sywat_render_shops_tab() {
                                 <?php foreach ( $unlinked_staff as $un_user ): ?>
                                     <?php 
                                         $curr_s_id = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
-                                        $curr_s_name = isset( $all_shops[$curr_s_id]['name'] ) ? $all_shops[$curr_s_id]['name'] : 'Default Shop';
+                                        $curr_s_name = isset( $all_shops[$curr_s_id]['name'] ) ? $all_shops[$curr_s_id]['name'] : 'Unassigned';
                                     ?>
                                     <option value="<?php echo esc_attr( $un_user->ID ); ?>">
                                         <?php echo esc_html( $un_user->display_name ); ?> (Currently: <?php echo esc_html( $curr_s_name ); ?>)
@@ -390,7 +404,7 @@ function sywat_render_shops_tab() {
                     </div>
                     <div class="sywat-shop-field">
                         <label>Contact Phone</label>
-                        <input type="text" name="shop_phone" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>">
+                        <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998">
                     </div>
                 </div>
 
@@ -478,10 +492,9 @@ function sywat_render_shops_tab() {
                 <table style="width:100%; border-collapse:collapse; font-size:14px; text-align:left;">
                     <thead>
                         <tr style="background:#f1f1f1; border-bottom:2px solid #ccc;">
-                            <th style="padding:8px; width:22%;">Shop Name & ID</th>
-                            <th style="padding:8px; width:25%;">Contact Info</th>
+                            <th style="padding:8px; width:30%;">Shop Name & ID</th>
+                            <th style="padding:8px; width:30%;">Contact Info</th>
                             <th style="padding:8px; width:15%;">Phone</th>
-                            <th style="padding:8px; width:13%;">Linked Staff</th>
                             <th style="padding:8px; text-align:left; width:25%;">Actions</th>
                         </tr>
                     </thead>
@@ -491,7 +504,6 @@ function sywat_render_shops_tab() {
                                 $linked_count = 0;
                                 foreach ( $eligible_users as $u ) {
                                     $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
-                                    if ( empty( $u_shop ) ) $u_shop = 'shop_ccr';
                                     if ( $u_shop === $s_id ) $linked_count++;
                                 }
                                 $s_contact = isset($shop['contact']) ? $shop['contact'] : '';
@@ -519,18 +531,13 @@ function sywat_render_shops_tab() {
                                     ?>
                                 </td>
                                 <td style="padding:8px;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                                <td style="padding:8px;">
-                                    <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" style="text-decoration:none;">
-                                        <span class="badge-type badge-prereg" style="font-size:12px;">👥 <?php echo $linked_count; ?> Staff User(s)</span>
-                                    </a>
-                                </td>
                                 <td style="padding:8px; text-align:left;">
                                     <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">👥 Link Staff</a>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">👥 Staff (<?php echo $linked_count; ?>)</a>
                                         <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">✏️ Edit Shop</a>
                                         
                                         <?php if ( $s_id !== 'shop_ccr' ): ?>
-                                            <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
+                                            <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop?');">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                                 <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
@@ -573,7 +580,7 @@ function sywat_render_shops_tab() {
 
                     <div class="sywat-shop-field">
                         <label>Contact Phone</label>
-                        <input type="text" name="shop_phone" placeholder="e.g. 817-439-8998">
+                        <input type="text" name="shop_phone" class="sywat-phone-input" placeholder="817-439-8998">
                     </div>
 
                     <hr style="border:none; border-top:1px dashed #ccc; margin:15px 0;">
@@ -624,6 +631,25 @@ function sywat_render_shops_tab() {
         }
 
         document.addEventListener("DOMContentLoaded", function() {
+            // Live JS Phone Input Masking (XXX-XXX-XXXX)
+            const phoneInputs = document.querySelectorAll('.sywat-phone-input');
+            phoneInputs.forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let digits = this.value.replace(/\D/g, '').substring(0, 10);
+                    let formatted = '';
+                    if (digits.length > 0) {
+                        if (digits.length <= 3) {
+                            formatted = digits;
+                        } else if (digits.length <= 6) {
+                            formatted = digits.substring(0, 3) + '-' + digits.substring(3);
+                        } else {
+                            formatted = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
+                        }
+                    }
+                    this.value = formatted;
+                });
+            });
+
             // Auto-fade notice banners
             const notice = document.getElementById('sywat-notice');
             if (notice) {
