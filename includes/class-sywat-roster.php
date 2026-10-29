@@ -264,8 +264,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         </div>
 
                         <div style="display:flex; justify-content:flex-end; gap:10px;">
-                            <a href="?tab=manage&view_tournament=<?php echo urlencode($selected_tournament); ?>&modal_action=manage" class="sywat-btn-secondary">Cancel</a>
-                            <button type="submit" class="sywat-btn-primary">Save Changes</button>
+                            <a href="?tab=manage&view_tournament=<?php echo urlencode($selected_tournament); ?>&modal_action=manage" class="sywat-btn sywat-btn-secondary">Cancel</a>
+                            <button type="submit" class="sywat-btn sywat-btn-primary">Save Changes</button>
                         </div>
                     </form>
                 </div>
@@ -291,7 +291,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <label for="search_shooter" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Search Archer Name</label>
                         <div style="display:flex; gap:5px; align-items:center;">
                             <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
                     </div>
 
@@ -304,7 +304,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                 <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                 <input type="hidden" name="redirect_action" value="manage">
-                                <button type="submit" class="sywat-btn-danger">Clear Line Roster</button>
+                                <button type="submit" class="sywat-btn sywat-btn-danger">Clear Line Roster</button>
                             </form>
                         </div>
                     <?php endif; ?>
@@ -343,7 +343,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                 <input type="hidden" name="modal_action" value="manage">
                                                 <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg_id ); ?>">
                                                 <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
-                                                <button type="submit" class="sywat-btn-primary" style="padding: 4px 10px; font-size: 12px; height: auto;">✏️ Edit</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-primary" style="padding: 4px 10px; font-size: 12px; height: auto;">✏️ Edit</button>
                                             </form>
 
                                             <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
@@ -351,7 +351,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                 <input type="hidden" name="sywat_action" value="delete_shooter">
                                                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                                 <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                                <button type="submit" class="sywat-btn-danger" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-danger" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
                                             </form>
                                         </div>
                                     </td>
