@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD, modal shop creation, optional address fields, phone auto-formatting (XXX-XXX-XXXX), line templates, explicit staff linking UI.
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -198,10 +198,7 @@ function sywat_handle_shop_actions() {
 
     if ( $action === 'delete_shop' ) {
         $shop_id = sanitize_text_field( $_POST['shop_id'] );
-        if ( $shop_id === 'shop_ccr' ) {
-            return '<div id="sywat-notice" style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">The primary default shop (Cinnamon Creek Ranch) cannot be deleted.</div>';
-        }
-
+        
         if ( isset( $shops[$shop_id] ) ) {
             $deleted_name = $shops[$shop_id]['name'];
             unset( $shops[$shop_id] );
@@ -309,8 +306,8 @@ function sywat_render_shops_tab() {
         ?>
         <div class="sywat-shop-card no-print">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <h3 style="margin:0; border:none; padding:0;">👤 Linked Staff for Shop: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></h3>
-                <a href="?tab=shops" class="sywat-btn sywat-btn-gray">← Back to Shops List</a>
+                <h3 style="margin:0; border:none; padding:0;">Linked Staff for Shop: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></h3>
+                <a href="?tab=shops" class="sywat-btn sywat-btn-gray">Back to Shops List</a>
             </div>
 
             <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
@@ -380,7 +377,7 @@ function sywat_render_shops_tab() {
         <!-- VIEW 2: EDIT SHOP DETAILS & LINE DEFAULT SCHEDULING -->
         <div class="sywat-shop-card no-print">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <h3 style="margin:0; border:none; padding:0;">✏️ Edit Archery Shop: <?php echo esc_html( $editing_shop['name'] ); ?></h3>
+                <h3 style="margin:0; border:none; padding:0;">Edit Archery Shop: <?php echo esc_html( $editing_shop['name'] ); ?></h3>
                 <a href="?tab=shops" class="sywat-btn sywat-btn-gray">Cancel Editing</a>
             </div>
 
@@ -466,7 +463,7 @@ function sywat_render_shops_tab() {
                 </table>
 
                 <div style="display:flex; gap:10px;">
-                    <button type="submit" class="sywat-btn sywat-btn-green" style="padding:8px 16px;">💾 Save Shop Changes</button>
+                    <button type="submit" class="sywat-btn sywat-btn-green" style="padding:8px 16px;">Save Shop Changes</button>
                     <a href="?tab=shops" class="sywat-btn sywat-btn-gray">Cancel</a>
                 </div>
             </form>
@@ -476,7 +473,7 @@ function sywat_render_shops_tab() {
         <!-- VIEW 3: MAIN SHOPS DIRECTORY & MODAL SHOP CREATION -->
         <div class="sywat-shop-card no-print">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-                <h3 style="margin:0; border:none; padding:0;">Configured Archery Shops</h3>
+                <h3 style="margin:0; border:none; padding:0;">Shop Management</h3>
                 <div style="display:flex; gap:8px; align-items:center;">
                     <div style="display:flex; gap:5px; margin:0; align-items:center;">
                         <input type="text" id="sywat_shop_search_input" placeholder="Search shop name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
@@ -533,19 +530,15 @@ function sywat_render_shops_tab() {
                                 <td style="padding:8px;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                 <td style="padding:8px; text-align:left;">
                                     <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">👥 Staff (<?php echo $linked_count; ?>)</a>
-                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">✏️ Edit Shop</a>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">Edit Shop</a>
                                         
-                                        <?php if ( $s_id !== 'shop_ccr' ): ?>
-                                            <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop?');">
-                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                <input type="hidden" name="sywat_shop_action" value="delete_shop">
-                                                <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-red">Delete</button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="badge-type" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1; padding:4px 8px;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
-                                        <?php endif; ?>
+                                        <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop?');">
+                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                            <input type="hidden" name="sywat_shop_action" value="delete_shop">
+                                            <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
+                                            <button type="submit" class="sywat-btn sywat-btn-red">Delete</button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -558,7 +551,7 @@ function sywat_render_shops_tab() {
         <!-- CREATE SHOP MODAL -->
         <div id="addShopModal" class="sywat-modal-bg" style="display:none;">
             <div class="sywat-modal-card">
-                <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">🏬 Create New Archery Shop</h3>
+                <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">Create New Archery Shop</h3>
                 <form method="post" action="?tab=shops">
                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                     <input type="hidden" name="sywat_shop_action" value="create_shop">
