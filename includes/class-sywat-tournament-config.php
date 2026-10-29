@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Tournament Configuration, Master Portal & Volunteer Hub
- * Description: Shortcode routing, master admin portal shell, tournament CRUD, multi-shop tabs, and Volunteer Hub portal view.
+ * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, and Volunteer Hub portal view.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 2.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -62,6 +62,47 @@ if ( ! function_exists( 'sywat_get_tournament_count' ) ) {
     }
 }
 
+// Helper: Format Start & End Dates nicely (e.g. "October 24 – 25, 2026" or "Oct 24, 2026")
+if ( ! function_exists( 'sywat_format_tournament_dates' ) ) {
+    function sywat_format_tournament_dates( $start_date, $end_date ) {
+        if ( empty( $start_date ) && empty( $end_date ) ) return '';
+        if ( empty( $end_date ) || $start_date === $end_date ) {
+            return date( 'F j, Y', strtotime( $start_date ) );
+        }
+
+        $s_time = strtotime( $start_date );
+        $e_time = strtotime( $end_date );
+
+        if ( date( 'Y-m', $s_time ) === date( 'Y-m', $e_time ) ) {
+            return date( 'F j', $s_time ) . ' – ' . date( 'j, Y', $e_time );
+        } elseif ( date( 'Y', $s_time ) === date( 'Y', $e_time ) ) {
+            return date( 'M j', $s_time ) . ' – ' . date( 'M j, Y', $e_time );
+        }
+        return date( 'M j, Y', $s_time ) . ' – ' . date( 'M j, Y', $e_time );
+    }
+}
+
+// Helper: Extract Lines Array from Tournament Data (Backwards Compatible)
+if ( ! function_exists( 'sywat_get_tournament_lines' ) ) {
+    function sywat_get_tournament_lines( $t_data ) {
+        if ( ! is_array( $t_data ) ) return array();
+        if ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) {
+            return $t_data['lines'];
+        }
+        return $t_data; // Legacy format where $t_data was directly an array of lines
+    }
+}
+
+// Helper: Extract Shop ID from Tournament Data (Backwards Compatible)
+if ( ! function_exists( 'sywat_get_tournament_shop_id' ) ) {
+    function sywat_get_tournament_shop_id( $t_data ) {
+        if ( is_array( $t_data ) && isset( $t_data['shop_id'] ) && ! empty( $t_data['shop_id'] ) ) {
+            return $t_data['shop_id'];
+        }
+        return 'shop_ccr'; // Default fallback for pre-existing tournaments
+    }
+}
+
 // Master Admin Portal Controller
 if ( ! function_exists( 'render_sywat_master_portal' ) ) {
     function render_sywat_master_portal() {
@@ -73,7 +114,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         ob_start();
         global $wpdb;
 
-        $is_admin = current_user_can( 'administrator' );
+        $is_admin     = current_user_can( 'administrator' );
+        $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $all_shops    = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( ! is_array( $tournaments ) ) $tournaments = array();
@@ -100,18 +143,24 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
         );
 
-        $edit_target      = isset( $_REQUEST['edit_tournament'] ) ? sanitize_text_field( $_REQUEST['edit_tournament'] ) : '';
-        $form_name        = ! empty( $edit_target ) ? $edit_target : '';
-        $form_lines       = ( ! empty( $edit_target ) && isset( $tournaments[$edit_target] ) ) ? $tournaments[$edit_target] : $default_lines;
-        $form_line_count  = isset( $_POST['line_count'] ) ? intval( $_POST['line_count'] ) : count( $form_lines );
-        if ( $form_line_count < 1 ) $form_line_count = 1;
-        if ( $form_line_count > 6 ) $form_line_count = 6;
-
         $selected_tournament = isset( $_REQUEST['view_tournament'] ) ? sanitize_text_field( $_REQUEST['view_tournament'] ) : '';
         $modal_action        = isset( $_REQUEST['modal_action'] ) ? sanitize_text_field( $_REQUEST['modal_action'] ) : 'manage';
         $open_modal          = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] );
 
-        $available_lines = $open_modal ? $tournaments[$selected_tournament] : array();
+        $open_tourn_modal    = isset( $_REQUEST['open_add_tournament'] ) || isset( $_REQUEST['edit_tournament_modal'] );
+        $edit_t_target       = isset( $_REQUEST['edit_tournament_modal'] ) ? sanitize_text_field( $_REQUEST['edit_tournament_modal'] ) : '';
+        
+        $edit_t_data         = ( ! empty( $edit_t_target ) && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
+        $edit_t_lines        = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
+        $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : $user_shop_id;
+        $edit_t_start        = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
+        $edit_t_end          = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
+
+        $form_line_count     = isset( $_POST['line_count'] ) ? intval( $_POST['line_count'] ) : count( $edit_t_lines );
+        if ( $form_line_count < 1 ) $form_line_count = 1;
+        if ( $form_line_count > 6 ) $form_line_count = 6;
+
+        $available_lines = $open_modal ? sywat_get_tournament_lines( $tournaments[$selected_tournament] ) : array();
         $filter_line_idx = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( $_REQUEST['filter_line_idx'] ) : 'all';
         $search_query    = isset( $_REQUEST['search_shooter'] ) ? trim( sanitize_text_field( $_REQUEST['search_shooter'] ) ) : '';
         $is_specific_line = ($filter_line_idx !== 'all' && $filter_line_idx !== '' && $filter_line_idx !== null);
@@ -149,9 +198,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 $t_name   = sanitize_text_field( $_POST['tournament_name'] );
                 $old_name = sanitize_text_field( $_POST['original_tournament_name'] );
                 $new_slug = sanitize_title( $t_name );
+
+                $start_date = sanitize_text_field( $_POST['start_date'] );
+                $end_date   = sanitize_text_field( $_POST['end_date'] );
+                if ( empty( $end_date ) ) $end_date = $start_date;
+
+                // Enforce shop assignment: Admins can assign to any shop, non-admins auto-lock to their own shop
+                $assigned_shop_id = $is_admin ? sanitize_text_field( $_POST['shop_id'] ) : $user_shop_id;
+                if ( empty( $assigned_shop_id ) ) $assigned_shop_id = $user_shop_id;
                 
-                $new_dates = isset($_POST['tournament_dates']) ? sanitize_text_field($_POST['tournament_dates']) : '';
-                update_option('sywat_dates_' . $new_slug, $new_dates);
+                $formatted_dates = sywat_format_tournament_dates( $start_date, $end_date );
+                update_option( 'sywat_dates_' . $new_slug, $formatted_dates );
 
                 $new_lines = array();
                 if ( ! empty( $_POST['line_names'] ) ) {
@@ -189,7 +246,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     }
                 }
 
-                $tournaments[$t_name] = $new_lines;
+                $tournaments[$t_name] = array(
+                    'shop_id'    => $assigned_shop_id,
+                    'start_date' => $start_date,
+                    'end_date'   => $end_date,
+                    'lines'      => $new_lines,
+                );
+
                 update_option( 'sywat_tournaments_list', $tournaments );
                 update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
                 update_option( 'sywat_current_tournament', $t_name );
@@ -197,6 +260,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                 $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully!</div>';
                 $active_tab = 'manage';
+                $open_tourn_modal = false;
             }
 
             if ( $action === 'delete_tournament' ) {
@@ -250,6 +314,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             if ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
                 $notice = sywat_handle_purge_line( $tournaments, $registrations );
                 $open_modal = true; $modal_action = isset( $_POST['redirect_action'] ) ? sanitize_text_field( $_POST['redirect_action'] ) : 'prereg';
+            }
+        }
+
+        // Filter Tournaments by Shop Scoping: Non-Admins only see tournaments hosted by their shop
+        $scoped_tournaments = array();
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $t_shop = sywat_get_tournament_shop_id( $t_data );
+            if ( $is_admin || $t_shop === $user_shop_id ) {
+                $scoped_tournaments[$t_name] = $t_data;
             }
         }
 
@@ -325,130 +398,66 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             .sywat-modal-close { background: none; border: none; font-size: 22px; font-weight: bold; color: #646970; cursor: pointer; line-height: 1; }
             .sywat-modal-close:hover { color: #d63638; }
             .sywat-modal-body { padding: 20px; overflow-y: auto; }
-
-            @media print {
-                @page { size: letter <?php echo ( $modal_action === 'print' ) ? 'landscape' : 'portrait'; ?>; margin: 0.4in; }
-                #wpadminbar, #adminmenumain, #wpfooter, header, footer, nav, aside, iframe, .no-print, .ast-site-header, .site-header, .ast-footer, .site-footer { display: none !important; }
-                html, body, #wpwrap, #wpcontent, #wpbody, #wpbody-content, #page, #content, .sywat-wrap, .sywat-modal-backdrop, .sywat-modal-content, .sywat-modal-body {
-                    position: static !important; display: block !important; float: none !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; background: #ffffff !important; box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important;
-                }
-                .sywat-modal-header, .sywat-modal-body > :not(#sywat_print_area) { display: none !important; }
-                #sywat_print_area { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-                .sywat-table, .invoice-fee-table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; page-break-after: auto !important; }
-                .sywat-table thead, .invoice-fee-table thead { display: table-header-group !important; }
-                .sywat-table tr, .invoice-fee-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-                .sywat-table th, .invoice-fee-table th { background-color: #f1f5f9 !important; border: 1px solid #000 !important; padding: 4px 6px !important; font-size: 10px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                .sywat-table td, .invoice-fee-table td { border: 1px solid #000 !important; padding: 3px 5px !important; font-size: 9px !important; vertical-align: middle !important; }
-            }
         </style>
 
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
             <div class="sywat-nav-tabs no-print">
-                <a href="?tab=manage" class="sywat-tab-item <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournaments & Rosters</a>
-                <a href="?tab=create" class="sywat-tab-item <?php echo $active_tab === 'create' ? 'active' : ''; ?>"><?php echo ! empty( $edit_target ) ? 'Edit Tournament Config' : 'Create New Tournament'; ?></a>
+                <a href="?tab=manage" class="sywat-tab-item active">Tournament Management</a>
                 <?php if ( $is_admin ): ?>
-                    <a href="?tab=shops" class="sywat-tab-item <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
+                    <a href="?tab=shops" class="sywat-tab-item">Shop Management</a>
                 <?php endif; ?>
             </div>
 
             <?php if ( $active_tab === 'shops' && $is_admin ): ?>
-                <!-- TAB 3: SHOPS & STAFF MANAGEMENT -->
+                <!-- TAB 2: SHOP MANAGEMENT -->
                 <?php if ( function_exists( 'sywat_render_shops_tab' ) ) sywat_render_shops_tab(); ?>
-
-            <?php elseif ( $active_tab === 'create' ): ?>
-                <!-- TAB 2: CREATE / EDIT TOURNAMENT FORM -->
-                <div class="sywat-card no-print">
-                    <h2 class="sywat-card-title"><?php echo ! empty( $edit_target ) ? 'Edit Tournament: ' . esc_html( $edit_target ) : 'Create New Tournament'; ?></h2>
-                    <form method="post" action="?tab=create<?php echo ! empty( $edit_target ) ? '&edit_tournament=' . urlencode($edit_target) : ''; ?>">
-                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                        <input type="hidden" name="sywat_action" value="save_tournament">
-                        <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $form_name ); ?>">
-
-                        <div style="margin-bottom: 20px;">
-                            <label style="display:block; font-weight:600; margin-bottom:5px;">Tournament Name</label>
-                            <input type="text" name="tournament_name" value="<?php echo esc_attr( $form_name ); ?>" placeholder="e.g. CCR October 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                        </div>
-
-                        <?php $t_dates = get_option('sywat_dates_' . sanitize_title($form_name), ''); ?>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display:block; font-weight:600; margin-bottom:5px;">Tournament Dates (For Invoice)</label>
-                            <input type="text" name="tournament_dates" value="<?php echo esc_attr( $t_dates ); ?>" placeholder="e.g. Oct 24 & 25, 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
-                        </div>
-
-                        <div style="margin-bottom: 20px;">
-                            <label style="display:block; font-weight:600; margin-bottom:5px;">Number of Shooting Lines (1 - 6)</label>
-                            <div style="display:flex; gap:10px; align-items:center;">
-                                <select name="line_count" style="padding:6px 10px; border:1px solid #8c8f94; border-radius:4px; width:130px; height:34px;">
-                                    <?php for ($i = 1; $i <= 6; $i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php selected( $form_line_count, $i ); ?>><?php echo $i; ?> Line<?php echo $i > 1 ? 's' : ''; ?></option>
-                                    <?php endfor; ?>
-                                </select>
-                                <button type="submit" class="sywat-btn-primary">Update Line Rows</button>
-                            </div>
-                        </div>
-
-                        <h3 style="font-size: 15px; font-weight: 600; margin-top: 25px; margin-bottom: 10px;">Shooting Lines & Capacity Configuration</h3>
-                        <table class="sywat-table" style="margin-bottom: 20px;">
-                            <thead>
-                                <tr>
-                                    <th>Line Day / Time</th>
-                                    <th style="width: 180px;">20yd Capacity</th>
-                                    <th style="width: 180px;">Cub Capacity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php for ($i = 0; $i < $form_line_count; $i++): ?>
-                                    <?php 
-                                        $fallback  = isset($default_lines[$i]) ? $default_lines[$i] : array( 'name' => 'Line ' . ($i + 1), 'cap_20yd' => 20, 'cap_cub' => 5 );
-                                        $line_name = isset($form_lines[$i]['name']) ? $form_lines[$i]['name'] : $fallback['name'];
-                                        $cap_20yd  = isset($form_lines[$i]['cap_20yd']) ? $form_lines[$i]['cap_20yd'] : $fallback['cap_20yd'];
-                                        $cap_cub   = isset($form_lines[$i]['cap_cub']) ? $form_lines[$i]['cap_cub'] : $fallback['cap_cub'];
-                                    ?>
-                                    <tr>
-                                        <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $line_name ); ?>" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
-                                        <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
-                                        <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
-                                    </tr>
-                                <?php endfor; ?>
-                            </tbody>
-                        </table>
-
-                        <button type="submit" class="sywat-btn-primary" style="height: auto; padding: 10px 20px; font-size: 14px;">Save Tournament & Config</button>
-                    </form>
-                </div>
 
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print">
                     <div class="sywat-card-title">
                         <span>Configured Tournaments</span>
-                        <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
-                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                            <input type="hidden" name="sywat_action" value="sync_tfaa_now">
-                            <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings Cache: <strong><?php echo $tfaa_count; ?></strong> Shooters (Updated: <?php echo esc_html($tfaa_updated); ?>)</span>
-                            <button type="submit" class="sywat-btn-secondary" style="height: 30px; font-size: 12px;">🔄 Sync TFAA Standings Now</button>
-                        </form>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
+                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                <input type="hidden" name="sywat_action" value="sync_tfaa_now">
+                                <span style="font-size: 12px; color: #646970; font-weight: normal;">TFAA Standings: <strong><?php echo $tfaa_count; ?></strong> Shooters</span>
+                                <button type="submit" class="sywat-btn-secondary" style="height: 30px; font-size: 12px;">🔄 Sync TFAA</button>
+                            </form>
+                            <button type="button" class="sywat-btn-success" style="height: 30px; font-size: 12px;" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                        </div>
                     </div>
                     <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
 
-                    <?php if ( empty( $tournaments ) ): ?>
-                        <p style="color:#646970; font-style:italic;">No tournaments created yet. Click on <strong>"Create New Tournament"</strong> to configure your first tournament.</p>
+                    <?php if ( empty( $scoped_tournaments ) ): ?>
+                        <p style="color:#646970; font-style:italic;">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
                     <?php else: ?>
                         <table class="sywat-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%;">Tournament Name</th>
-                                    <th style="width: 14%;">Volunteer Hub</th>
+                                    <th style="width: 22%;">Tournament & Location</th>
+                                    <th style="width: 12%;">Volunteer Hub</th>
                                     <th style="width: 35%;">Line Slot Availability (20yd / Cub)</th>
-                                    <th style="width: 17%;">Shooter Management</th>
-                                    <th style="width: 14%; text-align: right;">Tournament Management</th>
+                                    <th style="width: 16%;">Shooter Management</th>
+                                    <th style="width: 15%; text-align: right;">Tournament Management</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ( $tournaments as $t_name => $t_lines ): ?>
+                                <?php foreach ( $scoped_tournaments as $t_name => $t_data ): ?>
                                     <?php 
+                                        $t_lines    = sywat_get_tournament_lines( $t_data );
+                                        $t_shop_id  = sywat_get_tournament_shop_id( $t_data );
+                                        $t_shop_name= isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
+
+                                        $s_date     = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                                        $e_date     = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                                        $disp_dates = sywat_format_tournament_dates( $s_date, $e_date );
+                                        if ( empty( $disp_dates ) ) {
+                                            $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), 'Dates Not Set' );
+                                        }
+
                                         $line_count = is_array( $t_lines ) ? count( $t_lines ) : 0;
                                         $reg_count  = sywat_get_tournament_count( $t_name, $registrations );
                                         $is_active_hub = in_array( $t_name, $active_tournaments );
@@ -456,7 +465,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <tr>
                                         <td>
                                             <strong><?php echo esc_html( $t_name ); ?></strong>
-                                            <div style="font-size: 12px; color: #646970; margin-top: 2px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
+                                            <div style="font-size: 12px; color: #2271b1; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                            <div style="font-size: 11px; color: #646970; margin-top: 2px;">📅 <?php echo esc_html( $disp_dates ); ?></div>
+                                            <div style="font-size: 11px; color: #646970; margin-top: 1px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
                                         </td>
                                         <td>
                                             <form method="post" style="margin: 0;">
@@ -510,7 +521,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
                                                 <a href="/sywat-desk/" class="sywat-btn-success" style="width: 100%; max-width: 130px; justify-content: center;">Check-In Desk</a>
                                                 <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Enter Scores</a>
-                                                <a href="?tab=create&edit_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Edit Config</a>
+                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn-primary" style="width: 100%; max-width: 130px; justify-content: center;">Edit Config</a>
                                                 <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="delete_tournament">
@@ -527,7 +538,100 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 </div>
             <?php endif; ?>
 
-            <!-- MODAL DELEGATION SHELL -->
+            <!-- MODAL 1: ADD / EDIT TOURNAMENT MODAL -->
+            <div class="sywat-modal-backdrop <?php echo $open_tourn_modal ? 'active' : ''; ?>" id="sywat_add_tourn_modal">
+                <div class="sywat-modal-content" style="max-width: 700px;">
+                    <div class="sywat-modal-header no-print">
+                        <h3><?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
+                        <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
+                    </div>
+                    <div class="sywat-modal-body">
+                        <form method="post" action="?tab=manage">
+                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                            <input type="hidden" name="sywat_action" value="save_tournament">
+                            <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
+
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Tournament Name *</label>
+                                    <input type="text" name="tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="e.g. CCR October 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Host Archery Shop *</label>
+                                    <?php if ( $is_admin ): ?>
+                                        <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                            <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                                <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
+                                                    <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    <?php else: ?>
+                                        <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
+                                        <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; background:#f0f0f1; font-weight:bold;">
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 20px;">
+                                <div>
+                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
+                                    <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date (Optional for multi-day)</label>
+                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Number of Shooting Lines (1 - 6)</label>
+                                <div style="display:flex; gap:10px; align-items:center;">
+                                    <select name="line_count" style="padding:6px 10px; border:1px solid #8c8f94; border-radius:4px; width:130px; height:34px;">
+                                        <?php for ($i = 1; $i <= 6; $i++): ?>
+                                            <option value="<?php echo $i; ?>" <?php selected( $form_line_count, $i ); ?>><?php echo $i; ?> Line<?php echo $i > 1 ? 's' : ''; ?></option>
+                                        <?php endfor; ?>
+                                    </select>
+                                    <button type="submit" name="sywat_action" value="update_line_rows" class="sywat-btn-primary" formnovalidate>Update Line Rows</button>
+                                </div>
+                            </div>
+
+                            <h4 style="font-size: 14px; font-weight: 600; margin-top: 15px; margin-bottom: 10px;">Shooting Lines & Capacity Templates</h4>
+                            <table class="sywat-table" style="margin-bottom: 20px;">
+                                <thead>
+                                    <tr>
+                                        <th>Line Day / Time</th>
+                                        <th style="width: 140px;">20yd Capacity</th>
+                                        <th style="width: 140px;">Cub Capacity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php for ($i = 0; $i < $form_line_count; $i++): ?>
+                                        <?php 
+                                            $fallback  = isset($default_lines[$i]) ? $default_lines[$i] : array( 'name' => 'Line ' . ($i + 1), 'cap_20yd' => 20, 'cap_cub' => 5 );
+                                            $line_name = isset($edit_t_lines[$i]['name']) ? $edit_t_lines[$i]['name'] : $fallback['name'];
+                                            $cap_20yd  = isset($edit_t_lines[$i]['cap_20yd']) ? $edit_t_lines[$i]['cap_20yd'] : $fallback['cap_20yd'];
+                                            $cap_cub   = isset($edit_t_lines[$i]['cap_cub']) ? $edit_t_lines[$i]['cap_cub'] : $fallback['cap_cub'];
+                                        ?>
+                                        <tr>
+                                            <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $line_name ); ?>" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                            <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                            <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                        </tr>
+                                    <?php endfor; ?>
+                                </tbody>
+                            </table>
+
+                            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                                <button type="button" class="sywat-btn-secondary" onclick="closeAddTournamentModal()">Cancel</button>
+                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn-success" style="height:auto; padding:8px 16px;">Save Tournament Configuration</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL 2: DELEGATED SHOOTER / ROSTER / INVOICE MODAL -->
             <div class="sywat-modal-backdrop <?php echo $open_modal ? 'active' : ''; ?>" id="sywat_modal">
                 <div class="sywat-modal-content">
                     <div class="sywat-modal-header no-print">
@@ -561,6 +665,20 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         </div>
 
         <script>
+        function openAddTournamentModal() {
+            const modal = document.getElementById('sywat_add_tourn_modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeAddTournamentModal() {
+            const modal = document.getElementById('sywat_add_tourn_modal');
+            if (modal) modal.classList.remove('active');
+            const url = new URL(window.location.href);
+            url.searchParams.delete('open_add_tournament');
+            url.searchParams.delete('edit_tournament_modal');
+            window.history.replaceState({}, document.title, url.toString());
+        }
+
         function closeSywatModal() {
             const modal = document.getElementById('sywat_modal');
             if (modal) modal.classList.remove('active');
@@ -571,6 +689,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             url.searchParams.delete('search_shooter');
             window.history.replaceState({}, document.title, url.toString());
         }
+
         document.addEventListener("DOMContentLoaded", function() {
             const notice = document.getElementById('sywat-notice');
             if (notice) {
@@ -604,10 +723,14 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
         $active_tournaments = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
 
+        $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $is_admin     = current_user_can( 'administrator' );
+
         $display_tournaments = array();
-        foreach ($tournaments as $t_name => $t_lines) {
-            if ( in_array( $t_name, $active_tournaments ) ) {
-                $display_tournaments[$t_name] = $t_lines;
+        foreach ($tournaments as $t_name => $t_data) {
+            $t_shop = sywat_get_tournament_shop_id( $t_data );
+            if ( in_array( $t_name, $active_tournaments ) && ( $is_admin || $t_shop === $user_shop_id ) ) {
+                $display_tournaments[$t_name] = sywat_get_tournament_lines( $t_data );
             }
         }
 
