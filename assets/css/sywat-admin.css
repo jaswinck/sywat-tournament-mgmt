@@ -92,24 +92,14 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Primary Button (Solid Blue) */
-.sywat-btn-primary {
-    background-color: #2271b1;
-    border: 1px solid #2271b1;
-    color: #ffffff !important;
-}
-.sywat-btn-primary:hover {
-    background-color: #135e96;
-    border-color: #135e96;
-    color: #ffffff !important;
-}
-
-/* Secondary Button (White Background, Highlights Solid Blue on Hover) */
+/* Primary & Secondary Action Buttons (White Background, Highlights Solid Blue on Hover for High Icon Contrast) */
+.sywat-btn-primary,
 .sywat-btn-secondary {
     background-color: #ffffff;
     border: 1px solid #2271b1;
     color: #2271b1 !important;
 }
+.sywat-btn-primary:hover,
 .sywat-btn-secondary:hover {
     background-color: #2271b1;
     border-color: #2271b1;
@@ -163,6 +153,24 @@
     border-color: #545b62;
     color: #ffffff !important;
 }
+
+/* Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
+.sywat-btn-icon-save::before       { content: "💾\00a0"; }
+.sywat-btn-icon-edit::before       { content: "✏️\00a0"; }
+.sywat-btn-icon-manage::before     { content: "👥\00a0"; }
+.sywat-btn-icon-add::before        { content: "➕\00a0"; }
+.sywat-btn-icon-delete::before     { content: "🗑️\00a0"; }
+.sywat-btn-icon-checkin::before    { content: "📋\00a0"; }
+.sywat-btn-icon-checkedin::before  { content: "✓\00a0"; }
+.sywat-btn-icon-export::before     { content: "📥\00a0"; }
+.sywat-btn-icon-invoice::before    { content: "📄\00a0"; }
+.sywat-btn-icon-print::before      { content: "🖨️\00a0"; }
+.sywat-btn-icon-lock::before       { content: "🔒\00a0"; }
+.sywat-btn-icon-unlock::before     { content: "🔓\00a0"; }
+.sywat-btn-icon-sync::before       { content: "🔄\00a0"; }
+.sywat-btn-icon-reset::before      { content: "↺\00a0"; }
+.sywat-btn-icon-clear::before      { content: "✕\00a0"; }
+.sywat-btn-icon-back::before       { content: "←\00a0"; }
 
 /* Badges & Status Indicators */
 .sywat-badge {
