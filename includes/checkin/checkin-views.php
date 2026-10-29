@@ -28,18 +28,23 @@ function sywat_desk_render_family_banner($added_family_prompt) {
 }
 
 function sywat_desk_render_filter_bar($data) {
-    $selected_t  = isset($data['selected_tournament']) ? $data['selected_tournament'] : '';
-    $tournaments = isset($data['tournaments']) ? $data['tournaments'] : array();
-    $t_data      = isset($tournaments[$selected_t]) ? $tournaments[$selected_t] : array();
+    $selected_t = isset($data['selected_tournament']) ? $data['selected_tournament'] : '';
+    
+    // Fetch master tournament configuration directly from database option
+    $all_tournaments = get_option('sywat_tournaments_list', array());
+    $t_master        = (is_array($all_tournaments) && isset($all_tournaments[$selected_t])) ? $all_tournaments[$selected_t] : array();
 
-    $t_shop_id   = function_exists('sywat_get_tournament_shop_id') 
-        ? sywat_get_tournament_shop_id($t_data) 
-        : (is_array($t_data) && isset($t_data['shop_id']) ? $t_data['shop_id'] : 'shop_ccr');
+    $t_shop_id = 'shop_ccr';
+    if (is_array($t_master) && isset($t_master['shop_id']) && !empty($t_master['shop_id'])) {
+        $t_shop_id = $t_master['shop_id'];
+    } elseif (function_exists('sywat_get_tournament_shop_id')) {
+        $t_shop_id = sywat_get_tournament_shop_id($t_master);
+    }
 
     $active_hubs = get_option('sywat_active_tournaments', array());
     if (!is_array($active_hubs)) $active_hubs = array();
 
-    // Volunteer Hub is strictly for active tournaments hosted by Cinnamon Creek Ranch (shop_ccr)
+    // Volunteer Hub is strictly enabled ONLY for active tournaments hosted by Cinnamon Creek Ranch (shop_ccr)
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
     ?>
     <form method="post" id="sywat_filter_form" class="no-print sywat-card" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; padding:15px; margin-bottom:20px;">
