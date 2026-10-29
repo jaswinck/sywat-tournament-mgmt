@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
- * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering with dynamic API fallback, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -91,16 +91,16 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $all_tournament_regs = array_filter( $registrations, function($r) use ($selected_tournament) {
             return isset($r['tournament']) && strcasecmp($r['tournament'], $selected_tournament) === 0;
         });
-        $acct = sywat_calculate_accounting_totals($all_tournament_regs);
 
+        $acct = sywat_calculate_accounting_totals($all_tournament_regs);
         $t_dates = get_option('sywat_dates_' . sanitize_title($selected_tournament), '');
         $tourn_dates_str = !empty($t_dates) ? $t_dates : $selected_tournament;
 
         // Fetch Shop Info dynamically based on Tournament Assignment
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         $all_shops   = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
-        
         $shop_id     = 'shop_ccr';
+
         if ( isset( $tournaments[$selected_tournament] ) ) {
             $t_data  = $tournaments[$selected_tournament];
             $shop_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
@@ -112,9 +112,23 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email  = ! empty( $shop_info['email'] ) ? $shop_info['email'] : 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com';
         $shop_phone  = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '817-439-8998';
 
-        $raw_qr_path  = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
-        $zelle_qr_url = ( strpos( $raw_qr_path, 'http' ) === 0 ) ? $raw_qr_path : site_url( $raw_qr_path );
+        // Zelle QR Code Image Resolution with Dynamic Fallback
+        $raw_qr_path = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
+        $zelle_qr_url = '';
+
+        if ( strpos( $raw_qr_path, 'http' ) === 0 ) {
+            $zelle_qr_url = $raw_qr_path;
+        } else {
+            $local_file = ABSPATH . ltrim( $raw_qr_path, '/' );
+            if ( file_exists( $local_file ) ) {
+                $zelle_qr_url = site_url( $raw_qr_path );
+            } else {
+                // Fallback: Dynamically generate Zelle QR code for tfaachecking
+                $zelle_qr_url = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=tfaachecking';
+            }
+        }
         ?>
+
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-print" onclick="window.print()">Print / Save Invoice PDF</button>
         </div>
@@ -128,14 +142,20 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                 .invoice-header-table td { padding: 4px 6px; font-size: 12px; }
                 .invoice-header-label { font-weight: bold; width: 28%; white-space: nowrap; }
                 .invoice-header-val { background-color: #DAE6F5 !important; border: 1px solid #7092BE !important; font-weight: bold; padding: 4px 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                
                 .invoice-fee-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
                 .invoice-fee-table th { background-color: #f1f5f9 !important; border: 1px solid #000 !important; padding: 6px; font-size: 12px; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 .invoice-fee-table td { border: 1px solid #000 !important; padding: 6px; font-size: 12px; }
                 .blue-shade { background-color: #DAE6F5 !important; font-weight: bold; text-align: right; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                
                 .invoice-footer { text-align: center; font-size: 11px; margin-top: 15px; line-height: 1.5; }
                 .invoice-footer-bold { font-weight: bold; color: #1e3a8a; }
+
+                @media print {
+                    body * { visibility: hidden !important; }
+                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
+                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10px !important; }
+                    .no-print { display: none !important; }
+                    .invoice-qr-code { display: inline-block !important; visibility: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; width: 120px !important; height: auto !important; }
+                }
             </style>
 
             <div class="invoice-box">
@@ -151,6 +171,7 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                 </table>
 
                 <div style="font-weight:bold; font-size:13px; margin-bottom:6px;">Registration Tournament Fees:</div>
+
                 <table class="invoice-fee-table">
                     <thead>
                         <tr>
@@ -204,9 +225,11 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                     <p>Please remit TFAA Payment via Check or Zelle and a copy of this Invoice within 7 days to:</p>
                     <p class="invoice-footer-bold">Texas Field Archery Association<br>C/O Anna Hanson<br>722 Cannon Ball Dr.<br>Spring TX 77380<br>Email: anna.hanson@resolute-tx.com</p>
                     <p style="margin-top: 8px;">Send Money with Zelle®, Tag: <strong style="color:#1e3a8a;">tfaachecking</strong></p>
+                    
                     <div style="margin-top: 10px; text-align: center;">
-                        <img src="<?php echo esc_url($zelle_qr_url); ?>" alt="Zelle QR Code" style="width: 120px; height: auto; display: inline-block;" loading="eager">
+                        <img src="<?php echo esc_url($zelle_qr_url); ?>" class="invoice-qr-code" alt="Zelle QR Code" style="width: 120px; height: auto; display: inline-block;" loading="eager">
                     </div>
+                    
                     <p style="font-weight: bold; font-size: 13px; margin-top: 10px;">Thank You for Hosting!</p>
                 </div>
             </div>
@@ -234,12 +257,12 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
 
         $acct = sywat_calculate_accounting_totals($filtered_registrations);
         ?>
+
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
             <form method="get" action="" style="display: flex; gap: 12px; align-items: center; margin: 0;">
                 <input type="hidden" name="tab" value="manage">
                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="modal_action" value="print">
-
                 <div style="min-width: 220px;">
                     <label for="filter_line_idx_print" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Filter Roster by Line</label>
                     <select name="filter_line_idx" id="filter_line_idx_print" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="this.form.submit()">
@@ -254,6 +277,15 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         </div>
 
         <div id="sywat_print_area">
+            <style>
+                @media print {
+                    body * { visibility: hidden !important; }
+                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
+                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10px !important; }
+                    .no-print { display: none !important; }
+                }
+            </style>
+
             <div style="margin-bottom: 12px; border-bottom: 2px solid #1d2327; padding-bottom: 8px;">
                 <h2 style="margin: 0; font-size: 18px; color: #1d2327;">TFAA SYWAT Tournament Roster</h2>
                 <div style="font-size: 12px; color: #475569; font-weight: 600; margin-top: 4px;">
@@ -297,7 +329,11 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                 $is_no_show    = ( isset( $reg['division'] ) && $reg['division'] === 'No Show' );
 
                                 if ( $is_no_show ) {
-                                    $division_disp = 'No Show'; $gender_disp = 'No Show'; $style_disp = 'No Show'; $print_score = ''; $print_x = '';
+                                    $division_disp = 'No Show';
+                                    $gender_disp   = 'No Show';
+                                    $style_disp    = 'No Show';
+                                    $print_score   = '';
+                                    $print_x       = '';
                                 } elseif ( $is_checked_in ) {
                                     $division_disp = ! empty( $reg['division'] ) ? esc_html( $reg['division'] ) : '';
                                     $gender_disp   = ! empty( $reg['gender'] ) ? esc_html( $reg['gender'] ) : '';
@@ -308,7 +344,8 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                     $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
                                     $gender_disp   = 'M | F';
                                     $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
-                                    $print_score   = ''; $print_x = '';
+                                    $print_score   = '';
+                                    $print_x       = '';
                                 }
 
                                 $due_amt = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
@@ -335,10 +372,8 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                             </tr>
                         <?php endforeach; ?>
 
-                        <?php 
-                        if ( $is_specific_line && $num <= 100 ) {
-                            while ( $num <= 100 ) {
-                                ?>
+                        <?php if ( $is_specific_line && $num <= 100 ) {
+                            while ( $num <= 100 ) { ?>
                                 <tr>
                                     <td><strong><?php echo $num++; ?></strong></td>
                                     <td></td>
@@ -350,10 +385,8 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                     <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
                                     <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
                                 </tr>
-                                <?php
-                            }
-                        }
-                        ?>
+                            <?php }
+                        } ?>
                     </tbody>
                 </table>
             <?php endif; ?>
