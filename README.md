@@ -20,7 +20,12 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
   - `checkin-data.php` — Data aggregation and TFAA / shop profile history matching.
   - `checkin-modals.php` — Check-in and walk-in modals with dynamic real-time unpaid balance banner toggles.
   - `checkin-views.php` — Visual views, line capacity tracker, dynamic return navigation bar, and registered archers table.
+- **`includes/scores/`** — Modular Score Entry portal sub-system (`[sywat_scores]`):
+  - `class-sywat-scores.php` — Sub-module loader shell and shortcode binding.
+  - `scores-actions.php` — Action handlers for AJAX single score auto-save and batch save/lock/reset logic.
+  - `scores-export.php` — Early CSV score report export generation (`template_redirect`).
+  - `scores-scripts.php` — Client-side JavaScript engine (offline local draft storage, background AJAX auto-save, and input range validation).
+  - `scores-views.php` — Score entry filter bar with dynamic return navigation bar and batch scoring table UI.
 - **`includes/class-sywat-roster.php`** — Archer roster management, division/style restriction enforcement, family group assignments, and line purges.
 - **`includes/class-sywat-accounting.php`** — Financial accounting engine, 50/50 host/TFAA fee split math, family cap calculations, Zelle QR code rendering, and printable invoice/roster renderers with dynamic shop metadata.
-- **`includes/class-sywat-scores.php`** — Batch score entry app (`[sywat_scores]`) with real-time AJAX auto-save, offline local draft syncing, line locking, tie-breakers, and CSV export.
 - **`includes/class-sywat-tfaa-sync.php`** — TFAA membership verification, web scraping standings cache engine, standalone sync button (`[sywat_tfaa_sync_btn]`), and daily WP-Cron background sync.
