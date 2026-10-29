@@ -342,10 +342,10 @@ function render_sywat_scores_app() {
             } else {
                 if (!empty($locked_lines[$selected_line_idx])) {
                     unset($locked_lines[$selected_line_idx]);
-                    $notice = '<div class="sywat-alert sywat-alert-success">🔓 Line unlocked. Scores can now be edited.</div>';
+                    $notice = '<div class="sywat-alert sywat-alert-success">Line unlocked. Scores can now be edited.</div>';
                 } else {
                     $locked_lines[$selected_line_idx] = 1;
-                    $notice = '<div class="sywat-alert sywat-alert-success">🔒 Line locked. Scores on this line are frozen and cannot be edited until unlocked.</div>';
+                    $notice = '<div class="sywat-alert sywat-alert-success">Line locked. Scores on this line are frozen and cannot be edited until unlocked.</div>';
                 }
                 update_option('sywat_locks_' . $active_t_slug, $locked_lines);
                 $current_view_locked = !empty($locked_lines[$selected_line_idx]);
@@ -530,7 +530,7 @@ function render_sywat_scores_app() {
             </div>
 
             <div style="margin-left:auto;">
-                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary">← Back to Volunteer Hub</a>
+                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
             </div>
         </form>
 
@@ -552,26 +552,26 @@ function render_sywat_scores_app() {
                         <!-- Live Search Input -->
                         <div style="display:flex; gap:5px; align-items:center; margin-right:5px;">
                             <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
 
                         <!-- Export CSV Button (Admin Only & Shown Whenever Locked Lines Exist) -->
                         <?php if ($is_admin && !empty($locked_lines)): ?>
-                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary" style="height:32px;" title="Export scores for ALL locked lines to a CSV file">📥 Export CSV</button>
+                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" style="height:32px;" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
                         <?php endif; ?>
 
                         <?php if ($is_admin): ?>
                             <?php if ($selected_line_idx !== 'all'): ?>
                                 <?php if ($current_view_locked): ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary" style="height:32px;" title="Unlock to edit scores">🔓 Unlock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" style="height:32px;" title="Unlock to edit scores">Unlock Line</button>
                                 <?php else: ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary" style="height:32px;" title="Lock to prevent edits">🔒 Lock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock" style="height:32px;" title="Lock to prevent edits">Lock Line</button>
                                 <?php endif; ?>
                             <?php endif; ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                         <?php endif; ?>
                         
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success" style="height:32px;">💾 Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:32px;">Save All Scores</button>
                     </div>
                 </div>
 
@@ -629,9 +629,9 @@ function render_sywat_scores_app() {
 
                     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                         <?php if ($is_admin): ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                         <?php endif; ?>
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success" style="height:32px;">💾 Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:32px;">Save All Scores</button>
                     </div>
                 <?php else: ?>
                     <p style="color:#64748b; font-style:italic; padding:20px 0;">No checked-in archers found for this tournament/line selection.</p>
@@ -714,7 +714,7 @@ function render_sywat_scores_app() {
 
         // Local Storage Key Generator
         function getStorageKey(regId) {
-            return 'sywat_draft_' + currentTourn.replace(/[^a-z0-9]/gi, '_') + '_' + regId;
+            return 'sywat_draft_' + currentTourn.replace(/[^a-z0-9]/gi, '_') + '_' . regId;
         }
 
         // 1. Restore Unsaved Drafts on Page Load
