@@ -35,7 +35,10 @@ function sywat_desk_render_modals($data) {
 
     <!-- CHECK-IN MODAL (PRE-REG) -->
     <?php if ($modal_archer): ?>
-    <?php $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; ?>
+    <?php 
+        $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
+        $is_family = (isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family') || !empty($modal_archer['family_id']);
+    ?>
     <div class="sywat-modal-backdrop active">
         <div class="sywat-modal-content" style="max-width:480px;">
             <div class="sywat-modal-header no-print">
@@ -62,14 +65,22 @@ function sywat_desk_render_modals($data) {
                     </div>
 
                     <?php if ($modal_due > 0): ?>
-                        <div style="background:#f8d7da; color:#721c24; padding:12px; border-radius:6px; border:1px solid #f5c6cb; margin-bottom:15px; text-align:center;">
-                            <div style="font-size:16px; font-weight:bold;">⚠️ UNPAID BALANCE: $<?php echo number_format($modal_due, 2); ?></div>
-                            <div style="font-size:13px; margin-top:4px; font-weight:600;">Please See Event Staff for Payment</div>
+                        <div id="sywat_unpaid_warning_banner" style="background:#f8d7da; color:#721c24; padding:12px; border-radius:6px; border:1px solid #f5c6cb; margin-bottom:15px; text-align:center;">
+                            <div style="font-size:16px; font-weight:bold;">
+                                ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($modal_due, 2); ?>
+                            </div>
+                            <div style="font-size:13px; margin-top:4px; font-weight:600;">
+                                <?php if ($is_family): ?>
+                                    Family Cap Group Outstanding Balance. Collect Payment Onsite.
+                                <?php else: ?>
+                                    Please See Event Staff for Payment
+                                <?php endif; ?>
+                            </div>
                         </div>
 
                         <div style="margin-bottom:15px;">
                             <label style="color:#721c24; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:8px;">
-                                <input type="checkbox" name="checkin_payment_verified" value="1" required style="width:auto;">
+                                <input type="checkbox" name="checkin_payment_verified" id="sywat_payment_verified_check" value="1" required style="width:auto;" onchange="toggleUnpaidBanner(this.checked)">
                                 Payment / Resolution Verified with Event Staff
                             </label>
                         </div>
@@ -373,6 +384,13 @@ function sywat_desk_render_client_scripts($data) {
     <script>
     const sywatHistory = <?php echo json_encode($data['history_profiles']); ?>;
     const tfaaData     = <?php echo json_encode($data['tfaa_data_bundle']); ?>;
+
+    function toggleUnpaidBanner(isChecked) {
+        const banner = document.getElementById('sywat_unpaid_warning_banner');
+        if (banner) {
+            banner.style.display = isChecked ? 'none' : 'block';
+        }
+    }
 
     function findTfaaMatch(typedName) {
         if (!typedName || !tfaaData || !tfaaData.exact) return null;
