@@ -284,7 +284,7 @@ function sywat_render_shops_tab() {
         <div class="sywat-card no-print">
             <div class="sywat-card-title">
                 <span>Linked Staff for Shop: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></span>
-                <a href="?tab=shops" class="sywat-btn-secondary">Back to Shops List</a>
+                <a href="?tab=shops" class="sywat-btn sywat-btn-secondary">Back to Shops List</a>
             </div>
 
             <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
@@ -311,7 +311,7 @@ function sywat_render_shops_tab() {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <button type="submit" class="sywat-btn-success">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
+                        <button type="submit" class="sywat-btn sywat-btn-success">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
                     </form>
                 <?php endif; ?>
             </div>
@@ -340,7 +340,7 @@ function sywat_render_shops_tab() {
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                         <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
-                                        <button type="submit" class="sywat-btn-danger" style="padding:4px 8px; font-size:12px; height:auto;">Unlink Staff</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-danger" style="padding:4px 8px; font-size:12px; height:auto;">Unlink Staff</button>
                                     </form>
                                 </td>
                             </tr>
@@ -355,7 +355,7 @@ function sywat_render_shops_tab() {
         <div class="sywat-card no-print">
             <div class="sywat-card-title">
                 <span>Edit Archery Shop: <strong><?php echo esc_html( $editing_shop['name'] ); ?></strong></span>
-                <a href="?tab=shops" class="sywat-btn-secondary">Cancel Editing</a>
+                <a href="?tab=shops" class="sywat-btn sywat-btn-secondary">Cancel Editing</a>
             </div>
 
             <form method="post" action="?tab=shops">
@@ -446,8 +446,8 @@ function sywat_render_shops_tab() {
                 </table>
 
                 <div style="display:flex; gap:10px;">
-                    <button type="submit" class="sywat-btn-success">Save Shop Changes</button>
-                    <a href="?tab=shops" class="sywat-btn-secondary">Cancel</a>
+                    <button type="submit" class="sywat-btn sywat-btn-success">Save Shop Changes</button>
+                    <a href="?tab=shops" class="sywat-btn sywat-btn-secondary">Cancel</a>
                 </div>
             </form>
         </div>
@@ -460,9 +460,9 @@ function sywat_render_shops_tab() {
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <div style="display:flex; gap:5px; margin:0; align-items:center;">
                         <input type="text" id="sywat_shop_search_input" placeholder="Search shop name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                        <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_shop_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                        <button type="button" class="sywat-btn sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_shop_search_input').dispatchEvent(new Event('input'));">Clear</button>
                     </div>
-                    <button type="button" class="sywat-btn-success" style="height:32px;" onclick="openAddShopModal()">+ Add Shop</button>
+                    <button type="button" class="sywat-btn sywat-btn-success" style="height:32px;" onclick="openAddShopModal()">+ Add Shop</button>
                 </div>
             </div>
 
@@ -513,14 +513,14 @@ function sywat_render_shops_tab() {
                                 <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                 <td>
                                     <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">Staff (<?php echo $linked_count; ?>)</a>
-                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn-primary">Edit Shop</a>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-primary">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-primary">Edit Shop</a>
                                         
                                         <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                             <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                            <button type="submit" class="sywat-btn-danger">Delete</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-danger">Delete</button>
                                         </form>
                                     </div>
                                 </td>
@@ -597,8 +597,8 @@ function sywat_render_shops_tab() {
                         </div>
 
                         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                            <button type="button" class="sywat-btn-secondary" onclick="closeAddShopModal()">Cancel</button>
-                            <button type="submit" class="sywat-btn-success">+ Create Shop Profile</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeAddShopModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success">+ Create Shop Profile</button>
                         </div>
                     </form>
                 </div>
