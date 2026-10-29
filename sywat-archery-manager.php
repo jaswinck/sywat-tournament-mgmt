@@ -44,7 +44,7 @@ function sywat_archery_enqueue_assets() {
 
 // Load Core Portal & Multi-Shop Sub-Modules
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tournament-config.php';
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-registration.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php'; // Updated registration subfolder path
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-shops.php';       // Phase 2 Multi-Shop Engine
