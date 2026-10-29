@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Tournament Configuration, Master Portal & Volunteer Hub
- * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, and Volunteer Hub portal view.
+ * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, live tournament name search, and Volunteer Hub portal view.
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -152,7 +152,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         
         $edit_t_data         = ( ! empty( $edit_t_target ) && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
         $edit_t_lines        = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
-        $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : $user_shop_id;
+        $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( $is_admin ? '' : $user_shop_id );
         $edit_t_start        = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end          = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
 
@@ -361,11 +361,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             .sywat-tab-item.active { background: #ffffff; color: #1d2327; border-bottom: 1px solid #ffffff; margin-bottom: -1px; }
             
             .sywat-card { background: #ffffff; border: 1px solid #c3c4c7; border-radius: 4px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); padding: 20px; margin-bottom: 20px; }
-            .sywat-card-title { font-size: 1.1em; font-weight: 600; color: #1d2327; margin: 0 0 15px 0; border-bottom: 1px solid #dcdcde; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+            .sywat-card-title { font-size: 1.1em; font-weight: 600; color: #1d2327; margin: 0 0 15px 0; border-bottom: 1px solid #dcdcde; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
             .sywat-subtitle { font-size: 13px; color: #646970; margin-top: -10px; margin-bottom: 15px; }
             
             .sywat-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-            .sywat-table th { background-color: #f6f7f7; text-align: left; padding: 10px 12px; font-weight: 600; color: #1d2327; border-bottom: 1px solid #c3c4c7; }
+            .sywat-table th { background-color: #f6f7f7; text-align: center; padding: 10px 12px; font-weight: 600; color: #1d2327; border-bottom: 1px solid #c3c4c7; }
             .sywat-table td { padding: 12px; border-bottom: 1px solid #f0f0f1; color: #2c3338; vertical-align: middle; }
             
             .sywat-btn-primary { background-color: #2271b1; border: 1px solid #2271b1; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; height: 32px; white-space: nowrap; box-sizing: border-box; color: #ffffff !important; }
@@ -419,7 +419,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 <div class="sywat-card no-print">
                     <div class="sywat-card-title">
                         <span>Configured Tournaments</span>
-                        <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <div style="display:flex; gap:5px; margin:0; align-items:center;">
+                                <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn-secondary" style="font-size:13px; line-height:22px; height:30px;" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                            </div>
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
@@ -437,11 +441,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <table class="sywat-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 22%;">Tournament & Location</th>
-                                    <th style="width: 12%;">Volunteer Hub</th>
-                                    <th style="width: 35%;">Line Slot Availability (20yd / Cub)</th>
-                                    <th style="width: 16%;">Shooter Management</th>
-                                    <th style="width: 15%; text-align: right;">Tournament Management</th>
+                                    <th style="width: 22%; text-align: center;">Tournament & Location</th>
+                                    <th style="width: 12%; text-align: center;">Volunteer Hub</th>
+                                    <th style="width: 35%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
+                                    <th style="width: 16%; text-align: center;">Shooter Management</th>
+                                    <th style="width: 15%; text-align: center;">Tournament Management</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -462,14 +466,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         $reg_count  = sywat_get_tournament_count( $t_name, $registrations );
                                         $is_active_hub = in_array( $t_name, $active_tournaments );
                                     ?>
-                                    <tr>
+                                    <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
                                         <td>
                                             <strong><?php echo esc_html( $t_name ); ?></strong>
                                             <div style="font-size: 12px; color: #2271b1; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
                                             <div style="font-size: 11px; color: #646970; margin-top: 2px;">📅 <?php echo esc_html( $disp_dates ); ?></div>
                                             <div style="font-size: 11px; color: #646970; margin-top: 1px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
                                         </td>
-                                        <td>
+                                        <td style="text-align: center;">
                                             <?php if ( $t_shop_id === 'shop_ccr' ): ?>
                                                 <form method="post" style="margin: 0;">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -564,6 +568,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Host Archery Shop *</label>
                                     <?php if ( $is_admin ): ?>
                                         <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                            <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
                                             <?php foreach ( $all_shops as $s_id => $s_item ): ?>
                                                 <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
                                                     <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
@@ -702,6 +707,26 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     notice.style.opacity = "0";
                     setTimeout(function() { notice.remove(); }, 500);
                 }, 5000);
+            }
+
+            // Client-side tournament search filter
+            const tournSearchInput = document.getElementById('sywat_tournament_search_input');
+            if (tournSearchInput) {
+                tournSearchInput.addEventListener('input', function() {
+                    const filter = this.value.toLowerCase().trim();
+                    const rows = document.querySelectorAll('.sywat-tournament-row');
+                    
+                    rows.forEach(row => {
+                        const name = (row.getAttribute('data-name') || '').toLowerCase();
+                        const shop = (row.getAttribute('data-shop') || '').toLowerCase();
+                        
+                        if (name.includes(filter) || shop.includes(filter)) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
             }
         });
         </script>
