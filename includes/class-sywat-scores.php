@@ -1,11 +1,11 @@
 <?php
 /**
- * Module: SYWAT Score Management & Entry App (Snippet 37)
+ * Module: SYWAT Score Management & Entry App
  * Description: Front-end scoring interface featuring real-time AJAX auto-save, score validation (0-300),
- *              X-count tie-breakers, division/style sorting, and CSV score export generation.
+ *              X-count tie-breakers, division/style sorting, CSV score export generation, and multi-tenant shop scoping.
  * Shortcode: [sywat_scores]
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -231,18 +231,19 @@ function sywat_process_csv_export() {
 }
 
 // -----------------------------------------------------------------------------
-// 2. MAIN SHORTCODE RENDERER
+// 2. MAIN SHORTCODE RRENDERER
 // -----------------------------------------------------------------------------
 add_shortcode('sywat_scores', 'render_sywat_scores_app');
 
 function render_sywat_scores_app() {
     // Permissions Check
     $user = wp_get_current_user();
-    if ( ! is_user_logged_in() || ! array_intersect(array('administrator', 'management', 'non-shooting-member', 'staff_shooter'), (array) $user->roles) ) {
+    if ( ! is_user_logged_in() || ! array_intersect(array('administrator', 'management', 'non-shooting-member', 'staff_shooter', 'sywat_shop_manager', 'sywat_shop_user'), (array) $user->roles) ) {
         return '<p style="color:red; padding:20px;">Access denied. Staff access required.</p>';
     }
 
-    $is_admin = is_user_logged_in() && in_array('administrator', (array) $user->roles);
+    $is_admin     = is_user_logged_in() && in_array('administrator', (array) $user->roles);
+    $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
     // ==========================================
     // AJAX AUTOSAVE HANDLER
@@ -291,11 +292,19 @@ function render_sywat_scores_app() {
     ob_start();
     global $wpdb;
 
-    // 1. Fetch Tournaments List
-    $tournaments = get_option('sywat_tournaments_list', array());
-    if (empty($tournaments) || !is_array($tournaments)) {
+    // 1. Fetch Tournaments List with Shop Scoping
+    $all_tournaments = get_option('sywat_tournaments_list', array());
+    if (empty($all_tournaments) || !is_array($all_tournaments)) {
         $single_name = get_option('sywat_current_tournament', 'CCR SYWAT Qualifier');
-        $tournaments = array($single_name => get_option('sywat_line_config', array()));
+        $all_tournaments = array($single_name => get_option('sywat_line_config', array()));
+    }
+
+    $tournaments = array();
+    foreach ($all_tournaments as $t_name => $t_data) {
+        $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id($t_data) : 'shop_ccr';
+        if ($is_admin || $t_shop === $user_shop_id) {
+            $tournaments[$t_name] = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : $t_data;
+        }
     }
 
     $selected_tournament = isset($_POST['selected_tournament']) ? sanitize_text_field($_POST['selected_tournament']) : (isset($_GET['selected_tournament']) ? sanitize_text_field($_GET['selected_tournament']) : '');
@@ -321,22 +330,22 @@ function render_sywat_scores_app() {
     $action = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action && !$is_valid_nonce && $action !== 'autosave_single_score') {
-        $notice = '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Security token expired. Please refresh and try again.</div>';
+        $notice = '<div class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce) {
         
         // --- Action: Toggle Line Lock (Administrator Only) ---
         if ($action === 'toggle_lock') {
             if (!$is_admin) {
-                $notice = '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Access denied. Administrator privileges required to lock/unlock lines.</div>';
+                $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator privileges required to lock/unlock lines.</div>';
             } elseif ($selected_line_idx === 'all') {
-                $notice = '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Please filter to a specific shooting line first to lock or unlock it.</div>';
+                $notice = '<div class="sywat-alert sywat-alert-danger">Please filter to a specific shooting line first to lock or unlock it.</div>';
             } else {
                 if (!empty($locked_lines[$selected_line_idx])) {
                     unset($locked_lines[$selected_line_idx]);
-                    $notice = '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px;">🔓 Line unlocked. Scores can now be edited.</div>';
+                    $notice = '<div class="sywat-alert sywat-alert-success">🔓 Line unlocked. Scores can now be edited.</div>';
                 } else {
                     $locked_lines[$selected_line_idx] = 1;
-                    $notice = '<div style="background:#fff3cd; color:#856404; padding:10px; margin-bottom:15px; border:1px solid #ffeeba; border-radius:4px;">🔒 Line locked. Scores on this line are frozen and cannot be edited until unlocked.</div>';
+                    $notice = '<div class="sywat-alert sywat-alert-success">🔒 Line locked. Scores on this line are frozen and cannot be edited until unlocked.</div>';
                 }
                 update_option('sywat_locks_' . $active_t_slug, $locked_lines);
                 $current_view_locked = !empty($locked_lines[$selected_line_idx]);
@@ -346,7 +355,7 @@ function render_sywat_scores_app() {
         // --- Action A: Reset All Scores to 0 (Administrator Only) ---
         if ($action === 'reset_scores') {
             if (!$is_admin) {
-                $notice = '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Access denied. Administrator privileges required to reset scores.</div>';
+                $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator privileges required to reset scores.</div>';
             } else {
                 $reset_count = 0;
                 
@@ -372,7 +381,7 @@ function render_sywat_scores_app() {
                         }
                     }
                 }
-                $notice = '<div style="background:#fff3cd; color:#856404; padding:10px; margin-bottom:15px; border:1px solid #ffeeba; border-radius:4px;">Successfully reset scores and X counts to 0 for <strong>' . $reset_count . '</strong> unlocked, checked-in archer(s).</div>';
+                $notice = '<div class="sywat-alert sywat-alert-success">Successfully reset scores and X counts to 0 for <strong>' . $reset_count . '</strong> unlocked, checked-in archer(s).</div>';
             }
         }
 
@@ -404,9 +413,9 @@ function render_sywat_scores_app() {
             }
 
             if ($has_invalid_data) {
-                $notice = '<div style="background:#f8d7da; color:#721c24; padding:12px 15px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">⚠️ <strong>Save Rejected!</strong> One or more values were invalid. Scores must be 0–300 and X Counts 0–60. Please correct highlighted fields and save again.</div>';
+                $notice = '<div class="sywat-alert sywat-alert-danger">⚠️ <strong>Save Rejected!</strong> One or more values were invalid. Scores must be 0–300 and X Counts 0–60. Please correct highlighted fields and save again.</div>';
             } elseif (empty($submitted_ids)) {
-                $notice = '<div style="background:#e0f2fe; color:#0369a1; padding:10px; margin-bottom:15px; border:1px solid #bae6fd; border-radius:4px;">No changes were made.</div>';
+                $notice = '<div class="sywat-alert sywat-alert-success">No changes were made.</div>';
             } else {
                 $saved_count = 0;
                 foreach ($submitted_ids as $id) {
@@ -434,7 +443,7 @@ function render_sywat_scores_app() {
                 }
                 
                 if ($saved_count > 0) {
-                    $notice = '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px;">Successfully updated scores for <strong>' . $saved_count . '</strong> unlocked archer(s)!</div>';
+                    $notice = '<div class="sywat-alert sywat-alert-success">Successfully updated scores for <strong>' . $saved_count . '</strong> unlocked archer(s)!</div>';
                 }
             }
         }
@@ -478,29 +487,10 @@ function render_sywat_scores_app() {
     ?>
 
     <style>
-        .sywat-scores-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #2c3338; max-width: 1100px; margin: 0 auto; }
-        .sywat-scores-card { background: #ffffff; border: 1px solid #ccc; border-radius: 6px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .sywat-scores-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        .sywat-scores-table th { background: #f1f5f9; text-align: left; padding: 10px; font-weight: 600; color: #1e293b; border-bottom: 2px solid #cbd5e1; }
-        .sywat-scores-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-        
         .sywat-score-input { width: 80px; padding: 6px 8px; border: 1px solid #94a3b8; border-radius: 4px; font-size: 14px; text-align: center; font-weight: bold; transition: all 0.15s ease-in-out; }
         .sywat-score-input:focus { border-color: #2271b1; outline: 2px solid #2271b1; }
         .sywat-score-input:disabled { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; cursor: not-allowed; }
         .sywat-score-input.invalid-input { border: 2px solid #dc3545 !important; background-color: #f8d7da !important; color: #721c24 !important; }
-
-        .sywat-btn-save { background: #28a745; color: #fff; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-save:hover { background: #218838; }
-        .sywat-btn-reset { background: #dc3545; color: #fff; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-reset:hover { background: #bd2130; }
-        .sywat-btn-export { background: #0073aa; color: #fff; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-export:hover { background: #005177; }
-        .sywat-btn-lock { background: #6c757d; color: #fff; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-lock:hover { background: #5a6268; }
-        .sywat-btn-unlock { background: #b45309; color: #fff; border: none; padding: 10px 16px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-unlock:hover { background: #92400e; }
-        .sywat-btn-gray { background: #6c757d; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
-        .sywat-btn-gray:hover { background: #5a6268; }
 
         .sywat-save-status { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; white-space: nowrap; }
         .sywat-status-saved { color: #008a20; background: #d4edda; border: 1px solid #c3e6cb; }
@@ -510,15 +500,15 @@ function render_sywat_scores_app() {
         .sywat-status-locked { color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; }
     </style>
 
-    <div class="sywat-scores-wrap">
-        <?php echo $notice; ?>
+    <div class="sywat-wrap">
+        <div class="no-print"><?php echo $notice; ?></div>
 
         <!-- FILTER BAR -->
-        <form method="post" id="sywat_score_filter_form" style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; display:flex; gap:15px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
+        <form method="post" id="sywat_score_filter_form" class="sywat-card no-print" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; padding:15px; margin-bottom:20px;">
             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
             <div>
-                <label><strong>Tournament:</strong></label>
-                <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();">
+                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Tournament:</label>
+                <select name="selected_tournament" id="selected_tournament_val" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_score_filter_form').submit();">
                     <?php foreach ($tournaments as $t_name => $t_lines): ?>
                         <option value="<?php echo esc_attr($t_name); ?>" <?php selected($selected_tournament, $t_name); ?>>
                             <?php echo esc_html($t_name); ?>
@@ -528,8 +518,8 @@ function render_sywat_scores_app() {
             </div>
 
             <div>
-                <label><strong>Shooting Line:</strong></label>
-                <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();">
+                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
+                <select name="selected_line_idx" id="selected_line_val" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_score_filter_form').submit();">
                     <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
                     <?php foreach ($lines as $idx => $line): ?>
                         <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?>>
@@ -540,61 +530,61 @@ function render_sywat_scores_app() {
             </div>
 
             <div style="margin-left:auto;">
-                <a href="/sywat-volunteer-hub/" class="sywat-btn-gray" style="text-decoration:none; padding:8px 14px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">← Back to Volunteer Hub</a>
+                <a href="/sywat-volunteer-hub/" class="sywat-btn-secondary">← Back to Volunteer Hub</a>
             </div>
         </form>
 
-        <div class="sywat-scores-card">
+        <div class="sywat-card no-print">
             <form method="post" id="sywat_batch_score_form">
                 <?php wp_nonce_field('sywat_scores_action', 'sywat_nonce'); ?>
                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
 
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
+                <div class="sywat-card-title">
                     <div>
-                        <h3 style="margin:0; font-size:18px;">Batch Score Entry</h3>
-                        <div style="font-size:13px; color:#64748b; margin-top:2px;">
+                        <span style="font-size:18px;">Batch Score Entry</span>
+                        <div style="font-size:13px; color:#64748b; font-weight:normal; margin-top:2px;">
                             Displaying <strong><?php echo count($tourn_registrations); ?></strong> checked-in archer(s) for <?php echo esc_html($selected_tournament); ?>
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:8px; align-items:center;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <!-- Live Search Input -->
                         <div style="display:flex; gap:5px; align-items:center; margin-right:5px;">
-                            <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn-gray" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                            <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                            <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
 
                         <!-- Export CSV Button (Admin Only & Shown Whenever Locked Lines Exist) -->
                         <?php if ($is_admin && !empty($locked_lines)): ?>
-                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn-export" title="Export scores for ALL locked lines to a CSV file">📥 Export CSV</button>
+                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn-primary" style="height:32px;" title="Export scores for ALL locked lines to a CSV file">📥 Export CSV</button>
                         <?php endif; ?>
 
                         <?php if ($is_admin): ?>
                             <?php if ($selected_line_idx !== 'all'): ?>
                                 <?php if ($current_view_locked): ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn-unlock" title="Unlock to edit scores">🔓 Unlock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn-secondary" style="height:32px;" title="Unlock to edit scores">🔓 Unlock Line</button>
                                 <?php else: ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn-lock" title="Lock to prevent edits">🔒 Lock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn-secondary" style="height:32px;" title="Lock to prevent edits">🔒 Lock Line</button>
                                 <?php endif; ?>
                             <?php endif; ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn-danger" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
                         <?php endif; ?>
                         
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn-save">💾 Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn-success" style="height:32px;">💾 Save All Scores</button>
                     </div>
                 </div>
 
                 <?php if (!empty($tourn_registrations)): ?>
-                    <table class="sywat-scores-table">
+                    <table class="sywat-table">
                         <thead>
                             <tr>
                                 <th style="width: 4%;">#</th>
-                                <th style="width: 20%;">Archer Name</th>
-                                <th style="width: 15%;">Shooting Line</th>
+                                <th style="width: 20%; text-align: left;">Archer Name</th>
+                                <th style="width: 15%; text-align: left;">Shooting Line</th>
                                 <th style="width: 8%;">Gender</th>
-                                <th style="width: 10%;">Division</th>
-                                <th style="width: 12%;">Style</th>
+                                <th style="width: 10%; text-align: left;">Division</th>
+                                <th style="width: 12%; text-align: left;">Style</th>
                                 <th style="width: 11%; text-align: center;">Score (Max 300)</th>
                                 <th style="width: 11%; text-align: center;">X Count (Max 60)</th>
                                 <th style="width: 9%; text-align: center;">Status</th>
@@ -616,7 +606,7 @@ function render_sywat_scores_app() {
                                     <td><strong><?php echo $num++; ?></strong></td>
                                     <td><strong><?php echo esc_html($reg['name']); ?></strong></td>
                                     <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'Line 1'); ?></td>
-                                    <td><?php echo esc_html($gender_str); ?></td>
+                                    <td style="text-align: center;"><?php echo esc_html($gender_str); ?></td>
                                     <td><?php echo esc_html($div_str); ?></td>
                                     <td><?php echo esc_html($style_str); ?></td>
                                     <td style="text-align: center;">
@@ -639,9 +629,9 @@ function render_sywat_scores_app() {
 
                     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                         <?php if ($is_admin): ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn-danger" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">↺ Reset All Scores to 0</button>
                         <?php endif; ?>
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn-save">💾 Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn-success" style="height:32px;">💾 Save All Scores</button>
                     </div>
                 <?php else: ?>
                     <p style="color:#64748b; font-style:italic; padding:20px 0;">No checked-in archers found for this tournament/line selection.</p>
