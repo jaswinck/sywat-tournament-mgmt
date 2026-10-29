@@ -3,7 +3,7 @@
  * Module: Tournament Configuration, Master Portal & Volunteer Hub
  * Description: Shortcode routing, master admin portal shell, modal tournament CRUD with date pickers & host shop scoping, and Volunteer Hub portal view.
  * Author: SYWAT Archery
- * Version: 2.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -470,16 +470,20 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <div style="font-size: 11px; color: #646970; margin-top: 1px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
                                         </td>
                                         <td>
-                                            <form method="post" style="margin: 0;">
-                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                <input type="hidden" name="sywat_action" value="toggle_active_tournament">
-                                                <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                <?php if ( $is_active_hub ): ?>
-                                                    <button type="submit" class="sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
-                                                <?php else: ?>
-                                                    <button type="submit" class="sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
-                                                <?php endif; ?>
-                                            </form>
+                                            <?php if ( $t_shop_id === 'shop_ccr' ): ?>
+                                                <form method="post" style="margin: 0;">
+                                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                    <input type="hidden" name="sywat_action" value="toggle_active_tournament">
+                                                    <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                    <?php if ( $is_active_hub ): ?>
+                                                        <button type="submit" class="sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
+                                                    <?php else: ?>
+                                                        <button type="submit" class="sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
+                                                    <?php endif; ?>
+                                                </form>
+                                            <?php else: ?>
+                                                <span style="color: #8c8f94; font-size: 12px; font-weight: 600;">N/A</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <?php if ( ! empty( $t_lines ) && is_array( $t_lines ) ): ?>
