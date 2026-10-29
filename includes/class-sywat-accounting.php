@@ -116,7 +116,7 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $zelle_qr_url = ( strpos( $raw_qr_path, 'http' ) === 0 ) ? $raw_qr_path : site_url( $raw_qr_path );
         ?>
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
-            <button type="button" class="sywat-btn-secondary" onclick="window.print()">🖨️ Print / Save Invoice PDF</button>
+            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="window.print()">🖨️ Print / Save Invoice PDF</button>
         </div>
 
         <div id="sywat_print_area">
@@ -250,7 +250,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                     </select>
                 </div>
             </form>
-            <button type="button" class="sywat-btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
         </div>
 
         <div id="sywat_print_area">
