@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Archer Registration & Intake Engine
- * Description: Simplified phone group intake with full 7 TFAA age divisions, contact phone auto-formatting, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
+ * Description: Simplified phone group intake with full 7 TFAA age divisions, contact phone auto-formatting, per-line $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
  * Author: SYWAT Archery
- * Version: 2.3.2
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -45,8 +45,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
 
         $youth_divisions = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
-        $youth_count = 0;
-        $adult_count = 0;
         $valid_archers = array();
 
         foreach ($archers_raw as $a) {
@@ -61,21 +59,15 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
 
             $is_youth_tier = in_array($division, $youth_divisions) || ($distance === 'Cub');
-
-            if ($is_youth_tier) {
-                $youth_count++;
-                $paid_tier = 'Youth';
-            } else {
-                $adult_count++;
-                $paid_tier = 'Adult';
-            }
+            $paid_tier     = $is_youth_tier ? 'Youth' : 'Adult';
+            $line_idx      = !empty($a['line_idx']) ? sanitize_text_field($a['line_idx']) : $default_line_idx;
 
             $valid_archers[] = array(
                 'name'      => $name,
                 'division'  => $division,
                 'paid_tier' => $paid_tier,
                 'distance'  => $distance,
-                'line_idx'  => !empty($a['line_idx']) ? sanitize_text_field($a['line_idx']) : $default_line_idx,
+                'line_idx'  => $line_idx,
             );
         }
 
@@ -83,76 +75,121 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
-        $raw_total = ($youth_count * 25) + ($adult_count * 30);
-        $is_family_capped = ($raw_total >= 75 || count($valid_archers) >= 3);
-        $final_group_fee  = $is_family_capped ? 75.00 : $raw_total;
-        $total_balance_due = max(0, $final_group_fee - $amount_paid);
+        // Group archers by shooting line for per-line family capping
+        $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'] . ' Group';
+        $line_groups = array();
 
-        // Split balance due proportionally across group members
-        $per_archer_due = count($valid_archers) > 0 ? round($total_balance_due / count($valid_archers), 2) : 0;
+        foreach ($valid_archers as $archer) {
+            $l_idx = $archer['line_idx'];
+            if (!isset($line_groups[$l_idx])) {
+                $line_groups[$l_idx] = array(
+                    'archers'     => array(),
+                    'youth_count' => 0,
+                    'adult_count' => 0,
+                    'raw_total'   => 0,
+                    'is_capped'   => false,
+                    'line_fee'    => 0,
+                    'paid_amount' => 0,
+                    'balance_due' => 0,
+                    'family_id'   => 'fam_' . sanitize_title($family_base_name) . '_l' . $l_idx . '_' . uniqid(),
+                );
+            }
 
-        $family_id   = 'fam_' . sanitize_title(!empty($group_name) ? $group_name : $valid_archers[0]['name']) . '_' . uniqid();
-        $family_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'] . ' Group';
+            $line_groups[$l_idx]['archers'][] = $archer;
+            if ($archer['paid_tier'] === 'Youth') {
+                $line_groups[$l_idx]['youth_count']++;
+            } else {
+                $line_groups[$l_idx]['adult_count']++;
+            }
+        }
+
+        // Calculate per-line fees and family caps
+        $overall_fee = 0;
+        foreach ($line_groups as $l_idx => &$grp) {
+            $grp['raw_total'] = ($grp['youth_count'] * 25) + ($grp['adult_count'] * 30);
+            $grp['is_capped'] = ($grp['raw_total'] >= 75 || count($grp['archers']) >= 3);
+            $grp['line_fee']  = $grp['is_capped'] ? 75.00 : $grp['raw_total'];
+            $overall_fee      += $grp['line_fee'];
+        }
+        unset($grp);
+
+        // Allocate amount paid today sequentially across line groups
+        $rem_paid = $amount_paid;
+        $total_balance_due = 0;
+        foreach ($line_groups as $l_idx => &$grp) {
+            $grp_paid = min($rem_paid, $grp['line_fee']);
+            $grp['paid_amount'] = $grp_paid;
+            $rem_paid -= $grp_paid;
+
+            $grp['balance_due'] = max(0, $grp['line_fee'] - $grp_paid);
+            $total_balance_due += $grp['balance_due'];
+
+            $archer_cnt = count($grp['archers']);
+            $grp['per_archer_due'] = $archer_cnt > 0 ? round($grp['balance_due'] / $archer_cnt, 2) : 0;
+        }
+        unset($grp);
 
         $added_count = 0;
         $skipped_dup = 0;
         $skipped_cap = 0;
 
-        foreach ($valid_archers as $archer) {
-            $line_idx  = $archer['line_idx'];
-            $line_data = isset( $t_lines[$line_idx] ) ? $t_lines[$line_idx] : array();
-            $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line ' . ((int)$line_idx + 1);
-            $distance  = $archer['distance'];
-            $name      = $archer['name'];
+        foreach ($line_groups as $l_idx => $grp) {
+            $line_data = isset( $t_lines[$l_idx] ) ? $t_lines[$l_idx] : array();
+            $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line ' . ((int)$l_idx + 1);
 
-            // Duplicate check
-            $is_duplicate = false;
-            foreach ( $registrations as $existing ) {
-                if ( isset ( $existing['tournament'], $existing['line_index'], $existing['name'], $existing['distance'] ) &&
-                     strcasecmp ( $existing['tournament'], $tourn_name ) === 0 &&
-                     (string)$existing['line_index'] === (string)$line_idx &&
-                     strcasecmp ( trim ( $existing['name'] ), $name ) === 0 &&
-                     strcasecmp ( $existing['distance'], $distance ) === 0 ) {
-                    $is_duplicate = true;
-                    break;
+            foreach ($grp['archers'] as $archer) {
+                $distance = $archer['distance'];
+                $name     = $archer['name'];
+
+                // Duplicate check
+                $is_duplicate = false;
+                foreach ( $registrations as $existing ) {
+                    if ( isset ( $existing['tournament'], $existing['line_index'], $existing['name'], $existing['distance'] ) &&
+                         strcasecmp ( $existing['tournament'], $tourn_name ) === 0 &&
+                         (string)$existing['line_index'] === (string)$l_idx &&
+                         strcasecmp ( trim ( $existing['name'] ), $name ) === 0 &&
+                         strcasecmp ( $existing['distance'], $distance ) === 0 ) {
+                        $is_duplicate = true;
+                        break;
+                    }
                 }
+
+                if ($is_duplicate) { $skipped_dup++; continue; }
+
+                // Capacity check
+                $current_count = sywat_count_registered( $tourn_name, $l_idx, $distance, $registrations );
+                $max_capacity  = sywat_get_line_max_cap( $line_data, $distance );
+
+                if ($current_count >= $max_capacity) { $skipped_cap++; continue; }
+
+                $paid_status = $grp['is_capped'] ? 'Family' : $archer['paid_tier'];
+
+                $new_reg = array(
+                    'id'          => uniqid( 'reg_' ),
+                    'tournament'  => $tourn_name,
+                    'line_index'  => $l_idx,
+                    'line_name'   => $line_name,
+                    'name'        => $name,
+                    'phone'       => $group_phone,
+                    'distance'    => $distance,
+                    'division'    => $archer['division'],
+                    'gender'      => '', // Captured at Desk Check-In
+                    'style'       => '', // Captured at Desk Check-In
+                    'paid'        => $paid_status,
+                    'family_id'   => $grp['family_id'],
+                    'family_name' => $family_base_name,
+                    'balance_due' => $grp['per_archer_due'],
+                    'status'      => 'Pre-Reg',
+                    'created_at'  => current_time( 'mysql' ),
+                );
+
+                update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
+                $registrations[] = $new_reg;
+                $added_count++;
             }
-
-            if ($is_duplicate) { $skipped_dup++; continue; }
-
-            // Capacity check
-            $current_count = sywat_count_registered( $tourn_name, $line_idx, $distance, $registrations );
-            $max_capacity  = sywat_get_line_max_cap( $line_data, $distance );
-
-            if ($current_count >= $max_capacity) { $skipped_cap++; continue; }
-
-            $paid_status = $is_family_capped ? 'Family' : $archer['paid_tier'];
-
-            $new_reg = array(
-                'id'          => uniqid( 'reg_' ),
-                'tournament'  => $tourn_name,
-                'line_index'  => $line_idx,
-                'line_name'   => $line_name,
-                'name'        => $name,
-                'phone'       => $group_phone,
-                'distance'    => $distance,
-                'division'    => $archer['division'],
-                'gender'      => '', // Captured at Desk Check-In
-                'style'       => '', // Captured at Desk Check-In
-                'paid'        => $paid_status,
-                'family_id'   => $family_id,
-                'family_name' => $family_name,
-                'balance_due' => $per_archer_due,
-                'status'      => 'Pre-Reg',
-                'created_at'  => current_time( 'mysql' ),
-            );
-
-            update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-            $registrations[] = $new_reg;
-            $added_count++;
         }
 
-        $msg = "Successfully registered {$added_count} archer(s) under '{$family_name}'. Group Total: $" . number_format($final_group_fee, 2) . " (Balance Due: $" . number_format($total_balance_due, 2) . ").";
+        $msg = "Successfully registered {$added_count} archer(s) under '{$family_base_name}'. Total Fee: $" . number_format($overall_fee, 2) . " (Balance Due: $" . number_format($total_balance_due, 2) . ").";
         if ($skipped_dup > 0) $msg .= " Skipped {$skipped_dup} duplicate(s).";
         if ($skipped_cap > 0) $msg .= " Skipped {$skipped_cap} over-capacity spot(s).";
 
@@ -497,20 +534,19 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <option value="Cub">Cub (10yd)</option>
                             </select>
 
-                            <!-- Full 7 TFAA Age Division Selection -->
-                            <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();" required>
-                                <option value="" disabled selected hidden>Select Division</option>
+                            <!-- Full 7 TFAA Age Division Selection (Defaults to Adult 18 - 49) -->
+                            <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();">
+                                <option value="Adult (18 - 49)" selected>Adult (18 - 49) [$30]</option>
                                 <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
                                 <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
                                 <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                                <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
                                 <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
                                 <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
                                 <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
                             </select>
 
                             <!-- Line Override Selection -->
-                            <select name="archers[0][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                            <select name="archers[0][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
                                 <?php endforeach; ?>
@@ -653,6 +689,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             lineSelects.forEach(select => {
                 select.value = selectedLineIdx;
             });
+            recalculateGroupTotal();
         }
 
         function handleDistanceChange(distSelect) {
@@ -664,8 +701,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             if (distSelect.value === 'Cub') {
                 divSelect.value = 'Cub (8 - 11)';
             } else if (distSelect.value === '20yd') {
-                if (divSelect.value === 'Cub (8 - 11)' && divSelect.dataset.userChosen !== 'true') {
-                    divSelect.value = '';
+                if (divSelect.value === 'Cub (8 - 11)') {
+                    divSelect.value = 'Adult (18 - 49)';
                 }
             }
             recalculateGroupTotal();
@@ -697,18 +734,17 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <option value="Cub">Cub (10yd)</option>
                 </select>
 
-                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();" required>
-                    <option value="" disabled selected hidden>Select Division</option>
+                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();">
+                    <option value="Adult (18 - 49)" selected>Adult (18 - 49) [$30]</option>
                     <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
                     <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
                     <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
                     <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
                     <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
                     <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
                 </select>
 
-                <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
                     ${lineOptionsHtml}
                 </select>
 
@@ -732,44 +768,66 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
         function recalculateGroupTotal() {
             const rows = document.querySelectorAll('.sywat-archer-input-row');
-            let rawTotal = 0;
-            let archerCount = 0;
-
             const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
+
+            // Group rows by line_idx for per-line family capping
+            const lineMap = {};
 
             rows.forEach(row => {
                 const nameInput  = row.querySelector('input[type="text"]');
                 const distSelect = row.querySelector('.sywat-distance-select');
                 const divSelect  = row.querySelector('.sywat-division-select');
+                const lineSelect = row.querySelector('.sywat-line-override-select');
 
                 if (nameInput && nameInput.value.trim() !== '') {
-                    archerCount++;
+                    const lIdx = lineSelect ? lineSelect.value : '0';
                     const dist = distSelect ? distSelect.value : '20yd';
                     const div  = divSelect ? divSelect.value : '';
 
+                    if (!lineMap[lIdx]) {
+                        lineMap[lIdx] = { count: 0, rawTotal: 0 };
+                    }
+
+                    lineMap[lIdx].count++;
                     if (dist === 'Cub' || youthDivisions.includes(div)) {
-                        rawTotal += 25;
+                        lineMap[lIdx].rawTotal += 25;
                     } else {
-                        rawTotal += 30;
+                        lineMap[lIdx].rawTotal += 30;
                     }
                 }
             });
 
-            if (archerCount === 0) archerCount = rows.length;
+            let overallTotal = 0;
+            let anyCapped = false;
+            let cappedLinesCount = 0;
 
-            const isCapped = (rawTotal >= 75 || archerCount >= 3);
-            const finalFee = isCapped ? 75.00 : rawTotal;
+            Object.keys(lineMap).forEach(lIdx => {
+                const grp = lineMap[lIdx];
+                const isCapped = (grp.rawTotal >= 75 || grp.count >= 3);
+                if (isCapped) {
+                    anyCapped = true;
+                    cappedLinesCount++;
+                    overallTotal += 75.00;
+                } else {
+                    overallTotal += grp.rawTotal;
+                }
+            });
 
             const totalDisp = document.getElementById('sywat_group_total_disp');
             const capBadge  = document.getElementById('sywat_family_cap_badge');
             const paidInput = document.getElementById('sywat_amount_paid_today');
             const dueDisp   = document.getElementById('sywat_balance_due_disp');
 
-            if (totalDisp) totalDisp.textContent = '$' + finalFee.toFixed(2);
-            if (capBadge) capBadge.style.display = isCapped ? 'inline-block' : 'none';
+            if (totalDisp) totalDisp.textContent = '$' + overallTotal.toFixed(2);
+            if (capBadge) {
+                capBadge.style.display = anyCapped ? 'inline-block' : 'none';
+                if (anyCapped) {
+                    capBadge.textContent = '🟢 Family Cap Applied (' + cappedLinesCount + ' Line' + (cappedLinesCount > 1 ? 's' : '') + ')';
+                }
+            }
 
             const paidVal = paidInput ? parseFloat(paidInput.value) || 0 : 0;
-            const balanceDue = Math.max(0, finalFee - paidVal);
+            const balanceDue = Math.max(0, overallTotal - paidVal);
 
             if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
         }
