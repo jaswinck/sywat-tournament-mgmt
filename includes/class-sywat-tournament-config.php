@@ -473,7 +473,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         <td>
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
                                                 <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="width: 100%;">Manage Shooters</a>
-                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn sywat-btn-primary sywat-btn-icon-add" style="width: 100%;">Add Pre-Reg / CSV</a>
+                                                <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn sywat-btn-primary sywat-btn-icon-add" style="width: 100%;">Register Shooters</a>
                                                 <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print" style="width: 100%;">Print Roster</a>
                                                 <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice" style="width: 100%;">Generate Invoice</a>
                                             </div>
@@ -601,7 +601,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <?php 
                                 if ($modal_action === 'invoice') echo 'TFAA Tournament Invoice';
                                 elseif ($modal_action === 'print') echo 'Print Checked In Roster';
-                                elseif ($modal_action === 'prereg') echo 'Add Pre-Registrations & Bulk Import';
+                                elseif ($modal_action === 'prereg') echo 'Register Shooters & Bulk Import';
                                 else echo 'Manage Archers';
                             ?>: <?php echo esc_html( $selected_tournament ); ?>
                         </h3>
