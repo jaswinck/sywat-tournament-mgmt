@@ -41,9 +41,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             if (distSelect.value === 'Cub') {
                 divSelect.value = 'Cub (8 - 11)';
             } else if (distSelect.value === '20yd') {
-                if (divSelect.value === 'Cub (8 - 11)') {
-                    divSelect.value = 'Adult (18 - 49)';
-                }
+                divSelect.value = '';
             }
             recalculateGroupTotal();
         }
@@ -75,10 +73,11 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                 </select>
 
                 <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();">
-                    <option value="Adult (18 - 49)" selected>Adult (18 - 49) [$30]</option>
+                    <option value="" disabled selected hidden>Select Division</option>
                     <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
                     <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
                     <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
+                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
                     <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
                     <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
                     <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
