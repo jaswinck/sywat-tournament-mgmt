@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Shop Management & Multi-Tenant Permissions
- * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
+ * Description: Shop CRUD (Create, Read, Update, Delete), modal shop creation, optional address fields, default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.8.2
+ * Version: 1.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -26,6 +26,11 @@ function sywat_ensure_default_shop_exists() {
                 'contact'       => 'Hannah Lange / Beau Brennan',
                 'email'         => 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com',
                 'phone'         => '817-439-8998',
+                'address_1'     => '13795 Old Denton Rd',
+                'address_2'     => '',
+                'city'          => 'Roanoke',
+                'state'         => 'TX',
+                'zip'           => '76262',
                 'default_lines' => $default_lines,
                 'created_at'    => current_time( 'mysql' ),
             )
@@ -130,6 +135,11 @@ function sywat_handle_shop_actions() {
             'contact'       => sanitize_text_field( $_POST['shop_contact'] ),
             'email'         => sanitize_text_field( $_POST['shop_email'] ),
             'phone'         => sanitize_text_field( $_POST['shop_phone'] ),
+            'address_1'     => sanitize_text_field( $_POST['shop_address_1'] ),
+            'address_2'     => sanitize_text_field( $_POST['shop_address_2'] ),
+            'city'          => sanitize_text_field( $_POST['shop_city'] ),
+            'state'         => sanitize_text_field( $_POST['shop_state'] ),
+            'zip'           => sanitize_text_field( $_POST['shop_zip'] ),
             'default_lines' => $default_lines,
             'created_at'    => current_time( 'mysql' ),
         );
@@ -141,10 +151,15 @@ function sywat_handle_shop_actions() {
     if ( $action === 'update_shop' ) {
         $shop_id = sanitize_text_field( $_POST['shop_id'] );
         if ( isset( $shops[$shop_id] ) ) {
-            $shops[$shop_id]['name']    = sanitize_text_field( $_POST['shop_name'] );
-            $shops[$shop_id]['contact'] = sanitize_text_field( $_POST['shop_contact'] );
-            $shops[$shop_id]['email']   = sanitize_text_field( $_POST['shop_email'] );
-            $shops[$shop_id]['phone']   = sanitize_text_field( $_POST['shop_phone'] );
+            $shops[$shop_id]['name']      = sanitize_text_field( $_POST['shop_name'] );
+            $shops[$shop_id]['contact']   = sanitize_text_field( $_POST['shop_contact'] );
+            $shops[$shop_id]['email']     = sanitize_text_field( $_POST['shop_email'] );
+            $shops[$shop_id]['phone']     = sanitize_text_field( $_POST['shop_phone'] );
+            $shops[$shop_id]['address_1'] = sanitize_text_field( $_POST['shop_address_1'] );
+            $shops[$shop_id]['address_2'] = sanitize_text_field( $_POST['shop_address_2'] );
+            $shops[$shop_id]['city']      = sanitize_text_field( $_POST['shop_city'] );
+            $shops[$shop_id]['state']     = sanitize_text_field( $_POST['shop_state'] );
+            $shops[$shop_id]['zip']       = sanitize_text_field( $_POST['shop_zip'] );
 
             if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
                 $new_lines = array();
@@ -235,7 +250,7 @@ function sywat_render_shops_tab() {
     ) );
     ?>
     <style>
-        .sywat-btn { border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1.2; box-sizing: border-box; white-space: nowrap; }
+        .sywat-btn { border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1.2; box-sizing: border-box; white-space: nowrap; }
         .sywat-btn-green { background: #28a745; color: #fff !important; }
         .sywat-btn-green:hover { background: #218838; }
         .sywat-btn-blue { background: #0073aa; color: #fff !important; }
@@ -253,6 +268,8 @@ function sywat_render_shops_tab() {
         .sywat-shop-field select, .sywat-shop-field input[type="text"], .sywat-shop-field input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .badge-type { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .badge-prereg { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .sywat-modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .sywat-modal-card { background: #fff; padding: 25px; border-radius: 8px; width: 100%; max-width: 540px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
     </style>
 
     <div class="no-print">
@@ -335,7 +352,7 @@ function sywat_render_shops_tab() {
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                         <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-red">Unlink Staff</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-red" style="padding:4px 8px; font-size:12px;">Unlink Staff</button>
                                     </form>
                                 </td>
                             </tr>
@@ -377,6 +394,33 @@ function sywat_render_shops_tab() {
                     </div>
                 </div>
 
+                <!-- OPTIONAL ADDRESS FIELDS -->
+                <h4 style="margin:20px 0 10px 0; font-size:15px; font-weight:bold;">Location Address Details (Optional)</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                    <div class="sywat-shop-field">
+                        <label>Address Line 1</label>
+                        <input type="text" name="shop_address_1" value="<?php echo esc_attr( isset($editing_shop['address_1']) ? $editing_shop['address_1'] : '' ); ?>" placeholder="e.g. 13795 Old Denton Rd">
+                    </div>
+                    <div class="sywat-shop-field">
+                        <label>Address Line 2</label>
+                        <input type="text" name="shop_address_2" value="<?php echo esc_attr( isset($editing_shop['address_2']) ? $editing_shop['address_2'] : '' ); ?>" placeholder="Suite, Bldg, etc.">
+                    </div>
+                    <div class="sywat-shop-field">
+                        <label>City</label>
+                        <input type="text" name="shop_city" value="<?php echo esc_attr( isset($editing_shop['city']) ? $editing_shop['city'] : '' ); ?>" placeholder="e.g. Roanoke">
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div class="sywat-shop-field">
+                            <label>State</label>
+                            <input type="text" name="shop_state" value="<?php echo esc_attr( isset($editing_shop['state']) ? $editing_shop['state'] : '' ); ?>" placeholder="e.g. TX">
+                        </div>
+                        <div class="sywat-shop-field">
+                            <label>ZIP Code</label>
+                            <input type="text" name="shop_zip" value="<?php echo esc_attr( isset($editing_shop['zip']) ? $editing_shop['zip'] : '' ); ?>" placeholder="e.g. 76262">
+                        </div>
+                    </div>
+                </div>
+
                 <h4 style="margin:20px 0 10px 0; font-size:15px; font-weight:bold;">Default Shooting Lines & Capacity Templates</h4>
                 <table style="width:100%; border-collapse:collapse; font-size:14px; text-align:left; margin-bottom:20px;">
                     <thead>
@@ -415,37 +459,7 @@ function sywat_render_shops_tab() {
         </div>
 
     <?php else: ?>
-        <!-- VIEW 3: MAIN SHOPS DIRECTORY & CREATE SHOP FORM -->
-        <div class="sywat-shop-card no-print">
-            <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:8px;">🏬 Create New Archery Shop</h3>
-
-            <form method="post" action="?tab=shops">
-                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                <input type="hidden" name="sywat_shop_action" value="create_shop">
-
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-                    <div class="sywat-shop-field">
-                        <label>Shop Name *</label>
-                        <input type="text" name="shop_name" placeholder="e.g. Cinnamon Creek Ranch" required>
-                    </div>
-                    <div class="sywat-shop-field">
-                        <label>Primary Contact Name(s)</label>
-                        <input type="text" name="shop_contact" placeholder="e.g. Hannah Lange / Beau Brennan">
-                    </div>
-                    <div class="sywat-shop-field">
-                        <label>Contact Email(s)</label>
-                        <input type="text" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com, beau@cinnamoncreekranch.com">
-                    </div>
-                    <div class="sywat-shop-field">
-                        <label>Contact Phone</label>
-                        <input type="text" name="shop_phone" placeholder="e.g. 817-439-8998">
-                    </div>
-                </div>
-
-                <button type="submit" class="sywat-btn sywat-btn-green" style="padding:8px 16px;">+ Create Shop Profile</button>
-            </form>
-        </div>
-
+        <!-- VIEW 3: MAIN SHOPS DIRECTORY & MODAL SHOP CREATION -->
         <div class="sywat-shop-card no-print">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                 <h3 style="margin:0; border:none; padding:0;">Configured Archery Shops</h3>
@@ -454,6 +468,7 @@ function sywat_render_shops_tab() {
                         <input type="text" id="sywat_shop_search_input" placeholder="Search shop name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                         <button type="button" class="sywat-btn sywat-btn-gray" style="font-size:13px; line-height:22px;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_shop_search_input').dispatchEvent(new Event('input'));">Clear</button>
                     </div>
+                    <button type="button" class="sywat-btn sywat-btn-green" onclick="openAddShopModal()">+ Add Shop</button>
                 </div>
             </div>
 
@@ -533,7 +548,81 @@ function sywat_render_shops_tab() {
             <?php endif; ?>
         </div>
 
+        <!-- CREATE SHOP MODAL -->
+        <div id="addShopModal" class="sywat-modal-bg" style="display:none;">
+            <div class="sywat-modal-card">
+                <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">🏬 Create New Archery Shop</h3>
+                <form method="post" action="?tab=shops">
+                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                    <input type="hidden" name="sywat_shop_action" value="create_shop">
+
+                    <div class="sywat-shop-field">
+                        <label>Shop Name *</label>
+                        <input type="text" name="shop_name" placeholder="e.g. Cinnamon Creek Ranch" required>
+                    </div>
+
+                    <div class="sywat-shop-field">
+                        <label>Primary Contact Name(s)</label>
+                        <input type="text" name="shop_contact" placeholder="e.g. Hannah Lange / Beau Brennan">
+                    </div>
+
+                    <div class="sywat-shop-field">
+                        <label>Contact Email(s)</label>
+                        <input type="text" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com, beau@cinnamoncreekranch.com">
+                    </div>
+
+                    <div class="sywat-shop-field">
+                        <label>Contact Phone</label>
+                        <input type="text" name="shop_phone" placeholder="e.g. 817-439-8998">
+                    </div>
+
+                    <hr style="border:none; border-top:1px dashed #ccc; margin:15px 0;">
+                    <span style="font-size:12px; font-weight:bold; color:#646970; display:block; margin-bottom:10px;">LOCATION ADDRESS DETAILS (OPTIONAL)</span>
+
+                    <div class="sywat-shop-field">
+                        <label>Address Line 1</label>
+                        <input type="text" name="shop_address_1" placeholder="e.g. 13795 Old Denton Rd">
+                    </div>
+
+                    <div class="sywat-shop-field">
+                        <label>Address Line 2</label>
+                        <input type="text" name="shop_address_2" placeholder="Suite, Bldg, etc.">
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px;">
+                        <div class="sywat-shop-field">
+                            <label>City</label>
+                            <input type="text" name="shop_city" placeholder="e.g. Roanoke">
+                        </div>
+                        <div class="sywat-shop-field">
+                            <label>State</label>
+                            <input type="text" name="shop_state" placeholder="e.g. TX">
+                        </div>
+                        <div class="sywat-shop-field">
+                            <label>ZIP</label>
+                            <input type="text" name="shop_zip" placeholder="e.g. 76262">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                        <button type="button" class="sywat-btn sywat-btn-gray" onclick="closeAddShopModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-green">+ Create Shop Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
+        function openAddShopModal() {
+            const modal = document.getElementById('addShopModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function closeAddShopModal() {
+            const modal = document.getElementById('addShopModal');
+            if (modal) modal.style.display = 'none';
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             // Auto-fade notice banners
             const notice = document.getElementById('sywat-notice');
