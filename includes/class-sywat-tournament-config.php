@@ -480,7 +480,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         </td>
                                         <td style="text-align: right;">
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                <a href="/sywat-desk/" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="width: 100%; max-width: 130px;">Check-In Desk</a>
+                                                <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="width: 100%; max-width: 130px;">Check-In Desk</a>
                                                 <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="width: 100%; max-width: 130px;">Enter Scores</a>
                                                 <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="width: 100%; max-width: 130px;">Edit Config</a>
                                                 <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
