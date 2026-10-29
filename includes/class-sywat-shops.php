@@ -3,7 +3,7 @@
  * Module: Shop Management & Multi-Tenant Permissions
  * Description: Shop CRUD (Create, Read, Update, Delete), default line templates, contextual staff linking UI.
  * Author: SYWAT Archery
- * Version: 1.8.1
+ * Version: 1.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -109,7 +109,7 @@ function sywat_handle_shop_actions() {
     if ( $action === 'create_shop' ) {
         $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
         if ( empty( $shop_name ) ) {
-            return '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Shop Name is required.</div>';
+            return '<div id="sywat-notice" style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">Shop Name is required.</div>';
         }
 
         $shop_slug = 'shop_' . sanitize_title( $shop_name );
@@ -135,7 +135,7 @@ function sywat_handle_shop_actions() {
         );
 
         update_option( 'sywat_shops_list', $shops );
-        return '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully created shop ' . esc_html( $shop_name ) . '.</div>';
+        return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully created shop ' . esc_html( $shop_name ) . '.</div>';
     }
 
     if ( $action === 'update_shop' ) {
@@ -163,14 +163,14 @@ function sywat_handle_shop_actions() {
             }
 
             update_option( 'sywat_shops_list', $shops );
-            return '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully updated shop details for ' . esc_html( $shops[$shop_id]['name'] ) . '.</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully updated shop details for ' . esc_html( $shops[$shop_id]['name'] ) . '.</div>';
         }
     }
 
     if ( $action === 'delete_shop' ) {
         $shop_id = sanitize_text_field( $_POST['shop_id'] );
         if ( $shop_id === 'shop_ccr' ) {
-            return '<div style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">The primary default shop (Cinnamon Creek Ranch) cannot be deleted.</div>';
+            return '<div id="sywat-notice" style="background:#f8d7da; color:#721c24; padding:10px; margin-bottom:15px; border:1px solid #f5c6cb; border-radius:4px;">The primary default shop (Cinnamon Creek Ranch) cannot be deleted.</div>';
         }
 
         if ( isset( $shops[$shop_id] ) ) {
@@ -183,7 +183,7 @@ function sywat_handle_shop_actions() {
                 update_user_meta( $u->ID, 'sywat_shop_id', 'shop_ccr' );
             }
 
-            return '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully deleted shop ' . esc_html( $deleted_name ) . '. Staff reassigned to Cinnamon Creek Ranch.</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Successfully deleted shop ' . esc_html( $deleted_name ) . '. Staff reassigned to Cinnamon Creek Ranch.</div>';
         }
     }
 
@@ -195,7 +195,7 @@ function sywat_handle_shop_actions() {
             update_user_meta( $target_user_id, 'sywat_shop_id', $target_shop_id );
             $u = get_userdata( $target_user_id );
             $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
-            return '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Assigned ' . esc_html( $u_name ) . ' to ' . esc_html( $shops[$target_shop_id]['name'] ) . '.</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Assigned ' . esc_html( $u_name ) . ' to ' . esc_html( $shops[$target_shop_id]['name'] ) . '.</div>';
         }
     }
 
@@ -205,7 +205,7 @@ function sywat_handle_shop_actions() {
             update_user_meta( $target_user_id, 'sywat_shop_id', 'shop_ccr' );
             $u = get_userdata( $target_user_id );
             $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
-            return '<div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Removed ' . esc_html( $u_name ) . ' from shop assignment (reassigned to default).</div>';
+            return '<div id="sywat-notice" style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border:1px solid #c3e6cb; border-radius:4px; font-weight:bold;">Removed ' . esc_html( $u_name ) . ' from shop assignment (reassigned to default).</div>';
         }
     }
 
@@ -235,7 +235,7 @@ function sywat_render_shops_tab() {
     ) );
     ?>
     <style>
-        .sywat-btn { border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; font-size: 13px; line-height: 1.4; box-sizing: border-box; }
+        .sywat-btn { border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1.2; box-sizing: border-box; white-space: nowrap; }
         .sywat-btn-green { background: #28a745; color: #fff !important; }
         .sywat-btn-green:hover { background: #218838; }
         .sywat-btn-blue { background: #0073aa; color: #fff !important; }
@@ -251,7 +251,7 @@ function sywat_render_shops_tab() {
         .sywat-shop-field { margin-bottom: 12px; }
         .sywat-shop-field label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 13px; }
         .sywat-shop-field select, .sywat-shop-field input[type="text"], .sywat-shop-field input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .badge-type { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .badge-type { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; }
         .badge-prereg { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
     </style>
 
@@ -335,7 +335,7 @@ function sywat_render_shops_tab() {
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                         <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-red" style="padding:4px 8px; font-size:12px;">Unlink Staff</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-red">Unlink Staff</button>
                                     </form>
                                 </td>
                             </tr>
@@ -464,10 +464,10 @@ function sywat_render_shops_tab() {
                     <thead>
                         <tr style="background:#f1f1f1; border-bottom:2px solid #ccc;">
                             <th style="padding:8px; width:22%;">Shop Name & ID</th>
-                            <th style="padding:8px; width:28%;">Contact Info</th>
+                            <th style="padding:8px; width:25%;">Contact Info</th>
                             <th style="padding:8px; width:15%;">Phone</th>
-                            <th style="padding:8px; width:15%;">Linked Staff</th>
-                            <th style="padding:8px; text-align:right; width:20%;">Actions</th>
+                            <th style="padding:8px; width:13%;">Linked Staff</th>
+                            <th style="padding:8px; text-align:left; width:25%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -509,17 +509,17 @@ function sywat_render_shops_tab() {
                                         <span class="badge-type badge-prereg" style="font-size:12px;">👥 <?php echo $linked_count; ?> Staff User(s)</span>
                                     </a>
                                 </td>
-                                <td style="padding:8px; text-align:right;">
+                                <td style="padding:8px; text-align:left;">
                                     <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray" style="padding:4px 8px; font-size:12px;">👥 Link Staff</a>
-                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray" style="padding:4px 8px; font-size:12px;">✏️ Edit Shop</a>
+                                        <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">👥 Link Staff</a>
+                                        <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-gray">✏️ Edit Shop</a>
                                         
                                         <?php if ( $s_id !== 'shop_ccr' ): ?>
                                             <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this shop? Any assigned staff will be reassigned to Cinnamon Creek Ranch.');">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                                 <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-red" style="padding:4px 8px; font-size:12px;">Delete</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-red">Delete</button>
                                             </form>
                                         <?php else: ?>
                                             <span class="badge-type" style="background:#f1f5f9; color:#94a3b8; border:1px solid #cbd5e1; padding:4px 8px;" title="Primary seed shop cannot be deleted">🔒 Seed</span>
@@ -535,6 +535,17 @@ function sywat_render_shops_tab() {
 
         <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Auto-fade notice banners
+            const notice = document.getElementById('sywat-notice');
+            if (notice) {
+                setTimeout(function() {
+                    notice.style.transition = "opacity 0.5s ease";
+                    notice.style.opacity = "0";
+                    setTimeout(function() { notice.remove(); }, 500);
+                }, 5000);
+            }
+
+            // Client-side shop search filter
             const searchInput = document.getElementById('sywat_shop_search_input');
             if (searchInput) {
                 searchInput.addEventListener('input', function() {
