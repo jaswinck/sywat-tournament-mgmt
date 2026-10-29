@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Archer Registration & Intake Engine
- * Description: Simplified phone group intake with full 7 TFAA age divisions, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
+ * Description: Simplified phone group intake with full 7 TFAA age divisions, contact phone auto-formatting, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
  * Author: SYWAT Archery
- * Version: 2.3.1
+ * Version: 2.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,6 +29,7 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
         $group_name      = trim( sanitize_text_field( $_POST['group_name'] ) );
+        $group_phone     = trim( sanitize_text_field( $_POST['group_phone'] ) );
         $default_line_idx= sanitize_text_field( $_POST['default_line_idx'] );
         $tourn_name      = sanitize_text_field( $_POST['selected_tournament'] );
         $amount_paid     = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
@@ -133,6 +134,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'line_index'  => $line_idx,
                 'line_name'   => $line_name,
                 'name'        => $name,
+                'phone'       => $group_phone,
                 'distance'    => $distance,
                 'division'    => $archer['division'],
                 'gender'      => '', // Captured at Desk Check-In
@@ -242,6 +244,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     'line_index'  => $line_idx,
                     'line_name'   => $line_name,
                     'name'        => $clean_line,
+                    'phone'       => '',
                     'distance'    => $dist_val,
                     'division'    => $final_div,
                     'paid'        => $final_paid,
@@ -402,6 +405,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                             'line_index'  => $matched_line_idx,
                             'line_name'   => $matched_line_name,
                             'name'        => $clean_name,
+                            'phone'       => '',
                             'distance'    => $dist_val,
                             'division'    => $final_div,
                             'paid'        => $final_paid,
@@ -459,6 +463,11 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         <div>
                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller / Group Name</label>
                             <input type="text" name="group_name" placeholder="e.g. Smith Family or John Smith" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                        </div>
+
+                        <div>
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Contact Phone Number</label>
+                            <input type="tel" name="group_phone" id="sywat_group_phone" placeholder="e.g. 817-555-1234" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" oninput="formatPhoneNumber(this)">
                         </div>
 
                         <div>
@@ -625,6 +634,19 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
         <script>
         let archerRowCount = 1;
+
+        function formatPhoneNumber(input) {
+            let digits = input.value.replace(/\D/g, '');
+            if (digits.length > 10) digits = digits.substring(0, 10);
+
+            if (digits.length > 6) {
+                input.value = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
+            } else if (digits.length > 3) {
+                input.value = digits.substring(0, 3) + '-' + digits.substring(3);
+            } else {
+                input.value = digits;
+            }
+        }
 
         function updateAllArcherLines(selectedLineIdx) {
             const lineSelects = document.querySelectorAll('.sywat-line-override-select');
