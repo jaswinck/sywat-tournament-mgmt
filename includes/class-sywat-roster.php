@@ -3,7 +3,7 @@
  * Module: Archer Roster Management & Validation
  * Description: Archer editing logic, division/style restrictions, family group assignments, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,8 +168,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         ?>
         <div class="no-print">
             <?php if ( $modal_edit_archer ): ?>
-                <div style="background:#f6f7f7; padding:15px; border:1px solid #c3c4c7; border-radius:4px; margin-bottom:15px;">
-                    <h4 style="margin:0 0 15px 0; font-size:15px; font-weight:600;">Edit Archer Registration</h4>
+                <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px; margin-bottom:15px;">
+                    <h4 style="margin:0 0 15px 0; font-size:15px; font-weight:600; color:#1e293b;">Edit Archer Registration</h4>
                     <form method="post">
                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                         <input type="hidden" name="sywat_action" value="save_edit">
@@ -178,13 +178,13 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <input type="hidden" name="registration_id" value="<?php echo esc_attr( $modal_edit_archer['id'] ); ?>">
 
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-                            <div class="sywat-form-group">
-                                <label>Full Name</label>
-                                <input type="text" name="edit_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" required>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name</label>
+                                <input type="text" name="edit_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
                             </div>
-                            <div class="sywat-form-group">
-                                <label>Shooting Line</label>
-                                <select name="edit_line_index" required>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line</label>
+                                <select name="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
                                     <?php $curr_line = isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : ''; ?>
                                     <?php foreach ($available_lines as $idx => $line): ?>
                                         <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>><?php echo esc_html(isset($line['name']) ? $line['name'] : 'Line ' . ($idx + 1)); ?></option>
@@ -192,9 +192,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-form-group">
-                                <label>Division</label>
-                                <select name="edit_division" id="edit_division" required onchange="handleDivisionChange('edit');">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Division</label>
+                                <select name="edit_division" id="edit_division" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required onchange="handleDivisionChange('edit');">
                                     <?php
                                     $curr_div = isset($modal_edit_archer['division']) ? $modal_edit_archer['division'] : 'Adult (18 - 49)';
                                     foreach ($divs as $d) echo '<option value="' . esc_attr($d) . '" ' . selected($curr_div, $d, false) . '>' . esc_html($d) . '</option>';
@@ -202,9 +202,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-form-group">
-                                <label>Gender</label>
-                                <select name="edit_gender" required>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Gender</label>
+                                <select name="edit_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
                                     <?php
                                     $curr_gen = isset($modal_edit_archer['gender']) ? $modal_edit_archer['gender'] : 'Male';
                                     foreach ($genders as $g) echo '<option value="' . esc_attr($g) . '" ' . selected($curr_gen, $g, false) . '>' . esc_html($g) . '</option>';
@@ -212,9 +212,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-form-group" style="grid-column: 1 / -1;">
-                                <label>Style</label>
-                                <select name="edit_style" id="edit_style" required>
+                            <div style="grid-column: 1 / -1;">
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Style</label>
+                                <select name="edit_style" id="edit_style" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
                                     <?php
                                     $curr_sty = isset($modal_edit_archer['style']) ? $modal_edit_archer['style'] : '';
                                     foreach ($sywat_styles as $s) echo '<option value="' . esc_attr($s) . '" ' . selected($curr_sty, $s, false) . '>' . esc_html($s) . '</option>';
@@ -222,9 +222,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-form-group">
-                                <label>Paid Option</label>
-                                <select name="edit_pay_option" id="edit_pay_option" required onchange="updatePaidStatusDisplay('edit');">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Paid Option</label>
+                                <select name="edit_pay_option" id="edit_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required onchange="updatePaidStatusDisplay('edit');">
                                     <?php
                                     $curr_paid = isset($modal_edit_archer['paid']) ? $modal_edit_archer['paid'] : '';
                                     $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
@@ -235,26 +235,26 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-form-group" id="edit_family_group_box" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>">
-                                <label>Assign to Family Group</label>
-                                <select name="edit_family_group_id">
+                            <div id="edit_family_group_box" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>">
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Assign to Family Group</label>
+                                <select name="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
                                     <option value="">[ + Create New Family Group ]</option>
                                     <?php
                                     $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
                                     foreach ($existing_families as $fid => $flabel) echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
                                     ?>
                                 </select>
-                                <input type="text" name="edit_new_family_name" placeholder="Or type new family name..." style="margin-top:5px;">
+                                <input type="text" name="edit_new_family_name" placeholder="Or type new family name..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; margin-top:5px;">
                             </div>
 
-                            <div class="sywat-form-group">
-                                <label>Balance Due ($)</label>
-                                <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Balance Due ($)</label>
+                                <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
                             </div>
 
-                            <div class="sywat-form-group">
-                                <label>Distance (Calculated)</label>
-                                <input type="text" id="edit_distance_display" value="<?php echo ($curr_div === 'Cub (8 - 11)') ? 'Cub' : '20yd'; ?>" disabled style="background:#f9f9f9; font-weight:bold;">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Distance (Calculated)</label>
+                                <input type="text" id="edit_distance_display" value="<?php echo ($curr_div === 'Cub (8 - 11)') ? 'Cub' : '20yd'; ?>" disabled style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; background:#f9f9f9; font-weight:bold;">
                             </div>
                         </div>
 
@@ -270,15 +270,15 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     </form>
                 </div>
             <?php else: ?>
-                <div style="margin-bottom: 15px; display:flex; gap:12px; align-items:flex-end;">
+                <div style="margin-bottom: 15px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                     <form method="get" style="display: flex; gap: 12px; flex: 1; align-items: flex-end; margin: 0;">
                         <input type="hidden" name="tab" value="manage">
                         <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                         <input type="hidden" name="modal_action" value="manage">
 
-                        <div class="sywat-form-group">
-                            <label for="filter_line_idx">Filter by Line</label>
-                            <select name="filter_line_idx" id="filter_line_idx" onchange="this.form.submit()">
+                        <div>
+                            <label for="filter_line_idx" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Filter by Line</label>
+                            <select name="filter_line_idx" id="filter_line_idx" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.form.submit()">
                                 <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>(All Lines)</option>
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
@@ -287,16 +287,16 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         </div>
                     </form>
 
-                    <div class="sywat-form-group" style="flex: 2;">
-                        <label for="search_shooter">Search Archer Name</label>
+                    <div style="flex: 2;">
+                        <label for="search_shooter" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Search Archer Name</label>
                         <div style="display:flex; gap:5px; align-items:center;">
-                            <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="width:100%;">
-                            <button type="button" class="sywat-btn-secondary" style="height:34px; padding:0 12px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
+                            <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                            <button type="button" class="sywat-btn-secondary" style="height:32px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
                     </div>
 
                     <?php if ( $filter_line_idx !== 'all' && ! empty( $filtered_registrations ) ): ?>
-                        <div class="sywat-form-group" style="flex: 0 0 auto;">
+                        <div style="flex: 0 0 auto;">
                             <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to clear ALL archers from this line?');">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="purge_line">
@@ -316,11 +316,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     <table class="sywat-table">
                         <thead>
                             <tr>
-                                <th>Shooter Name</th>
-                                <th>Type</th>
-                                <th>Line</th>
-                                <th>Distance</th>
-                                <th style="text-align: right;">Action</th>
+                                <th style="text-align:left;">Shooter Name</th>
+                                <th style="text-align:center;">Type</th>
+                                <th style="text-align:left;">Line</th>
+                                <th style="text-align:center;">Distance</th>
+                                <th style="text-align:right;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -332,26 +332,28 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 ?>
                                 <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                     <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
-                                    <td><span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span></td>
+                                    <td style="text-align:center;"><span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span></td>
                                     <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
-                                    <td><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
-                                    <td style="text-align: right; display:flex; gap:6px; justify-content:flex-end;">
-                                        <form method="post" style="margin: 0;">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                            <input type="hidden" name="modal_action" value="manage">
-                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                            <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
-                                            <button type="submit" class="sywat-btn-primary" style="background:#6c757d; border-color:#6c757d; padding: 4px 10px; font-size: 12px; height: auto;">✏️ Edit</button>
-                                        </form>
+                                    <td style="text-align:center;"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
+                                    <td style="text-align:right;">
+                                        <div style="display:inline-flex; gap:6px; justify-content:flex-end;">
+                                            <form method="post" style="margin: 0;">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="modal_action" value="manage">
+                                                <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                                <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
+                                                <button type="submit" class="sywat-btn-primary" style="padding: 4px 10px; font-size: 12px; height: auto;">✏️ Edit</button>
+                                            </form>
 
-                                        <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                            <input type="hidden" name="sywat_action" value="delete_shooter">
-                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                            <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                            <button type="submit" class="sywat-btn-danger" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
-                                        </form>
+                                            <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="sywat_action" value="delete_shooter">
+                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                                <button type="submit" class="sywat-btn-danger" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
