@@ -5,7 +5,7 @@
  *              statuses, assigning target lanes onsite, and managing event line check-ins with multi-tenant shop scoping.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 2.3.0
+ * Version: 2.3.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -609,7 +609,7 @@ function render_sywat_desk_app() {
                         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
                                 <strong style="color:#0f172a; font-size:14px;"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
-                                <span style="font-size:11px; background:#0073aa; color:#fff; padding:2px 6px; border-radius:12px; font-weight:bold;">
+                                <span style="font-size:11px; background:#0073aa; color:#fff; padding:2px 6px; border-radius:12px; font-weight:bold; white-space:nowrap;">
                                     <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                 </span>
                             </div>
@@ -721,7 +721,7 @@ function render_sywat_desk_app() {
                                                 <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                                 <input type="hidden" name="sywat_action" value="undo_checkin">
                                                 <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                <button type="submit" class="sywat-btn-success" style="height:28px; padding:2px 8px; font-size:12px;">Checked In ✓</button>
+                                                <button type="submit" class="sywat-btn-checkedin" style="height:28px; padding:2px 8px; font-size:12px;">Checked In ✓</button>
                                             </form>
                                         <?php else: ?>
                                             <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
