@@ -217,13 +217,18 @@ function sywat_desk_render_archers_table($data) {
                             $paid_disp  = (!empty($reg['checked_in']) && !empty($reg['paid'])) ? $reg['paid'] : '—';
                             $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
                             $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
+                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || !empty($reg['family_id']);
                         ?>
                         <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                             <td>
                                 <strong><?php echo esc_html($reg['name']); ?></strong>
                                 <?php if ($balance_due > 0): ?>
                                     <span style="font-size:11px; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:2px 6px; border-radius:10px; font-weight:bold; margin-left:4px;">
-                                        ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
+                                        <?php if ($is_family_due): ?>
+                                            ⚠️ OWE: FAMILY
+                                        <?php else: ?>
+                                            ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
+                                        <?php endif; ?>
                                     </span>
                                 <?php endif; ?>
                             </td>
