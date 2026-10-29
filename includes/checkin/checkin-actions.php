@@ -166,16 +166,20 @@ function sywat_desk_handle_actions(&$data) {
                 
                 update_option($opt_key, $reg, false);
 
-                // Multi-Archer Family Balance Sync: Clear balance_due for all family members
-                $fam_id  = !empty($reg['family_id']) ? $reg['family_id'] : '';
-                $book_id = !empty($reg['booking_id']) ? $reg['booking_id'] : '';
+                // Multi-Archer Family Balance Sync: Clear balance_due ONLY for archers on the SAME shooting line
+                $fam_id      = !empty($reg['family_id']) ? $reg['family_id'] : '';
+                $book_id     = !empty($reg['booking_id']) ? $reg['booking_id'] : '';
+                $target_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
 
                 foreach ($registrations as &$r) {
                     if (isset($r['id']) && $r['id'] === $target_id) {
                         $r = $reg;
                     }
                     if (!empty($fam_id) || !empty($book_id)) {
-                        if (isset($r['tournament']) && strcasecmp($r['tournament'], $selected_tournament) === 0) {
+                        if (isset($r['tournament'], $r['line_index']) 
+                            && strcasecmp($r['tournament'], $selected_tournament) === 0
+                            && (string)$r['line_index'] === $target_line) {
+                            
                             $is_fam_match = (!empty($fam_id) && isset($r['family_id']) && $r['family_id'] === $fam_id) ||
                                             (!empty($book_id) && isset($r['booking_id']) && $r['booking_id'] === $book_id);
                             if ($is_fam_match) {
