@@ -214,7 +214,7 @@ function sywat_desk_render_archers_table($data) {
                             $reg_type   = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
                             $badge_class= ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
                             $balance_due= isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                            $paid_disp  = (!empty($reg['checked_in']) && !empty($reg['paid'])) ? $reg['paid'] : '—';
+                            $paid_disp  = !empty($reg['paid']) ? $reg['paid'] : '—';
                             $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
                             $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
                             $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || !empty($reg['family_id']);
