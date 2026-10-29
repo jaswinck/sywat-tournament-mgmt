@@ -1,9 +1,9 @@
 <?php
 /**
  * Module: Archer Registration & Intake Engine
- * Description: Simplified phone group intake, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
+ * Description: Simplified phone group intake with full 7 TFAA age divisions, real-time $75 family capping, CCR-only FareHarbor CSV parsing, and line slot tracker.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -40,7 +40,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please add at least one archer name.</div>';
         }
 
-        // Calculate Pricing Tier & Family Capping
+        $youth_divisions = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
         $youth_count = 0;
         $adult_count = 0;
         $valid_archers = array();
@@ -49,15 +49,29 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $name = trim(sanitize_text_field($a['name']));
             if (empty($name)) continue;
 
-            $tier = sanitize_text_field($a['tier']); // 'Youth' or 'Adult'
-            if ($tier === 'Youth') $youth_count++;
-            else $adult_count++;
+            $distance = sywat_normalize_dist(sanitize_text_field($a['distance']));
+            $division = sanitize_text_field($a['division']);
+
+            if (empty($division)) {
+                $division = ($distance === 'Cub') ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+            }
+
+            $is_youth_tier = in_array($division, $youth_divisions) || ($distance === 'Cub');
+
+            if ($is_youth_tier) {
+                $youth_count++;
+                $paid_tier = 'Youth';
+            } else {
+                $adult_count++;
+                $paid_tier = 'Adult';
+            }
 
             $valid_archers[] = array(
-                'name'     => $name,
-                'tier'     => $tier,
-                'distance' => sywat_normalize_dist(sanitize_text_field($a['distance'])),
-                'line_idx' => !empty($a['line_idx']) ? sanitize_text_field($a['line_idx']) : $default_line_idx,
+                'name'      => $name,
+                'division'  => $division,
+                'paid_tier' => $paid_tier,
+                'distance'  => $distance,
+                'line_idx'  => !empty($a['line_idx']) ? sanitize_text_field($a['line_idx']) : $default_line_idx,
             );
         }
 
@@ -108,8 +122,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             if ($current_count >= $max_capacity) { $skipped_cap++; continue; }
 
-            $paid_status = $is_family_capped ? 'Family' : $archer['tier'];
-            $default_div = ($distance === 'Cub') ? 'Cub (8 - 11)' : ($archer['tier'] === 'Youth' ? 'Youth (12 - 14)' : 'Adult (18 - 49)');
+            $paid_status = $is_family_capped ? 'Family' : $archer['paid_tier'];
 
             $new_reg = array(
                 'id'          => uniqid( 'reg_' ),
@@ -118,7 +131,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'line_name'   => $line_name,
                 'name'        => $name,
                 'distance'    => $distance,
-                'division'    => $default_div,
+                'division'    => $archer['division'], // Direct flow-through to Check-In
                 'gender'      => '', // Captured at Desk Check-In
                 'style'       => '', // Captured at Desk Check-In
                 'paid'        => $paid_status,
@@ -465,16 +478,25 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         <div class="sywat-archer-input-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
                             <input type="text" name="archers[0][name]" placeholder="Archer Full Name *" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="recalculateGroupTotal()">
                             
-                            <select name="archers[0][tier]" class="sywat-tier-select" style="flex:1; min-width:120px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
-                                <option value="Youth">Youth ($25)</option>
-                                <option value="Adult" selected>Adult ($30)</option>
-                            </select>
-
-                            <select name="archers[0][distance]" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                            <!-- Target Distance Selection -->
+                            <select name="archers[0][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                                 <option value="20yd" selected>20yd</option>
                                 <option value="Cub">Cub (10yd)</option>
                             </select>
 
+                            <!-- Full 7 TFAA Age Division Selection -->
+                            <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();" required>
+                                <option value="" disabled selected hidden>Select Division</option>
+                                <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
+                                <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
+                                <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
+                                <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
+                                <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
+                                <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
+                                <option value="Master Senior (70+)">Master Senior (70+) [$30]</option>
+                            </select>
+
+                            <!-- Line Override Selection -->
                             <select name="archers[0][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
@@ -607,6 +629,22 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             });
         }
 
+        function handleDistanceChange(distSelect) {
+            const row = distSelect.closest('.sywat-archer-input-row');
+            if (!row) return;
+            const divSelect = row.querySelector('.sywat-division-select');
+            if (!divSelect) return;
+
+            if (distSelect.value === 'Cub') {
+                divSelect.value = 'Cub (8 - 11)';
+            } else if (distSelect.value === '20yd') {
+                if (divSelect.value === 'Cub (8 - 11)' && divSelect.dataset.userChosen !== 'true') {
+                    divSelect.value = '';
+                }
+            }
+            recalculateGroupTotal();
+        }
+
         function addArcherRow() {
             const container = document.getElementById('sywat_archer_rows_container');
             if (!container) return;
@@ -627,17 +665,27 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
             rowDiv.innerHTML = `
                 <input type="text" name="archers[${archerRowCount}][name]" placeholder="Archer Full Name *" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="recalculateGroupTotal()">
-                <select name="archers[${archerRowCount}][tier]" class="sywat-tier-select" style="flex:1; min-width:120px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
-                    <option value="Youth">Youth ($25)</option>
-                    <option value="Adult" selected>Adult ($30)</option>
-                </select>
-                <select name="archers[${archerRowCount}][distance]" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                
+                <select name="archers[${archerRowCount}][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                     <option value="20yd" selected>20yd</option>
                     <option value="Cub">Cub (10yd)</option>
                 </select>
+
+                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();" required>
+                    <option value="" disabled selected hidden>Select Division</option>
+                    <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
+                    <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
+                    <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
+                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
+                    <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
+                    <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
+                    <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
+                </select>
+
                 <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
                     ${lineOptionsHtml}
                 </select>
+
                 <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
             `;
 
@@ -657,19 +705,31 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         }
 
         function recalculateGroupTotal() {
-            const tierSelects = document.querySelectorAll('.sywat-tier-select');
+            const rows = document.querySelectorAll('.sywat-archer-input-row');
             let rawTotal = 0;
             let archerCount = 0;
 
-            tierSelects.forEach(select => {
-                const nameInput = select.closest('.sywat-archer-input-row')?.querySelector('input[type="text"]');
+            const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
+
+            rows.forEach(row => {
+                const nameInput  = row.querySelector('input[type="text"]');
+                const distSelect = row.querySelector('.sywat-distance-select');
+                const divSelect  = row.querySelector('.sywat-division-select');
+
                 if (nameInput && nameInput.value.trim() !== '') {
                     archerCount++;
-                    rawTotal += (select.value === 'Youth') ? 25 : 30;
+                    const dist = distSelect ? distSelect.value : '20yd';
+                    const div  = divSelect ? divSelect.value : '';
+
+                    if (dist === 'Cub' || youthDivisions.includes(div)) {
+                        rawTotal += 25;
+                    } else {
+                        rawTotal += 30;
+                    }
                 }
             });
 
-            if (archerCount === 0) archerCount = tierSelects.length;
+            if (archerCount === 0) archerCount = rows.length;
 
             const isCapped = (rawTotal >= 75 || archerCount >= 3);
             const finalFee = isCapped ? 75.00 : rawTotal;
