@@ -31,6 +31,14 @@ function sywat_archery_activate() {
 add_action('wp_enqueue_scripts', 'sywat_archery_enqueue_assets');
 function sywat_archery_enqueue_assets() {
     wp_enqueue_script('jquery');
+
+    // Enqueue Master Admin Stylesheet
+    wp_enqueue_style(
+        'sywat-admin-css',
+        SYWAT_PLUGIN_URL . 'assets/css/sywat-admin.css',
+        array(),
+        '2.3.0'
+    );
 }
 
 // Load Core Portal & Multi-Shop Sub-Modules
