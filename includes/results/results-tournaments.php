@@ -118,8 +118,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
                                 <div class="sywat-tourn-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
                                     <h4 class="sywat-style-header" style="border-left-color: #0f172a;">
-                                        <span>🏆 <?php echo esc_html( $style_name ); ?></span>
-                                        <span class="sywat-style-header-tag" style="background: #0f172a;">Style Category</span>
+                                        🏆 <?php echo esc_html( $style_name ); ?>
                                     </h4>
 
                                     <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
