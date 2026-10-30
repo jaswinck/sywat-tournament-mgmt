@@ -168,6 +168,20 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
 }
 
 /**
+ * Permission 6: Can create or manage member user accounts.
+ */
+if ( ! function_exists( 'sywat_can_create_members' ) ) {
+    function sywat_can_create_members( $user_id = 0 ) {
+        $allowed = array(
+            'administrator',
+            'tfaa_webmaster',
+            'tfaa_admin',
+        );
+        return sywat_user_has_any_role( $allowed, $user_id );
+    }
+}
+
+/**
  * Helper: Retrieve assigned District slug for Field Governor user scoping.
  */
 if ( ! function_exists( 'sywat_get_user_district' ) ) {
