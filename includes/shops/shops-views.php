@@ -9,8 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
     function sywat_render_shops_tab() {
-        if ( ! current_user_can( 'administrator' ) ) {
-            echo '<p style="color:red; padding:20px;">Administrator access required to manage shops.</p>';
+        $can_manage = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
+        if ( ! $can_manage ) {
+            echo '<p style="color:red; padding:20px;">Management access required to manage shops.</p>';
             return;
         }
 
