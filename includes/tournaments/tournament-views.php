@@ -9,16 +9,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'render_sywat_master_portal' ) ) {
     function render_sywat_master_portal() {
-        $user = wp_get_current_user();
-        $allowed_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'sywat_shop_manager' );
-        if ( is_user_logged_in() && ! array_intersect( $allowed_roles, (array) $user->roles ) ) {
-            return '<p style="color:red; padding:20px;">Access denied. Management access required.</p>';
+        // Enforce Central Permission Check
+        if ( ! sywat_can_manage_tournaments() ) {
+            return '<p style="color:red; padding:20px; font-weight:bold;">Access denied. Management access required.</p>';
         }
 
         ob_start();
         global $wpdb;
 
-        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $can_manage_seasons = sywat_can_manage_seasons();
         $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
         $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
         $seasons            = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
@@ -117,7 +116,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <!-- Navigation Tabs with CSS Pseudo-element Icons -->
+            <!-- Navigation Tabs -->
             <div class="sywat-nav-tabs no-print">
                 <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
                 <?php if ( $can_manage_seasons ): ?>
@@ -141,7 +140,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <span>Configured Tournaments</span>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             
-                            <!-- Strictly Side-by-Side Shop Filter & Text Search Group -->
                             <div style="display: flex; gap: 5px; margin: 0; align-items: center; flex-wrap: nowrap;">
                                 <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; height: 32px; box-sizing: border-box; width: 140px;">
                                     <option value="all">All Shops</option>
@@ -153,7 +151,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px; padding: 4px 8px;" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
 
-                            <!-- Unified Stat Chip Pill for TFAA Sync -->
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 10px; gap: 6px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
@@ -203,7 +200,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         $is_active_hub = in_array( $t_name, $active_tournaments );
                                         $is_scores_pub = ! empty( $t_data['scores_published'] );
 
-                                        // FIX: Use sprintf to create a clean, unescaped raw string, then strictly esc_js() it in the HTML later.
                                         $confirm_msg_raw = $is_scores_pub
                                             ? sprintf( 'Are you sure you want to recall scores for "%s" and hide them from Season Standings?', $t_name )
                                             : sprintf( 'Are you sure you want to push scores for "%s" to Season Standings?', $t_name );
@@ -273,7 +269,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check-In Desk</a>
                                                 <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Enter Scores</a>
 
-                                                <!-- FIX APPLIED HERE: Properly escaped JS confirmation prompt -->
                                                 <form method="post" class="sywat-table-action-form" onsubmit="return confirm('<?php echo esc_js( $confirm_msg_raw ); ?>');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="toggle_publish_standings">
