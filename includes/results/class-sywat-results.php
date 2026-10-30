@@ -45,9 +45,22 @@ function render_sywat_public_results_portal() {
             <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">🎯 Individual Tournament Results</h2>
             <ul style="list-style: none; padding: 0; margin-top: 15px;">
                 <?php foreach ( $tournaments as $t_name => $t_data ): ?>
-                    <li style="padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                        <strong><?php echo esc_html( $t_name ); ?></strong>
-                        <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 4px 10px;">View Leaderboard</a>
+                    <?php 
+                        $s_date     = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                        $e_date     = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                        $disp_dates = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
+                        if ( empty( $disp_dates ) ) {
+                            $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '' );
+                        }
+                    ?>
+                    <li style="padding: 12px 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <?php if ( ! empty( $disp_dates ) ): ?>
+                                <span style="font-size: 12px; font-weight: 600; color: #646970; display: block; margin-bottom: 2px;">📅 <?php echo esc_html( $disp_dates ); ?></span>
+                            <?php endif; ?>
+                            <strong style="font-size: 15px; color: #0f172a;"><?php echo esc_html( $t_name ); ?></strong>
+                        </div>
+                        <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
                     </li>
                 <?php endforeach; ?>
             </ul>
