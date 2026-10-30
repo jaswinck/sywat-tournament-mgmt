@@ -22,7 +22,7 @@ register_activation_hook( __FILE__, 'sywat_archery_activate' );
 function sywat_archery_activate() {
     add_role( 'staff_shooter', 'Staff Shooter', array( 'read' => true ) );
     add_role( 'management', 'Management', array( 'read' => true ) );
-    
+
     // Custom Multi-Shop Roles
     add_role( 'sywat_shop_manager', 'SYWAT Shop Manager', array( 'read' => true ) );
     add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
@@ -57,3 +57,4 @@ require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-shops.php';               
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';      // Check-In Desk App ([sywat_desk])
 require_once SYWAT_PLUGIN_DIR . 'includes/scores/class-sywat-scores.php';         // Batch Score Entry App ([sywat_scores])
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tfaa-sync.php';            // TFAA Membership Verification & Sync
+require_once SYWAT_PLUGIN_DIR . 'includes/results/class-sywat-results.php';      // Public Standings & Results ([sywat_results])
