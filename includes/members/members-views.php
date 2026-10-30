@@ -159,9 +159,28 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 </div>
                             </div>
 
-                            <div style="margin-bottom: 20px;">
-                                <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Initial Password * (Minimum 8 characters)</label>
-                                <input type="password" name="password" required style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                            <!-- PASSWORD & CONFIRM PASSWORD -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
+                                <div>
+                                    <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Initial Password *</label>
+                                    <input type="password" id="sywat_add_pw" name="password" required oninput="sywatValidatePasswordRules('sywat_add_pw', 'sywat_add_pw_confirm', 'add_rule')" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Confirm Password *</label>
+                                    <input type="password" id="sywat_add_pw_confirm" name="confirm_password" required oninput="sywatValidatePasswordRules('sywat_add_pw', 'sywat_add_pw_confirm', 'add_rule')" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                                </div>
+                            </div>
+
+                            <!-- LIVE COMPLIANCE STATUS INDICATOR -->
+                            <div style="margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Password Requirements</div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; color: #64748b;">
+                                    <div id="add_rule_len">🔴 8+ Characters</div>
+                                    <div id="add_rule_upper">🔴 1 Uppercase (A-Z)</div>
+                                    <div id="add_rule_lower">🔴 1 Lowercase (a-z)</div>
+                                    <div id="add_rule_num">🔴 1 Number (0-9)</div>
+                                    <div id="add_rule_match" style="grid-column: span 2;">🔴 Passwords Match</div>
+                                </div>
                             </div>
 
                             <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -227,9 +246,28 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     </div>
                                 </div>
 
-                                <div style="margin-bottom: 20px;">
-                                    <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Reset Password (Leave blank to keep current password)</label>
-                                    <input type="password" name="new_password" placeholder="New password..." style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                                <!-- RESET PASSWORD (OPTIONAL) -->
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
+                                    <div>
+                                        <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Reset Password (Optional)</label>
+                                        <input type="password" id="sywat_edit_pw" name="new_password" placeholder="Leave blank to keep..." oninput="sywatValidatePasswordRules('sywat_edit_pw', 'sywat_edit_pw_confirm', 'edit_rule')" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Confirm New Password</label>
+                                        <input type="password" id="sywat_edit_pw_confirm" name="confirm_new_password" placeholder="Confirm password..." oninput="sywatValidatePasswordRules('sywat_edit_pw', 'sywat_edit_pw_confirm', 'edit_rule')" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
+                                    </div>
+                                </div>
+
+                                <!-- EDIT PASSWORD COMPLIANCE INDICATOR -->
+                                <div style="margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px;">
+                                    <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">New Password Requirements</div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; color: #64748b;">
+                                        <div id="edit_rule_len">⚪ 8+ Characters</div>
+                                        <div id="edit_rule_upper">⚪ 1 Uppercase (A-Z)</div>
+                                        <div id="edit_rule_lower">⚪ 1 Lowercase (a-z)</div>
+                                        <div id="edit_rule_num">⚪ 1 Number (0-9)</div>
+                                        <div id="edit_rule_match" style="grid-column: span 2;">⚪ Passwords Match</div>
+                                    </div>
                                 </div>
 
                                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -253,6 +291,38 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                 input.value = val.substring(0, 3) + '-' + val.substring(3);
             } else {
                 input.value = val;
+            }
+        }
+
+        function sywatValidatePasswordRules(pwId, confirmId, prefix) {
+            const pwVal      = document.getElementById(pwId).value;
+            const confirmVal = document.getElementById(confirmId).value;
+
+            const isLen   = pwVal.length >= 8;
+            const isUpper = /[A-Z]/.test(pwVal);
+            const isLower = /[a-z]/.test(pwVal);
+            const isNum   = /[0-9]/.test(pwVal);
+            const isMatch = (pwVal.length > 0 && pwVal === confirmVal);
+
+            sywatUpdateRuleStatus(prefix + '_len', isLen, '8+ Characters');
+            sywatUpdateRuleStatus(prefix + '_upper', isUpper, '1 Uppercase (A-Z)');
+            sywatUpdateRuleStatus(prefix + '_lower', isLower, '1 Lowercase (a-z)');
+            sywatUpdateRuleStatus(prefix + '_num', isNum, '1 Number (0-9)');
+            sywatUpdateRuleStatus(prefix + '_match', isMatch, 'Passwords Match');
+        }
+
+        function sywatUpdateRuleStatus(elementId, isValid, text) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+
+            if (isValid) {
+                el.style.color = '#166534';
+                el.style.fontWeight = '700';
+                el.innerHTML = '🟢 ' + text;
+            } else {
+                el.style.color = '#dc2626';
+                el.style.fontWeight = '400';
+                el.innerHTML = '🔴 ' + text;
             }
         }
 
