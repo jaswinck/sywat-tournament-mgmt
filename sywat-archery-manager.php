@@ -45,6 +45,7 @@ function sywat_archery_enqueue_assets() {
 // Load Core Tournament & Multi-Shop Modules
 require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-config.php'; // Tournament Config, Seasons & Volunteer Hub
 require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';  // Intake & Phone Registration Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-member-signup.php'; // Public/Admin Member Signup Shortcode ([sywat_member_signup])
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';               // Roster Administration & Line Purging
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';           // Financial Split Calculations & Invoicing
 require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';           // Multi-Tenant Shop Management Engine
