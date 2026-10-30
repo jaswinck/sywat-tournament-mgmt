@@ -14,6 +14,8 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
                 'slug'         => 'indoor-2026-2027',
                 'name'         => '2026-2027 Indoor',
                 'type'         => 'Indoor',
+                'start_date'   => '2026-10-01',
+                'end_date'     => '2027-03-31',
                 'year_label'   => '2026–2027',
                 'status'       => 'active',
                 'best_n_count' => 3,
@@ -22,6 +24,8 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
                 'slug'         => 'outdoor-2026',
                 'name'         => '2026 Outdoor',
                 'type'         => 'Outdoor',
+                'start_date'   => '2026-04-01',
+                'end_date'     => '2026-07-31',
                 'year_label'   => '2026',
                 'status'       => 'archived',
                 'best_n_count' => 3,
@@ -63,14 +67,15 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                 <span>Season Management</span>
                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="document.getElementById('sywat_season_form_card').scrollIntoView({behavior: 'smooth'});">Add New Season</button>
             </div>
-            <div class="sywat-subtitle">Configure SYWAT Indoor/Outdoor competition seasons and set active aggregate score rules.</div>
+            <div class="sywat-subtitle">Configure SYWAT competition seasons and set active aggregate score rules.</div>
 
             <table class="sywat-table" style="margin-bottom: 30px;">
                 <thead>
                     <tr>
                         <th>Season Name</th>
                         <th style="text-align: center;">Type</th>
-                        <th style="text-align: center;">Years</th>
+                        <th style="text-align: center;">Season Duration</th>
+                        <th style="text-align: center;">Calculated Year</th>
                         <th style="text-align: center;">Best-N Qualifier Rule</th>
                         <th style="text-align: center;">Status</th>
                         <th style="text-align: right;">Actions</th>
@@ -78,10 +83,15 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                 </thead>
                 <tbody>
                     <?php foreach ( $seasons as $slug => $s ): ?>
+                        <?php 
+                            $s_start = ! empty( $s['start_date'] ) ? date( 'M j, Y', strtotime( $s['start_date'] ) ) : '—';
+                            $s_end   = ! empty( $s['end_date'] ) ? date( 'M j, Y', strtotime( $s['end_date'] ) ) : '—';
+                        ?>
                         <tr>
                             <td><strong><?php echo esc_html( $s['name'] ); ?></strong></td>
                             <td style="text-align: center;"><span class="sywat-badge"><?php echo esc_html( $s['type'] ); ?></span></td>
-                            <td style="text-align: center;"><?php echo esc_html( $s['year_label'] ); ?></td>
+                            <td style="text-align: center; font-size: 12px; color: #475569;"><?php echo esc_html( $s_start . ' – ' . $s_end ); ?></td>
+                            <td style="text-align: center; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( isset( $s['year_label'] ) ? $s['year_label'] : '—' ); ?></td>
                             <td style="text-align: center;">Best <strong><?php echo intval( $s['best_n_count'] ); ?></strong> Scores</td>
                             <td style="text-align: center;">
                                 <?php if ( $s['status'] === 'active' ): ?>
@@ -118,17 +128,12 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                         <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Type *</label>
                             <select name="season_type" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
-                                <option value="Indoor" <?php selected( $edit_season ? $edit_season['type'] : 'Indoor', 'Indoor' ); ?>>Indoor (Oct – Mar)</option>
-                                <option value="Outdoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Outdoor' ); ?>>Outdoor (Apr – Jul)</option>
+                                <option value="" <?php selected( empty($edit_season['type']), true ); ?>>Select Season Type</option>
+                                <option value="Indoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Indoor' ); ?>>Indoor</option>
+                                <option value="Outdoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Outdoor' ); ?>>Outdoor</option>
+                                <option value="Field 50" <?php selected( $edit_season ? $edit_season['type'] : '', 'Field 50' ); ?>>Field 50</option>
                             </select>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Year Label *</label>
-                            <input type="text" name="season_years" value="<?php echo esc_attr( $edit_season ? $edit_season['year_label'] : '2026–2027' ); ?>" placeholder="e.g. 2026-2027" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Status *</label>
                             <select name="season_status" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
@@ -136,12 +141,23 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                                 <option value="upcoming" <?php selected( $edit_season ? $edit_season['status'] : '', 'upcoming' ); ?>>Upcoming</option>
                                 <option value="archived" <?php selected( $edit_season ? $edit_season['status'] : '', 'archived' ); ?>>Archived</option>
                             </select>
-                            <span style="font-size: 11px; color: #646970;">Setting a season to Active automatically archives previous active seasons.</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
+                            <input type="date" name="start_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['start_date']) ? $edit_season['start_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                        </div>
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date *</label>
+                            <input type="date" name="end_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['end_date']) ? $edit_season['end_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            <span style="font-size: 11px; color: #646970;">Year label is automatically calculated from Start/End dates.</span>
                         </div>
                         <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Top Qualifier Scores Count (Best N)</label>
                             <input type="number" name="season_best_n" value="<?php echo esc_attr( $edit_season ? $edit_season['best_n_count'] : 3 ); ?>" min="1" max="10" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                            <span style="font-size: 11px; color: #646970;">Number of highest qualifier scores kept in season aggregate (Default: 3).</span>
+                            <span style="font-size: 11px; color: #646970;">Number of highest qualifier scores kept in aggregate (Default: 3).</span>
                         </div>
                     </div>
 
