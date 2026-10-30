@@ -1,61 +1,56 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
- * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded for print reliability), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.6
+ * Version: 2.3.7
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Helper: Detect and resolve absolute HTTPS URL for Zelle QR Code image
-if ( ! function_exists( 'sywat_get_zelle_qr_url' ) ) {
-    function sywat_get_zelle_qr_url() {
-        $raw_qr = get_option( 'sywat_zelle_qr_url', '' );
+// Helper: Detect and embed Zelle QR Code as Base64 to guarantee print/PDF rendering
+if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
+    function sywat_get_zelle_qr_base64() {
+        $raw_qr    = get_option( 'sywat_zelle_qr_url', '' );
+        $file_path = '';
 
         // 1. If stored as numeric Media Attachment ID
         if ( is_numeric( $raw_qr ) && intval( $raw_qr ) > 0 ) {
-            $att_url = wp_get_attachment_url( intval( $raw_qr ) );
-            if ( $att_url ) {
-                return function_exists('set_url_scheme') ? set_url_scheme( $att_url, 'https' ) : $att_url;
+            $file_path = get_attached_file( intval( $raw_qr ) );
+        }
+
+        // 2. If stored as URL or relative path, attempt to map to physical server path
+        if ( empty( $file_path ) && ! empty( $raw_qr ) ) {
+            $parsed_url = parse_url( $raw_qr, PHP_URL_PATH );
+            if ( $parsed_url ) {
+                $clean_path = ltrim( $parsed_url, '/' );
+                if ( file_exists( ABSPATH . $clean_path ) ) {
+                    $file_path = ABSPATH . $clean_path;
+                }
             }
         }
 
-        // 2. If stored as absolute URL
-        if ( ! empty( $raw_qr ) && ( strpos( $raw_qr, 'http://' ) === 0 || strpos( $raw_qr, 'https://' ) === 0 ) ) {
-            return function_exists('set_url_scheme') ? set_url_scheme( $raw_qr, 'https' ) : $raw_qr;
-        }
-
-        // 3. If stored as relative path
-        if ( ! empty( $raw_qr ) ) {
-            $clean_path = ltrim( $raw_qr, '/' );
-            if ( file_exists( ABSPATH . $clean_path ) ) {
-                $site_url = site_url( '/' . $clean_path );
-                return function_exists('set_url_scheme') ? set_url_scheme( $site_url, 'https' ) : $site_url;
-            }
-        }
-
-        // 4. Fallback checks in standard WordPress uploads folder
-        if ( function_exists( 'wp_upload_dir' ) ) {
+        // 3. Fallback checks in standard WordPress uploads folder
+        if ( empty( $file_path ) && function_exists( 'wp_upload_dir' ) ) {
             $upload_dir = wp_upload_dir();
             if ( file_exists( $upload_dir['basedir'] . '/zelle-qr.png' ) ) {
-                return function_exists('set_url_scheme') ? set_url_scheme( $upload_dir['baseurl'] . '/zelle-qr.png', 'https' ) : $upload_dir['baseurl'] . '/zelle-qr.png';
-            }
-            if ( file_exists( $upload_dir['basedir'] . '/zelle-qr.jpg' ) ) {
-                return function_exists('set_url_scheme') ? set_url_scheme( $upload_dir['baseurl'] . '/zelle-qr.jpg', 'https' ) : $upload_dir['baseurl'] . '/zelle-qr.jpg';
-            }
-        }
-
-        // 5. Fallback in plugin assets directory
-        if ( defined( 'SYWAT_PLUGIN_DIR' ) && defined( 'SYWAT_PLUGIN_URL' ) ) {
-            if ( file_exists( SYWAT_PLUGIN_DIR . 'assets/images/zelle-qr.png' ) ) {
-                return function_exists('set_url_scheme') ? set_url_scheme( SYWAT_PLUGIN_URL . 'assets/images/zelle-qr.png', 'https' ) : SYWAT_PLUGIN_URL . 'assets/images/zelle-qr.png';
+                $file_path = $upload_dir['basedir'] . '/zelle-qr.png';
+            } elseif ( file_exists( $upload_dir['basedir'] . '/zelle-qr.jpg' ) ) {
+                $file_path = $upload_dir['basedir'] . '/zelle-qr.jpg';
             }
         }
 
-        // 6. Default root uploads URL fallback
-        $default_url = site_url( '/wp-content/uploads/zelle-qr.png' );
-        return function_exists('set_url_scheme') ? set_url_scheme( $default_url, 'https' ) : $default_url;
+        // 4. Encode to Base64 if physical file is found
+        if ( ! empty( $file_path ) && file_exists( $file_path ) ) {
+            $type = pathinfo( $file_path, PATHINFO_EXTENSION );
+            $data = file_get_contents( $file_path );
+            if ( $data ) {
+                return 'data:image/' . $type . ';base64,' . base64_encode( $data );
+            }
+        }
+
+        // 5. Ultimate Fallback (Return raw option if file lookup fails)
+        return ! empty( $raw_qr ) ? esc_url( $raw_qr ) : '';
     }
 }
 
@@ -147,7 +142,7 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $t_dates = get_option('sywat_dates_' . sanitize_title($selected_tournament), '');
         $tourn_dates_str = !empty($t_dates) ? $t_dates : $selected_tournament;
 
-        // Fetch Shop Info dynamically based on Tournament Assignment
+        // Fetch Shop Info dynamically
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         $all_shops   = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
         $shop_id     = 'shop_ccr';
@@ -163,8 +158,8 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email = ! empty( $shop_info['email'] ) ? $shop_info['email'] : '—';
         $shop_phone = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '—';
 
-        // Dynamically resolve uploaded Zelle QR code image URL
-        $zelle_qr_url = sywat_get_zelle_qr_url();
+        // Fetch Base64 Encoded QR Code
+        $zelle_qr_src = sywat_get_zelle_qr_base64();
         ?>
 
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
@@ -193,44 +188,23 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                         color: #000000 !important;
                         margin: 0 !important;
                         padding: 0 !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        overflow: visible !important;
                     }
-
                     body * {
                         visibility: hidden !important;
                     }
-
                     #sywat_print_area, #sywat_print_area * {
                         visibility: visible !important;
                     }
-
                     #sywat_print_area {
                         position: absolute !important;
                         left: 0 !important;
                         top: 0 !important;
                         width: 100% !important;
-                        max-width: 100% !important;
                         margin: 0 !important;
                         padding: 15px !important;
-                        background: #ffffff !important;
-                        box-sizing: border-box !important;
                     }
-
                     .no-print {
                         display: none !important;
-                    }
-
-                    .invoice-qr-code {
-                        display: block !important;
-                        visibility: visible !important;
-                        width: 130px !important;
-                        height: auto !important;
-                        max-width: 130px !important;
-                        margin: 10px auto !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
                     }
                 }
             </style>
@@ -304,7 +278,11 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                     <p style="margin-top: 8px;">Send Money with Zelle®, Tag: <strong style="color:#1e3a8a;">tfaachecking</strong></p>
                     
                     <div style="margin-top: 10px; text-align: center;">
-                        <img src="<?php echo esc_url($zelle_qr_url); ?>" class="invoice-qr-code" alt="Zelle QR Code" style="width: 130px; height: auto; max-width: 130px; display: inline-block; margin: 0 auto; border: none; outline: none;" loading="eager">
+                        <?php if ( ! empty( $zelle_qr_src ) ) : ?>
+                            <img src="<?php echo $zelle_qr_src; ?>" alt="Zelle QR Code" style="width: 130px; height: auto; display: inline-block; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        <?php else : ?>
+                            <span style="display:inline-block; padding: 20px; border: 1px dashed #ccc; color: #666; font-size: 11px;">[ QR Code Image Missing ]</span>
+                        <?php endif; ?>
                     </div>
                     
                     <p style="font-weight: bold; font-size: 13px; margin-top: 10px;">Thank You for Hosting!</p>
@@ -356,35 +334,11 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         <div id="sywat_print_area">
             <style>
                 @media print {
-                    html, body {
-                        background: #ffffff !important;
-                        color: #000000 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-                    body * {
-                        visibility: hidden !important;
-                    }
-                    #sywat_print_area, #sywat_print_area * {
-                        visibility: visible !important;
-                    }
-                    #sywat_print_area {
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        margin: 0 !important;
-                        padding: 15px !important;
-                        background: #ffffff !important;
-                        box-sizing: border-box !important;
-                    }
-                    .no-print {
-                        display: none !important;
-                    }
+                    html, body { background: #ffffff !important; color: #000000 !important; margin: 0 !important; padding: 0 !important; }
+                    body * { visibility: hidden !important; }
+                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
+                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 15px !important; }
+                    .no-print { display: none !important; }
                 }
             </style>
 
