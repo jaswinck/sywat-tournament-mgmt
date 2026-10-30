@@ -58,12 +58,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <table class="sywat-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 15%; text-align: center;">TFAA Member #</th>
-                                    <th style="width: 25%;">Member Name</th>
-                                    <th style="width: 25%;">Email Address</th>
-                                    <th style="width: 15%; text-align: center;">Phone</th>
+                                    <th style="width: 14%; text-align: center;">TFAA Member #</th>
+                                    <th style="width: 22%;">Member Name</th>
+                                    <th style="width: 24%;">Email Address</th>
+                                    <th style="width: 14%; text-align: center;">Phone</th>
                                     <th style="width: 10%; text-align: center;">NFAA Status</th>
-                                    <th style="width: 10%; text-align: right;">Action</th>
+                                    <th style="width: 16%; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -75,11 +75,14 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
                                         $is_nfaa_active = ( $m_nfaa === 'yes' );
                                     ?>
-                                    <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone ) ); ?>">
+                                    <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone ) ); ?>">
                                         <td style="text-align: center;">
                                             <strong style="color: #1e3a8a; font-family: monospace; font-size: 13px;"><?php echo esc_html( $disp_id ); ?></strong>
                                         </td>
-                                        <td><strong><?php echo esc_html( $m->display_name ); ?></strong></td>
+                                        <td>
+                                            <strong><?php echo esc_html( $m->display_name ); ?></strong>
+                                            <div style="font-size: 11px; color: #64748b; font-family: monospace; margin-top: 1px;">👤 <?php echo esc_html( $m->user_login ); ?></div>
+                                        </td>
                                         <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" style="color: #2271b1; text-decoration: none;"><?php echo esc_html( $m->user_email ); ?></a></td>
                                         <td style="text-align: center;"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
                                         <td style="text-align: center;">
@@ -90,7 +93,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <?php endif; ?>
                                         </td>
                                         <td style="text-align: right;">
-                                            <a href="?tab=members&subtab=directory&edit_member_id=<?php echo $m->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px;">Edit</a>
+                                            <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
+                                                <a href="?tab=members&subtab=directory&edit_member_id=<?php echo $m->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px; height: 26px;">Edit</a>
+                                                <?php if ( get_current_user_id() !== $m->ID ): ?>
+                                                    <form method="post" action="?tab=members&subtab=directory" style="margin: 0;" onsubmit="return confirm('Are you sure you want to permanently delete member \'<?php echo esc_js( $m->display_name ); ?>\'? This action cannot be undone.');">
+                                                        <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_member_action" value="delete_member">
+                                                        <input type="hidden" name="target_user_id" value="<?php echo $m->ID; ?>">
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="font-size: 11px; padding: 3px 8px; height: 26px;">Delete</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -113,7 +126,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <input type="hidden" name="sywat_member_action" value="create_member">
 
                             <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 12px; color: #1e3a8a;">
-                                🆔 <strong>TFAA Member ID:</strong> System auto-generates sequentially upon creation (e.g., <code>TFAA-10001</code>).
+                                🆔 <strong>TFAA Member ID & Username:</strong> Username is auto-formatted as <code>Firstname.Lastname</code> and Member ID is auto-generated sequentially.
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -179,8 +192,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <input type="hidden" name="sywat_member_action" value="update_member">
                                 <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
 
-                                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px; color: #334155;">
-                                    🆔 <strong>TFAA Member #:</strong> <span style="font-family: monospace; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( ! empty( $e_tfaa ) ? $e_tfaa : 'Unassigned' ); ?></span>
+                                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px; color: #334155; display: flex; justify-content: space-between;">
+                                    <span>🆔 <strong>TFAA Member #:</strong> <span style="font-family: monospace; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( ! empty( $e_tfaa ) ? $e_tfaa : 'Unassigned' ); ?></span></span>
+                                    <span>👤 <strong>Username:</strong> <span style="font-family: monospace; font-weight: bold; color: #334155;"><?php echo esc_html( $edit_user_obj->user_login ); ?></span></span>
                                 </div>
 
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
