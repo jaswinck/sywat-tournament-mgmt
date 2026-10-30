@@ -9,7 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
     function sywat_handle_shop_actions() {
-        if ( ! current_user_can( 'administrator' ) ) return '';
+        $can_manage = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
+        if ( ! $can_manage ) return '';
         if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) return '';
         if ( ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) return '';
 
