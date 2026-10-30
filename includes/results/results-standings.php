@@ -111,8 +111,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
                                 <div class="sywat-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
                                     <h4 class="sywat-style-header">
-                                        <span>🏹 <?php echo esc_html( $style_name ); ?></span>
-                                        <span class="sywat-style-header-tag">Style Category</span>
+                                        🏹 <?php echo esc_html( $style_name ); ?>
                                     </h4>
 
                                     <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
