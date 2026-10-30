@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and TFAA sync.
- * Version:     2.4.0
+ * Version:     2.5.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,21 +15,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '2.4.0' );
+define( 'SYWAT_PLUGIN_VERSION', '2.5.0' );
 
-// Automatically register custom roles upon plugin activation
+// Load Central Roles & Permissions Management Sub-Module First
+require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
+
+// Trigger automatic role registration upon plugin activation
 register_activation_hook( __FILE__, 'sywat_archery_activate' );
 function sywat_archery_activate() {
-    add_role( 'staff_shooter', 'Staff Shooter', array( 'read' => true ) );
-    add_role( 'management', 'Management', array( 'read' => true ) );
-
-    // Custom Multi-Shop Roles
-    add_role( 'sywat_shop_manager', 'SYWAT Shop Manager', array( 'read' => true ) );
-    add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
-
-    // Custom TFAA Administrative Roles
-    add_role( 'tfaa_webmaster', 'TFAA Webmaster', array( 'read' => true, 'upload_files' => true, 'edit_posts' => true ) );
-    add_role( 'tfaa_admin', 'TFAA Admin', array( 'read' => true, 'upload_files' => true, 'edit_posts' => true ) );
+    if ( function_exists( 'sywat_register_custom_roles' ) ) {
+        sywat_register_custom_roles();
+    }
 }
 
 // Enqueue standard jQuery and global styles
