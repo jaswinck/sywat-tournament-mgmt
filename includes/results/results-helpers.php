@@ -95,7 +95,7 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
 /**
  * Aggregates season standings grouped by Division + Gender -> Style
- * Deduplicates multiple scores from the same archer in the same tournament/division/gender/style (keeping only highest)
+ * EXCLUDES all Guest scores and secondary re-entries entirely
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
     function sywat_aggregate_season_standings( $season_slug ) {
@@ -119,16 +119,22 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             $raw_scores = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
-            // Deduplicate per single tournament: Keep ONLY highest score for identical Archer + D/G/S
-            $deduped_scores = array();
-            $grouped_per_tournament = array();
+            // Explicitly filter out any score where style is 'Guest' or name contains '[Guest]'
+            $official_scores = array_filter( $raw_scores, function( $s ) {
+                $st = strtolower( trim( $s['style'] ) );
+                $nm = strtolower( trim( $s['name'] ) );
+                return ( $st !== 'guest' && strpos( $nm, '[guest]' ) === false );
+            });
 
-            foreach ( $raw_scores as $s ) {
+            // Group per Archer + D/G/S to ensure only top official score per tournament counts
+            $grouped_per_tournament = array();
+            foreach ( $official_scores as $s ) {
                 $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
                 $archer_key = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
                 $grouped_per_tournament[$dgs_key][$archer_key][] = $s;
             }
 
+            $deduped_scores = array();
             foreach ( $grouped_per_tournament as $dgs_key => $archers_map ) {
                 foreach ( $archers_map as $archer_key => $entries ) {
                     usort( $entries, function( $p, $q ) {
@@ -137,7 +143,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                         }
                         return $q['score'] - $p['score'];
                     });
-                    // Promote only the highest single score for this tournament
+                    // Only top official score is promoted
                     $deduped_scores[] = $entries[0];
                 }
             }
@@ -194,7 +200,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Compute scores and sort archers inside each style
+        // Compute Best-N scores and sort archers inside each style
         foreach ( $groups as $dg_key => &$group ) {
             ksort( $group['styles'] );
 
