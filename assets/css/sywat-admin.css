@@ -385,3 +385,21 @@
 .sywat-modal-backdrop.sywat-nested-modal {
     z-index: 100050 !important;
 }
+
+/* Global Table Header Alignment */
+.sywat-table th {
+    text-align: left;
+}
+
+/* Retain explicit center and right alignments for numeric/action headers */
+.sywat-table th.text-center,
+.sywat-table th[style*="text-align: center"],
+.sywat-table th[style*="text-align:center"] {
+    text-align: center;
+}
+
+.sywat-table th.text-right,
+.sywat-table th[style*="text-align: right"],
+.sywat-table th[style*="text-align:right"] {
+    text-align: right;
+}
