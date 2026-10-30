@@ -65,7 +65,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $modal_action        = isset( $_REQUEST['modal_action'] ) ? sanitize_text_field( $_REQUEST['modal_action'] ) : 'manage';
         $open_modal          = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] );
 
-        // Declare missing archer and family modal variables to avoid PHP warnings
         $modal_edit_archer   = isset( $_REQUEST['edit_archer'] ) ? sanitize_text_field( $_REQUEST['edit_archer'] ) : '';
         $existing_families   = function_exists( 'sywat_get_existing_families' ) ? sywat_get_existing_families( $registrations ) : array();
 
@@ -96,6 +95,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 $scoped_tournaments[$t_name] = $t_data;
             }
         }
+
+        // Sort tournaments chronologically by Start Date (Soonest first)
+        uasort( $scoped_tournaments, function( $a, $b ) {
+            $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
+            $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
+            if ( $a_date === $b_date ) return 0;
+            return ( $a_date < $b_date ) ? -1 : 1;
+        });
 
         $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
         $tfaa_count = isset( $tfaa_cache['count'] ) ? $tfaa_cache['count'] : 0;
