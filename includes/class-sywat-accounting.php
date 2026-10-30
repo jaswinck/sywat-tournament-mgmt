@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.2
+ * Version: 2.3.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -106,24 +106,37 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
             $shop_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
         }
 
-        $shop_info   = isset( $all_shops[$shop_id] ) ? $all_shops[$shop_id] : array();
-        $shop_name   = ! empty( $shop_info['name'] ) ? $shop_info['name'] : 'Cinnamon Creek Ranch';
-        $shop_cont   = ! empty( $shop_info['contact'] ) ? $shop_info['contact'] : 'Hannah Lange / Beau Brennan';
-        $shop_email  = ! empty( $shop_info['email'] ) ? $shop_info['email'] : 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com';
-        $shop_phone  = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '817-439-8998';
+        $shop_info  = isset( $all_shops[$shop_id] ) ? $all_shops[$shop_id] : array();
+        $shop_name  = ! empty( $shop_info['name'] ) ? $shop_info['name'] : $selected_tournament;
+        $shop_cont  = ! empty( $shop_info['contact'] ) ? $shop_info['contact'] : ( ! empty( $shop_info['contact_name'] ) ? $shop_info['contact_name'] : '—' );
+        $shop_email = ! empty( $shop_info['email'] ) ? $shop_info['email'] : '—';
+        $shop_phone = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '—';
 
-        // Retrieve uploaded Zelle QR code image path directly
-        $zelle_qr_url = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
-        if ( empty( $zelle_qr_url ) ) {
-            $zelle_qr_url = '/wp-content/uploads/zelle-qr.png';
+        // Retrieve uploaded Zelle QR code image from option
+        $raw_qr = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
+        if ( empty( $raw_qr ) ) {
+            $raw_qr = '/wp-content/uploads/zelle-qr.png';
         }
 
-        if ( is_numeric( $zelle_qr_url ) ) {
-            $att_url = wp_get_attachment_url( intval( $zelle_qr_url ) );
+        $zelle_qr_url = '';
+
+        // 1. Check if stored as numeric Media Attachment ID
+        if ( is_numeric( $raw_qr ) ) {
+            $att_url = wp_get_attachment_url( intval( $raw_qr ) );
             if ( $att_url ) $zelle_qr_url = $att_url;
         }
 
-        if ( function_exists( 'set_url_scheme' ) && ! empty( $zelle_qr_url ) && strpos( $zelle_qr_url, 'http' ) === 0 ) {
+        // 2. Convert relative path to fully qualified absolute site URL
+        if ( empty( $zelle_qr_url ) ) {
+            if ( strpos( $raw_qr, 'http://' ) === 0 || strpos( $raw_qr, 'https://' ) === 0 ) {
+                $zelle_qr_url = $raw_qr;
+            } else {
+                $zelle_qr_url = site_url( '/' . ltrim( $raw_qr, '/' ) );
+            }
+        }
+
+        // 3. Enforce HTTPS scheme for browser print preview compatibility
+        if ( ! empty( $zelle_qr_url ) && function_exists( 'set_url_scheme' ) ) {
             $zelle_qr_url = set_url_scheme( $zelle_qr_url, 'https' );
         }
         ?>
@@ -153,7 +166,7 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                     #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
                     #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10px !important; }
                     .no-print { display: none !important; }
-                    .invoice-qr-code { display: inline-block !important; visibility: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; width: 120px !important; height: auto !important; }
+                    .invoice-qr-code { display: block !important; visibility: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; width: 120px !important; height: auto !important; max-width: 120px !important; margin: 0 auto !important; }
                 }
             </style>
 
