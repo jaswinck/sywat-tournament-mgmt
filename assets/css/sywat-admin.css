@@ -75,7 +75,9 @@
 .sywat-btn-success,
 .sywat-btn-danger,
 .sywat-btn-gray,
-.sywat-btn-checkedin {
+.sywat-btn-checkedin,
+.sywat-btn-push,
+.sywat-btn-live {
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
@@ -142,6 +144,30 @@
     color: #155724 !important;
 }
 
+/* Push Standings Action Button (White BG, Slate Border, Solid Slate Hover) */
+.sywat-btn-push {
+    background-color: #ffffff;
+    border: 1px solid #475569;
+    color: #475569 !important;
+}
+.sywat-btn-push:hover {
+    background-color: #475569;
+    border-color: #475569;
+    color: #ffffff !important;
+}
+
+/* Standings Live Indicator Button (White BG, Green Border, Solid Green Hover) */
+.sywat-btn-live {
+    background-color: #ffffff;
+    border: 1px solid #008a20;
+    color: #008a20 !important;
+}
+.sywat-btn-live:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+    color: #ffffff !important;
+}
+
 /* Gray Button (Muted Dark Neutral) */
 .sywat-btn-gray {
     background-color: #6c757d;
@@ -152,6 +178,18 @@
     background-color: #5a6268;
     border-color: #545b62;
     color: #ffffff !important;
+}
+
+/* Button Sizing & Action Form Utilities */
+.sywat-btn-full {
+    width: 100%;
+    max-width: 130px;
+}
+
+.sywat-table-action-form {
+    margin: 0;
+    width: 100%;
+    max-width: 130px;
 }
 
 /* Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
