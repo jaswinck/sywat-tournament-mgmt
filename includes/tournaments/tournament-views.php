@@ -103,7 +103,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <div class="sywat-nav-tabs no-print">
                 <a href="?tab=manage" class="sywat-tab-item <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
                 <?php if ( $can_manage_seasons ): ?>
-                    <a href="?tab=seasons" class="sywat-tab-item <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Manage Seasons</a>
+                    <a href="?tab=seasons" class="sywat-tab-item <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Season Management</a>
                     <a href="?tab=shops" class="sywat-tab-item <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
                 <?php endif; ?>
             </div>
