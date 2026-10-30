@@ -72,12 +72,13 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
         $seasons = sywat_get_seasons();
         $edit_slug = isset( $_REQUEST['edit_season'] ) ? sanitize_text_field( $_REQUEST['edit_season'] ) : '';
         $edit_season = ( ! empty( $edit_slug ) && isset( $seasons[$edit_slug] ) ) ? $seasons[$edit_slug] : null;
+        $open_season_modal = ! empty( $edit_season ) || isset( $_REQUEST['open_add_season'] );
         ?>
 
         <div class="sywat-card no-print">
             <div class="sywat-card-title">
                 <span>Season Management</span>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="document.getElementById('sywat_season_form_card').scrollIntoView({behavior: 'smooth'});">Add New Season</button>
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddSeasonModal()">Add New Season</button>
             </div>
             <div class="sywat-subtitle">Configure SYWAT competition seasons and set active aggregate score rules.</div>
 
@@ -121,65 +122,84 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
 
-            <!-- Add / Edit Season Form -->
-            <div id="sywat_season_form_card" style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 20px;">
-                <h3 style="margin-top: 0; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-                    <?php echo $edit_season ? 'Edit Season: ' . esc_html($edit_season['name']) : 'Add New Season'; ?>
-                </h3>
-                <form method="post" action="?tab=seasons">
-                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                    <input type="hidden" name="sywat_action" value="save_season">
-                    <input type="hidden" name="original_season_slug" value="<?php echo esc_attr( $edit_slug ); ?>">
+        <!-- Add / Edit Season Pop-Up Modal -->
+        <div class="sywat-modal-backdrop <?php echo $open_season_modal ? 'active' : ''; ?>" id="sywat_add_season_modal">
+            <div class="sywat-modal-content" style="max-width: 650px;">
+                <div class="sywat-modal-header no-print">
+                    <h3><?php echo $edit_season ? 'Edit Season: ' . esc_html($edit_season['name']) : 'Create New Season'; ?></h3>
+                    <button type="button" class="sywat-modal-close" onclick="closeAddSeasonModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <form method="post" action="?tab=seasons">
+                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                        <input type="hidden" name="sywat_action" value="save_season">
+                        <input type="hidden" name="original_season_slug" value="<?php echo esc_attr( $edit_slug ); ?>">
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Type *</label>
-                            <select name="season_type" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
-                                <option value="" <?php selected( empty($edit_season['type']), true ); ?>>Select Season Type</option>
-                                <option value="Indoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Indoor' ); ?>>Indoor</option>
-                                <option value="Outdoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Outdoor' ); ?>>Outdoor</option>
-                                <option value="Field 50" <?php selected( $edit_season ? $edit_season['type'] : '', 'Field 50' ); ?>>Field 50</option>
-                            </select>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Type *</label>
+                                <select name="season_type" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                    <option value="" <?php selected( empty($edit_season['type']), true ); ?>>Select Season Type</option>
+                                    <option value="Indoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Indoor' ); ?>>Indoor</option>
+                                    <option value="Outdoor" <?php selected( $edit_season ? $edit_season['type'] : '', 'Outdoor' ); ?>>Outdoor</option>
+                                    <option value="Field 50" <?php selected( $edit_season ? $edit_season['type'] : '', 'Field 50' ); ?>>Field 50</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Status *</label>
+                                <select name="season_status" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                    <option value="active" <?php selected( $edit_season ? $edit_season['status'] : 'active', 'active' ); ?>>Active (Current Active Season)</option>
+                                    <option value="upcoming" <?php selected( $edit_season ? $edit_season['status'] : '', 'upcoming' ); ?>>Upcoming</option>
+                                    <option value="archived" <?php selected( $edit_season ? $edit_season['status'] : '', 'archived' ); ?>>Archived</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Status *</label>
-                            <select name="season_status" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
-                                <option value="active" <?php selected( $edit_season ? $edit_season['status'] : 'active', 'active' ); ?>>Active (Current Active Season)</option>
-                                <option value="upcoming" <?php selected( $edit_season ? $edit_season['status'] : '', 'upcoming' ); ?>>Upcoming</option>
-                                <option value="archived" <?php selected( $edit_season ? $edit_season['status'] : '', 'archived' ); ?>>Archived</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Top Qualifier Scores Count (Best N)</label>
-                            <input type="number" name="season_best_n" value="<?php echo esc_attr( $edit_season ? $edit_season['best_n_count'] : 3 ); ?>" min="1" max="10" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                        </div>
-                    </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
-                            <input type="date" name="start_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['start_date']) ? $edit_season['start_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
+                                <input type="date" name="start_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['start_date']) ? $edit_season['start_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date *</label>
+                                <input type="date" name="end_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['end_date']) ? $edit_season['end_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Top Qualifier Scores (Best N)</label>
+                                <input type="number" name="season_best_n" value="<?php echo esc_attr( $edit_season ? $edit_season['best_n_count'] : 3 ); ?>" min="1" max="10" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            </div>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date *</label>
-                            <input type="date" name="end_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['end_date']) ? $edit_season['end_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+
+                        <div style="background: #edf2f7; border-left: 4px solid #3182ce; padding: 10px 12px; margin-bottom: 20px; font-size: 12px; color: #2d3748;">
+                            ℹ️ <strong>Auto-Generated Name Notice:</strong> Season name and year label are created automatically based on your dates and type (e.g., <em>"2026–2027 Indoor"</em> or <em>"2026 Outdoor"</em>).
                         </div>
-                    </div>
 
-                    <div style="background: #edf2f7; border-left: 4px solid #3182ce; padding: 10px 12px; margin-bottom: 20px; font-size: 12px; color: #2d3748;">
-                        ℹ️ <strong>Auto-Generated Name Notice:</strong> Season name and year label are created automatically based on your dates and type (e.g., <em>"2026–2027 Indoor"</em> or <em>"2026 Outdoor"</em>).
-                    </div>
-
-                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                        <?php if ( $edit_season ): ?>
-                            <a href="?tab=seasons" class="sywat-btn sywat-btn-secondary">Cancel Edit</a>
-                        <?php endif; ?>
-                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Season Configuration</button>
-                    </div>
-                </form>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeAddSeasonModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Season Configuration</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
+
+        <script>
+        function openAddSeasonModal() {
+            const modal = document.getElementById('sywat_add_season_modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeAddSeasonModal() {
+            const modal = document.getElementById('sywat_add_season_modal');
+            if (modal) modal.classList.remove('active');
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit_season');
+            url.searchParams.delete('open_add_season');
+            window.history.replaceState({}, document.title, url.toString());
+        }
+        </script>
         <?php
     }
 }
