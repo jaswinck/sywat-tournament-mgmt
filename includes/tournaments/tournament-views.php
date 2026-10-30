@@ -117,11 +117,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
+            <!-- Navigation Tabs with CSS Pseudo-element Icons -->
             <div class="sywat-nav-tabs no-print">
-                <a href="?tab=manage" class="sywat-tab-item <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
+                <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
                 <?php if ( $can_manage_seasons ): ?>
-                    <a href="?tab=seasons" class="sywat-tab-item <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Season Management</a>
-                    <a href="?tab=shops" class="sywat-tab-item <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
+                    <a href="?tab=seasons" class="sywat-tab-item sywat-tab-icon-season <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Season Management</a>
+                    <a href="?tab=shops" class="sywat-tab-item sywat-tab-icon-shop <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
                 <?php endif; ?>
             </div>
 
