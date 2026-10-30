@@ -95,6 +95,7 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
 /**
  * Aggregates season standings grouped by Division + Gender -> Style
+ * Deduplicates multiple scores from the same archer in the same tournament/division/gender/style (keeping only highest)
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
     function sywat_aggregate_season_standings( $season_slug ) {
@@ -115,10 +116,33 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $groups = array();
 
         foreach ( $matching_tournaments as $t_name ) {
-            $scores = sywat_get_tournament_scores( $t_name );
+            $raw_scores = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
-            foreach ( $scores as $s ) {
+            // Deduplicate per single tournament: Keep ONLY highest score for identical Archer + D/G/S
+            $deduped_scores = array();
+            $grouped_per_tournament = array();
+
+            foreach ( $raw_scores as $s ) {
+                $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
+                $archer_key = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+                $grouped_per_tournament[$dgs_key][$archer_key][] = $s;
+            }
+
+            foreach ( $grouped_per_tournament as $dgs_key => $archers_map ) {
+                foreach ( $archers_map as $archer_key => $entries ) {
+                    usort( $entries, function( $p, $q ) {
+                        if ( $p['score'] === $q['score'] ) {
+                            return $q['x_count'] - $p['x_count'];
+                        }
+                        return $q['score'] - $p['score'];
+                    });
+                    // Promote only the highest single score for this tournament
+                    $deduped_scores[] = $entries[0];
+                }
+            }
+
+            foreach ( $deduped_scores as $s ) {
                 $div_gen_key = $s['division'] . '|||' . $s['gender'];
                 $style_key   = $s['style'];
                 $archer_key  = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
