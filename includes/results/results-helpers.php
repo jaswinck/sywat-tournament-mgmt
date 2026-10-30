@@ -7,29 +7,60 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'sywat_get_division_weight' ) ) {
-    function sywat_get_division_weight( $div ) {
+/**
+ * Calculates numeric sort weight for Division + Gender groupings.
+ * Order: Cub -> Youth -> Young Adult -> Adult (Pro Male -> Male -> Pro Female -> Female) -> Senior -> Silver Senior -> Master Senior
+ */
+if ( ! function_exists( 'sywat_get_div_gen_sort_weight' ) ) {
+    function sywat_get_div_gen_sort_weight( $div, $gender ) {
         $d = strtolower( trim( $div ) );
-        if ( strpos( $d, 'cub' ) !== false ) return 1;
-        if ( strpos( $d, 'young adult' ) !== false ) return 3;
-        if ( strpos( $d, 'youth' ) !== false ) return 2;
-        if ( strpos( $d, 'master senior' ) !== false ) return 7;
-        if ( strpos( $d, 'silver senior' ) !== false ) return 6;
-        if ( strpos( $d, 'senior' ) !== false ) return 5;
-        if ( strpos( $d, 'adult' ) !== false ) return 4;
-        return 99;
-    }
-}
-
-if ( ! function_exists( 'sywat_get_gender_weight' ) ) {
-    function sywat_get_gender_weight( $gender ) {
         $g = strtolower( trim( $gender ) );
-        if ( strpos( $g, 'female' ) !== false ) return 2;
-        if ( strpos( $g, 'male' ) !== false ) return 1;
-        return 3;
+
+        $base = 90;
+        if ( strpos( $d, 'cub' ) !== false ) $base = 10;
+        elseif ( strpos( $d, 'young adult' ) !== false ) $base = 30;
+        elseif ( strpos( $d, 'youth' ) !== false ) $base = 20;
+        elseif ( strpos( $d, 'master senior' ) !== false ) $base = 70;
+        elseif ( strpos( $d, 'silver senior' ) !== false ) $base = 60;
+        elseif ( strpos( $d, 'senior' ) !== false ) $base = 50;
+        elseif ( strpos( $d, 'adult' ) !== false ) $base = 40;
+
+        $mod = 2; // Default Male
+        $is_pro    = ( strpos( $d, 'pro' ) !== false || strpos( $g, 'pro' ) !== false );
+        $is_female = ( strpos( $g, 'female' ) !== false );
+
+        if ( $is_pro && ! $is_female ) {
+            $mod = 1; // Pro Male
+        } elseif ( ! $is_pro && ! $is_female ) {
+            $mod = 2; // Male
+        } elseif ( $is_pro && $is_female ) {
+            $mod = 3; // Pro Female
+        } elseif ( ! $is_pro && $is_female ) {
+            $mod = 4; // Female
+        }
+
+        return $base + $mod;
     }
 }
 
+/**
+ * Cleanly formats Division and Gender into a unified header title
+ */
+if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
+    function sywat_format_div_gen_heading( $division, $gender ) {
+        $clean_div = trim( preg_replace( '/\s*\([^)]*\)/', '', $division ) );
+        $clean_gen = trim( preg_replace( '/\s*\([^)]*\)/', '', $gender ) );
+        
+        if ( stripos( $clean_div, $clean_gen ) !== false ) {
+            return $clean_div;
+        }
+        return $clean_div . ' ' . $clean_gen;
+    }
+}
+
+/**
+ * Fetch all completed score records for a given tournament
+ */
 if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     function sywat_get_tournament_scores( $t_name ) {
         global $wpdb;
@@ -62,6 +93,9 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     }
 }
 
+/**
+ * Aggregates season standings grouped by Division + Gender -> Style
+ */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
     function sywat_aggregate_season_standings( $season_slug ) {
         $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
@@ -78,22 +112,32 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             }
         }
 
-        $categories = array();
+        $groups = array();
 
         foreach ( $matching_tournaments as $t_name ) {
             $scores = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
             foreach ( $scores as $s ) {
-                $cat_key   = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
-                $archer_key = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+                $div_gen_key = $s['division'] . '|||' . $s['gender'];
+                $style_key   = $s['style'];
+                $archer_key  = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
 
-                if ( ! isset( $categories[$cat_key] ) ) {
-                    $categories[$cat_key] = array();
+                if ( ! isset( $groups[$div_gen_key] ) ) {
+                    $groups[$div_gen_key] = array(
+                        'division' => $s['division'],
+                        'gender'   => $s['gender'],
+                        'heading'  => sywat_format_div_gen_heading( $s['division'], $s['gender'] ),
+                        'styles'   => array(),
+                    );
                 }
 
-                if ( ! isset( $categories[$cat_key][$archer_key] ) ) {
-                    $categories[$cat_key][$archer_key] = array(
+                if ( ! isset( $groups[$div_gen_key]['styles'][$style_key] ) ) {
+                    $groups[$div_gen_key]['styles'][$style_key] = array();
+                }
+
+                if ( ! isset( $groups[$div_gen_key]['styles'][$style_key][$archer_key] ) ) {
+                    $groups[$div_gen_key]['styles'][$style_key][$archer_key] = array(
                         'name'             => $s['name'],
                         'tfaa_id'          => $s['tfaa_id'],
                         'division'         => $s['division'],
@@ -105,92 +149,89 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 }
 
                 if ( $is_state_tourn ) {
-                    $categories[$cat_key][$archer_key]['state_score'] = $s;
+                    $groups[$div_gen_key]['styles'][$style_key][$archer_key]['state_score'] = $s;
                 } else {
-                    $categories[$cat_key][$archer_key]['qualifier_scores'][] = $s;
+                    $groups[$div_gen_key]['styles'][$style_key][$archer_key]['qualifier_scores'][] = $s;
                 }
             }
         }
 
-        // Sort categories logically: Cubs -> Youth -> Young Adult -> Adult -> Senior (Male first, then Female)
-        uksort( $categories, function( $keyA, $keyB ) {
-            list( $divA, $genA, $styleA ) = explode( '|||', $keyA );
-            list( $divB, $genB, $styleB ) = explode( '|||', $keyB );
+        // Sort Division + Gender groups (Cub -> Youth -> Young Adult -> Adult Pro Male -> Adult Male -> etc.)
+        uksort( $groups, function( $keyA, $keyB ) {
+            list( $divA, $genA ) = explode( '|||', $keyA );
+            list( $divB, $genB ) = explode( '|||', $keyB );
 
-            $w_divA = sywat_get_division_weight( $divA );
-            $w_divB = sywat_get_division_weight( $divB );
+            $wA = sywat_get_div_gen_sort_weight( $divA, $genA );
+            $wB = sywat_get_div_gen_sort_weight( $divB, $genB );
 
-            if ( $w_divA !== $w_divB ) {
-                return $w_divA - $w_divB;
+            if ( $wA !== $wB ) {
+                return $wA - $wB;
             }
-
-            $w_genA = sywat_get_gender_weight( $genA );
-            $w_genB = sywat_get_gender_weight( $genB );
-
-            if ( $w_genA !== $w_genB ) {
-                return $w_genA - $w_genB;
-            }
-
-            return strcasecmp( $styleA, $styleB );
+            return strcasecmp( $keyA, $keyB );
         });
 
-        // Compute top N scores, state score, and totals
-        $final_standings = array();
+        // Compute scores and sort archers inside each style
+        foreach ( $groups as $dg_key => &$group ) {
+            ksort( $group['styles'] );
 
-        foreach ( $categories as $cat_key => $archers ) {
-            $final_standings[$cat_key] = array();
+            foreach ( $group['styles'] as $st_key => &$archers ) {
+                $processed = array();
 
-            foreach ( $archers as $archer_key => $a ) {
-                // Sort qualifiers: Score DESC, X-Count DESC
-                usort( $a['qualifier_scores'], function( $p, $q ) {
-                    if ( $p['score'] === $q['score'] ) {
-                        return $q['x_count'] - $p['x_count'];
+                foreach ( $archers as $a_key => $a ) {
+                    usort( $a['qualifier_scores'], function( $p, $q ) {
+                        if ( $p['score'] === $q['score'] ) {
+                            return $q['x_count'] - $p['x_count'];
+                        }
+                        return $q['score'] - $p['score'];
+                    });
+
+                    $score_1 = isset( $a['qualifier_scores'][0] ) ? $a['qualifier_scores'][0] : null;
+                    $score_2 = isset( $a['qualifier_scores'][1] ) ? $a['qualifier_scores'][1] : null;
+                    $score_3 = isset( $a['qualifier_scores'][2] ) ? $a['qualifier_scores'][2] : null;
+                    $state_s = $a['state_score'];
+
+                    $total_score   = 0;
+                    $total_x_count = 0;
+
+                    $kept_list = array_filter( array( $score_1, $score_2, $score_3, $state_s ) );
+                    foreach ( $kept_list as $ks ) {
+                        $total_score   += $ks['score'];
+                        $total_x_count += $ks['x_count'];
                     }
-                    return $q['score'] - $p['score'];
+
+                    $processed[] = array(
+                        'name'          => $a['name'],
+                        'tfaa_id'       => $a['tfaa_id'],
+                        'division'      => $a['division'],
+                        'gender'        => $a['gender'],
+                        'style'         => $a['style'],
+                        'score_1'       => $score_1,
+                        'score_2'       => $score_2,
+                        'score_3'       => $score_3,
+                        'state_score'   => $state_s,
+                        'total_score'   => $total_score,
+                        'total_x_count' => $total_x_count,
+                    );
+                }
+
+                // Rank category: Total Score DESC, Total X DESC
+                usort( $processed, function( $x, $y ) {
+                    if ( $x['total_score'] === $y['total_score'] ) {
+                        return $y['total_x_count'] - $x['total_x_count'];
+                    }
+                    return $y['total_score'] - $x['total_score'];
                 });
 
-                $score_1 = isset( $a['qualifier_scores'][0] ) ? $a['qualifier_scores'][0] : null;
-                $score_2 = isset( $a['qualifier_scores'][1] ) ? $a['qualifier_scores'][1] : null;
-                $score_3 = isset( $a['qualifier_scores'][2] ) ? $a['qualifier_scores'][2] : null;
-                $state_s = $a['state_score'];
-
-                $total_score   = 0;
-                $total_x_count = 0;
-
-                $kept_list = array_filter( array( $score_1, $score_2, $score_3, $state_s ) );
-                foreach ( $kept_list as $ks ) {
-                    $total_score   += $ks['score'];
-                    $total_x_count += $ks['x_count'];
-                }
-
-                $final_standings[$cat_key][] = array(
-                    'name'          => $a['name'],
-                    'tfaa_id'       => $a['tfaa_id'],
-                    'division'      => $a['division'],
-                    'gender'        => $a['gender'],
-                    'style'         => $a['style'],
-                    'score_1'       => $score_1,
-                    'score_2'       => $score_2,
-                    'score_3'       => $score_3,
-                    'state_score'   => $state_s,
-                    'total_score'   => $total_score,
-                    'total_x_count' => $total_x_count,
-                );
+                $archers = $processed;
             }
-
-            // Rank category: Total Score DESC, Total X DESC
-            usort( $final_standings[$cat_key], function( $x, $y ) {
-                if ( $x['total_score'] === $y['total_score'] ) {
-                    return $y['total_x_count'] - $x['total_x_count'];
-                }
-                return $y['total_score'] - $x['total_score'];
-            });
+            unset($archers);
         }
+        unset($group);
 
         return array(
             'season'    => $season,
             'best_n'    => $best_n,
-            'standings' => $final_standings,
+            'groups'    => $groups,
         );
     }
 }
