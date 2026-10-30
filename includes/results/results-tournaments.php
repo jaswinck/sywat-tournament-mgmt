@@ -31,12 +31,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         ?>
 
         <div class="sywat-public-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <a href="?view=tournaments" style="font-size: 12px; text-decoration: none; color: #2563eb; font-weight: 600;">← Back to Tournament Directory</a>
-                    <h2 style="margin: 5px 0 0 0; font-size: 22px; color: #0f172a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
-                </div>
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-print" onclick="window.print();">Print Leaderboard</button>
+            <div style="margin-bottom: 20px;">
+                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary" style="margin-bottom: 12px; display: inline-flex; align-items: center; gap: 5px;">← Back to Tournament Directory</a>
+                <h2 style="margin: 0; font-size: 22px; color: #0f172a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
             </div>
 
             <?php if ( empty( $grouped ) ): ?>
