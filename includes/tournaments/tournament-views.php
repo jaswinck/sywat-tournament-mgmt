@@ -87,14 +87,20 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $search_query    = isset( $_REQUEST['search_shooter'] ) ? trim( sanitize_text_field( $_REQUEST['search_shooter'] ) ) : '';
         $is_specific_line = ($filter_line_idx !== 'all' && $filter_line_idx !== '' && $filter_line_idx !== null);
 
-        // Filter Tournaments by Shop Scoping
+        // Filter Tournaments by Shop Scoping & Collect Unique Shops for Filter Dropdown
         $scoped_tournaments = array();
+        $filter_shops       = array();
+
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop = sywat_get_tournament_shop_id( $t_data );
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
                 $scoped_tournaments[$t_name] = $t_data;
+                if ( isset( $all_shops[$t_shop]['name'] ) ) {
+                    $filter_shops[$t_shop] = $all_shops[$t_shop]['name'];
+                }
             }
         }
+        asort( $filter_shops );
 
         // Sort tournaments chronologically by Start Date (Soonest first)
         uasort( $scoped_tournaments, function( $a, $b ) {
@@ -133,9 +139,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     <div class="sywat-card-title">
                         <span>Configured Tournaments</span>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <div style="display:flex; gap:5px; margin:0; align-items:center;">
-                                <input type="text" id="sywat_tournament_search_input" placeholder="Search tournament name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_tournament_search_input').value=''; document.getElementById('sywat_tournament_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                            <!-- Shop Filter Dropdown & Text Search -->
+                            <div style="display:flex; gap:6px; margin:0; align-items:center; flex-wrap:wrap;">
+                                <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; height:32px; box-sizing:border-box;">
+                                    <option value="all">All Shops</option>
+                                    <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search tournament..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:160px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 10px;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -426,6 +439,38 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             window.history.replaceState({}, document.title, url.toString());
         }
 
+        function sywatApplyTournamentFilters() {
+            const shopSelect   = document.getElementById('sywat_tournament_shop_filter');
+            const searchInput  = document.getElementById('sywat_tournament_search_input');
+
+            const shopFilter   = shopSelect ? shopSelect.value.toLowerCase().trim() : 'all';
+            const searchFilter = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            const rows = document.querySelectorAll('.sywat-tournament-row');
+
+            rows.forEach(row => {
+                const name = (row.getAttribute('data-name') || '').toLowerCase();
+                const shop = (row.getAttribute('data-shop') || '').toLowerCase();
+
+                const shopMatch   = (shopFilter === 'all' || shop === shopFilter);
+                const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter));
+
+                if (shopMatch && searchMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function sywatResetTournamentFilters() {
+            const shopSelect  = document.getElementById('sywat_tournament_shop_filter');
+            const searchInput = document.getElementById('sywat_tournament_search_input');
+            if (shopSelect) shopSelect.value = 'all';
+            if (searchInput) searchInput.value = '';
+            sywatApplyTournamentFilters();
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             const notice = document.getElementById('sywat-notice');
             if (notice) {
@@ -434,25 +479,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     notice.style.opacity = "0";
                     setTimeout(function() { notice.remove(); }, 500);
                 }, 5000);
-            }
-
-            const tournSearchInput = document.getElementById('sywat_tournament_search_input');
-            if (tournSearchInput) {
-                tournSearchInput.addEventListener('input', function() {
-                    const filter = this.value.toLowerCase().trim();
-                    const rows = document.querySelectorAll('.sywat-tournament-row');
-                    
-                    rows.forEach(row => {
-                        const name = (row.getAttribute('data-name') || '').toLowerCase();
-                        const shop = (row.getAttribute('data-shop') || '').toLowerCase();
-                        
-                        if (name.includes(filter) || shop.includes(filter)) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
-                });
             }
         });
         </script>
