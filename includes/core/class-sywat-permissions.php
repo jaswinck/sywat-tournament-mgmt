@@ -4,7 +4,7 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers custom TFAA & Staff roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.7.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -66,6 +66,31 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     }
 }
 add_action( 'init', 'sywat_register_custom_roles' );
+
+/**
+ * Utility: Returns array of all custom system role slugs.
+ */
+if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
+    function sywat_get_custom_roles_slugs() {
+        return array(
+            'tfaa_member',
+            'tfaa_president',
+            'tfaa_vice_president',
+            'tfaa_treasurer',
+            'tfaa_secretary',
+            'tfaa_tournament_director',
+            'tfaa_social_media_director',
+            'tfaa_webmaster',
+            'tfaa_field_governor',
+            'staff_shooter',
+            'management',
+            'non-shooting-member',
+            'sywat_shop_manager',
+            'sywat_shop_user',
+            'administrator',
+        );
+    }
+}
 
 /**
  * Utility: Master list of official TFAA Board Positions (for checkboxes / dropdowns).
