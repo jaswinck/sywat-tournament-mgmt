@@ -12,7 +12,7 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
         $default_seasons = array(
             'indoor-2026-2027' => array(
                 'slug'         => 'indoor-2026-2027',
-                'name'         => '2026-2027 Indoor',
+                'name'         => '2026–2027 Indoor',
                 'type'         => 'Indoor',
                 'start_date'   => '2026-10-01',
                 'end_date'     => '2027-03-31',
@@ -122,10 +122,6 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Name *</label>
-                            <input type="text" name="season_name" value="<?php echo esc_attr( $edit_season ? $edit_season['name'] : '' ); ?>" placeholder="e.g. 2026-2027 Indoor" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                        </div>
-                        <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Type *</label>
                             <select name="season_type" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
                                 <option value="" <?php selected( empty($edit_season['type']), true ); ?>>Select Season Type</option>
@@ -142,9 +138,13 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                                 <option value="archived" <?php selected( $edit_season ? $edit_season['status'] : '', 'archived' ); ?>>Archived</option>
                             </select>
                         </div>
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Top Qualifier Scores Count (Best N)</label>
+                            <input type="number" name="season_best_n" value="<?php echo esc_attr( $edit_season ? $edit_season['best_n_count'] : 3 ); ?>" min="1" max="10" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                        </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
                             <input type="date" name="start_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['start_date']) ? $edit_season['start_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
@@ -152,13 +152,11 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                         <div>
                             <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date *</label>
                             <input type="date" name="end_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['end_date']) ? $edit_season['end_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                            <span style="font-size: 11px; color: #646970;">Year label is automatically calculated from Start/End dates.</span>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Top Qualifier Scores Count (Best N)</label>
-                            <input type="number" name="season_best_n" value="<?php echo esc_attr( $edit_season ? $edit_season['best_n_count'] : 3 ); ?>" min="1" max="10" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
-                            <span style="font-size: 11px; color: #646970;">Number of highest qualifier scores kept in aggregate (Default: 3).</span>
-                        </div>
+                    </div>
+
+                    <div style="background: #edf2f7; border-left: 4px solid #3182ce; padding: 10px 12px; margin-bottom: 20px; font-size: 12px; color: #2d3748;">
+                        ℹ️ <strong>Auto-Generated Name Notice:</strong> Season name and year label are created automatically based on your dates and type (e.g., <em>"2026–2027 Indoor"</em> or <em>"2026 Outdoor"</em>).
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 10px;">
