@@ -19,10 +19,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             $notice = sywat_handle_member_post_actions();
         }
 
+        $subtab  = isset( $_REQUEST['subtab'] ) ? sanitize_text_field( $_REQUEST['subtab'] ) : 'directory';
         $members = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
 
-        $edit_target_id = isset( $_REQUEST['edit_member_id'] ) ? intval( $_REQUEST['edit_member_id'] ) : 0;
-        $edit_user_obj  = ( $edit_target_id > 0 ) ? get_userdata( $edit_target_id ) : null;
+        $edit_target_id  = isset( $_REQUEST['edit_member_id'] ) ? intval( $_REQUEST['edit_member_id'] ) : 0;
+        $edit_user_obj   = ( $edit_target_id > 0 ) ? get_userdata( $edit_target_id ) : null;
         $open_edit_modal = ( $edit_user_obj !== null );
 
         ob_start();
@@ -30,66 +31,74 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <div class="sywat-card no-print">
-                <div class="sywat-card-title">
-                    <span>TFAA Member Directory</span>
-                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <div style="display: flex; gap: 5px; margin: 0; align-items: center; flex-wrap: nowrap;">
-                            <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" style="padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; width: 180px; height: 32px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px; padding: 4px 8px;" onclick="sywatResetMemberSearch()">Clear</button>
-                        </div>
-                        <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">Add Member</button>
-                    </div>
-                </div>
-
-                <div class="sywat-subtitle">Overview of registered TFAA members, contact details, and NFAA membership status.</div>
-
-                <?php if ( empty( $members ) ): ?>
-                    <p style="color: #646970; font-style: italic; padding: 20px 0;">No members found in system database.</p>
-                <?php else: ?>
-                    <table class="sywat-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 15%; text-align: center;">TFAA Member #</th>
-                                <th style="width: 25%;">Member Name</th>
-                                <th style="width: 25%;">Email Address</th>
-                                <th style="width: 15%; text-align: center;">Phone</th>
-                                <th style="width: 10%; text-align: center;">NFAA Status</th>
-                                <th style="width: 10%; text-align: right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ( $members as $m ): ?>
-                                <?php 
-                                    $m_tfaa   = get_user_meta( $m->ID, 'sywat_tfaa_number', true );
-                                    $m_phone  = get_user_meta( $m->ID, 'sywat_phone', true );
-                                    $m_nfaa   = get_user_meta( $m->ID, 'sywat_is_nfaa_member', true );
-                                    $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
-                                    $is_nfaa_active = ( $m_nfaa === 'yes' );
-                                ?>
-                                <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone ) ); ?>">
-                                    <td style="text-align: center;">
-                                        <strong style="color: #1e3a8a; font-family: monospace; font-size: 13px;"><?php echo esc_html( $disp_id ); ?></strong>
-                                    </td>
-                                    <td><strong><?php echo esc_html( $m->display_name ); ?></strong></td>
-                                    <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" style="color: #2271b1; text-decoration: none;"><?php echo esc_html( $m->user_email ); ?></a></td>
-                                    <td style="text-align: center;"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
-                                    <td style="text-align: center;">
-                                        <?php if ( $is_nfaa_active ): ?>
-                                            <span style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; display: inline-block;">🟢 NFAA Yes</span>
-                                        <?php else: ?>
-                                            <span style="background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 12px; display: inline-block;">⚪ NFAA No</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="text-align: right;">
-                                        <a href="?tab=members&edit_member_id=<?php echo $m->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px;">Edit</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
+            <!-- Member Sub-System Navigation Tabs -->
+            <div class="sywat-nav-tabs no-print">
+                <a href="?tab=members&subtab=directory" class="sywat-tab-item sywat-tab-icon-member <?php echo $subtab === 'directory' ? 'active' : ''; ?>">Member Directory</a>
             </div>
+
+            <?php if ( $subtab === 'directory' ): ?>
+                <!-- SUB-TAB 1: MEMBER DIRECTORY -->
+                <div class="sywat-card no-print">
+                    <div class="sywat-card-title">
+                        <span>TFAA Member Directory</span>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 5px; margin: 0; align-items: center; flex-wrap: nowrap;">
+                                <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" style="padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; width: 180px; height: 32px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px; padding: 4px 8px;" onclick="sywatResetMemberSearch()">Clear</button>
+                            </div>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">Add Member</button>
+                        </div>
+                    </div>
+
+                    <div class="sywat-subtitle">Overview of registered TFAA members, contact details, and NFAA membership status.</div>
+
+                    <?php if ( empty( $members ) ): ?>
+                        <p style="color: #646970; font-style: italic; padding: 20px 0;">No members found in system database.</p>
+                    <?php else: ?>
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%; text-align: center;">TFAA Member #</th>
+                                    <th style="width: 25%;">Member Name</th>
+                                    <th style="width: 25%;">Email Address</th>
+                                    <th style="width: 15%; text-align: center;">Phone</th>
+                                    <th style="width: 10%; text-align: center;">NFAA Status</th>
+                                    <th style="width: 10%; text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $members as $m ): ?>
+                                    <?php 
+                                        $m_tfaa   = get_user_meta( $m->ID, 'sywat_tfaa_number', true );
+                                        $m_phone  = get_user_meta( $m->ID, 'sywat_phone', true );
+                                        $m_nfaa   = get_user_meta( $m->ID, 'sywat_is_nfaa_member', true );
+                                        $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
+                                        $is_nfaa_active = ( $m_nfaa === 'yes' );
+                                    ?>
+                                    <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone ) ); ?>">
+                                        <td style="text-align: center;">
+                                            <strong style="color: #1e3a8a; font-family: monospace; font-size: 13px;"><?php echo esc_html( $disp_id ); ?></strong>
+                                        </td>
+                                        <td><strong><?php echo esc_html( $m->display_name ); ?></strong></td>
+                                        <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" style="color: #2271b1; text-decoration: none;"><?php echo esc_html( $m->user_email ); ?></a></td>
+                                        <td style="text-align: center;"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
+                                        <td style="text-align: center;">
+                                            <?php if ( $is_nfaa_active ): ?>
+                                                <span style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; display: inline-block;">🟢 NFAA Yes</span>
+                                            <?php else: ?>
+                                                <span style="background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 12px; display: inline-block;">⚪ NFAA No</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="text-align: right;">
+                                            <a href="?tab=members&subtab=directory&edit_member_id=<?php echo $m->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px;">Edit</a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 
             <!-- MODAL 1: ADD NEW MEMBER MODAL -->
             <div class="sywat-modal-backdrop" id="sywat_add_member_modal">
@@ -99,7 +108,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <button type="button" class="sywat-modal-close" onclick="sywatCloseAddMemberModal()">&times;</button>
                     </div>
                     <div class="sywat-modal-body">
-                        <form method="post" action="?tab=members">
+                        <form method="post" action="?tab=members&subtab=directory">
                             <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
                             <input type="hidden" name="sywat_member_action" value="create_member">
 
@@ -165,7 +174,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <button type="button" class="sywat-modal-close" onclick="sywatCloseEditMemberModal()">&times;</button>
                         </div>
                         <div class="sywat-modal-body">
-                            <form method="post" action="?tab=members">
+                            <form method="post" action="?tab=members&subtab=directory">
                                 <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
                                 <input type="hidden" name="sywat_member_action" value="update_member">
                                 <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
