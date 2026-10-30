@@ -50,8 +50,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                 <tr>
                                     <th style="width: 50px; text-align: center;">Place</th>
                                     <th>Archer Name</th>
-                                    <th style="text-align: right; width: 100px;">Score</th>
-                                    <th style="text-align: right; width: 80px;">X Count</th>
+                                    <th style="text-align: right; width: 140px;">Score / X</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -59,8 +58,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                     <tr>
                                         <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
                                         <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
-                                        <td style="text-align: right; font-weight: 700;"><?php echo $a['score']; ?></td>
-                                        <td style="text-align: right; font-weight: 700; color: #2563eb;"><?php echo $a['x_count']; ?>X</td>
+                                        <td style="text-align: right; font-size: 15px; color: #0f172a;">
+                                            <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
