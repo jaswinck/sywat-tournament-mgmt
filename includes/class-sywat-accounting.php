@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.4
+ * Version: 2.3.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -162,11 +162,68 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                 .invoice-footer-bold { font-weight: bold; color: #1e3a8a; }
 
                 @media print {
-                    body * { visibility: hidden !important; }
-                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
-                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10px !important; }
-                    .no-print { display: none !important; }
-                    .invoice-qr-code { display: block !important; visibility: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; width: 120px !important; height: auto !important; max-width: 120px !important; margin: 0 auto !important; }
+                    /* 1. Reset Modal Backdrop Positioning & Overlay Styles */
+                    .sywat-modal-backdrop {
+                        position: static !important;
+                        background: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                    }
+                    .sywat-modal-content, .sywat-modal-body {
+                        position: static !important;
+                        background: transparent !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                    }
+
+                    /* 2. Hide Non-Print Elements via display:none */
+                    #wpadminbar, 
+                    header, 
+                    footer, 
+                    nav, 
+                    .no-print, 
+                    .sywat-card, 
+                    .sywat-nav-tabs, 
+                    .sywat-modal-header, 
+                    .ast-header-break-point, 
+                    #ast-scroll-top {
+                        display: none !important;
+                    }
+
+                    /* 3. Ensure Print Container and Children Are Visually Unlocked */
+                    #sywat_print_area {
+                        display: block !important;
+                        visibility: visible !important;
+                        position: static !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 10px !important;
+                    }
+                    #sywat_print_area * {
+                        visibility: visible !important;
+                    }
+
+                    /* 4. Force Image Rasterization for QR Code */
+                    .invoice-qr-code {
+                        display: block !important;
+                        visibility: visible !important;
+                        width: 120px !important;
+                        height: auto !important;
+                        max-width: 120px !important;
+                        margin: 10px auto !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
                 }
             </style>
 
@@ -291,10 +348,42 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         <div id="sywat_print_area">
             <style>
                 @media print {
-                    body * { visibility: hidden !important; }
-                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
-                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 10px !important; }
-                    .no-print { display: none !important; }
+                    .sywat-modal-backdrop {
+                        position: static !important;
+                        background: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                    }
+                    .sywat-modal-content, .sywat-modal-body {
+                        position: static !important;
+                        background: transparent !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                    }
+                    #wpadminbar, header, footer, nav, .no-print, .sywat-card, .sywat-nav-tabs, .sywat-modal-header {
+                        display: none !important;
+                    }
+                    #sywat_print_area {
+                        display: block !important;
+                        visibility: visible !important;
+                        position: static !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 10px !important;
+                    }
+                    #sywat_print_area * {
+                        visibility: visible !important;
+                    }
                 }
             </style>
 
