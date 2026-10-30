@@ -28,7 +28,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         $best_n      = $season_data['best_n'];
         $groups      = $season_data['groups'];
 
-        // Collect unique styles for filter dropdown
         $all_styles = array();
         foreach ( $groups as $g ) {
             foreach ( $g['styles'] as $s_name => $archers ) {
@@ -47,7 +46,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </div>
                 </div>
 
-                <!-- Season Dropdown Selector -->
                 <form method="get" style="margin: 0;">
                     <input type="hidden" name="view" value="standings">
                     <select name="season" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; font-size: 13px; height: 38px;">
@@ -60,8 +58,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 </form>
             </div>
 
-            <!-- Filter Controls Bar -->
-            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+            <div class="sywat-filter-bar">
                 <div>
                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Division</label>
                     <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 140px;">
@@ -105,19 +102,20 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 <p style="color: #646970; font-style: italic; padding: 20px 0;">No completed scores recorded yet for this season.</p>
             <?php else: ?>
                 <?php foreach ( $groups as $dg_key => $group_data ): ?>
-                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>" style="margin-bottom: 30px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
-                        <div style="background: #1e3a8a; color: #ffffff; padding: 12px 18px; font-weight: 800; font-size: 17px; letter-spacing: 0.5px;">
+                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>">
+                        <div class="sywat-div-gen-header">
                             🎯 <?php echo esc_html( $group_data['heading'] ); ?>
                         </div>
 
                         <div style="padding: 15px;">
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <div class="sywat-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>" style="margin-bottom: 25px;">
-                                    <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #1e293b; background: #f1f5f9; padding: 6px 12px; border-left: 4px solid #3b82f6; border-radius: 0 4px 4px 0;">
-                                        🏹 <?php echo esc_html( $style_name ); ?>
+                                <div class="sywat-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
+                                    <h4 class="sywat-style-header">
+                                        <span>🏹 <?php echo esc_html( $style_name ); ?></span>
+                                        <span class="sywat-style-header-tag">Style Category</span>
                                     </h4>
 
-                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 10px;">
+                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
                                         <thead>
                                             <tr>
                                                 <th style="width: 50px; text-align: center;">Rank</th>
