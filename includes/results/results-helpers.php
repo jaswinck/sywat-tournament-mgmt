@@ -118,7 +118,8 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
 /**
  * Aggregates season standings grouped by Division + Gender -> Style
- * EXCLUDES all Guest scores and secondary re-entries entirely
+ * EXCLUDES all Guest scores and secondary re-entries entirely.
+ * ENFORCES 'scores_published' gate so unpublished scores remain hidden.
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
     function sywat_aggregate_season_standings( $season_slug ) {
@@ -130,8 +131,11 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $matching_tournaments = array();
 
         foreach ( $all_tournaments as $t_name => $t_data ) {
-            $t_season = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
-            if ( $t_season === $season_slug ) {
+            $t_season     = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
+            $is_published = ! empty( $t_data['scores_published'] );
+
+            // Only include tournaments matching this season AND explicitly published by the TD
+            if ( $t_season === $season_slug && $is_published ) {
                 $matching_tournaments[] = $t_name;
             }
         }
