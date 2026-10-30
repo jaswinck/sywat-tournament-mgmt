@@ -4,7 +4,7 @@
  * Path: includes/results/class-sywat-results.php
  * Description: Main loader binding public shortcode [sywat_results].
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,9 +59,9 @@ function render_sywat_public_results_portal() {
                 <table class="sywat-table" style="margin-top: 15px;">
                     <thead>
                         <tr>
-                            <th style="width: 30%;">Tournament Date</th>
+                            <th style="width: 25%;">Tournament Date</th>
                             <th>Tournament Name</th>
-                            <th style="width: 140px; text-align: right;">Action</th>
+                            <th style="width: 220px; text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -82,7 +82,12 @@ function render_sywat_public_results_portal() {
                                     <strong style="font-size: 15px; color: #0f172a; font-weight: 700;"><?php echo esc_html( $t_name ); ?></strong>
                                 </td>
                                 <td style="text-align: right;">
-                                    <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
+                                    <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                        <?php if ( function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores() ): ?>
+                                            <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-secondary" style="font-size: 12px; padding: 6px 10px;" title="Jump to Score Entry Desk">✏️ Enter Scores</a>
+                                        <?php endif; ?>
+                                        <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
