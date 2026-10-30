@@ -9,13 +9,48 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
-        $scores = sywat_get_tournament_scores( $tournament_name );
+        $raw_scores = sywat_get_tournament_scores( $tournament_name );
+
+        // Group scores by Division + Gender + Style + Archer to separate re-entries into Guest
+        $grouped_by_archer_dgs = array();
+        foreach ( $raw_scores as $s ) {
+            $dgs_key   = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
+            $archer_key= ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+            $grouped_by_archer_dgs[$dgs_key][$archer_key][] = $s;
+        }
+
+        $processed_scores = array();
+
+        foreach ( $grouped_by_archer_dgs as $dgs_key => $archers_map ) {
+            foreach ( $archers_map as $archer_key => $entries ) {
+                // Sort entries: Score DESC, X-Count DESC
+                usort( $entries, function( $p, $q ) {
+                    if ( $p['score'] === $q['score'] ) {
+                        return $q['x_count'] - $p['x_count'];
+                    }
+                    return $q['score'] - $p['score'];
+                });
+
+                // Top score stays in official style
+                $processed_scores[] = $entries[0];
+
+                // Lower scores get assigned to 'Guest' style and name gets '[Guest]' appended
+                for ( $i = 1; $i < count( $entries ); $i++ ) {
+                    $guest_entry = $entries[$i];
+                    $guest_entry['style'] = 'Guest';
+                    if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
+                        $guest_entry['name'] .= ' [Guest]';
+                    }
+                    $processed_scores[] = $guest_entry;
+                }
+            }
+        }
 
         $groups        = array();
         $all_divisions = array();
         $all_styles    = array();
 
-        foreach ( $scores as $s ) {
+        foreach ( $processed_scores as $s ) {
             $div_gen_key = $s['division'] . '|||' . $s['gender'];
             $style_key   = $s['style'];
 
@@ -40,6 +75,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         ksort($all_divisions);
         ksort($all_styles);
 
+        // Sort Division + Gender groups by Pro-first weight
         uksort( $groups, function( $keyA, $keyB ) {
             list( $divA, $genA ) = explode( '|||', $keyA );
             list( $divB, $genB ) = explode( '|||', $keyB );
@@ -51,8 +87,14 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
+        // Sort styles inside each group (Guest placed at the end), and archers inside each style
         foreach ( $groups as $dg_key => &$group ) {
-            ksort( $group['styles'] );
+            uksort( $group['styles'], function( $stA, $stB ) {
+                if ( $stA === 'Guest' ) return 1;
+                if ( $stB === 'Guest' ) return -1;
+                return strcasecmp( $stA, $stB );
+            });
+
             foreach ( $group['styles'] as $st_key => &$archers ) {
                 usort( $archers, function( $a, $b ) {
                     if ( $a['score'] === $b['score'] ) {
