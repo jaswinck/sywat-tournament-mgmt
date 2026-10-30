@@ -17,8 +17,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 1. CREATE NEW MEMBER ACCOUNT
         if ( $action === 'create_member' ) {
-            $first_name = sanitize_text_field( $_POST['first_name'] );
-            $last_name  = sanitize_text_field( $_POST['last_name'] );
+            $first_name = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
+            $last_name  = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
             $email      = sanitize_email( $_POST['email'] );
             $password   = $_POST['password'];
             $phone      = sanitize_text_field( $_POST['phone'] );
@@ -36,9 +36,19 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Password must be at least 8 characters long.</div>';
             }
 
+            // Generate Username: Firstname.Lastname (e.g. John.Doe) with collision protection
+            $base_username = sanitize_user( $first_name . '.' . $last_name, true );
+            $username      = $base_username;
+            $counter       = 1;
+
+            while ( username_exists( $username ) ) {
+                $username = $base_username . $counter;
+                $counter++;
+            }
+
             $tfaa_id = sywat_generate_unique_tfaa_id();
             $user_id = wp_insert_user( array(
-                'user_login'   => $email,
+                'user_login'   => $username,
                 'user_email'   => $email,
                 'user_pass'    => $password,
                 'first_name'   => $first_name,
@@ -55,7 +65,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account for <strong>' . esc_html( $first_name . ' ' . $last_name ) . '</strong> created successfully! Assigned Member ID: <strong>' . esc_html( $tfaa_id ) . '</strong></div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | Member ID: <strong>' . esc_html( $tfaa_id ) . '</strong></div>';
         }
 
         // 2. UPDATE EXISTING MEMBER PROFILE
@@ -85,6 +95,30 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 }
 
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
+            }
+        }
+
+        // 3. DELETE MEMBER ACCOUNT
+        if ( $action === 'delete_member' ) {
+            $user_id = intval( $_POST['target_user_id'] );
+            $user    = get_userdata( $user_id );
+
+            if ( ! $user ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">User not found.</div>';
+            }
+
+            // Prevent currently logged in user from deleting themselves
+            if ( get_current_user_id() === $user_id ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">You cannot delete your own active administrator account.</div>';
+            }
+
+            require_once ABSPATH . 'wp-admin/includes/user.php';
+            $deleted_name = $user->display_name;
+
+            if ( wp_delete_user( $user_id ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account "<strong>' . esc_html( $deleted_name ) . '</strong>" has been permanently deleted.</div>';
+            } else {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to delete user account. Please try again.</div>';
             }
         }
 
