@@ -150,20 +150,22 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search tournament..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:160px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
+
+                            <!-- Option 2: Unified Stat Chip Pill for TFAA Sync -->
+                            <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 12px; gap: 8px;">
+                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                <input type="hidden" name="sywat_action" value="sync_tfaa_now">
+                                <span style="font-size: 12px; color: #475569; font-weight: 600; white-space: nowrap;">
+                                    👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
+                                </span>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 26px; padding: 2px 10px; font-size: 11px; border-radius: 14px; background: #ffffff;">Sync</button>
+                            </form>
+
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
 
-                    <!-- Subtitle & Relocated TFAA Sync Utility Badge -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: -10px; margin-bottom: 15px;">
-                        <div class="sywat-subtitle" style="margin: 0;">Overview of configured tournaments, shooting lines, and archer administration.</div>
-                        <form method="post" style="margin: 0; display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 4px;">
-                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                            <input type="hidden" name="sywat_action" value="sync_tfaa_now">
-                            <span style="font-size: 12px; color: #475569; font-weight: 600;">TFAA Standings: <strong><?php echo $tfaa_count; ?></strong> Shooters</span>
-                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 26px; padding: 2px 8px; font-size: 11px;">Sync TFAA</button>
-                        </form>
-                    </div>
+                    <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
 
                     <?php if ( empty( $scoped_tournaments ) ): ?>
                         <p style="color:#646970; font-style:italic;">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
