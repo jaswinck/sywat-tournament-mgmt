@@ -78,7 +78,13 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
         <div class="sywat-card no-print">
             <div class="sywat-card-title">
                 <span>Season Management</span>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddSeasonModal()">Add New Season</button>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="display:flex; gap:5px; margin:0; align-items:center;">
+                        <input type="text" id="sywat_season_search_input" placeholder="Search seasons..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_season_search_input').value=''; document.getElementById('sywat_season_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                    </div>
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddSeasonModal()">Add New Season</button>
+                </div>
             </div>
             <div class="sywat-subtitle">Configure SYWAT competition seasons and set active aggregate score rules.</div>
 
@@ -99,8 +105,9 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                         <?php 
                             $s_start = ! empty( $s['start_date'] ) ? date( 'M j, Y', strtotime( $s['start_date'] ) ) : '—';
                             $s_end   = ! empty( $s['end_date'] ) ? date( 'M j, Y', strtotime( $s['end_date'] ) ) : '—';
+                            $search_data = strtolower( $s['name'] . ' ' . $s['type'] . ' ' . ( isset( $s['year_label'] ) ? $s['year_label'] : '' ) );
                         ?>
-                        <tr>
+                        <tr class="sywat-season-row" data-search="<?php echo esc_attr( $search_data ); ?>">
                             <td><strong><?php echo esc_html( $s['name'] ); ?></strong></td>
                             <td style="text-align: center;"><span class="sywat-badge"><?php echo esc_html( $s['type'] ); ?></span></td>
                             <td style="text-align: center; font-size: 12px; color: #475569;"><?php echo esc_html( $s_start . ' – ' . $s_end ); ?></td>
@@ -199,6 +206,20 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
             url.searchParams.delete('open_add_season');
             window.history.replaceState({}, document.title, url.toString());
         }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const seasonSearchInput = document.getElementById('sywat_season_search_input');
+            if (seasonSearchInput) {
+                seasonSearchInput.addEventListener('input', function() {
+                    const filter = this.value.toLowerCase().trim();
+                    const rows = document.querySelectorAll('.sywat-season-row');
+                    rows.forEach(row => {
+                        const searchStr = (row.getAttribute('data-search') || '').toLowerCase();
+                        row.style.display = searchStr.includes(filter) ? '' : 'none';
+                    });
+                });
+            }
+        });
         </script>
         <?php
     }
