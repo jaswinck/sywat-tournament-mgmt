@@ -44,6 +44,29 @@ if ( ! function_exists( 'sywat_get_div_gen_sort_weight' ) ) {
 }
 
 /**
+ * Calculates numeric sort weight for Shooting Styles (1 to 11)
+ */
+if ( ! function_exists( 'sywat_get_style_sort_weight' ) ) {
+    function sywat_get_style_sort_weight( $style_name ) {
+        $st = strtolower( trim( $style_name ) );
+
+        if ( $st === 'guest' || strpos( $st, 'guest' ) !== false ) return 11;
+        if ( strpos( $st, 'genesis' ) !== false ) return 10;
+        if ( strpos( $st, 'fslr' ) !== false || ( strpos( $st, 'recurve' ) !== false && strpos( $st, 'fsl' ) !== false ) ) return 9;
+        if ( strpos( $st, 'lb' ) !== false || strpos( $st, 'longbow' ) !== false ) return 8;
+        if ( strpos( $st, 'trad' ) !== false || strpos( $st, 'traditional' ) !== false ) return 7;
+        if ( strpos( $st, 'bbr' ) !== false || strpos( $st, 'barebow recurve' ) !== false || ( strpos( $st, 'bb' ) !== false && strpos( $st, 'bbc' ) === false && strpos( $st, 'bhfs' ) === false ) ) return 6;
+        if ( strpos( $st, 'bbc' ) !== false || strpos( $st, 'barebow compound' ) !== false ) return 5;
+        if ( strpos( $st, 'mbh' ) !== false || strpos( $st, 'modern bowhunter' ) !== false ) return 4;
+        if ( strpos( $st, 'bhfs' ) !== false || strpos( $st, 'bowhunter freestyle' ) !== false ) return 3;
+        if ( strpos( $st, 'fsl' ) !== false ) return 2;
+        if ( strpos( $st, 'fs' ) !== false || strpos( $st, 'freestyle' ) !== false ) return 1;
+
+        return 99;
+    }
+}
+
+/**
  * Cleanly formats Division and Gender into a unified header title
  */
 if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
@@ -200,9 +223,14 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Compute Best-N scores and sort archers inside each style
+        // Sort styles inside each group by 11-tier style weight priority
         foreach ( $groups as $dg_key => &$group ) {
-            ksort( $group['styles'] );
+            uksort( $group['styles'], function( $stA, $stB ) {
+                $wA = sywat_get_style_sort_weight( $stA );
+                $wB = sywat_get_style_sort_weight( $stB );
+                if ( $wA !== $wB ) return $wA - $wB;
+                return strcasecmp( $stA, $stB );
+            });
 
             foreach ( $group['styles'] as $st_key => &$archers ) {
                 $processed = array();
