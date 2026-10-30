@@ -184,22 +184,23 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <tbody>
                                 <?php foreach ( $scoped_tournaments as $t_name => $t_data ): ?>
                                     <?php 
-                                        $t_lines     = sywat_get_tournament_lines( $t_data );
-                                        $t_shop_id   = sywat_get_tournament_shop_id( $t_data );
+                                        $t_lines       = sywat_get_tournament_lines( $t_data );
+                                        $t_shop_id     = sywat_get_tournament_shop_id( $t_data );
                                         $t_season_slug = sywat_get_tournament_season_slug( $t_data );
                                         $t_season_name = isset( $seasons[$t_season_slug]['name'] ) ? $seasons[$t_season_slug]['name'] : 'Active Season';
-                                        $t_shop_name = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
+                                        $t_shop_name   = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
 
-                                        $s_date      = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
-                                        $e_date      = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
-                                        $disp_dates  = sywat_format_tournament_dates( $s_date, $e_date );
+                                        $s_date        = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                                        $e_date        = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                                        $disp_dates    = sywat_format_tournament_dates( $s_date, $e_date );
                                         if ( empty( $disp_dates ) ) {
                                             $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), 'Dates Not Set' );
                                         }
 
-                                        $line_count = is_array( $t_lines ) ? count( $t_lines ) : 0;
-                                        $reg_count  = sywat_get_tournament_count( $t_name, $registrations );
+                                        $line_count    = is_array( $t_lines ) ? count( $t_lines ) : 0;
+                                        $reg_count     = sywat_get_tournament_count( $t_name, $registrations );
                                         $is_active_hub = in_array( $t_name, $active_tournaments );
+                                        $is_scores_pub = ! empty( $t_data['scores_published'] );
                                     ?>
                                     <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
                                         <td>
@@ -263,14 +264,32 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         </td>
                                         <td style="text-align: right;">
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="width: 100%; max-width: 130px;">Check-In Desk</a>
-                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="width: 100%; max-width: 130px;">Enter Scores</a>
-                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="width: 100%; max-width: 130px;">Edit Config</a>
-                                                <form method="post" style="margin: 0; width: 100%; max-width: 130px;" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
+                                                <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check-In Desk</a>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Enter Scores</a>
+
+                                                <!-- Push to Standings / Standings Live Toggle Form -->
+                                                <form method="post" class="sywat-table-action-form">
+                                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                    <input type="hidden" name="sywat_action" value="toggle_publish_standings">
+                                                    <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                    <?php if ( $is_scores_pub ): ?>
+                                                        <button type="submit" class="sywat-btn sywat-btn-live sywat-btn-full" title="Scores are live in Season Standings. Click to unpublish/hide.">
+                                                            🟢 Standings Live
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <button type="submit" class="sywat-btn sywat-btn-push sywat-btn-full" title="Push tournament scores to Season Standings">
+                                                            🚀 Push Standings
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </form>
+
+                                                <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Config</a>
+                                                
+                                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="delete_tournament">
                                                     <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="width: 100%;">Delete</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Delete</button>
                                                 </form>
                                             </div>
                                         </td>
