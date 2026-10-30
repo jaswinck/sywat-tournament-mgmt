@@ -19,8 +19,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $seasons     = sywat_get_seasons();
-            $s_name      = sanitize_text_field( $_POST['season_name'] );
-            $s_slug      = sanitize_title( $s_name );
+            $orig_slug   = isset( $_POST['original_season_slug'] ) ? sanitize_text_field( $_POST['original_season_slug'] ) : '';
             $s_type      = sanitize_text_field( $_POST['season_type'] );
             $start_date  = sanitize_text_field( $_POST['start_date'] );
             $end_date    = sanitize_text_field( $_POST['end_date'] );
@@ -32,15 +31,23 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid Season Type (Indoor, Outdoor, or Field 50).</div>';
             }
 
+            if ( empty( $start_date ) || empty( $end_date ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select both Start and End dates for the season.</div>';
+            }
+
             // Automatically Calculate Year Label from Start and End Dates
-            $s_start_year = ! empty( $start_date ) ? date( 'Y', strtotime( $start_date ) ) : date('Y');
-            $s_end_year   = ! empty( $end_date ) ? date( 'Y', strtotime( $end_date ) ) : $s_start_year;
+            $s_start_year = date( 'Y', strtotime( $start_date ) );
+            $s_end_year   = date( 'Y', strtotime( $end_date ) );
 
             if ( $s_start_year === $s_end_year ) {
                 $year_label = $s_start_year;
             } else {
-                $year_label = $s_start_year . ' – ' . $s_end_year;
+                $year_label = $s_start_year . '–' . $s_end_year;
             }
+
+            // Automatically Generate Season Name & Slug
+            $s_name = $year_label . ' ' . $s_type;
+            $s_slug = ! empty( $orig_slug ) ? $orig_slug : sanitize_title( $s_name );
 
             if ( $s_status === 'active' ) {
                 foreach ( $seasons as $k => &$s ) {
@@ -61,7 +68,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             );
 
             update_option( 'sywat_seasons_list', $seasons );
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> (' . esc_html($year_label) . ') saved successfully!</div>';
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully!</div>';
         }
 
         if ( $action === 'sync_tfaa_now' && function_exists( 'sywat_sync_tfaa_standings' ) ) {
