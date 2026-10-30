@@ -192,7 +192,13 @@
     max-width: 130px;
 }
 
-/* Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
+/* Tab & Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
+.sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-season::before     { content: "🏆\00a0"; }
+.sywat-tab-icon-shop::before       { content: "🏪\00a0"; }
+.sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
+.sywat-tab-icon-results::before    { content: "🎯\00a0"; }
+
 .sywat-btn-icon-save::before       { content: "💾\00a0"; }
 .sywat-btn-icon-edit::before       { content: "✏️\00a0"; }
 .sywat-btn-icon-manage::before     { content: "👥\00a0"; }
