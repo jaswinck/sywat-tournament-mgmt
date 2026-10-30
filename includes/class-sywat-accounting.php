@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded for print reliability), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.7
+ * Version: 2.3.8
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -11,46 +11,50 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // Helper: Detect and embed Zelle QR Code as Base64 to guarantee print/PDF rendering
 if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
     function sywat_get_zelle_qr_base64() {
-        $raw_qr    = get_option( 'sywat_zelle_qr_url', '' );
-        $file_path = '';
+        // Use the exact confirmed URL as the primary fallback
+        $known_url = 'https://ccrstaffshooters.com/wp-content/uploads/2026/10/zelle-qr.png';
+        $raw_qr    = get_option( 'sywat_zelle_qr_url', $known_url );
+        
+        if ( empty( $raw_qr ) || $raw_qr === '/wp-content/uploads/zelle-qr.png' ) {
+            $raw_qr = $known_url;
+        }
 
-        // 1. If stored as numeric Media Attachment ID
-        if ( is_numeric( $raw_qr ) && intval( $raw_qr ) > 0 ) {
+        // 1. If stored as a numeric Media Attachment ID
+        if ( is_numeric( $raw_qr ) ) {
             $file_path = get_attached_file( intval( $raw_qr ) );
+            if ( $file_path && file_exists( $file_path ) ) {
+                $type = pathinfo( $file_path, PATHINFO_EXTENSION );
+                $data = file_get_contents( $file_path );
+                return 'data:image/' . $type . ';base64,' . base64_encode( $data );
+            }
+            // Fallback to getting URL if physical path lookup fails
+            $raw_qr = wp_get_attachment_url( intval( $raw_qr ) );
         }
 
-        // 2. If stored as URL or relative path, attempt to map to physical server path
-        if ( empty( $file_path ) && ! empty( $raw_qr ) ) {
-            $parsed_url = parse_url( $raw_qr, PHP_URL_PATH );
-            if ( $parsed_url ) {
-                $clean_path = ltrim( $parsed_url, '/' );
-                if ( file_exists( ABSPATH . $clean_path ) ) {
-                    $file_path = ABSPATH . $clean_path;
-                }
+        // 2. Fetch the image directly via URL and encode to Base64
+        if ( filter_var( $raw_qr, FILTER_VALIDATE_URL ) ) {
+            $response = wp_remote_get( $raw_qr, array( 'timeout' => 5 ) );
+            if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+                $image_data   = wp_remote_retrieve_body( $response );
+                $content_type = wp_remote_retrieve_header( $response, 'content-type' );
+                if ( empty( $content_type ) ) $content_type = 'image/png';
+                return 'data:' . $content_type . ';base64,' . base64_encode( $image_data );
             }
         }
 
-        // 3. Fallback checks in standard WordPress uploads folder
-        if ( empty( $file_path ) && function_exists( 'wp_upload_dir' ) ) {
-            $upload_dir = wp_upload_dir();
-            if ( file_exists( $upload_dir['basedir'] . '/zelle-qr.png' ) ) {
-                $file_path = $upload_dir['basedir'] . '/zelle-qr.png';
-            } elseif ( file_exists( $upload_dir['basedir'] . '/zelle-qr.jpg' ) ) {
-                $file_path = $upload_dir['basedir'] . '/zelle-qr.jpg';
-            }
-        }
-
-        // 4. Encode to Base64 if physical file is found
-        if ( ! empty( $file_path ) && file_exists( $file_path ) ) {
-            $type = pathinfo( $file_path, PATHINFO_EXTENSION );
-            $data = file_get_contents( $file_path );
-            if ( $data ) {
+        // 3. Ultimate Fallback: Try local physical path mapping
+        $parsed_url = parse_url( $raw_qr, PHP_URL_PATH );
+        if ( $parsed_url ) {
+            $clean_path = ltrim( $parsed_url, '/' );
+            if ( file_exists( ABSPATH . $clean_path ) ) {
+                $type = pathinfo( ABSPATH . $clean_path, PATHINFO_EXTENSION );
+                $data = file_get_contents( ABSPATH . $clean_path );
                 return 'data:image/' . $type . ';base64,' . base64_encode( $data );
             }
         }
 
-        // 5. Ultimate Fallback (Return raw option if file lookup fails)
-        return ! empty( $raw_qr ) ? esc_url( $raw_qr ) : '';
+        // Return raw URL if all Base64 attempts fail (browser will try to render it natively)
+        return esc_url( $raw_qr );
     }
 }
 
@@ -278,10 +282,11 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                     <p style="margin-top: 8px;">Send Money with Zelle®, Tag: <strong style="color:#1e3a8a;">tfaachecking</strong></p>
                     
                     <div style="margin-top: 10px; text-align: center;">
-                        <?php if ( ! empty( $zelle_qr_src ) ) : ?>
+                        <?php if ( ! empty( $zelle_qr_src ) && strpos($zelle_qr_src, 'data:image') !== false ) : ?>
                             <img src="<?php echo $zelle_qr_src; ?>" alt="Zelle QR Code" style="width: 130px; height: auto; display: inline-block; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                         <?php else : ?>
-                            <span style="display:inline-block; padding: 20px; border: 1px dashed #ccc; color: #666; font-size: 11px;">[ QR Code Image Missing ]</span>
+                            <!-- Fallback for standard URL rendering if Base64 fails -->
+                            <img src="<?php echo esc_url($zelle_qr_src); ?>" alt="Zelle QR Code" style="width: 130px; height: auto; display: inline-block; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                         <?php endif; ?>
                     </div>
                     
