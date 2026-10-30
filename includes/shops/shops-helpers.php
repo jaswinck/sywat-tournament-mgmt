@@ -67,13 +67,15 @@ if ( ! function_exists( 'sywat_get_shops' ) ) {
 
 /**
  * Fetch Current User's Assigned Shop ID
+ * Allows Administrators, Management, and TFAA Admin roles to switch shop views
  */
 if ( ! function_exists( 'sywat_get_current_user_shop_id' ) ) {
     function sywat_get_current_user_shop_id() {
         $user = wp_get_current_user();
         if ( ! $user || ! $user->ID ) return 'shop_ccr';
 
-        if ( array_intersect( array( 'administrator' ), (array) $user->roles ) ) {
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        if ( array_intersect( $admin_roles, (array) $user->roles ) ) {
             if ( isset( $_REQUEST['sywat_shop_filter'] ) ) {
                 return sanitize_text_field( $_REQUEST['sywat_shop_filter'] );
             }
@@ -92,7 +94,10 @@ add_action( 'edit_user_profile', 'sywat_render_user_profile_shop_field' );
 
 if ( ! function_exists( 'sywat_render_user_profile_shop_field' ) ) {
     function sywat_render_user_profile_shop_field( $user ) {
-        if ( ! current_user_can( 'administrator' ) ) return;
+        $curr_user = wp_get_current_user();
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
+
         if ( ! array_intersect( array( 'sywat_shop_manager', 'sywat_shop_user' ), (array) $user->roles ) ) {
             return;
         }
@@ -125,7 +130,10 @@ add_action( 'edit_user_profile_update', 'sywat_save_user_profile_shop_field' );
 
 if ( ! function_exists( 'sywat_save_user_profile_shop_field' ) ) {
     function sywat_save_user_profile_shop_field( $user_id ) {
-        if ( ! current_user_can( 'administrator' ) ) return;
+        $curr_user = wp_get_current_user();
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
+
         if ( isset( $_POST['sywat_shop_id'] ) ) {
             $val = sanitize_text_field( $_POST['sywat_shop_id'] );
             if ( empty( $val ) ) {
