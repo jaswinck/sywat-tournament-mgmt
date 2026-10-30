@@ -71,6 +71,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully!</div>';
         }
 
+        // Action: Sync TFAA Cache
         if ( $action === 'sync_tfaa_now' && function_exists( 'sywat_sync_tfaa_standings' ) ) {
             $res = sywat_sync_tfaa_standings();
             $notice = ! empty( $res['success'] ) 
@@ -78,6 +79,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 : '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
         }
 
+        // Action: Toggle Volunteer Hub Display
         if ( $action === 'toggle_active_tournament' ) {
             $target_t = sanitize_text_field( $_POST['tournament_name'] );
             if ( in_array( $target_t, $active_tournaments ) ) {
@@ -90,6 +92,26 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Updated Volunteer Hub status for <strong>' . esc_html( $target_t ) . '</strong>.</div>';
         }
 
+        // Action: Toggle Push / Publish Scores to Season Standings
+        if ( $action === 'toggle_publish_standings' ) {
+            $t_name = sanitize_text_field( $_POST['tournament_name'] );
+            if ( isset( $tournaments[$t_name] ) ) {
+                $is_published = ! empty( $tournaments[$t_name]['scores_published'] );
+                $tournaments[$t_name]['scores_published'] = ! $is_published;
+
+                if ( ! $is_published ) {
+                    $tournaments[$t_name]['published_at'] = current_time( 'mysql' );
+                    $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Scores for <strong>' . esc_html( $t_name ) . '</strong> have been 🚀 <strong>Pushed to Season Standings</strong>!</div>';
+                } else {
+                    unset( $tournaments[$t_name]['published_at'] );
+                    $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Scores for <strong>' . esc_html( $t_name ) . '</strong> have been 🔴 <strong>Hidden from Season Standings</strong>.</div>';
+                }
+
+                update_option( 'sywat_tournaments_list', $tournaments );
+            }
+        }
+
+        // Action: Save / Edit Tournament Config
         if ( $action === 'save_tournament' ) {
             $t_name      = sanitize_text_field( $_POST['tournament_name'] );
             $old_name    = sanitize_text_field( $_POST['original_tournament_name'] );
@@ -120,6 +142,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 }
             }
 
+            // Carry forward existing publishing metadata if present
+            $lookup_handle = ( ! empty( $old_name ) && isset( $tournaments[$old_name] ) ) ? $old_name : $t_name;
+            $is_scores_pub = isset( $tournaments[$lookup_handle]['scores_published'] ) ? $tournaments[$lookup_handle]['scores_published'] : false;
+            $published_at  = isset( $tournaments[$lookup_handle]['published_at'] ) ? $tournaments[$lookup_handle]['published_at'] : '';
+
             if ( ! empty( $old_name ) && $old_name !== $t_name && isset( $tournaments[$old_name] ) ) {
                 unset( $tournaments[$old_name] );
                 $old_slug = sanitize_title( $old_name );
@@ -144,12 +171,17 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $tournaments[$t_name] = array(
-                'shop_id'     => $assigned_shop_id,
-                'season_slug' => $season_slug,
-                'start_date'  => $start_date,
-                'end_date'    => $end_date,
-                'lines'       => $new_lines,
+                'shop_id'          => $assigned_shop_id,
+                'season_slug'      => $season_slug,
+                'start_date'       => $start_date,
+                'end_date'         => $end_date,
+                'lines'            => $new_lines,
+                'scores_published' => $is_scores_pub,
             );
+
+            if ( ! empty( $published_at ) ) {
+                $tournaments[$t_name]['published_at'] = $published_at;
+            }
 
             update_option( 'sywat_tournaments_list', $tournaments );
             update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
@@ -159,6 +191,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully!</div>';
         }
 
+        // Action: Delete Tournament
         if ( $action === 'delete_tournament' ) {
             $del_tournament = sanitize_text_field( $_POST['tournament_name'] );
             if ( isset( $tournaments[$del_tournament] ) ) {
