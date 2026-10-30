@@ -7,6 +7,30 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Utility: Password Strength & Match Validation Helper
+ */
+if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
+    function sywat_validate_password_rules( $password, $confirm_password ) {
+        if ( $password !== $confirm_password ) {
+            return 'Passwords do not match. Please ensure both password fields are identical.';
+        }
+        if ( strlen( $password ) < 8 ) {
+            return 'Password must be at least 8 characters long.';
+        }
+        if ( ! preg_match( '/[A-Z]/', $password ) ) {
+            return 'Password must contain at least one uppercase letter (A-Z).';
+        }
+        if ( ! preg_match( '/[a-z]/', $password ) ) {
+            return 'Password must contain at least one lowercase letter (a-z).';
+        }
+        if ( ! preg_match( '/[0-9]/', $password ) ) {
+            return 'Password must contain at least one number (0-9).';
+        }
+        return true;
+    }
+}
+
 if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
     function sywat_handle_member_post_actions() {
         if ( ! isset( $_POST['sywat_member_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_member_nonce'], 'sywat_member_action_nonce' ) ) {
@@ -17,12 +41,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 1. CREATE NEW MEMBER ACCOUNT
         if ( $action === 'create_member' ) {
-            $first_name = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
-            $last_name  = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
-            $email      = sanitize_email( $_POST['email'] );
-            $password   = $_POST['password'];
-            $phone      = sanitize_text_field( $_POST['phone'] );
-            $is_nfaa    = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
+            $first_name       = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
+            $last_name        = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
+            $email            = sanitize_email( $_POST['email'] );
+            $password         = $_POST['password'];
+            $confirm_password = isset( $_POST['confirm_password'] ) ? $_POST['confirm_password'] : '';
+            $phone            = sanitize_text_field( $_POST['phone'] );
+            $is_nfaa          = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
 
             if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
@@ -32,8 +57,10 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">An account with email address "' . esc_html( $email ) . '" already exists.</div>';
             }
 
-            if ( strlen( $password ) < 8 ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Password must be at least 8 characters long.</div>';
+            // Password Complexity & Match Check
+            $pw_val = sywat_validate_password_rules( $password, $confirm_password );
+            if ( $pw_val !== true ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
             }
 
             // Generate Username: Firstname.Lastname (e.g. John.Doe) with collision protection
@@ -70,15 +97,25 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 2. UPDATE EXISTING MEMBER PROFILE
         if ( $action === 'update_member' ) {
-            $user_id    = intval( $_POST['target_user_id'] );
-            $first_name = sanitize_text_field( $_POST['first_name'] );
-            $last_name  = sanitize_text_field( $_POST['last_name'] );
-            $email      = sanitize_email( $_POST['email'] );
-            $phone      = sanitize_text_field( $_POST['phone'] );
-            $is_nfaa    = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
-            $new_pw     = $_POST['new_password'];
+            $user_id        = intval( $_POST['target_user_id'] );
+            $first_name     = sanitize_text_field( $_POST['first_name'] );
+            $last_name      = sanitize_text_field( $_POST['last_name'] );
+            $email          = sanitize_email( $_POST['email'] );
+            $phone          = sanitize_text_field( $_POST['phone'] );
+            $is_nfaa        = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
+            $new_pw         = $_POST['new_password'];
+            $confirm_new_pw = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
             if ( $user_id > 0 && get_userdata( $user_id ) ) {
+                // If a new password is entering, validate complexity & match
+                if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
+                    $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
+                    if ( $pw_val !== true ) {
+                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
+                    }
+                    wp_set_password( $new_pw, $user_id );
+                }
+
                 wp_update_user( array(
                     'ID'           => $user_id,
                     'first_name'   => $first_name,
@@ -89,10 +126,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
-
-                if ( ! empty( $new_pw ) && strlen( $new_pw ) >= 8 ) {
-                    wp_set_password( $new_pw, $user_id );
-                }
 
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
             }
