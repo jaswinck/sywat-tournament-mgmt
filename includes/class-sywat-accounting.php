@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering, dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.1
+ * Version: 2.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -112,16 +112,19 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email  = ! empty( $shop_info['email'] ) ? $shop_info['email'] : 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com';
         $shop_phone  = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '817-439-8998';
 
-        // Strictly serve the uploaded Zelle QR code image path
-        $raw_qr_path = get_option( 'sywat_zelle_qr_url', '' );
-        if ( ! empty( $raw_qr_path ) ) {
-            if ( strpos( $raw_qr_path, 'http' ) === 0 ) {
-                $zelle_qr_url = $raw_qr_path;
-            } else {
-                $zelle_qr_url = site_url( '/' . ltrim( $raw_qr_path, '/' ) );
-            }
-        } else {
-            $zelle_qr_url = site_url( '/wp-content/uploads/zelle-qr.png' );
+        // Retrieve uploaded Zelle QR code image path directly
+        $zelle_qr_url = get_option( 'sywat_zelle_qr_url', '/wp-content/uploads/zelle-qr.png' );
+        if ( empty( $zelle_qr_url ) ) {
+            $zelle_qr_url = '/wp-content/uploads/zelle-qr.png';
+        }
+
+        if ( is_numeric( $zelle_qr_url ) ) {
+            $att_url = wp_get_attachment_url( intval( $zelle_qr_url ) );
+            if ( $att_url ) $zelle_qr_url = $att_url;
+        }
+
+        if ( function_exists( 'set_url_scheme' ) && ! empty( $zelle_qr_url ) && strpos( $zelle_qr_url, 'http' ) === 0 ) {
+            $zelle_qr_url = set_url_scheme( $zelle_qr_url, 'https' );
         }
         ?>
 
