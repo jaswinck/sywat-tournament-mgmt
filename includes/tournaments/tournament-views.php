@@ -203,9 +203,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         $is_active_hub = in_array( $t_name, $active_tournaments );
                                         $is_scores_pub = ! empty( $t_data['scores_published'] );
 
-                                        $confirm_msg   = $is_scores_pub
-                                            ? 'Are you sure you want to recall scores for \'' . esc_js( $t_name ) . '\' and hide them from Season Standings?'
-                                            : 'Are you sure you want to push scores for \'' . esc_js( $t_name ) . '\' to Season Standings?';
+                                        // FIX: Use sprintf to create a clean, unescaped raw string, then strictly esc_js() it in the HTML later.
+                                        $confirm_msg_raw = $is_scores_pub
+                                            ? sprintf( 'Are you sure you want to recall scores for "%s" and hide them from Season Standings?', $t_name )
+                                            : sprintf( 'Are you sure you want to push scores for "%s" to Season Standings?', $t_name );
                                     ?>
                                     <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
                                         <td>
@@ -272,8 +273,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check-In Desk</a>
                                                 <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Enter Scores</a>
 
-                                                <!-- Push to Standings / Standings Live Toggle Form with Confirmation Prompt -->
-                                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('<?php echo $confirm_msg; ?>');">
+                                                <!-- FIX APPLIED HERE: Properly escaped JS confirmation prompt -->
+                                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('<?php echo esc_js( $confirm_msg_raw ); ?>');">
                                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                     <input type="hidden" name="sywat_action" value="toggle_publish_standings">
                                                     <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
