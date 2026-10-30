@@ -33,7 +33,19 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
         );
 
         $seasons = get_option( 'sywat_seasons_list', $default_seasons );
-        return is_array( $seasons ) ? $seasons : $default_seasons;
+        if ( ! is_array( $seasons ) ) $seasons = $default_seasons;
+
+        // Sort seasons from newest to oldest by start date (descending)
+        uasort( $seasons, function( $a, $b ) {
+            $a_date = ! empty( $a['start_date'] ) ? $a['start_date'] : ( ! empty( $a['end_date'] ) ? $a['end_date'] : '' );
+            $b_date = ! empty( $b['start_date'] ) ? $b['start_date'] : ( ! empty( $b['end_date'] ) ? $b['end_date'] : '' );
+            if ( $a_date === $b_date ) {
+                return strcasecmp( isset( $b['name'] ) ? $b['name'] : '', isset( $a['name'] ) ? $a['name'] : '' );
+            }
+            return ( $a_date < $b_date ) ? 1 : -1;
+        });
+
+        return $seasons;
     }
 }
 
