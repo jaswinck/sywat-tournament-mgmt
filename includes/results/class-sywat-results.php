@@ -59,7 +59,7 @@ function render_sywat_public_results_portal() {
                 <table class="sywat-table" style="margin-top: 15px;">
                     <thead>
                         <tr>
-                            <th style="width: 25%;">Tournament Date</th>
+                            <th style="width: 30%;">Tournament Date</th>
                             <th>Tournament Name</th>
                             <th style="width: 140px; text-align: right;">Action</th>
                         </tr>
@@ -76,10 +76,10 @@ function render_sywat_public_results_portal() {
                             ?>
                             <tr>
                                 <td>
-                                    <strong style="font-size: 13px; color: #475569;">📅 <?php echo esc_html( $disp_dates ); ?></strong>
+                                    <strong style="font-size: 15px; color: #0f172a; font-weight: 700;">📅 <?php echo esc_html( $disp_dates ); ?></strong>
                                 </td>
                                 <td>
-                                    <strong style="font-size: 15px; color: #0f172a;"><?php echo esc_html( $t_name ); ?></strong>
+                                    <strong style="font-size: 15px; color: #0f172a; font-weight: 700;"><?php echo esc_html( $t_name ); ?></strong>
                                 </td>
                                 <td style="text-align: right;">
                                     <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
