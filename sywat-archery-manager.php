@@ -51,7 +51,7 @@ require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-con
 require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';  // Intake & Phone Registration Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';               // Roster Administration & Line Purging
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';           // Financial Split Calculations & Invoicing
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-shops.php';                // Multi-Tenant Shop Management Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';           // Multi-Tenant Shop Management Engine
 
 // Load Front-End Operations Apps
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';      // Check-In Desk App ([sywat_desk])
