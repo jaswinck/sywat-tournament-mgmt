@@ -42,7 +42,14 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             }
         }
         ksort($all_divisions);
-        ksort($all_styles);
+
+        // Sort filter styles dropdown by style priority weight
+        uksort( $all_styles, function( $a, $b ) {
+            $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $a ) : 50;
+            $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $b ) : 50;
+            if ( $wA !== $wB ) return $wA - $wB;
+            return strcasecmp( $a, $b );
+        });
         ?>
 
         <div class="sywat-public-card">
