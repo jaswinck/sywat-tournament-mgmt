@@ -29,8 +29,8 @@ function render_sywat_public_results_portal() {
     ?>
     <div class="sywat-wrap no-print" style="margin-bottom: 20px;">
         <div class="sywat-nav-tabs">
-            <a href="?view=standings" class="sywat-tab-item <?php echo $view === 'standings' ? 'active' : ''; ?>">🏆 Season Standings</a>
-            <a href="?view=tournaments" class="sywat-tab-item <?php echo $view === 'tournaments' ? 'active' : ''; ?>">🎯 Tournament Results</a>
+            <a href="?view=standings" class="sywat-tab-item sywat-tab-icon-standings <?php echo $view === 'standings' ? 'active' : ''; ?>">Season Standings</a>
+            <a href="?view=tournaments" class="sywat-tab-item sywat-tab-icon-results <?php echo $view === 'tournaments' ? 'active' : ''; ?>">Tournament Results</a>
         </div>
     </div>
     <?php
