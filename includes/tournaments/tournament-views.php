@@ -65,6 +65,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $modal_action        = isset( $_REQUEST['modal_action'] ) ? sanitize_text_field( $_REQUEST['modal_action'] ) : 'manage';
         $open_modal          = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] );
 
+        // Declare missing archer and family modal variables to avoid PHP warnings
+        $modal_edit_archer   = isset( $_REQUEST['edit_archer'] ) ? sanitize_text_field( $_REQUEST['edit_archer'] ) : '';
+        $existing_families   = function_exists( 'sywat_get_existing_families' ) ? sywat_get_existing_families( $registrations ) : array();
+
         $open_tourn_modal    = isset( $_REQUEST['open_add_tournament'] ) || isset( $_REQUEST['edit_tournament_modal'] );
         $edit_t_target       = isset( $_REQUEST['edit_tournament_modal'] ) ? sanitize_text_field( $_REQUEST['edit_tournament_modal'] ) : '';
         
