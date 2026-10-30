@@ -194,6 +194,7 @@
 
 /* Tab & Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
 .sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-member::before     { content: "👤\00a0"; }
 .sywat-tab-icon-season::before     { content: "🏆\00a0"; }
 .sywat-tab-icon-shop::before       { content: "🏪\00a0"; }
 .sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
