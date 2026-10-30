@@ -8,13 +8,23 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Retrieve all registered TFAA members.
+ * Retrieve registered TFAA members matching custom system roles.
  */
 if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
     function sywat_get_all_tfaa_members() {
+        $allowed_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
+            ? sywat_get_custom_roles_slugs() 
+            : array(
+                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+                'tfaa_webmaster', 'tfaa_field_governor', 'staff_shooter', 'management', 
+                'non-shooting-member', 'sywat_shop_manager', 'sywat_shop_user', 'administrator'
+            );
+
         return get_users( array(
-            'orderby' => 'display_name',
-            'order'   => 'ASC',
+            'role__in' => $allowed_roles,
+            'orderby'  => 'display_name',
+            'order'    => 'ASC',
         ) );
     }
 }
