@@ -114,6 +114,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             unset($archers);
         }
         unset($group);
+
+        $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
 
         <div class="sywat-public-card">
@@ -189,9 +191,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                         </thead>
                                         <tbody>
                                             <?php foreach ( $archers as $idx => $a ): ?>
+                                                <?php $archer_identifier = ! empty( $a['id'] ) ? $a['id'] : $a['name']; ?>
                                                 <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
                                                     <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
-                                                    <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
+                                                    <td>
+                                                        <strong style="font-size: 14px; color: #0f172a;"><?php echo esc_html( $a['name'] ); ?></strong>
+                                                        <?php if ( $can_edit_scores ): ?>
+                                                            <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $tournament_name ); ?>&edit_archer=<?php echo urlencode( $archer_identifier ); ?>" 
+                                                               class="sywat-btn-edit-shortcut" 
+                                                               style="font-size: 11px; padding: 2px 6px; margin-left: 8px; text-decoration: none; background: #2271b1; color: #ffffff; border-radius: 3px; display: inline-block; font-weight: 600;" 
+                                                               title="Edit Archer Score & Details">
+                                                                ✏️ Edit
+                                                            </a>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td style="text-align: right; font-size: 15px; color: #0f172a;">
                                                         <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
                                                     </td>
