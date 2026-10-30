@@ -62,7 +62,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         <div class="sywat-public-card">
             <div style="margin-bottom: 20px;">
                 <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary" style="margin-bottom: 12px; display: inline-flex; align-items: center; gap: 5px;">← Back to Tournament Directory</a>
-                <h2 style="margin: 0; font-size: 22px; color: #0f172a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
+                <h2 style="margin: 0; font-size: 22px; color: #1e3a8a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
             </div>
 
             <div class="sywat-filter-bar">
@@ -109,16 +109,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 <p style="color: #646970; font-style: italic; padding: 20px 0;">No scores submitted yet for this tournament.</p>
             <?php else: ?>
                 <?php foreach ( $groups as $dg_key => $group_data ): ?>
-                    <div class="sywat-tourn-div-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>">
-                        <div class="sywat-div-gen-header" style="background: #0f172a;">
+                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>">
+                        <div class="sywat-div-gen-header">
                             🎯 <?php echo esc_html( $group_data['heading'] ); ?>
                         </div>
 
                         <div style="padding: 15px;">
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <div class="sywat-tourn-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
-                                    <h4 class="sywat-style-header" style="border-left-color: #0f172a;">
-                                        🏆 <?php echo esc_html( $style_name ); ?>
+                                <div class="sywat-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
+                                    <h4 class="sywat-style-header">
+                                        🏹 <?php echo esc_html( $style_name ); ?>
                                     </h4>
 
                                     <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
@@ -156,7 +156,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             const styleFilter = document.getElementById('sywat_tourn_filter_style').value.toLowerCase();
             const searchFilter= document.getElementById('sywat_tourn_search').value.toLowerCase().trim();
 
-            const cards = document.querySelectorAll('.sywat-tourn-div-card');
+            const cards = document.querySelectorAll('.sywat-div-gen-card');
 
             cards.forEach(card => {
                 const cardDiv = (card.getAttribute('data-division') || '').toLowerCase();
@@ -166,7 +166,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 const genMatch = (genFilter === 'all' || cardGen.includes(genFilter));
 
                 let cardHasVisibleBlock = false;
-                const styleBlocks = card.querySelectorAll('.sywat-tourn-style-block');
+                const styleBlocks = card.querySelectorAll('.sywat-style-block');
 
                 styleBlocks.forEach(block => {
                     const blockStyle = (block.getAttribute('data-style') || '').toLowerCase();
