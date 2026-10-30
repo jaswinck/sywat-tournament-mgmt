@@ -4,7 +4,7 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers custom TFAA & Staff roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 2.6.1
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -33,7 +33,7 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
             add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
         }
 
-        // 3. TFAA Executive Board & Administrative Roles
+        // 3. TFAA Executive Board Roles
         if ( null === get_role( 'tfaa_president' ) ) {
             add_role( 'tfaa_president', 'TFAA President', array( 'read' => true ) );
         }
@@ -54,9 +54,6 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
         }
         if ( null === get_role( 'tfaa_webmaster' ) ) {
             add_role( 'tfaa_webmaster', 'TFAA Webmaster', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_admin' ) ) {
-            add_role( 'tfaa_admin', 'TFAA Admin', array( 'read' => true ) );
         }
         if ( null === get_role( 'tfaa_field_governor' ) ) {
             add_role( 'tfaa_field_governor', 'TFAA Field Governor', array( 'read' => true ) );
@@ -131,7 +128,6 @@ if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
             'tfaa_treasurer',
             'tfaa_secretary',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_field_governor',
             'tfaa_tournament_director',
             'tfaa_social_media_director',
@@ -150,8 +146,8 @@ if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
         $allowed = array(
             'administrator',
             'tfaa_president',
+            'tfaa_vice_president',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_tournament_director',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
@@ -168,7 +164,6 @@ if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
             'tfaa_president',
             'tfaa_vice_president',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_field_governor',
             'tfaa_tournament_director',
         );
@@ -188,7 +183,6 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
             'tfaa_treasurer',
             'tfaa_secretary',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_field_governor',
             'tfaa_tournament_director',
             'tfaa_social_media_director',
@@ -214,7 +208,6 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
             'tfaa_treasurer',
             'tfaa_secretary',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_field_governor',
             'tfaa_tournament_director',
             'tfaa_social_media_director',
@@ -239,7 +232,6 @@ if ( ! function_exists( 'sywat_can_create_members' ) ) {
             'tfaa_vice_president',
             'tfaa_secretary',
             'tfaa_webmaster',
-            'tfaa_admin',
             'tfaa_tournament_director',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
@@ -254,8 +246,8 @@ if ( ! function_exists( 'sywat_can_manage_board' ) ) {
         $allowed = array(
             'administrator',
             'tfaa_president',
+            'tfaa_vice_president',
             'tfaa_webmaster',
-            'tfaa_admin',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
