@@ -42,13 +42,13 @@ function sywat_archery_enqueue_assets() {
     );
 }
 
-// Load Core Tournament & Multi-Shop Modules
+// Load Core Tournament, Member & Multi-Shop Modules
 require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-config.php'; // Tournament Config, Seasons & Volunteer Hub
-require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';  // Intake & Phone Registration Engine
-require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-member-signup.php'; // Public/Admin Member Signup Shortcode ([sywat_member_signup])
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';               // Roster Administration & Line Purging
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';           // Financial Split Calculations & Invoicing
-require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';           // Multi-Tenant Shop Management Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/members/class-sywat-members.php';               // Member Management Sub-System ([sywat_members])
+require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';      // Intake & Phone Registration Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';                         // Roster Administration & Line Purging
+require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';                     // Financial Split Calculations & Invoicing
+require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';                     // Multi-Tenant Shop Management Engine
 
 // Load Front-End Operations Apps
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';      // Check-In Desk App ([sywat_desk])
