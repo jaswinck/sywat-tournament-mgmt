@@ -73,7 +73,14 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         }
 
         ksort($all_divisions);
-        ksort($all_styles);
+
+        // Sort filter styles dropdown by style priority weight
+        uksort( $all_styles, function( $a, $b ) {
+            $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $a ) : 50;
+            $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $b ) : 50;
+            if ( $wA !== $wB ) return $wA - $wB;
+            return strcasecmp( $a, $b );
+        });
 
         // Sort Division + Gender groups by Pro-first weight
         uksort( $groups, function( $keyA, $keyB ) {
@@ -87,11 +94,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Sort styles inside each group (Guest placed at the end), and archers inside each style
+        // Sort styles inside each group using 11-tier style weight priority
         foreach ( $groups as $dg_key => &$group ) {
             uksort( $group['styles'], function( $stA, $stB ) {
-                if ( $stA === 'Guest' ) return 1;
-                if ( $stB === 'Guest' ) return -1;
+                $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $stA ) : 50;
+                $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $stB ) : 50;
+                if ( $wA !== $wB ) return $wA - $wB;
                 return strcasecmp( $stA, $stB );
             });
 
