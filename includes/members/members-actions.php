@@ -1,15 +1,12 @@
 <?php
 /**
- * Sub-Module: Member POST Action Handling
+ * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
  * Author: SYWAT Archery
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/**
- * Utility: Password Strength & Match Validation Helper
- */
 if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
     function sywat_validate_password_rules( $password, $confirm_password ) {
         if ( $password !== $confirm_password ) {
@@ -57,13 +54,11 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">An account with email address "' . esc_html( $email ) . '" already exists.</div>';
             }
 
-            // Password Complexity & Match Check
             $pw_val = sywat_validate_password_rules( $password, $confirm_password );
             if ( $pw_val !== true ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
             }
 
-            // Generate Username: Firstname.Lastname (e.g. John.Doe) with collision protection
             $base_username = sanitize_user( $first_name . '.' . $last_name, true );
             $username      = $base_username;
             $counter       = 1;
@@ -107,7 +102,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $confirm_new_pw = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
             if ( $user_id > 0 && get_userdata( $user_id ) ) {
-                // If a new password is entering, validate complexity & match
                 if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
                     $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
                     if ( $pw_val !== true ) {
@@ -140,7 +134,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">User not found.</div>';
             }
 
-            // Prevent currently logged in user from deleting themselves
             if ( get_current_user_id() === $user_id ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">You cannot delete your own active administrator account.</div>';
             }
@@ -152,6 +145,37 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account "<strong>' . esc_html( $deleted_name ) . '</strong>" has been permanently deleted.</div>';
             } else {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to delete user account. Please try again.</div>';
+            }
+        }
+
+        // 4. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
+        if ( $action === 'save_board_member' ) {
+            $user_id   = intval( $_POST['board_user_id'] );
+            $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
+
+            if ( $user_id <= 0 || ! get_userdata( $user_id ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid member to assign to the Board.</div>';
+            }
+
+            if ( empty( $positions ) ) {
+                delete_user_meta( $user_id, 'sywat_board_positions' );
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions removed for member.</div>';
+            }
+
+            update_user_meta( $user_id, 'sywat_board_positions', $positions );
+            $user = get_userdata( $user_id );
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
+        }
+
+        // 5. REMOVE BOARD MEMBER ASSIGNMENT
+        if ( $action === 'remove_board_member' ) {
+            $user_id = intval( $_POST['target_user_id'] );
+            $user    = get_userdata( $user_id );
+
+            if ( $user ) {
+                delete_user_meta( $user_id, 'sywat_board_positions' );
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">"<strong>' . esc_html( $user->display_name ) . '</strong>" has been removed from the Board of Directors.</div>';
             }
         }
 
