@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Central Roles & Permissions Management
  * Path: includes/core/class-sywat-permissions.php
- * Description: Registers custom TFAA roles automatically and provides central capability checks.
+ * Description: Registers custom TFAA & Staff roles automatically and provides central capability checks.
  * Author: SYWAT Archery
  * Version: 2.5.0
  */
@@ -10,43 +10,44 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Register custom TFAA plugin roles safely in WordPress.
+ * Register custom TFAA & Staff roles safely in WordPress.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
-        // 1. TFAA Member (Read-only archer for online registration & personal score history)
+        // 1. Volunteer & Staff Roles
+        if ( null === get_role( 'staff_shooter' ) ) {
+            add_role( 'staff_shooter', 'Staff Shooter', array( 'read' => true ) );
+        }
+        if ( null === get_role( 'management' ) ) {
+            add_role( 'management', 'Management', array( 'read' => true ) );
+        }
+        if ( null === get_role( 'non-shooting-member' ) ) {
+            add_role( 'non-shooting-member', 'Non-Shooting Member', array( 'read' => true ) );
+        }
+
+        // 2. Multi-Shop Roles
+        if ( null === get_role( 'sywat_shop_manager' ) ) {
+            add_role( 'sywat_shop_manager', 'SYWAT Shop Manager', array( 'read' => true ) );
+        }
+        if ( null === get_role( 'sywat_shop_user' ) ) {
+            add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
+        }
+
+        // 3. TFAA Member & Administrative Roles
         if ( null === get_role( 'tfaa_member' ) ) {
-            add_role( 'tfaa_member', 'TFAA Member', array(
-                'read' => true,
-            ) );
+            add_role( 'tfaa_member', 'TFAA Member', array( 'read' => true ) );
         }
-
-        // 2. TFAA Tournament Director (Local Desk, Check-In, Walk-Ins, Roster, Score Entry)
         if ( null === get_role( 'tfaa_tournament_director' ) ) {
-            add_role( 'tfaa_tournament_director', 'TFAA Tournament Director', array(
-                'read' => true,
-            ) );
+            add_role( 'tfaa_tournament_director', 'TFAA Tournament Director', array( 'read' => true ) );
         }
-
-        // 3. TFAA Field Governor (District Oversight - District Shops, Tournaments, Scores)
         if ( null === get_role( 'tfaa_field_governor' ) ) {
-            add_role( 'tfaa_field_governor', 'TFAA Field Governor', array(
-                'read' => true,
-            ) );
+            add_role( 'tfaa_field_governor', 'TFAA Field Governor', array( 'read' => true ) );
         }
-
-        // 4. TFAA Admin (Statewide Plugin Admin across all districts)
         if ( null === get_role( 'tfaa_admin' ) ) {
-            add_role( 'tfaa_admin', 'TFAA Admin', array(
-                'read' => true,
-            ) );
+            add_role( 'tfaa_admin', 'TFAA Admin', array( 'read' => true ) );
         }
-
-        // 5. TFAA Webmaster (Full Statewide Plugin Admin + WordPress Core Admin)
         if ( null === get_role( 'tfaa_webmaster' ) ) {
-            add_role( 'tfaa_webmaster', 'TFAA Webmaster', array(
-                'read' => true,
-            ) );
+            add_role( 'tfaa_webmaster', 'TFAA Webmaster', array( 'read' => true ) );
         }
     }
 }
@@ -89,7 +90,7 @@ if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
             'tfaa_field_governor',
             'tfaa_tournament_director',
             'sywat_shop_manager',
-            'management', // Maintained during prototype migration
+            'management',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
@@ -136,7 +137,10 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
             'tfaa_field_governor',
             'tfaa_tournament_director',
             'sywat_shop_manager',
+            'sywat_shop_user',
             'management',
+            'staff_shooter',
+            'non-shooting-member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
@@ -156,6 +160,8 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
             'sywat_shop_manager',
             'sywat_shop_user',
             'management',
+            'staff_shooter',
+            'non-shooting-member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
