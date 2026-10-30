@@ -11,7 +11,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
         $scores = sywat_get_tournament_scores( $tournament_name );
 
-        // Group scores by Division + Gender -> Style
         $groups = array();
         $all_styles = array();
 
@@ -34,7 +33,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         ksort($all_styles);
 
-        // Sort groups by Pro-first weight
         uksort( $groups, function( $keyA, $keyB ) {
             list( $divA, $genA ) = explode( '|||', $keyA );
             list( $divB, $genB ) = explode( '|||', $keyB );
@@ -46,7 +44,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Sort archers within each style by Score DESC, then X Count DESC
         foreach ( $groups as $dg_key => &$group ) {
             ksort( $group['styles'] );
             foreach ( $group['styles'] as $st_key => &$archers ) {
@@ -68,8 +65,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 <h2 style="margin: 0; font-size: 22px; color: #0f172a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
             </div>
 
-            <!-- Filter Controls Bar -->
-            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+            <div class="sywat-filter-bar">
                 <div>
                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Division</label>
                     <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 140px;">
@@ -113,19 +109,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 <p style="color: #646970; font-style: italic; padding: 20px 0;">No scores submitted yet for this tournament.</p>
             <?php else: ?>
                 <?php foreach ( $groups as $dg_key => $group_data ): ?>
-                    <div class="sywat-tourn-div-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>" style="margin-bottom: 30px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
-                        <div style="background: #0f172a; color: #ffffff; padding: 12px 18px; font-weight: 800; font-size: 17px; letter-spacing: 0.5px;">
+                    <div class="sywat-tourn-div-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>">
+                        <div class="sywat-div-gen-header" style="background: #0f172a;">
                             🎯 <?php echo esc_html( $group_data['heading'] ); ?>
                         </div>
 
                         <div style="padding: 15px;">
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <div class="sywat-tourn-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>" style="margin-bottom: 25px;">
-                                    <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #1e293b; background: #f1f5f9; padding: 6px 12px; border-left: 4px solid #0f172a; border-radius: 0 4px 4px 0;">
-                                        🏆 <?php echo esc_html( $style_name ); ?>
+                                <div class="sywat-tourn-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
+                                    <h4 class="sywat-style-header" style="border-left-color: #0f172a;">
+                                        <span>🏆 <?php echo esc_html( $style_name ); ?></span>
+                                        <span class="sywat-style-header-tag" style="background: #0f172a;">Style Category</span>
                                     </h4>
 
-                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 10px;">
+                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
                                         <thead>
                                             <tr>
                                                 <th style="width: 50px; text-align: center;">Place</th>
