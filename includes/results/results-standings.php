@@ -28,12 +28,20 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         $best_n      = $season_data['best_n'];
         $groups      = $season_data['groups'];
 
-        $all_styles = array();
+        // Collect unique divisions and styles dynamically for dropdown filters
+        $all_divisions = array();
+        $all_styles    = array();
+
         foreach ( $groups as $g ) {
+            $clean_d = trim( preg_replace( '/\s*\([^)]*\)/', '', $g['division'] ) );
+            if ( ! empty( $clean_d ) ) {
+                $all_divisions[strtolower( $clean_d )] = $clean_d;
+            }
             foreach ( $g['styles'] as $s_name => $archers ) {
-                $all_styles[$s_name] = $s_name;
+                $all_styles[strtolower( trim( $s_name ) )] = trim( $s_name );
             }
         }
+        ksort($all_divisions);
         ksort($all_styles);
         ?>
 
@@ -63,13 +71,9 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Division</label>
                     <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 140px;">
                         <option value="all">All Divisions</option>
-                        <option value="cub">Cub</option>
-                        <option value="youth">Youth</option>
-                        <option value="young adult">Young Adult</option>
-                        <option value="adult">Adult</option>
-                        <option value="senior">Senior</option>
-                        <option value="silver senior">Silver Senior</option>
-                        <option value="master senior">Master Senior</option>
+                        <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
+                            <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
@@ -84,8 +88,8 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Style</label>
                     <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 160px;">
                         <option value="all">All Styles</option>
-                        <?php foreach ( $all_styles as $st ): ?>
-                            <option value="<?php echo esc_attr( strtolower( $st ) ); ?>"><?php echo esc_html( $st ); ?></option>
+                        <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
+                            <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -102,14 +106,19 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 <p style="color: #646970; font-style: italic; padding: 20px 0;">No completed scores recorded yet for this season.</p>
             <?php else: ?>
                 <?php foreach ( $groups as $dg_key => $group_data ): ?>
-                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( strtolower( $group_data['division'] ) ); ?>" data-gender="<?php echo esc_attr( strtolower( $group_data['gender'] ) ); ?>">
+                    <?php 
+                        $card_div_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['division'] ) ) );
+                        $card_gen_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['gender'] ) ) );
+                    ?>
+                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>">
                         <div class="sywat-div-gen-header">
                             🎯 <?php echo esc_html( $group_data['heading'] ); ?>
                         </div>
 
                         <div style="padding: 15px;">
                             <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <div class="sywat-style-block" data-style="<?php echo esc_attr( strtolower( $style_name ) ); ?>">
+                                <?php $style_slug = strtolower( trim( $style_name ) ); ?>
+                                <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>">
                                     <h4 class="sywat-style-header">
                                         🏹 <?php echo esc_html( $style_name ); ?>
                                     </h4>
@@ -161,26 +170,26 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
         <script>
         function sywatApplyStandingsFilters() {
-            const divFilter   = document.getElementById('sywat_standings_filter_div').value.toLowerCase();
-            const genFilter   = document.getElementById('sywat_standings_filter_gen').value.toLowerCase();
-            const styleFilter = document.getElementById('sywat_standings_filter_style').value.toLowerCase();
+            const divFilter   = document.getElementById('sywat_standings_filter_div').value.toLowerCase().trim();
+            const genFilter   = document.getElementById('sywat_standings_filter_gen').value.toLowerCase().trim();
+            const styleFilter = document.getElementById('sywat_standings_filter_style').value.toLowerCase().trim();
             const searchFilter= document.getElementById('sywat_standings_search').value.toLowerCase().trim();
 
             const cards = document.querySelectorAll('.sywat-div-gen-card');
 
             cards.forEach(card => {
-                const cardDiv = (card.getAttribute('data-division') || '').toLowerCase();
-                const cardGen = (card.getAttribute('data-gender') || '').toLowerCase();
+                const cardDiv = (card.getAttribute('data-division') || '').toLowerCase().trim();
+                const cardGen = (card.getAttribute('data-gender') || '').toLowerCase().trim();
 
-                const divMatch = (divFilter === 'all' || cardDiv.includes(divFilter));
-                const genMatch = (genFilter === 'all' || cardGen.includes(genFilter));
+                const divMatch = (divFilter === 'all' || cardDiv === divFilter);
+                const genMatch = (genFilter === 'all' || cardGen === genFilter);
 
                 let cardHasVisibleBlock = false;
                 const styleBlocks = card.querySelectorAll('.sywat-style-block');
 
                 styleBlocks.forEach(block => {
-                    const blockStyle = (block.getAttribute('data-style') || '').toLowerCase();
-                    const styleMatch = (styleFilter === 'all' || blockStyle.includes(styleFilter));
+                    const blockStyle = (block.getAttribute('data-style') || '').toLowerCase().trim();
+                    const styleMatch = (styleFilter === 'all' || blockStyle === styleFilter);
 
                     let blockHasVisibleRow = false;
                     const rows = block.querySelectorAll('.sywat-standings-row');
