@@ -3,6 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -35,11 +36,33 @@ if ( ! function_exists( 'sywat_get_line_max_cap' ) ) {
 if ( ! function_exists( 'sywat_count_registered' ) ) {
     function sywat_count_registered( $t_name, $l_idx, $dist, $registrations ) {
         $count = 0;
+        $norm_target_dist = sywat_normalize_dist( $dist );
+
         foreach ( $registrations as $reg ) {
-            if ( isset( $reg['tournament'], $reg['line_index'], $reg['distance'] )
-                && strcasecmp( $reg['tournament'], $t_name ) === 0
-                && (string)$reg['line_index'] === (string)$l_idx
-                && sywat_normalize_dist( $reg['distance'] ) === $dist ) {
+            if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( $reg['tournament'] ), trim( $t_name ) ) !== 0 ) {
+                continue;
+            }
+
+            $reg_dist = isset( $reg['distance'] ) ? sywat_normalize_dist( $reg['distance'] ) : '20yd';
+            if ( $reg_dist !== $norm_target_dist ) {
+                continue;
+            }
+
+            // Match by numerical array index (e.g. 0 === 0)
+            $match_idx = isset( $reg['line_index'] ) && (string)$reg['line_index'] === (string)$l_idx;
+
+            // Fallback match: check if line_name or line_index contains the line text name
+            $match_name = false;
+            if ( isset( $reg['line_name'] ) && is_string( $l_idx ) && strcasecmp( trim( $reg['line_name'] ), trim( $l_idx ) ) === 0 ) {
+                $match_name = true;
+            }
+            if ( isset( $reg['line_index'] ) && is_string( $reg['line_index'] ) && ! is_numeric( $reg['line_index'] ) ) {
+                if ( (string)$reg['line_index'] === (string)$l_idx ) {
+                    $match_name = true;
+                }
+            }
+
+            if ( $match_idx || $match_name ) {
                 $count++;
             }
         }
@@ -47,11 +70,35 @@ if ( ! function_exists( 'sywat_count_registered' ) ) {
     }
 }
 
+if ( ! function_exists( 'sywat_get_registrations' ) ) {
+    function sywat_get_registrations( $t_name = '' ) {
+        if ( ! empty( $t_name ) ) {
+            $t_slug = sanitize_title( $t_name );
+            $regs   = get_option( 'sywat_registrations_' . $t_slug, array() );
+            if ( is_array( $regs ) && ! empty( $regs ) ) {
+                return array_values( $regs );
+            }
+        }
+
+        $global_regs = get_option( 'sywat_registrations', array() );
+        if ( is_array( $global_regs ) && ! empty( $global_regs ) ) {
+            if ( empty( $t_name ) ) {
+                return array_values( $global_regs );
+            }
+            return array_values( array_filter( $global_regs, function( $r ) use ( $t_name ) {
+                return isset( $r['tournament'] ) && strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) === 0;
+            } ) );
+        }
+
+        return array();
+    }
+}
+
 if ( ! function_exists( 'sywat_get_tournament_count' ) ) {
     function sywat_get_tournament_count( $t_name, $registrations ) {
         $count = 0;
         foreach ( $registrations as $reg ) {
-            if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $t_name ) === 0 ) {
+            if ( isset( $reg['tournament'] ) && strcasecmp( trim( $reg['tournament'] ), trim( $t_name ) ) === 0 ) {
                 $count++;
             }
         }
