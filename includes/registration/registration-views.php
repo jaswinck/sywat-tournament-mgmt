@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -23,9 +23,25 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
             ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
             : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
+
+        $modal_notice       = ! empty( $GLOBALS['sywat_modal_notice'] ) ? $GLOBALS['sywat_modal_notice'] : '';
+        $skipped_duplicates = ! empty( $GLOBALS['sywat_skipped_duplicates'] ) ? $GLOBALS['sywat_skipped_duplicates'] : array();
         ?>
         <div class="no-print" style="display:flex; flex-direction:column; gap:20px;">
             
+            <?php if ( ! empty( $modal_notice ) ): ?>
+                <div><?php echo $modal_notice; ?></div>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $skipped_duplicates ) ): ?>
+                <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const dupes = <?php echo json_encode( array_values( $skipped_duplicates ) ); ?>;
+                    alert("⚠️ REGISTRATION NOTICE:\n\nThe following archer(s) were NOT registered because they are already signed up on this line:\n\n• " + dupes.join("\n• "));
+                });
+                </script>
+            <?php endif; ?>
+
             <!-- PHONE & GROUP INTAKE FORM -->
             <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:600; color:#1e293b;">1. Phone & Group Registration Intake</h4>
@@ -233,7 +249,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         });
         </script>
         <?php
-        // Render Client Scripts
         if ( function_exists( 'sywat_render_registration_scripts' ) ) {
             sywat_render_registration_scripts();
         }
