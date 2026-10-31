@@ -2,30 +2,19 @@
 /**
  * Sub-Module: Central Roles & Permissions Management
  * Path: includes/core/class-sywat-permissions.php
- * Description: Registers custom TFAA & Staff roles automatically and provides central capability checks.
+ * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 2.7.1
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Register custom TFAA & Staff roles safely in WordPress.
+ * Register clean, essential TFAA & Shop roles safely in WordPress.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
-        // 1. Volunteer & Staff Roles
-        if ( null === get_role( 'staff_shooter' ) ) {
-            add_role( 'staff_shooter', 'Staff Shooter', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'management' ) ) {
-            add_role( 'management', 'Management', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'non-shooting-member' ) ) {
-            add_role( 'non-shooting-member', 'Non-Shooting Member', array( 'read' => true ) );
-        }
-
-        // 2. Multi-Shop Roles
+        // 1. Multi-Shop Roles
         if ( null === get_role( 'sywat_shop_manager' ) ) {
             add_role( 'sywat_shop_manager', 'SYWAT Shop Manager', array( 'read' => true ) );
         }
@@ -33,7 +22,7 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
             add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
         }
 
-        // 3. TFAA Executive Board Roles
+        // 2. TFAA Executive Board Roles
         if ( null === get_role( 'tfaa_president' ) ) {
             add_role( 'tfaa_president', 'TFAA President', array( 'read' => true ) );
         }
@@ -59,7 +48,7 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
             add_role( 'tfaa_field_governor', 'TFAA Field Governor', array( 'read' => true ) );
         }
 
-        // 4. Standard TFAA General Membership
+        // 3. Standard TFAA General Membership
         if ( null === get_role( 'tfaa_member' ) ) {
             add_role( 'tfaa_member', 'TFAA Member', array( 'read' => true ) );
         }
@@ -68,7 +57,7 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
 add_action( 'init', 'sywat_register_custom_roles' );
 
 /**
- * Utility: Returns array of all custom system role slugs.
+ * Utility: Returns array of active custom system role slugs.
  */
 if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
     function sywat_get_custom_roles_slugs() {
@@ -82,9 +71,6 @@ if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
             'tfaa_social_media_director',
             'tfaa_webmaster',
             'tfaa_field_governor',
-            'staff_shooter',
-            'management',
-            'non-shooting-member',
             'sywat_shop_manager',
             'sywat_shop_user',
             'administrator',
@@ -157,7 +143,6 @@ if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
             'tfaa_tournament_director',
             'tfaa_social_media_director',
             'sywat_shop_manager',
-            'management',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
@@ -213,9 +198,7 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
             'tfaa_social_media_director',
             'sywat_shop_manager',
             'sywat_shop_user',
-            'management',
-            'staff_shooter',
-            'non-shooting-member',
+            'tfaa_member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
@@ -238,9 +221,7 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
             'tfaa_social_media_director',
             'sywat_shop_manager',
             'sywat_shop_user',
-            'management',
-            'staff_shooter',
-            'non-shooting-member',
+            'tfaa_member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
