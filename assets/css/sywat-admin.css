@@ -526,10 +526,23 @@
     color: #38bdf8;
 }
 
-/* Auth Header Hover Dropdown Menu */
+/* Auth Header Hover Dropdown Menu & Caret */
 .sywat-auth-dropdown {
     position: relative;
     display: inline-block;
+}
+
+.sywat-dropdown-caret {
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 6px;
+    color: #38bdf8;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.sywat-auth-dropdown:hover .sywat-dropdown-caret {
+    transform: rotate(180deg);
+    color: #7dd3fc;
 }
 
 .sywat-auth-dropdown-menu {
