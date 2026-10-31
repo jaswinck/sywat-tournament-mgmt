@@ -3,38 +3,68 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.1.2
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Render Header Bar for Logged-In Users
+ * Render Master App Navigation Bar for Logged-In Users
  */
 if ( ! function_exists( 'sywat_render_auth_header' ) ) {
     function sywat_render_auth_header() {
         if ( ! is_user_logged_in() ) return;
 
         $current_user = wp_get_current_user();
+        $user_id      = $current_user->ID;
+
+        // Dynamic page links based on user role capabilities
+        $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
+        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         ?>
-        <div class="sywat-auth-bar">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:15px; font-weight:700; color:#38bdf8;">🎯 Texas Field Archery Association</span>
+        <div class="sywat-auth-bar" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:8px 18px; border-radius:6px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+            
+            <!-- Left: Brand Logo & Title -->
+            <div style="display:flex; align-items:center; gap:20px;">
+                <span style="font-size:15px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+                    🎯 TFAA Archery
+                </span>
+
+                <!-- Center: Primary App Navigation Links -->
+                <nav style="display:flex; align-items:center; gap:12px;">
+                    <?php if ( $can_manage_tournaments ): ?>
+                        <a href="<?php echo esc_url( site_url( '/tournaments' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                            🎯 Tournaments
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if ( $can_access_desk ): ?>
+                        <a href="<?php echo esc_url( site_url( '/desk' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                            📋 Check-In Desk
+                        </a>
+                    <?php endif; ?>
+
+                    <a href="<?php echo esc_url( site_url( '/results' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                        🏆 Results
+                    </a>
+                </nav>
             </div>
 
-            <div style="display:flex; align-items:center; gap:14px;">
-                <span style="font-size:13px; color:#cbd5e1;">
-                    Logged in as: <strong style="color:#fff;"><?php echo esc_html( $current_user->display_name ); ?></strong>
+            <!-- Right: Compact User Profile & Logout -->
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:13px; font-weight:600; color:#cbd5e1; display:flex; align-items:center; gap:4px;">
+                    👤 <?php echo esc_html( $current_user->display_name ); ?>
                 </span>
 
                 <form method="post" style="margin:0; display:inline;">
                     <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                     <input type="hidden" name="sywat_auth_action" value="logout">
-                    <button type="submit" class="sywat-btn sywat-btn-danger">
+                    <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 10px;">
                         🚪 Log Out
                     </button>
                 </form>
             </div>
+
         </div>
         <?php
     }
