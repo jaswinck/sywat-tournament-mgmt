@@ -1,15 +1,15 @@
 <?php
 /**
- * Sub-Module: TFAA Authentication Views Renderer
+ * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Render Header Bar for Logged-In Operators
+ * Render Header Bar for Logged-In Users with Dynamic TFAA Role Labels
  */
 if ( ! function_exists( 'sywat_render_auth_header' ) ) {
     function sywat_render_auth_header() {
@@ -17,13 +17,36 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
 
         $current_user = wp_get_current_user();
         $roles        = (array) $current_user->roles;
-        $role_label   = in_array( 'administrator', $roles ) ? 'Administrator' : 'Operator';
+
+        // Map system role slugs to official user-facing TFAA labels
+        $role_labels = array(
+            'administrator'              => 'System Administrator',
+            'tfaa_president'             => 'TFAA President',
+            'tfaa_vice_president'        => 'TFAA Vice-President',
+            'tfaa_treasurer'             => 'TFAA Treasurer',
+            'tfaa_secretary'             => 'TFAA Secretary',
+            'tfaa_tournament_director'   => 'Tournament Director',
+            'tfaa_social_media_director' => 'Social Media Director',
+            'tfaa_webmaster'             => 'Webmaster',
+            'tfaa_field_governor'        => 'Field Governor',
+            'sywat_shop_manager'         => 'Shop Manager',
+            'sywat_shop_user'            => 'Shop Operator',
+            'tfaa_member'                => 'TFAA Member',
+        );
+
+        $user_role_label = 'TFAA Member';
+        foreach ( $role_labels as $slug => $label ) {
+            if ( in_array( $slug, $roles, true ) ) {
+                $user_role_label = $label;
+                break;
+            }
+        }
         ?>
         <div class="sywat-auth-bar" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:10px 16px; border-radius:6px; margin-bottom:18px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-size:15px; font-weight:700; color:#38bdf8;">🎯 Texas Field Archery Association</span>
                 <span style="background:#1e293b; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #334155;">
-                    <?php echo esc_html( $role_label ); ?>
+                    <?php echo esc_html( $user_role_label ); ?>
                 </span>
             </div>
 
@@ -53,15 +76,16 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         $auth_error   = ! empty( $GLOBALS['sywat_auth_error'] ) ? $GLOBALS['sywat_auth_error'] : '';
         $auth_message = ! empty( $GLOBALS['sywat_auth_message'] ) ? $GLOBALS['sywat_auth_message'] : '';
         
-        $action = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : 'login';
-        $rp_key = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
-        $rp_login = isset( $_GET['login'] ) ? sanitize_text_field( $_GET['login'] ) : '';
+        $action      = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : 'login';
+        $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
+        $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( $_GET['login'] ) : '';
+        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : '';
 
         if ( ! empty( $rp_key ) && ! empty( $rp_login ) ) {
             $action = 'rp';
         }
 
-        $current_url = remove_query_arg( array( 'action', 'key', 'login' ) );
+        $current_url   = remove_query_arg( array( 'action', 'key', 'login' ) );
         $lost_pass_url = add_query_arg( 'action', 'lost_password', $current_url );
         ?>
         <div class="sywat-login-card" style="max-width:400px; margin:40px auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.08); overflow:hidden;">
@@ -151,6 +175,9 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                     <form method="post" id="sywat_plugin_login_form">
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="login">
+                        <?php if ( ! empty( $redirect_to ) ): ?>
+                            <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
+                        <?php endif; ?>
 
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
@@ -184,4 +211,33 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         </div>
         <?php
     }
+}
+
+/**
+ * Shortcode Handler: [sywat_login]
+ * Dedicated shortcode for rendering the login portal on any WordPress page (e.g. /login).
+ */
+if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
+    function sywat_render_login_shortcode() {
+        ob_start();
+        echo '<div class="sywat-app">';
+
+        if ( is_user_logged_in() ) {
+            sywat_render_auth_header();
+            $user = wp_get_current_user();
+            ?>
+            <div class="sywat-card" style="text-align:center; padding:30px; max-width:500px; margin:20px auto;">
+                <div style="font-size:32px; margin-bottom:8px;">🎯</div>
+                <h3 style="margin-top:0; color:#0f172a;">Welcome, <?php echo esc_html( $user->display_name ); ?>!</h3>
+                <p style="color:#64748b; font-size:14px;">You are currently signed in to the Texas Field Archery Association portal.</p>
+            </div>
+            <?php
+        } else {
+            sywat_render_login_screen();
+        }
+
+        echo '</div>';
+        return ob_get_clean();
+    }
+    add_shortcode( 'sywat_login', 'sywat_render_login_shortcode' );
 }
