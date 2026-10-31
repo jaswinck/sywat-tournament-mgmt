@@ -3,6 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,13 +29,21 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $active_tournaments = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
 
+        // Load Registrations from DB with Master Roster Fallback
         $registrations = array();
         $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
-        foreach ($results as $row) {
-            $reg_data = maybe_unserialize($row->option_value);
-            if (is_array($reg_data) && isset($reg_data['id'])) {
-                $registrations[] = $reg_data;
+        if ( is_array( $results ) ) {
+            foreach ($results as $row) {
+                $reg_data = maybe_unserialize($row->option_value);
+                if (is_array($reg_data) && isset($reg_data['id'])) {
+                    $registrations[] = $reg_data;
+                }
             }
+        }
+
+        // Fallback: Query master registration options if single option keys return empty
+        if ( empty( $registrations ) && function_exists( 'sywat_get_registrations' ) ) {
+            $registrations = sywat_get_registrations();
         }
 
         $notice = '';
@@ -338,9 +347,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <?php if ( $can_manage_seasons ): ?>
                                         <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
                                             <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
-                                            <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                            <?php foreach ( $all_shops as $s_id => $s_name ): ?>
                                                 <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
-                                                    <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
+                                                    <?php echo esc_html( $s_name['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
