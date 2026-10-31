@@ -64,7 +64,7 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`scores-views.php`** — Score entry filter bar with dynamic return navigation bar and batch scoring table UI.
 
 #### 8. Members & Board Roster Sub-System (`includes/members/`)
-- **`class-sywat-members.php`** — Loader shell initializing shortcodes (`[sywat_member_directory]`, `[sywat_board_directory]`) and administrative member management hooks.
+- **`class-sywat-members.php`** — Sub-module loader shell and master shortcode binding (`[sywat_members]`). Binds `sywat_render_members_portal` to handle public board roster views, member directory search, and administrative role updates.
 - **`members-helpers.php`** — Resolves user board designations (`tfaa_president`, `tfaa_field_governor`, etc.), maps district assignments (`sywat_tfaa_district`), checks active status, and formats contact info.
 - **`members-actions.php`** — Action handlers for updating member profiles, assigning custom TFAA roles, toggling active/inactive status, and updating TFAA membership numbers.
 - **`members-views.php`** — Public Board of Directors roster with district contact buttons, searchable Member Directory cards, and the administrative Member Management panel (`tab=members`).
