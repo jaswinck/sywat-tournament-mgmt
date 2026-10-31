@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.8.3
+ * Version: 2.8.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -176,6 +176,12 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                     e.preventDefault();
                     input.value = m.name;
                     closeAllTfaaAutocompletes();
+
+                    // Auto-fill Caller Name if empty or if selecting for Row 1
+                    const callerInput = document.getElementById('sywat_group_name');
+                    if (callerInput && (!callerInput.value.trim() || input.id === 'sywat_first_archer_name')) {
+                        callerInput.value = m.name;
+                    }
 
                     const row = input.closest('.sywat-archer-input-row');
                     if (row) {
