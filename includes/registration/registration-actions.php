@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -129,9 +129,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
         unset($grp);
 
-        $added_count = 0;
-        $skipped_dup = 0;
-        $skipped_cap = 0;
+        $added_count        = 0;
+        $skipped_duplicates = array();
+        $skipped_cap        = 0;
 
         // Fetch master roster array to ensure unified persistence
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
@@ -174,14 +174,17 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     }
                 }
 
-                if ($is_duplicate) { $skipped_dup++; continue; }
+                if ($is_duplicate) { 
+                    $skipped_duplicates[] = $name . ' (' . $line_name . ')'; 
+                    continue; 
+                }
 
-                // Capacity check with safe default threshold (20 for 20yd, 5 for Cub if line capacity is unset)
+                // Capacity check
                 $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $l_idx, $distance, $registrations ) : 0;
                 $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $distance ) : 0;
                 
                 if ( ! $max_capacity || $max_capacity <= 0 ) {
-                    $max_capacity = ($distance === 'Cub') ? 5 : 20; // Safe defaults
+                    $max_capacity = ($distance === 'Cub') ? 5 : 20;
                 }
 
                 if ($current_count >= $max_capacity) { $skipped_cap++; continue; }
@@ -197,8 +200,8 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     'phone'       => $group_phone,
                     'distance'    => $distance,
                     'division'    => $archer['division'],
-                    'gender'      => '', // Captured at Desk Check-In
-                    'style'       => '', // Captured at Desk Check-In
+                    'gender'      => '',
+                    'style'       => '',
                     'paid'        => $paid_status,
                     'family_id'   => $grp['family_id'],
                     'family_name' => $family_base_name,
@@ -207,25 +210,29 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     'created_at'  => current_time( 'mysql' ),
                 );
 
-                // Save to individual option
                 update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-                
-                // Synchronize into Master Tournament Roster option
                 $master_regs[$new_reg['id']] = $new_reg;
-
                 $registrations[] = $new_reg;
                 $added_count++;
             }
         }
 
-        // Persist Master Tournament Roster Option
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
 
-        $msg = "Successfully registered {$added_count} archer(s) under '{$family_base_name}'. Total Fee: $" . number_format($overall_fee, 2) . " (Balance Due: $" . number_format($total_balance_due, 2) . ").";
-        if ($skipped_dup > 0) $msg .= " Skipped {$skipped_dup} duplicate(s) already on this line.";
-        if ($skipped_cap > 0) $msg .= " Skipped {$skipped_cap} over-capacity spot(s).";
+        // Store globals so registration-views can render inline alerts & popup dialogs inside the modal
+        $GLOBALS['sywat_last_added_count']    = $added_count;
+        $GLOBALS['sywat_skipped_duplicates']  = $skipped_duplicates;
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">' . esc_html($msg) . '</div>';
+        $msg = '';
+        if ($added_count > 0) {
+            $msg .= '<div class="sywat-alert sywat-alert-success">Successfully registered ' . $added_count . ' archer(s) under \'' . esc_html($family_base_name) . '\'.</div>';
+        }
+        if (!empty($skipped_duplicates)) {
+            $msg .= '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ DUPLICATE BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_duplicates)) . ' — already registered on this shooting line!</div>';
+        }
+
+        $GLOBALS['sywat_modal_notice'] = $msg;
+        return $msg;
     }
 }
