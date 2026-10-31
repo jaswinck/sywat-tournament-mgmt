@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.8.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -26,6 +26,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
         $modal_notice       = ! empty( $GLOBALS['sywat_modal_notice'] ) ? $GLOBALS['sywat_modal_notice'] : '';
         $skipped_duplicates = ! empty( $GLOBALS['sywat_skipped_duplicates'] ) ? $GLOBALS['sywat_skipped_duplicates'] : array();
+        $skipped_full       = ! empty( $GLOBALS['sywat_skipped_full'] ) ? $GLOBALS['sywat_skipped_full'] : array();
         ?>
         <div class="no-print" style="display:flex; flex-direction:column; gap:20px;">
             
@@ -33,11 +34,18 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 <div><?php echo $modal_notice; ?></div>
             <?php endif; ?>
 
-            <?php if ( ! empty( $skipped_duplicates ) ): ?>
+            <?php if ( ! empty( $skipped_duplicates ) || ! empty( $skipped_full ) ): ?>
                 <script>
                 document.addEventListener("DOMContentLoaded", function() {
+                    <?php if ( ! empty( $skipped_duplicates ) ): ?>
                     const dupes = <?php echo json_encode( array_values( $skipped_duplicates ) ); ?>;
                     alert("⚠️ REGISTRATION NOTICE:\n\nThe following archer(s) were NOT registered because they are already signed up on this line:\n\n• " + dupes.join("\n• "));
+                    <?php endif; ?>
+
+                    <?php if ( ! empty( $skipped_full ) ): ?>
+                    const fulls = <?php echo json_encode( array_values( $skipped_full ) ); ?>;
+                    alert("⚠️ REGISTRATION NOTICE:\n\nThe following archer(s) were NOT registered because the target shooting line is FULL:\n\n• " + fulls.join("\n• "));
+                    <?php endif; ?>
                 });
                 </script>
             <?php endif; ?>
