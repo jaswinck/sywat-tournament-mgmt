@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.7.1
+ * Version: 1.7.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -27,70 +27,72 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
         <div class="sywat-auth-bar">
-            
-            <!-- Left: Brand Logo & Title -->
-            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
-                <?php if ( ! empty( $logo_url ) ): ?>
-                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:40px; width:auto; display:block; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none';">
-                <?php endif; ?>
+            <div class="sywat-auth-bar-inner">
                 
-                <span style="font-size:16px; font-weight:800; color:#ffffff; letter-spacing:0.3px; white-space:nowrap;">
-                    TFAA Archery
-                </span>
-            </div>
+                <!-- Left: Brand Logo & Title -->
+                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                    <?php if ( ! empty( $logo_url ) ): ?>
+                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:40px; width:auto; display:block; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none';">
+                    <?php endif; ?>
+                    
+                    <span style="font-size:16px; font-weight:800; color:#ffffff; letter-spacing:0.3px; white-space:nowrap;">
+                        TFAA Archery
+                    </span>
+                </div>
 
-            <!-- Center: Primary App Navigation Links -->
-            <nav style="display:flex; align-items:center; gap:6px;">
-                <?php if ( $can_manage_tournaments ): ?>
-                    <!-- Dropdown Container -->
-                    <div class="sywat-auth-dropdown">
-                        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
-                            🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
-                        </a>
-                        <div class="sywat-auth-dropdown-menu">
-                            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>">
-                                📊 Tournament Dashboard
+                <!-- Center: Primary App Navigation Links -->
+                <nav style="display:flex; align-items:center; gap:6px;">
+                    <?php if ( $can_manage_tournaments ): ?>
+                        <!-- Dropdown Container -->
+                        <div class="sywat-auth-dropdown">
+                            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                                🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
                             </a>
-                            <?php if ( $can_access_desk ): ?>
-                                <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>">
-                                    📋 Check-In Desk
+                            <div class="sywat-auth-dropdown-menu">
+                                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>">
+                                    📊 Tournament Dashboard
                                 </a>
-                            <?php endif; ?>
-                            <?php if ( $can_edit_scores ): ?>
-                                <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>">
-                                    ✏️ Score Entry
-                                </a>
-                            <?php endif; ?>
+                                <?php if ( $can_access_desk ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>">
+                                        📋 Check-In Desk
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ( $can_edit_scores ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>">
+                                        ✏️ Score Entry
+                                    </a>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                    </div>
-                <?php endif; ?>
+                    <?php endif; ?>
 
-                <?php if ( $can_manage_members ): ?>
-                    <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>" class="sywat-auth-nav-link">
-                        👥 Members
+                    <?php if ( $can_manage_members ): ?>
+                        <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>" class="sywat-auth-nav-link">
+                            👥 Members
+                        </a>
+                    <?php endif; ?>
+
+                    <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
+                        🏆 Results
                     </a>
-                <?php endif; ?>
+                </nav>
 
-                <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
-                    🏆 Results
-                </a>
-            </nav>
+                <!-- Right: Compact User Profile & Logout -->
+                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                    <span style="font-size:13px; font-weight:600; color:#e2e8f0; white-space:nowrap;">
+                        👤 <?php echo esc_html( $current_user->display_name ); ?>
+                    </span>
 
-            <!-- Right: Compact User Profile & Logout -->
-            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
-                <span style="font-size:13px; font-weight:600; color:#e2e8f0; white-space:nowrap;">
-                    👤 <?php echo esc_html( $current_user->display_name ); ?>
-                </span>
+                    <form method="post" style="margin:0; display:inline;">
+                        <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
+                        <input type="hidden" name="sywat_auth_action" value="logout">
+                        <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
+                            🚪 Log Out
+                        </button>
+                    </form>
+                </div>
 
-                <form method="post" style="margin:0; display:inline;">
-                    <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
-                    <input type="hidden" name="sywat_auth_action" value="logout">
-                    <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
-                        🚪 Log Out
-                    </button>
-                </form>
             </div>
-
         </div>
         <?php
     }
