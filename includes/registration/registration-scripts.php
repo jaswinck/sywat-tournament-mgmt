@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.8.4
+ * Version: 2.8.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -177,7 +177,6 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                     input.value = m.name;
                     closeAllTfaaAutocompletes();
 
-                    // Auto-fill Caller Name if empty or if selecting for Row 1
                     const callerInput = document.getElementById('sywat_group_name');
                     if (callerInput && (!callerInput.value.trim() || input.id === 'sywat_first_archer_name')) {
                         callerInput.value = m.name;
@@ -372,6 +371,24 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
         }
 
+        // Auto-dismiss notification and alert banners smoothly after 5 seconds
+        function initAutoDismissAlerts() {
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.sywat-alert, #sywat-notice, .sywat-modal-notice');
+                alerts.forEach(function(alert) {
+                    alert.style.transition = 'opacity 0.5s ease, max-height 0.5s ease, margin 0.5s ease, padding 0.5s ease';
+                    alert.style.opacity = '0';
+                    alert.style.maxHeight = '0';
+                    alert.style.paddingTop = '0';
+                    alert.style.paddingBottom = '0';
+                    alert.style.marginTop = '0';
+                    alert.style.marginBottom = '0';
+                    alert.style.overflow = 'hidden';
+                    setTimeout(function() { alert.remove(); }, 500);
+                });
+            }, 5000);
+        }
+
         document.addEventListener('input', function(e) {
             if (e.target && e.target.name && e.target.name.includes('[name]')) {
                 handleTfaaAutocomplete(e.target);
@@ -394,6 +411,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                 }
             }
             recalculateGroupTotal();
+            initAutoDismissAlerts();
         });
         </script>
         <?php
