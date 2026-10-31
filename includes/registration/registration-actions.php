@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.8.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -131,7 +131,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
         $added_count        = 0;
         $skipped_duplicates = array();
-        $skipped_cap        = 0;
+        $skipped_full       = array();
 
         // Fetch master roster array to ensure unified persistence
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
@@ -187,7 +187,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     $max_capacity = ($distance === 'Cub') ? 5 : 20;
                 }
 
-                if ($current_count >= $max_capacity) { $skipped_cap++; continue; }
+                if ($current_count >= $max_capacity) { 
+                    $skipped_full[] = $name . ' (' . $line_name . ' - ' . $distance . ')'; 
+                    continue; 
+                }
 
                 $paid_status = $grp['is_capped'] ? 'Family' : $archer['paid_tier'];
 
@@ -238,6 +241,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         // Store globals so registration-views can render inline alerts & popup dialogs inside the modal
         $GLOBALS['sywat_last_added_count']    = $added_count;
         $GLOBALS['sywat_skipped_duplicates']  = $skipped_duplicates;
+        $GLOBALS['sywat_skipped_full']        = $skipped_full;
 
         $msg = '';
         if ($added_count > 0) {
@@ -245,6 +249,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
         if (!empty($skipped_duplicates)) {
             $msg .= '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ DUPLICATE BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_duplicates)) . ' — already registered on this shooting line!</div>';
+        }
+        if (!empty($skipped_full)) {
+            $msg .= '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
         }
 
         $GLOBALS['sywat_modal_notice'] = $msg;
