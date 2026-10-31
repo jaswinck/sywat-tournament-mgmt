@@ -3,28 +3,59 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
     function sywat_render_registration_scripts() {
-        $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
-        $tfaa_shooters = isset( $tfaa_cache['shooters'] ) && is_array( $tfaa_cache['shooters'] ) 
-            ? $tfaa_cache['shooters'] 
-            : ( is_array( $tfaa_cache ) ? $tfaa_cache : array() );
-
+        $tfaa_cache  = get_option( 'sywat_tfaa_cache', array() );
         $js_tfaa_data = array();
-        foreach ( $tfaa_shooters as $s ) {
-            $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
-            if ( ! empty( $name ) ) {
-                $js_tfaa_data[] = array(
-                    'name'     => $name,
-                    'division' => isset( $s['division'] ) ? $s['division'] : '',
-                    'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
-                    'style'    => isset( $s['style'] ) ? $s['style'] : '',
-                );
+
+        // Extract shooter profiles robustly regardless of DB cache structure
+        if ( is_array( $tfaa_cache ) ) {
+            $shooters = array();
+            if ( isset( $tfaa_cache['shooters'] ) && is_array( $tfaa_cache['shooters'] ) ) {
+                $shooters = $tfaa_cache['shooters'];
+            } elseif ( isset( $tfaa_cache['exact'] ) && is_array( $tfaa_cache['exact'] ) ) {
+                foreach ( $tfaa_cache['exact'] as $name_key => $records ) {
+                    if ( is_array( $records ) && ! empty( $records ) ) {
+                        $rec = $records[0];
+                        $shooters[] = array(
+                            'name'     => isset( $rec['full_name'] ) ? $rec['full_name'] : $name_key,
+                            'division' => isset( $rec['division'] ) ? $rec['division'] : '',
+                            'gender'   => isset( $rec['gender'] ) ? $rec['gender'] : '',
+                            'style'    => isset( $rec['style'] ) ? $rec['style'] : '',
+                        );
+                    }
+                }
+            } else {
+                foreach ( $tfaa_cache as $k => $v ) {
+                    if ( is_array( $v ) ) {
+                        $name = isset( $v['name'] ) ? $v['name'] : ( isset( $v['full_name'] ) ? $v['full_name'] : ( is_string( $k ) ? $k : '' ) );
+                        if ( ! empty( $name ) ) {
+                            $shooters[] = array(
+                                'name'     => $name,
+                                'division' => isset( $v['division'] ) ? $v['division'] : '',
+                                'gender'   => isset( $v['gender'] ) ? $v['gender'] : '',
+                                'style'    => isset( $v['style'] ) ? $v['style'] : '',
+                            );
+                        }
+                    }
+                }
+            }
+
+            foreach ( $shooters as $s ) {
+                $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
+                if ( ! empty( $name ) ) {
+                    $js_tfaa_data[] = array(
+                        'name'     => $name,
+                        'division' => isset( $s['division'] ) ? $s['division'] : '',
+                        'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
+                        'style'    => isset( $s['style'] ) ? $s['style'] : '',
+                    );
+                }
             }
         }
         ?>
@@ -65,6 +96,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             if (!tfaaDiv || !selectEl) return;
             const cleanTfaa = tfaaDiv.trim().toLowerCase();
 
+            // Exact match check
             for (let opt of selectEl.options) {
                 if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
                     selectEl.value = opt.value;
@@ -73,10 +105,15 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                 }
             }
 
+            // Base category keyword match (e.g. "Adult" -> "Adult (18 - 49)", "Silver Senior" -> "Silver Senior (60 - 69)")
+            const tfaaBaseName = cleanTfaa.split(' (')[0].trim();
+
             for (let opt of selectEl.options) {
                 if (!opt.value) continue;
                 const optLower = opt.value.trim().toLowerCase();
-                if (optLower.includes(cleanTfaa) || cleanTfaa.includes(optLower.split(' ')[0])) {
+                const optBaseName = optLower.split(' (')[0].trim();
+
+                if (optBaseName === tfaaBaseName || optLower.includes(cleanTfaa) || cleanTfaa.includes(optBaseName)) {
                     selectEl.value = opt.value;
                     selectEl.dataset.userChosen = 'true';
                     return;
@@ -93,6 +130,21 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
 
             const matches = sywatTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
+
+            // Auto-populate division immediately on exact or unique match
+            const exactMatch = sywatTfaaShooters.find(s => s.name && s.name.trim().toLowerCase() === query);
+            const targetMatch = exactMatch || (matches.length === 1 ? matches[0] : null);
+
+            if (targetMatch && targetMatch.division) {
+                const row = input.closest('.sywat-archer-input-row');
+                if (row) {
+                    const divSelect = row.querySelector('.sywat-division-select');
+                    if (divSelect && (!divSelect.dataset.userChosen || query === targetMatch.name.toLowerCase())) {
+                        matchTfaaDivision(targetMatch.division, divSelect);
+                    }
+                }
+            }
+
             if (matches.length === 0) return;
 
             const parent = input.parentElement;
