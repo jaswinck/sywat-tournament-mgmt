@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -21,45 +21,51 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         // Dynamic page links based on user role capabilities
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
+        
+        $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
-        <div class="sywat-auth-bar" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:8px 18px; border-radius:6px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+        <div class="sywat-auth-bar">
             
             <!-- Left: Brand Logo & Title -->
-            <div style="display:flex; align-items:center; gap:20px;">
-                <span style="font-size:15px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:6px;">
-                    🎯 TFAA Archery
+            <div style="display:flex; align-items:center; gap:16px;">
+                <?php if ( ! empty( $logo_url ) ): ?>
+                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:44px; width:auto; display:block; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none';">
+                <?php endif; ?>
+                
+                <span style="font-size:17px; font-weight:800; color:#ffffff; letter-spacing:0.3px; display:flex; align-items:center;">
+                    TFAA Archery
                 </span>
 
                 <!-- Center: Primary App Navigation Links -->
-                <nav style="display:flex; align-items:center; gap:12px;">
+                <nav style="display:flex; align-items:center; gap:8px; margin-left:10px;">
                     <?php if ( $can_manage_tournaments ): ?>
-                        <a href="<?php echo esc_url( site_url( '/tournaments' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                        <a href="<?php echo esc_url( site_url( '/tournaments' ) ); ?>" class="sywat-auth-nav-link">
                             🎯 Tournaments
                         </a>
                     <?php endif; ?>
 
                     <?php if ( $can_access_desk ): ?>
-                        <a href="<?php echo esc_url( site_url( '/desk' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                        <a href="<?php echo esc_url( site_url( '/desk' ) ); ?>" class="sywat-auth-nav-link">
                             📋 Check-In Desk
                         </a>
                     <?php endif; ?>
 
-                    <a href="<?php echo esc_url( site_url( '/results' ) ); ?>" style="color:#e2e8f0; font-size:13px; font-weight:600; text-decoration:none; padding:4px 8px; border-radius:4px; transition:background 0.2s;">
+                    <a href="<?php echo esc_url( site_url( '/results' ) ); ?>" class="sywat-auth-nav-link">
                         🏆 Results
                     </a>
                 </nav>
             </div>
 
             <!-- Right: Compact User Profile & Logout -->
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span style="font-size:13px; font-weight:600; color:#cbd5e1; display:flex; align-items:center; gap:4px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span style="font-size:14px; font-weight:600; color:#e2e8f0; display:flex; align-items:center; gap:6px;">
                     👤 <?php echo esc_html( $current_user->display_name ); ?>
                 </span>
 
                 <form method="post" style="margin:0; display:inline;">
                     <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                     <input type="hidden" name="sywat_auth_action" value="logout">
-                    <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 10px;">
+                    <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:13px; padding:6px 14px; height:36px;">
                         🚪 Log Out
                     </button>
                 </form>
@@ -89,13 +95,16 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
         $current_url   = remove_query_arg( array( 'action', 'key', 'login' ) );
         $lost_pass_url = add_query_arg( 'action', 'lost_password', $current_url );
+        $logo_url      = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
         <div class="sywat-login-card">
             
             <!-- Card Header -->
-            <div style="background:#0f172a; padding:24px 20px; text-align:center; color:#ffffff;">
-                <div style="font-size:28px; margin-bottom:6px;">🎯</div>
-                <h3 style="margin:0; font-size:18px; font-weight:700; color:#ffffff;">Texas Field Archery Association</h3>
+            <div style="background:#0f172a; padding:28px 20px; text-align:center; color:#ffffff;">
+                <?php if ( ! empty( $logo_url ) ): ?>
+                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:64px; width:auto; margin:0 auto 10px auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));" onerror="this.style.display='none';">
+                <?php endif; ?>
+                <h3 style="margin:0; font-size:19px; font-weight:700; color:#ffffff;">Texas Field Archery Association</h3>
             </div>
 
             <!-- Card Body -->
