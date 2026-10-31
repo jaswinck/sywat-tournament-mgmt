@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -35,6 +35,30 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function handleCallerNameInput(callerInput) {
+            const firstArcherInput = document.getElementById('sywat_first_archer_name') || document.querySelector('.sywat-archer-name-input');
+            if (!firstArcherInput) return;
+
+            if (!firstArcherInput.dataset.manuallyEdited) {
+                firstArcherInput.value = callerInput.value;
+                handleTfaaAutocomplete(firstArcherInput);
+                recalculateGroupTotal();
+            }
+        }
+
+        function handleArcherNameInput(archerInput) {
+            const callerInput = document.getElementById('sywat_group_name');
+            if (callerInput && archerInput.id === 'sywat_first_archer_name') {
+                if (archerInput.value !== callerInput.value && archerInput.value !== '') {
+                    archerInput.dataset.manuallyEdited = 'true';
+                } else if (archerInput.value === '') {
+                    delete archerInput.dataset.manuallyEdited;
+                }
+            }
+            handleTfaaAutocomplete(archerInput);
+            recalculateGroupTotal();
         }
 
         function matchTfaaDivision(tfaaDiv, selectEl) {
@@ -171,7 +195,9 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
 
             rowDiv.innerHTML = `
-                <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleTfaaAutocomplete(this); recalculateGroupTotal();">
+                <div style="flex:2; position:relative;">
+                    <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
+                </div>
                 
                 <select name="archers[${archerRowCount}][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                     <option value="20yd" selected>20yd</option>
