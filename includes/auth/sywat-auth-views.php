@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.5.0
+ * Version: 1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -22,6 +22,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
+        $can_manage_members     = function_exists( 'sywat_can_manage_members' ) ? sywat_can_manage_members( $user_id ) : current_user_can( 'manage_options' );
         
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
@@ -61,6 +62,12 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 <?php endif; ?>
                             </div>
                         </div>
+                    <?php endif; ?>
+
+                    <?php if ( $can_manage_members ): ?>
+                        <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>" class="sywat-auth-nav-link">
+                            👥 Member Management
+                        </a>
                     <?php endif; ?>
 
                     <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
