@@ -89,7 +89,9 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | Member ID: <strong>' . esc_html( $tfaa_id ) . '</strong></div>';
+            // Clean Redirect back to directory to prevent blank screens and duplicate posts
+            wp_safe_redirect( add_query_arg( array( 'tab' => 'members', 'subtab' => 'directory', 'msg' => 'created' ) ) );
+            exit;
         }
 
         // 2. UPDATE EXISTING MEMBER PROFILE
@@ -123,7 +125,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
 
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
+                wp_safe_redirect( add_query_arg( array( 'tab' => 'members', 'subtab' => 'directory', 'msg' => 'updated' ) ) );
+                exit;
             }
         }
 
@@ -141,10 +144,10 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
 
             require_once ABSPATH . 'wp-admin/includes/user.php';
-            $deleted_name = $user->display_name;
 
             if ( wp_delete_user( $user_id ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account "<strong>' . esc_html( $deleted_name ) . '</strong>" has been permanently deleted.</div>';
+                wp_safe_redirect( add_query_arg( array( 'tab' => 'members', 'subtab' => 'directory', 'msg' => 'deleted' ) ) );
+                exit;
             } else {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to delete user account. Please try again.</div>';
             }
@@ -161,13 +164,12 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
             if ( empty( $positions ) ) {
                 delete_user_meta( $user_id, 'sywat_board_positions' );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions removed for member.</div>';
+            } else {
+                update_user_meta( $user_id, 'sywat_board_positions', $positions );
             }
 
-            update_user_meta( $user_id, 'sywat_board_positions', $positions );
-            $user = get_userdata( $user_id );
-
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
+            wp_safe_redirect( add_query_arg( array( 'tab' => 'members', 'subtab' => 'board', 'msg' => 'board_saved' ) ) );
+            exit;
         }
 
         // 5. REMOVE BOARD MEMBER ASSIGNMENT
@@ -177,7 +179,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
             if ( $user ) {
                 delete_user_meta( $user_id, 'sywat_board_positions' );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">"<strong>' . esc_html( $user->display_name ) . '</strong>" has been removed from the Board of Directors.</div>';
+                wp_safe_redirect( add_query_arg( array( 'tab' => 'members', 'subtab' => 'board', 'msg' => 'board_removed' ) ) );
+                exit;
             }
         }
 
