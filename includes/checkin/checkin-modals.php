@@ -1,6 +1,9 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Modals & Client Scripts
+ * Path: includes/checkin/checkin-modals.php
+ * Author: SYWAT Archery
+ * Version: 2.7.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -57,9 +60,9 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_archer['id']); ?>">
 
-                    <div style="margin-bottom:12px;">
+                    <div style="margin-bottom:12px; position:relative;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Name:</label>
-                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-weight:bold;">
+                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-weight:bold;">
                         <div id="checkin_tfaa_badge"></div>
                         <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
@@ -173,9 +176,9 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_edit_archer['id']); ?>">
 
-                    <div style="margin-bottom:12px;">
+                    <div style="margin-bottom:12px; position:relative;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name:</label>
-                        <input type="text" name="edit_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                        <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
                     </div>
 
                     <div style="margin-bottom:12px;">
@@ -210,7 +213,7 @@ function sywat_desk_render_modals($data) {
 
                     <div style="margin-bottom:12px;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Gender:</label>
-                        <select name="edit_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                        <select name="edit_gender" id="edit_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
                             <?php
                             $curr_gen = isset($modal_edit_archer['gender']) && in_array($modal_edit_archer['gender'], $genders) ? $modal_edit_archer['gender'] : '';
                             echo '<option value="" disabled ' . (empty($curr_gen) ? 'selected' : '') . ' hidden>Select Gender</option>';
@@ -296,9 +299,9 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
 
-                    <div style="margin-bottom:12px;">
+                    <div style="margin-bottom:12px; position:relative;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name:</label>
-                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <div id="walkin_tfaa_badge"></div>
                         <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
@@ -380,10 +383,33 @@ function sywat_desk_render_modals($data) {
 }
 
 function sywat_desk_render_client_scripts($data) {
+    $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
+    $tfaa_shooters = isset( $tfaa_cache['shooters'] ) && is_array( $tfaa_cache['shooters'] ) 
+        ? $tfaa_cache['shooters'] 
+        : ( is_array( $tfaa_cache ) ? $tfaa_cache : array() );
+
+    $js_tfaa_desk_data = array();
+    foreach ( $tfaa_shooters as $s ) {
+        $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
+        if ( ! empty( $name ) ) {
+            $js_tfaa_desk_data[] = array(
+                'name'     => $name,
+                'division' => isset( $s['division'] ) ? $s['division'] : '',
+                'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
+                'style'    => isset( $s['style'] ) ? $s['style'] : '',
+            );
+        }
+    }
     ?>
     <script>
     const sywatHistory = <?php echo json_encode($data['history_profiles']); ?>;
     const tfaaData     = <?php echo json_encode($data['tfaa_data_bundle']); ?>;
+    const sywatDeskTfaaShooters = <?php echo json_encode( array_values( $js_tfaa_desk_data ) ); ?>;
+
+    function escapeHtmlDesk(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 
     function toggleUnpaidBanner(isChecked) {
         const banner = document.getElementById('sywat_unpaid_warning_banner');
@@ -393,17 +419,33 @@ function sywat_desk_render_client_scripts($data) {
     }
 
     function findTfaaMatch(typedName) {
-        if (!typedName || !tfaaData || !tfaaData.exact) return null;
+        if (!typedName || !tfaaData) return null;
         const clean = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
-        if (!clean) return null;
+        if (!clean || clean.length < 2) return null;
 
-        if (tfaaData.exact[clean]) return tfaaData.exact[clean];
+        if (tfaaData.exact && tfaaData.exact[clean]) return tfaaData.exact[clean];
 
         const parts = clean.split(' ');
         if (parts.length > 1) {
             const flKey = parts[0] + '___' + parts[parts.length - 1];
             if (tfaaData.fl && tfaaData.fl[flKey]) return tfaaData.fl[flKey];
         }
+
+        // Substring partial search across tfaaData.exact dictionary
+        if (tfaaData.exact) {
+            let partialMatches = [];
+            const keys = Object.keys(tfaaData.exact);
+            for (let i = 0; i < keys.length; i++) {
+                if (keys[i].includes(clean)) {
+                    const arr = tfaaData.exact[keys[i]];
+                    if (Array.isArray(arr)) {
+                        partialMatches = partialMatches.concat(arr);
+                    }
+                }
+            }
+            if (partialMatches.length > 0) return partialMatches;
+        }
+
         return null;
     }
 
@@ -420,6 +462,108 @@ function sywat_desk_render_client_scripts($data) {
             if (sywatHistory.fl && sywatHistory.fl[flKey]) return sywatHistory.fl[flKey];
         }
         return null;
+    }
+
+    function matchDeskTfaaSelect(value, selectEl) {
+        if (!value || !selectEl) return;
+        const clean = value.trim().toLowerCase();
+
+        for (let opt of selectEl.options) {
+            if (opt.value && opt.value.trim().toLowerCase() === clean) {
+                selectEl.value = opt.value;
+                return;
+            }
+        }
+
+        for (let opt of selectEl.options) {
+            if (!opt.value) continue;
+            const optLower = opt.value.trim().toLowerCase();
+            if (optLower.includes(clean) || clean.includes(optLower.split(' ')[0])) {
+                selectEl.value = opt.value;
+                return;
+            }
+        }
+    }
+
+    function handleDeskTfaaAutocomplete(input) {
+        const query = input.value.trim().toLowerCase();
+        closeAllDeskTfaaAutocompletes();
+
+        if (query.length < 2) return;
+
+        let matches = [];
+        if (Array.isArray(sywatDeskTfaaShooters) && sywatDeskTfaaShooters.length > 0) {
+            matches = sywatDeskTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
+        } else if (tfaaData && tfaaData.exact) {
+            const keys = Object.keys(tfaaData.exact);
+            for (let i = 0; i < keys.length; i++) {
+                if (keys[i].includes(query)) {
+                    const arr = tfaaData.exact[keys[i]];
+                    if (Array.isArray(arr) && arr.length > 0) {
+                        matches.push({
+                            name: arr[0].full_name || keys[i],
+                            division: arr[0].division || '',
+                            gender: arr[0].gender || '',
+                            style: arr[0].style || ''
+                        });
+                    }
+                    if (matches.length >= 8) break;
+                }
+            }
+        }
+
+        if (matches.length === 0) return;
+
+        const parent = input.parentElement;
+        if (getComputedStyle(parent).position === 'static') {
+            parent.style.position = 'relative';
+        }
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'sywat-desk-tfaa-dropdown';
+        dropdown.style.cssText = 'position:absolute; top:100%; left:0; width:100%; min-width:240px; z-index:99999; background:#fff; border:1px solid #94a3b8; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:180px; overflow-y:auto; margin-top:2px;';
+
+        matches.forEach(m => {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding:7px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:12px; display:flex; justify-content:space-between; align-items:center; color:#1e293b;';
+            item.innerHTML = `<strong>${escapeHtmlDesk(m.name)}</strong> <span style="font-size:11px; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:3px;">${escapeHtmlDesk(m.division || '')}</span>`;
+
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                input.value = m.name;
+                closeAllDeskTfaaAutocompletes();
+
+                const form = input.closest('form');
+                let prefix = 'walkin';
+                if (input.id === 'checkin_archer_name' || input.name === 'checkin_name') {
+                    prefix = 'checkin';
+                } else if (input.id === 'edit_archer_name' || input.name === 'edit_name') {
+                    prefix = 'edit';
+                }
+
+                if (form) {
+                    const divEl   = form.querySelector('select[name="walkin_division"], select[name="checkin_division"], select[name="edit_division"]');
+                    const genEl   = form.querySelector('select[name="walkin_gender"], select[name="checkin_gender"], select[name="edit_gender"]');
+                    const styleEl = form.querySelector('select[name="walkin_style"], select[name="checkin_style"], select[name="edit_style"]');
+
+                    if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
+                    if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
+                    if (styleEl && m.style) matchDeskTfaaSelect(m.style, styleEl);
+                }
+
+                if (typeof autoFillOnNameChange === 'function' && (prefix === 'walkin' || prefix === 'checkin')) {
+                    autoFillOnNameChange(prefix);
+                }
+            });
+
+            dropdown.appendChild(item);
+        });
+
+        parent.appendChild(dropdown);
+    }
+
+    function closeAllDeskTfaaAutocompletes() {
+        document.querySelectorAll('.sywat-desk-tfaa-dropdown').forEach(el => el.remove());
     }
 
     function loadTfaaCategory(prefix, divVal, genVal, styleVal) {
@@ -509,7 +653,7 @@ function sywat_desk_render_client_scripts($data) {
             pillsEl.appendChild(buttonContainer);
         }
 
-        let officialName = tfaaMatches[0].full_name || '';
+        let officialName = tfaaMatches[0].full_name || tfaaMatches[0].name || '';
         let cleanTyped = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
         let cleanOfficial = officialName.trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -596,6 +740,7 @@ function sywat_desk_render_client_scripts($data) {
         toggleFamilyBox('walkin');
         handleStyleRestrictions('walkin');
         evaluateTfaaStatus('walkin');
+        closeAllDeskTfaaAutocompletes();
     }
 
     function openWalkinModal() {
@@ -672,6 +817,18 @@ function sywat_desk_render_client_scripts($data) {
             });
             
             searchInput.dispatchEvent(new Event('input'));
+        }
+    });
+
+    document.addEventListener('input', function(e) {
+        if (e.target && (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name')) {
+            handleDeskTfaaAutocomplete(e.target);
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.sywat-desk-tfaa-dropdown')) {
+            closeAllDeskTfaaAutocompletes();
         }
     });
 
