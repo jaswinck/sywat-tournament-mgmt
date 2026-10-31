@@ -7,6 +7,17 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Safe fallback generator if not defined elsewhere in the plugin
+if ( ! function_exists( 'sywat_generate_unique_tfaa_id' ) ) {
+    function sywat_generate_unique_tfaa_id() {
+        $random_id = mt_rand( 10000, 99999 );
+        while ( ! empty( get_users( array( 'meta_key' => 'sywat_tfaa_number', 'meta_value' => $random_id, 'number' => 1 ) ) ) ) {
+            $random_id = mt_rand( 10000, 99999 );
+        }
+        return (string) $random_id;
+    }
+}
+
 if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
     function sywat_validate_password_rules( $password, $confirm_password ) {
         if ( $password !== $confirm_password ) {
