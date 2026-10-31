@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,8 +56,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <!-- Group Header Information -->
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:4px; margin-bottom:15px;">
                         <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller / Group Name</label>
-                            <input type="text" name="group_name" placeholder="e.g. Smith Family or John Smith" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller Name</label>
+                            <input type="text" name="group_name" id="sywat_group_name" placeholder="e.g. John Smith or Smith Family" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" oninput="handleCallerNameInput(this)">
                         </div>
 
                         <div>
@@ -86,8 +86,10 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <div id="sywat_archer_rows_container">
                         <!-- Archer Row 1 -->
                         <div class="sywat-archer-input-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                            <input type="text" name="archers[0][name]" placeholder="Archer Full Name *" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="recalculateGroupTotal()">
-                            
+                            <div style="flex:2; position:relative;">
+                                <input type="text" name="archers[0][name]" id="sywat_first_archer_name" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
+                            </div>
+
                             <!-- Target Distance Selection -->
                             <select name="archers[0][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                                 <option value="20yd" selected>20yd</option>
