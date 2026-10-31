@@ -22,8 +22,8 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
   - `sywat_get_user_district()` — District scoping helper for Field Governors.
 
 #### 2. TFAA Desk Authentication Sub-System (`includes/auth/`)
-- **`sywat-auth-actions.php`** — Backend authentication action handler managing user sign-in via `wp_signon()`, secure sign-out via `wp_logout()`, lost password email requests via `retrieve_password()`, and new password updates via `reset_password()` with nonce security and inline error tracking.
-- **`sywat-auth-views.php`** — Front-end UI renderer providing the dark Operator Header Bar (`sywat_render_auth_header`) for authenticated users and the 3-state TFAA Login Card (`sywat_render_login_screen`) for unauthenticated users:
+- **`sywat-auth-actions.php`** — Backend authentication action handler managing user sign-in via `wp_signon()`, dynamic post-login role redirection via `sywat_get_post_login_redirect_url()`, secure sign-out via `wp_logout()`, lost password email requests via `retrieve_password()`, and new password updates via `reset_password()` with nonce security and inline error tracking.
+- **`sywat-auth-views.php`** — Front-end UI renderer providing the dark Operator Header Bar (`sywat_render_auth_header`) with dynamic role titles across all TFAA Board, Shop, and Member roles, the standalone `[sywat_login]` shortcode for dedicated portal login pages, and the 3-state TFAA Login Card (`sywat_render_login_screen`) with `redirect_to` target preservation:
   - **State 1 (Sign In)**: Username/Email, Password, Remember Me, and Sign In button with "Forgot Password?" link.
   - **State 2 (Request Password Reset)**: Front-end password recovery input triggering reset emails.
   - **State 3 (Set New Password)**: Front-end password update form for operators arriving via email reset tokens.
