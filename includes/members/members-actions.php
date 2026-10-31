@@ -30,7 +30,9 @@ if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
 
 if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
     function sywat_handle_member_post_actions() {
-        if ( ! isset( $_POST['sywat_member_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_member_nonce'], 'sywat_member_action_nonce' ) ) {
+        // Flexible Nonce Verification for IP / Domain switching
+        $nonce = isset( $_POST['sywat_member_nonce'] ) ? $_POST['sywat_member_nonce'] : '';
+        if ( empty( $nonce ) || ! wp_verify_nonce( $nonce, 'sywat_member_action_nonce' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
         }
 
