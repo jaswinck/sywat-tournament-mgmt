@@ -2,6 +2,8 @@
 /**
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
+ * Author: SYWAT Archery
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -156,16 +158,19 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $distance = $archer['distance'];
                 $name     = $archer['name'];
 
-                // Duplicate check against current registrations
+                // Duplicate check: prevent registering the same archer on the same line twice
                 $is_duplicate = false;
-                foreach ( $registrations as $existing ) {
-                    if ( isset ( $existing['tournament'], $existing['line_index'], $existing['name'], $existing['distance'] ) &&
-                         strcasecmp ( $existing['tournament'], $tourn_name ) === 0 &&
-                         (string)$existing['line_index'] === (string)$l_idx &&
-                         strcasecmp ( trim ( $existing['name'] ), $name ) === 0 &&
-                         strcasecmp ( $existing['distance'], $distance ) === 0 ) {
-                        $is_duplicate = true;
-                        break;
+                if ( function_exists( 'sywat_is_archer_on_line' ) ) {
+                    $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
+                } else {
+                    foreach ( $registrations as $existing ) {
+                        if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'] ) &&
+                             strcasecmp( trim( $existing['tournament'] ), trim( $tourn_name ) ) === 0 &&
+                             (string)$existing['line_index'] === (string)$l_idx &&
+                             strcasecmp( trim( $existing['name'] ), trim( $name ) ) === 0 ) {
+                            $is_duplicate = true;
+                            break;
+                        }
                     }
                 }
 
@@ -218,7 +223,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         update_option( 'sywat_registrations', $registrations, false );
 
         $msg = "Successfully registered {$added_count} archer(s) under '{$family_base_name}'. Total Fee: $" . number_format($overall_fee, 2) . " (Balance Due: $" . number_format($total_balance_due, 2) . ").";
-        if ($skipped_dup > 0) $msg .= " Skipped {$skipped_dup} duplicate(s).";
+        if ($skipped_dup > 0) $msg .= " Skipped {$skipped_dup} duplicate(s) already on this line.";
         if ($skipped_cap > 0) $msg .= " Skipped {$skipped_cap} over-capacity spot(s).";
 
         return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">' . esc_html($msg) . '</div>';
