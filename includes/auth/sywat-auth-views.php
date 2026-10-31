@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.3.0
+ * Version: 1.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -20,7 +20,6 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
 
         // Dynamic page links based on user role capabilities
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
-        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
@@ -39,18 +38,12 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <!-- Center: Primary App Navigation Links -->
                 <nav style="display:flex; align-items:center; gap:8px; margin-left:10px;">
                     <?php if ( $can_manage_tournaments ): ?>
-                        <a href="<?php echo esc_url( site_url( '/tournaments' ) ); ?>" class="sywat-auth-nav-link">
-                            🎯 Tournaments
+                        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link">
+                            🎯 Tournament Management
                         </a>
                     <?php endif; ?>
 
-                    <?php if ( $can_access_desk ): ?>
-                        <a href="<?php echo esc_url( site_url( '/desk' ) ); ?>" class="sywat-auth-nav-link">
-                            📋 Check-In Desk
-                        </a>
-                    <?php endif; ?>
-
-                    <a href="<?php echo esc_url( site_url( '/results' ) ); ?>" class="sywat-auth-nav-link">
+                    <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
                         🏆 Results
                     </a>
                 </nav>
