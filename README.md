@@ -1,10 +1,10 @@
 # SYWAT Archery Tournament Management Plugin
 
-Custom WordPress plugin consolidating multi-tenant shop scoping, tournament administration, check-in operations, score entry, season tracking, public standings, role-based access control, and TFAA data syncing into a unified portal architecture.
+Custom WordPress plugin consolidating multi-tenant shop scoping, tournament administration, check-in operations, score entry, season tracking, public standings, role-based access control, member directories, board management, and TFAA data syncing into a unified portal architecture.
 
 ## Included Structure & Modules
 
-- **`sywat-archery-manager.php`** — Main plugin header, master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
+- **`sywat-archery-manager.php`** — Main plugin header, master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
 - **`assets/css/sywat-admin.css`** — Centralized master stylesheet enforcing uniform button palettes, card containers, centered division headers, left-aligned table data, and high-contrast modal overlays across all portal screens.
 
 ---
@@ -63,7 +63,13 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`scores-scripts.php`** — Client-side JavaScript engine (offline local draft storage, background AJAX auto-save, and input range validation).
 - **`scores-views.php`** — Score entry filter bar with dynamic return navigation bar and batch scoring table UI.
 
-#### 8. Standalone Supporting Modules
+#### 8. Members & Board Roster Sub-System (`includes/members/`)
+- **`class-sywat-members.php`** — Loader shell initializing shortcodes (`[sywat_member_directory]`, `[sywat_board_directory]`) and administrative member management hooks.
+- **`members-helpers.php`** — Resolves user board designations (`tfaa_president`, `tfaa_field_governor`, etc.), maps district assignments (`sywat_tfaa_district`), checks active status, and formats contact info.
+- **`members-actions.php`** — Action handlers for updating member profiles, assigning custom TFAA roles, toggling active/inactive status, and updating TFAA membership numbers.
+- **`members-views.php`** — Public Board of Directors roster with district contact buttons, searchable Member Directory cards, and the administrative Member Management panel (`tab=members`).
+
+#### 9. Standalone Supporting Modules
 - **`class-sywat-roster.php`** — Archer roster management, division/style restriction enforcement, family group assignments, line purges, and high z-index nested edit archer modal overlay (`#sywat_edit_archer_modal`).
 - **`class-sywat-accounting.php`** — Financial accounting engine, 50/50 host/TFAA fee split math, family cap calculations, Zelle Base64 QR code rendering, and printable invoice/roster renderers with dynamic shop metadata.
 - **`class-sywat-tfaa-sync.php`** — TFAA membership verification, web scraping standings cache engine, standalone sync button (`[sywat_tfaa_sync_btn]`), and daily WP-Cron background sync.
