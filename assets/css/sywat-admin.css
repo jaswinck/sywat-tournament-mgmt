@@ -497,19 +497,27 @@
     background-color: #f1f5f9;
 }
 
-/* Desk Authentication Module & Master Top Bar */
+/* Desk Authentication Module & Master Top Bar - Full Width & Mobile Responsive */
 .sywat-auth-bar {
+    width: 100%;
+    background: #0f172a;
+    color: #ffffff;
+    margin: 0 0 20px 0;
+    padding: 8px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
+}
+
+.sywat-auth-bar-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #0f172a;
-    color: #ffffff;
-    padding: 10px 20px;
-    border-radius: 8px;
-    max-width: 1100px;
-    margin: 20px auto;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .sywat-auth-nav-link {
@@ -611,11 +619,35 @@
     text-align: right;
 }
 
-/* Force Hide Astra Theme Header Bar & Navigation */
+/* Mobile Responsiveness & Sub-Tab Touch Scrolling */
+@media (max-width: 768px) {
+    .sywat-auth-bar {
+        padding: 6px 0;
+    }
+    
+    .sywat-auth-bar-inner {
+        padding: 0 12px;
+    }
+    
+    .sywat-nav-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    
+    .sywat-nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Force Hide Astra Theme Header Bar, Navigation & Page Titles */
 #masthead,
 header.site-header,
 .ast-site-title-wrap,
 .site-branding,
-.main-header-bar {
+.main-header-bar,
+.entry-header,
+h1.entry-title {
     display: none !important;
 }
