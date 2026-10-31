@@ -249,6 +249,24 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 </div>
                             </div>
 
+                            <!-- MULTI-ROLE CHECKBOX GRID (ADD MODAL) -->
+                            <?php
+                            global $wp_roles;
+                            $editable_roles = $wp_roles ? $wp_roles->roles : array();
+                            ?>
+                            <div style="margin-bottom: 15px;">
+                                <label style="display:block; font-weight:600; font-size:13px; margin-bottom:8px;">Assign System Role(s) *</label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 150px; overflow-y: auto;">
+                                    <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                        <?php if ( $r_key === 'administrator' ) continue; // Skip admin for safety in member creation ?>
+                                        <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?>>
+                                            <?php echo esc_html( $r_details['name'] ); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 8px;">
                                 <div>
                                     <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Initial Password *</label>
@@ -284,9 +302,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             <div class="sywat-modal-backdrop <?php echo $open_edit_modal ? 'active' : ''; ?>" id="sywat_edit_member_modal">
                 <?php if ( $edit_user_obj ): ?>
                     <?php 
-                        $e_tfaa  = get_user_meta( $edit_user_obj->ID, 'sywat_tfaa_number', true );
-                        $e_phone = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
-                        $e_nfaa  = get_user_meta( $edit_user_obj->ID, 'sywat_is_nfaa_member', true );
+                        $e_tfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_tfaa_number', true );
+                        $e_phone            = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
+                        $e_nfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_is_nfaa_member', true );
+                        $current_user_roles = (array) $edit_user_obj->roles;
                     ?>
                     <div class="sywat-modal-content" style="max-width: 600px;">
                         <div class="sywat-modal-header no-print">
@@ -331,6 +350,20 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <option value="no" <?php selected( $e_nfaa, 'no' ); ?>>No</option>
                                             <option value="yes" <?php selected( $e_nfaa, 'yes' ); ?>>Yes</option>
                                         </select>
+                                    </div>
+                                </div>
+
+                                <!-- MULTI-ROLE CHECKBOX GRID (EDIT MODAL) -->
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display:block; font-weight:600; font-size:13px; margin-bottom:8px;">Assigned System Role(s) *</label>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 150px; overflow-y: auto;">
+                                        <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                            <?php if ( $r_key === 'administrator' && ! current_user_can( 'administrator' ) ) continue; ?>
+                                            <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                                <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $current_user_roles ), true ); ?>>
+                                                <?php echo esc_html( $r_details['name'] ); ?>
+                                            </label>
+                                        <?php endforeach; ?>
                                     </div>
                                 </div>
 
