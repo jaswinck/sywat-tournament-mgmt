@@ -3,6 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -12,7 +13,32 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         $notice = '';
         $action = isset($_POST['sywat_action']) ? sanitize_text_field($_POST['sywat_action']) : '';
 
-        // Save Season Action
+        // Action: Register Shooter Intake Form
+        if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
+            return sywat_handle_register_shooter( $tournaments, $registrations );
+        }
+
+        // Action: Import Shooters (FareHarbor CSV / Raw Text)
+        if ( $action === 'import_shooters' && function_exists( 'sywat_handle_import_shooters' ) ) {
+            return sywat_handle_import_shooters( $tournaments, $registrations );
+        }
+
+        // Action: Save Edited Archer
+        if ( $action === 'save_edit' && function_exists( 'sywat_handle_save_edit' ) ) {
+            return sywat_handle_save_edit( $tournaments, $registrations );
+        }
+
+        // Action: Delete Single Shooter
+        if ( $action === 'delete_shooter' && function_exists( 'sywat_handle_delete_shooter' ) ) {
+            return sywat_handle_delete_shooter( $registrations );
+        }
+
+        // Action: Purge Entire Line
+        if ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
+            return sywat_handle_purge_line( $tournaments, $registrations );
+        }
+
+        // Action: Save Season Configuration
         if ( $action === 'save_season' ) {
             if ( ! $can_manage_seasons ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators and TFAA webmasters can configure seasons.</div>';
