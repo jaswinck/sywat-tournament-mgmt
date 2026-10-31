@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -219,6 +219,21 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
+
+        // Store phone lookup cache for future recall
+        if ( ! empty( $group_phone ) && $added_count > 0 ) {
+            $phone_cache = get_option( 'sywat_shooter_phones_cache', array() );
+            if ( ! is_array( $phone_cache ) ) {
+                $phone_cache = array();
+            }
+            foreach ( $valid_archers as $archer ) {
+                if ( ! empty( $archer['name'] ) ) {
+                    $norm_name = strtolower( trim( $archer['name'] ) );
+                    $phone_cache[$norm_name] = $group_phone;
+                }
+            }
+            update_option( 'sywat_shooter_phones_cache', $phone_cache, false );
+        }
 
         // Store globals so registration-views can render inline alerts & popup dialogs inside the modal
         $GLOBALS['sywat_last_added_count']    = $added_count;
