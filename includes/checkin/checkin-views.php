@@ -47,39 +47,58 @@ function sywat_desk_render_filter_bar($data) {
     // Volunteer Hub is strictly enabled ONLY for active tournaments hosted by Cinnamon Creek Ranch (shop_ccr)
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
     ?>
-    <form method="post" id="sywat_filter_form" class="no-print sywat-card" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; padding:15px; margin-bottom:20px;">
-        <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
-        <div>
-            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Tournament:</label>
-            <select name="selected_tournament" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_filter_form').submit();">
-                <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
-                    <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
-                        <?php echo esc_html($t_name); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+    <div class="sywat-card no-print" style="margin-bottom:20px;">
+        
+        <!-- Master Tournament Sub-Tabs -->
+        <div class="sywat-nav-tabs">
+            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item">
+                📊 Dashboard
+            </a>
+            <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active">
+                📋 Check-In Desk
+            </a>
+            <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item">
+                ✏️ Score Entry
+            </a>
         </div>
 
-        <div>
-            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
-            <select name="selected_line_idx" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_filter_form').submit();">
-                <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
-                <?php foreach ($data['lines'] as $idx => $line): ?>
-                    <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
-                        <?php echo esc_html($line['name']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <!-- Filter Row & Actions -->
+        <form method="post" id="sywat_filter_form" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; background:#f8fafc; padding:15px; border:1px solid #e2e8f0; border-radius:6px; margin-top:15px;">
+            <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
+            
+            <div>
+                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Tournament:</label>
+                <select name="selected_tournament" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
+                        <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
+                            <?php echo esc_html($t_name); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-        <div style="margin-left:auto;">
-            <?php if ($is_hub_enabled): ?>
-                <a href="/sywat-volunteer-hub/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
-            <?php else: ?>
-                <a href="/sywat-manage-tournaments/" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Manage Tournaments</a>
-            <?php endif; ?>
-        </div>
-    </form>
+            <div>
+                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
+                <select name="selected_line_idx" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
+                    <?php foreach ($data['lines'] as $idx => $line): ?>
+                        <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
+                            <?php echo esc_html($line['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="margin-left:auto;">
+                <?php if ($is_hub_enabled): ?>
+                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Volunteer Hub</a>
+                <?php else: ?>
+                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Manage Tournaments</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
+    </div>
     <?php
 }
 
