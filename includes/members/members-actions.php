@@ -57,6 +57,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $confirm_password = isset( $_POST['confirm_password'] ) ? $_POST['confirm_password'] : '';
             $phone            = sanitize_text_field( $_POST['phone'] );
             $is_nfaa          = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
+            $submitted_roles  = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array( 'tfaa_member' );
 
             if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
@@ -88,11 +89,19 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 'first_name'   => $first_name,
                 'last_name'    => $last_name,
                 'display_name' => $first_name . ' ' . $last_name,
-                'role'         => 'tfaa_member',
             ) );
 
             if ( is_wp_error( $user_id ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $user_id->get_error_message() ) . '</div>';
+            }
+
+            // Assign multiple checked roles directly to database user capabilities
+            $new_user_obj = new WP_User( $user_id );
+            if ( $new_user_obj->exists() ) {
+                $new_user_obj->set_role( reset( $submitted_roles ) );
+                foreach ( $submitted_roles as $r_slug ) {
+                    $new_user_obj->add_role( $r_slug );
+                }
             }
 
             update_user_meta( $user_id, 'sywat_tfaa_number', $tfaa_id );
@@ -104,14 +113,15 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 2. UPDATE EXISTING MEMBER PROFILE
         if ( $action === 'update_member' ) {
-            $user_id        = intval( $_POST['target_user_id'] );
-            $first_name     = sanitize_text_field( $_POST['first_name'] );
-            $last_name      = sanitize_text_field( $_POST['last_name'] );
-            $email          = sanitize_email( $_POST['email'] );
-            $phone          = sanitize_text_field( $_POST['phone'] );
-            $is_nfaa        = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
-            $new_pw         = $_POST['new_password'];
-            $confirm_new_pw = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
+            $user_id         = intval( $_POST['target_user_id'] );
+            $first_name      = sanitize_text_field( $_POST['first_name'] );
+            $last_name       = sanitize_text_field( $_POST['last_name'] );
+            $email           = sanitize_email( $_POST['email'] );
+            $phone           = sanitize_text_field( $_POST['phone'] );
+            $is_nfaa         = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
+            $submitted_roles = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array();
+            $new_pw          = $_POST['new_password'];
+            $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
             if ( $user_id > 0 && get_userdata( $user_id ) ) {
                 if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
@@ -133,7 +143,22 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
 
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
+                // Sync multi-role changes to the database user capabilities
+                $user_obj = new WP_User( $user_id );
+                if ( $user_obj->exists() && ! empty( $submitted_roles ) ) {
+                    foreach ( (array) $user_obj->roles as $old_role ) {
+                        if ( ! in_array( $old_role, $submitted_roles, true ) ) {
+                            $user_obj->remove_role( $old_role );
+                        }
+                    }
+                    foreach ( $submitted_roles as $new_role ) {
+                        if ( ! in_array( $new_role, (array) $user_obj->roles, true ) ) {
+                            $user_obj->add_role( $new_role );
+                        }
+                    }
+                }
+
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile and roles updated successfully.</div>';
             }
         }
 
