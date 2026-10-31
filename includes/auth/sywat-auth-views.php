@@ -3,51 +3,23 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.1.1
+ * Version: 1.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Render Header Bar for Logged-In Users with Dynamic TFAA Role Labels
+ * Render Header Bar for Logged-In Users
  */
 if ( ! function_exists( 'sywat_render_auth_header' ) ) {
     function sywat_render_auth_header() {
         if ( ! is_user_logged_in() ) return;
 
         $current_user = wp_get_current_user();
-        $roles        = (array) $current_user->roles;
-
-        // Map system role slugs to official user-facing TFAA labels
-        $role_labels = array(
-            'administrator'              => 'System Administrator',
-            'tfaa_president'             => 'TFAA President',
-            'tfaa_vice_president'        => 'TFAA Vice-President',
-            'tfaa_treasurer'             => 'TFAA Treasurer',
-            'tfaa_secretary'             => 'TFAA Secretary',
-            'tfaa_tournament_director'   => 'Tournament Director',
-            'tfaa_social_media_director' => 'Social Media Director',
-            'tfaa_webmaster'             => 'Webmaster',
-            'tfaa_field_governor'        => 'Field Governor',
-            'sywat_shop_manager'         => 'Shop Manager',
-            'sywat_shop_user'            => 'Shop Operator',
-            'tfaa_member'                => 'TFAA Member',
-        );
-
-        $user_role_label = 'TFAA Member';
-        foreach ( $role_labels as $slug => $label ) {
-            if ( in_array( $slug, $roles, true ) ) {
-                $user_role_label = $label;
-                break;
-            }
-        }
         ?>
         <div class="sywat-auth-bar">
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-size:15px; font-weight:700; color:#38bdf8;">🎯 Texas Field Archery Association</span>
-                <span style="background:#1e293b; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #334155;">
-                    <?php echo esc_html( $user_role_label ); ?>
-                </span>
             </div>
 
             <div style="display:flex; align-items:center; gap:14px;">
