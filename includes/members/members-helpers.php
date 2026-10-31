@@ -17,8 +17,8 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
             : array(
                 'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
                 'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-                'tfaa_webmaster', 'tfaa_field_governor', 'staff_shooter', 'management', 
-                'non-shooting-member', 'sywat_shop_manager', 'sywat_shop_user', 'administrator'
+                'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager', 
+                'sywat_shop_user', 'administrator'
             );
 
         return get_users( array(
