@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.4.0
+ * Version: 1.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -43,7 +43,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         <!-- Dropdown Container -->
                         <div class="sywat-auth-dropdown">
                             <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
-                                🎯 Tournament Management <span style="font-size:10px; margin-left:4px;">▾</span>
+                                🎯 Tournament Management <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
                                 <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>">
@@ -55,7 +55,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                     </a>
                                 <?php endif; ?>
                                 <?php if ( $can_edit_scores ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/sywat-scores/' ) ); ?>">
+                                    <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>">
                                         ✏️ Score Entry
                                     </a>
                                 <?php endif; ?>
