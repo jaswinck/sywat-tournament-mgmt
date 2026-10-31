@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.4.2
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_render_auth_header' ) ) {
     function sywat_render_auth_header() {
-        if ( ! is_user_logged_in() ) return;
+        if ( ! is_user_logged_in() || is_admin() ) return;
 
         $current_user = wp_get_current_user();
         $user_id      = $current_user->ID;
@@ -88,6 +88,8 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         <?php
     }
 }
+// Automatically inject header at top of body on all pages
+add_action( 'wp_body_open', 'sywat_render_auth_header', 5 );
 
 /**
  * Render Custom TFAA Front-End Auth Screen (Sign In, Lost Password, & Set New Password)
@@ -247,7 +249,6 @@ if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
         echo '<div class="sywat-app">';
 
         if ( is_user_logged_in() ) {
-            sywat_render_auth_header();
             $user = wp_get_current_user();
             ?>
             <div class="sywat-card" style="text-align:center; padding:30px; max-width:500px; margin:20px auto;">
