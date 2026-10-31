@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-roster.php
  * Description: Archer editing logic, division/style restrictions, family group assignments, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -38,28 +38,38 @@ if ( ! function_exists( 'sywat_sanitize_style_for_division' ) ) {
 
 if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
     function sywat_handle_save_edit( $tournaments, &$registrations ) {
-        $edit_id       = sanitize_text_field( $_POST['registration_id'] );
-        $tourn_context = sanitize_text_field( $_POST['view_tournament'] );
+        $edit_id       = sanitize_text_field( $_POST['registration_id'] ?? '' );
+        $tourn_context = sanitize_text_field( $_POST['view_tournament'] ?? '' );
         $t_slug        = sanitize_title( $tourn_context );
 
         $opt_key = 'sywat_t_' . $t_slug . '_' . $edit_id;
-        $reg = get_option($opt_key);
+        $reg     = get_option($opt_key);
+
+        // Fallback: search in-memory registrations array if single option doesn't exist
+        if ( ! $reg && ! empty( $registrations ) ) {
+            foreach ( $registrations as $r ) {
+                if ( isset( $r['id'] ) && (string)$r['id'] === (string)$edit_id ) {
+                    $reg = $r;
+                    break;
+                }
+            }
+        }
 
         if ($reg) {
-            $line_idx  = sanitize_text_field($_POST['edit_line_index']);
-            $line_name = isset($tournaments[$tourn_context][$line_idx]['name']) ? $tournaments[$tourn_context][$line_idx]['name'] : 'N/A';
-            $division  = sanitize_text_field($_POST['edit_division']);
+            $line_idx  = sanitize_text_field($_POST['edit_line_index'] ?? '0');
+            $line_name = isset($tournaments[$tourn_context][$line_idx]['name']) ? $tournaments[$tourn_context][$line_idx]['name'] : 'Line ' . ((int)$line_idx + 1);
+            $division  = sanitize_text_field($_POST['edit_division'] ?? '');
             $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
-            $pay_opt   = sanitize_text_field($_POST['edit_pay_option']);
-            $style     = sanitize_text_field($_POST['edit_style']);
+            $pay_opt   = sanitize_text_field($_POST['edit_pay_option'] ?? '');
+            $style     = sanitize_text_field($_POST['edit_style'] ?? '');
             $due_val   = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
 
-            $reg['name']        = sanitize_text_field($_POST['edit_name']);
+            $reg['name']        = sanitize_text_field($_POST['edit_name'] ?? '');
             $reg['line_index']  = $line_idx;
             $reg['line_name']   = $line_name;
             $reg['distance']    = $distance;
             $reg['division']    = $division;
-            $reg['gender']      = sanitize_text_field($_POST['edit_gender']);
+            $reg['gender']      = sanitize_text_field($_POST['edit_gender'] ?? '');
             $reg['style']       = sywat_sanitize_style_for_division($style, $division);
             $reg['paid']        = sywat_calculate_paid_status($pay_opt, $division);
             $reg['balance_due'] = $due_val;
@@ -78,8 +88,10 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 unset($reg['family_name']);
             }
 
+            // 1. Update single option key
             update_option($opt_key, $reg, false);
 
+            // 2. Update memory array
             foreach ($registrations as &$r) {
                 if (isset($r['id']) && (string)$r['id'] === (string)$edit_id) {
                     $r = $reg;
@@ -87,6 +99,13 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 }
             }
             unset($r);
+
+            // 3. Synchronize master tournament array options
+            $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
+            if ( ! is_array( $master_regs ) ) $master_regs = array();
+            $master_regs[$edit_id] = $reg;
+            update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
+            update_option( 'sywat_registrations', $registrations, false );
 
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated archer: <strong>' . esc_html($reg['name']) . '</strong>.</div>';
         }
@@ -96,8 +115,8 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
 
 if ( ! function_exists( 'sywat_handle_delete_shooter' ) ) {
     function sywat_handle_delete_shooter( &$registrations ) {
-        $delete_id     = sanitize_text_field( $_POST['registration_id'] );
-        $tourn_context = sanitize_text_field( $_POST['view_tournament'] );
+        $delete_id     = sanitize_text_field( $_POST['registration_id'] ?? '' );
+        $tourn_context = sanitize_text_field( $_POST['view_tournament'] ?? '' );
         $t_slug        = sanitize_title( $tourn_context );
 
         $deleted_name = '';
@@ -113,29 +132,49 @@ if ( ! function_exists( 'sywat_handle_delete_shooter' ) ) {
         }
 
         $registrations = $new_registrations;
+
+        // Synchronize master array options
+        $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
+        if ( is_array( $master_regs ) && isset( $master_regs[$delete_id] ) ) {
+            unset( $master_regs[$delete_id] );
+            update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
+        }
+        update_option( 'sywat_registrations', $registrations, false );
+
         return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully removed <strong>' . esc_html( $deleted_name ) . '</strong> from the roster.</div>';
     }
 }
 
 if ( ! function_exists( 'sywat_handle_purge_line' ) ) {
     function sywat_handle_purge_line( $tournaments, &$registrations ) {
-        $tourn_name = sanitize_text_field( $_POST['selected_tournament'] );
-        $line_idx   = sanitize_text_field( $_POST['target_line_idx'] );
+        $tourn_name = sanitize_text_field( $_POST['selected_tournament'] ?? '' );
+        $line_idx   = sanitize_text_field( $_POST['target_line_idx'] ?? '' );
         $t_slug     = sanitize_title( $tourn_name );
 
         $line_data = isset( $tournaments[$tourn_name][$line_idx] ) ? $tournaments[$tourn_name][$line_idx] : array();
         $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line ' . ((int)$line_idx + 1);
 
         $purged_count = 0;
+        $master_regs  = get_option( 'sywat_registrations_' . $t_slug, array() );
+        if ( ! is_array( $master_regs ) ) $master_regs = array();
+
         foreach ( $registrations as $k => $reg ) {
             if ( isset( $reg['tournament'], $reg['line_index'] ) && strcasecmp( $reg['tournament'], $tourn_name ) === 0 && (string)$reg['line_index'] === (string)$line_idx ) {
                 delete_option( 'sywat_t_' . $t_slug . '_' . $reg['id'] );
+                if ( isset( $master_regs[$reg['id']] ) ) {
+                    unset( $master_regs[$reg['id']] );
+                }
                 $purged_count++;
                 unset($registrations[$k]);
             }
         }
 
         $registrations = array_values($registrations);
+
+        // Synchronize master array options
+        update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
+        update_option( 'sywat_registrations', $registrations, false );
+
         return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully cleared <strong>' . $purged_count . '</strong> archer(s) from <strong>' . esc_html( $line_name ) . '</strong>.</div>';
     }
 }
