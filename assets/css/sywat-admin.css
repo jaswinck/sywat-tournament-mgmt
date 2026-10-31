@@ -506,9 +506,10 @@
     color: #ffffff;
     padding: 14px 24px;
     border-radius: 8px;
-    margin-top: 24px;
-    margin-bottom: 24px;
+    max-width: 1100px;
+    margin: 24px auto;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
 }
 
 .sywat-auth-nav-link {
