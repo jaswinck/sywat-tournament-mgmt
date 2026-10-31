@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -151,5 +151,44 @@ if ( ! function_exists( 'sywat_get_tournament_season_slug' ) ) {
         }
         $active_season = function_exists('sywat_get_active_season') ? sywat_get_active_season() : array();
         return isset( $active_season['slug'] ) ? $active_season['slug'] : 'indoor-2026-2027';
+    }
+}
+
+// Check if an archer is already registered on a specific line
+if ( ! function_exists( 'sywat_is_archer_on_line' ) ) {
+    function sywat_is_archer_on_line( $t_name, $l_idx, $archer_name, $registrations ) {
+        $norm_target_name = strtolower( trim( $archer_name ) );
+        if ( empty( $norm_target_name ) ) return false;
+
+        foreach ( $registrations as $reg ) {
+            if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( $reg['tournament'] ), trim( $t_name ) ) !== 0 ) {
+                continue;
+            }
+
+            $reg_name = '';
+            if ( ! empty( $reg['name'] ) ) {
+                $reg_name = strtolower( trim( $reg['name'] ) );
+            } elseif ( ! empty( $reg['archer_name'] ) ) {
+                $reg_name = strtolower( trim( $reg['archer_name'] ) );
+            }
+
+            if ( $reg_name === $norm_target_name ) {
+                $match_idx = isset( $reg['line_index'] ) && (string)$reg['line_index'] === (string)$l_idx;
+                $match_name = false;
+                if ( isset( $reg['line_name'] ) && is_string( $l_idx ) && strcasecmp( trim( $reg['line_name'] ), trim( $l_idx ) ) === 0 ) {
+                    $match_name = true;
+                }
+                if ( isset( $reg['line_index'] ) && is_string( $reg['line_index'] ) && ! is_numeric( $reg['line_index'] ) ) {
+                    if ( (string)$reg['line_index'] === (string)$l_idx ) {
+                        $match_name = true;
+                    }
+                }
+
+                if ( $match_idx || $match_name ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
