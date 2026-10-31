@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -42,7 +42,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
             }
         }
         ?>
-        <div class="sywat-auth-bar" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:10px 16px; border-radius:6px; margin-bottom:18px; box-shadow:0 2px 6px rgba(0,0,0,0.1);">
+        <div class="sywat-auth-bar">
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-size:15px; font-weight:700; color:#38bdf8;">🎯 Texas Field Archery Association</span>
                 <span style="background:#1e293b; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:12px; border:1px solid #334155;">
@@ -58,7 +58,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <form method="post" style="margin:0; display:inline;">
                     <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                     <input type="hidden" name="sywat_auth_action" value="logout">
-                    <button type="submit" class="sywat-btn sywat-btn-danger" style="background:#ef4444; color:#fff; border:none; padding:5px 12px; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer;">
+                    <button type="submit" class="sywat-btn sywat-btn-danger">
                         🚪 Log Out
                     </button>
                 </form>
@@ -88,7 +88,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         $current_url   = remove_query_arg( array( 'action', 'key', 'login' ) );
         $lost_pass_url = add_query_arg( 'action', 'lost_password', $current_url );
         ?>
-        <div class="sywat-login-card" style="max-width:400px; margin:40px auto; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.08); overflow:hidden;">
+        <div class="sywat-login-card">
             
             <!-- Card Header -->
             <div style="background:#0f172a; padding:24px 20px; text-align:center; color:#ffffff;">
@@ -100,13 +100,13 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
             <div style="padding:24px; background:#f8fafc;">
                 
                 <?php if ( ! empty( $auth_error ) ): ?>
-                    <div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 12px; border-radius:4px; font-size:13px; font-weight:600; margin-bottom:16px;">
+                    <div class="sywat-alert sywat-alert-danger">
                         ⚠️ <?php echo esc_html( $auth_error ); ?>
                     </div>
                 <?php endif; ?>
 
                 <?php if ( ! empty( $auth_message ) ): ?>
-                    <div class="sywat-alert sywat-alert-success" style="background:#dcfce7; border:1px solid #86efac; color:#166534; padding:10px 12px; border-radius:4px; font-size:13px; font-weight:600; margin-bottom:16px;">
+                    <div class="sywat-alert sywat-alert-success">
                         ✅ <?php echo esc_html( $auth_message ); ?>
                     </div>
                 <?php endif; ?>
@@ -123,10 +123,10 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
                         <div style="margin-bottom:18px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
-                            <input type="text" name="sywat_user_login" required style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:14px; box-sizing:border-box; height:38px;">
+                            <input type="text" name="sywat_user_login" required style="width:100%;">
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%; padding:10px; background:#0284c7; color:#fff; border:none; border-radius:4px; font-size:14px; font-weight:700; cursor:pointer;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
                             Send Reset Link
                         </button>
                     </form>
@@ -151,15 +151,15 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">New Password</label>
-                            <input type="password" name="pass1" required autocomplete="new-password" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:14px; box-sizing:border-box; height:38px;">
+                            <input type="password" name="pass1" required autocomplete="new-password" style="width:100%;">
                         </div>
 
                         <div style="margin-bottom:18px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Confirm New Password</label>
-                            <input type="password" name="pass2" required autocomplete="new-password" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:14px; box-sizing:border-box; height:38px;">
+                            <input type="password" name="pass2" required autocomplete="new-password" style="width:100%;">
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%; padding:10px; background:#0284c7; color:#fff; border:none; border-radius:4px; font-size:14px; font-weight:700; cursor:pointer;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
                             Save New Password
                         </button>
                     </form>
@@ -181,12 +181,12 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
-                            <input type="text" name="sywat_user_login" required autocomplete="username" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:14px; box-sizing:border-box; height:38px;">
+                            <input type="text" name="sywat_user_login" required autocomplete="username" style="width:100%;">
                         </div>
 
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Password</label>
-                            <input type="password" name="sywat_user_pass" required autocomplete="current-password" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:14px; box-sizing:border-box; height:38px;">
+                            <input type="password" name="sywat_user_pass" required autocomplete="current-password" style="width:100%;">
                         </div>
 
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
@@ -195,7 +195,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                             </label>
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%; padding:10px; background:#0284c7; color:#fff; border:none; border-radius:4px; font-size:14px; font-weight:700; cursor:pointer; transition:background 0.2s;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
                             Sign In
                         </button>
                     </form>
