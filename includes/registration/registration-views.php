@@ -1,6 +1,9 @@
 <?php
 /**
  * Sub-Module: Registration Engine Views Renderer
+ * Path: includes/registration/registration-views.php
+ * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,6 +18,11 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         $tourn_shop_id    = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id($tourn_data) : 'shop_ccr';
 
         $can_show_csv_import = ($is_admin && $tourn_shop_id === 'shop_ccr');
+
+        // Persist previously selected line index across form submissions
+        $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
+            ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
+            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
         ?>
         <div class="no-print" style="display:flex; flex-direction:column; gap:20px;">
             
@@ -43,9 +51,11 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
                         <div>
                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Default Shooting Line *</label>
-                            <select name="default_line_idx" id="sywat_default_line_idx" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required onchange="updateAllArcherLines(this.value)">
+                            <select name="default_line_idx" id="sywat_default_line_idx" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required onchange="sessionStorage.setItem('sywat_last_line_idx', this.value); updateAllArcherLines(this.value)">
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
-                                    <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
+                                    <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
+                                        <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -83,7 +93,9 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             <!-- Line Override Selection -->
                             <select name="archers[0][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
-                                    <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
+                                    <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
+                                        <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
 
@@ -126,7 +138,9 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select Target Shooting Line</label>
                                 <select name="target_line_idx" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required>
                                     <?php foreach ( $available_lines as $idx => $line ): ?>
-                                        <option value="<?php echo esc_attr( $idx ); ?>"><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
+                                        <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
+                                            <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                        </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -202,6 +216,22 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 </table>
             </div>
         </div>
+
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const defaultLineSelect = document.getElementById('sywat_default_line_idx');
+            if (defaultLineSelect) {
+                const savedLine = sessionStorage.getItem('sywat_last_line_idx');
+                const hasPhpSelection = <?php echo ( isset($_REQUEST['default_line_idx']) || isset($_REQUEST['target_line_idx']) ) ? 'true' : 'false'; ?>;
+                if (savedLine !== null && !hasPhpSelection && defaultLineSelect.querySelector('option[value="' + savedLine + '"]')) {
+                    defaultLineSelect.value = savedLine;
+                    if (typeof updateAllArcherLines === 'function') {
+                        updateAllArcherLines(savedLine);
+                    }
+                }
+            }
+        });
+        </script>
         <?php
         // Render Client Scripts
         if ( function_exists( 'sywat_render_registration_scripts' ) ) {
