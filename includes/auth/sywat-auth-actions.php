@@ -1,13 +1,41 @@
 <?php
 /**
- * Sub-Module: TFAA Authentication Actions Handler
+ * Sub-Module: TFAA Authentication Actions & Routing Handler
  * Path: includes/auth/sywat-auth-actions.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Resolve post-login destination URL based on user role or explicit redirect target.
+ */
+if ( ! function_exists( 'sywat_get_post_login_redirect_url' ) ) {
+    function sywat_get_post_login_redirect_url( $user ) {
+        // 1. If user was attempting to access a specific protected page, respect that destination
+        if ( ! empty( $_REQUEST['redirect_to'] ) ) {
+            return esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) );
+        }
+
+        // 2. Administrators, TFAA Board Members, Directors & Shop Managers -> Tournaments Admin Page
+        if ( function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user->ID ) ) {
+            return site_url( '/tournaments' );
+        }
+
+        // 3. Shop Operators -> Check-In Desk Page
+        if ( function_exists( 'sywat_user_has_any_role' ) && sywat_user_has_any_role( array( 'sywat_shop_user' ), $user->ID ) ) {
+            return site_url( '/desk' );
+        }
+
+        // 4. Default: Standard TFAA Members & All Other Roles -> Main Site Homepage
+        return home_url();
+    }
+}
+
+/**
+ * Handle Authentication Post Requests (Login, Logout, Lost Password, Reset Password)
+ */
 if ( ! function_exists( 'sywat_handle_auth_actions' ) ) {
     function sywat_handle_auth_actions() {
         if ( ! isset( $_REQUEST['sywat_auth_action'] ) ) {
@@ -20,7 +48,7 @@ if ( ! function_exists( 'sywat_handle_auth_actions' ) ) {
         if ( $action === 'logout' ) {
             if ( check_admin_referer( 'sywat_auth_action', 'sywat_auth_nonce' ) ) {
                 wp_logout();
-                $redirect = remove_query_arg( array( 'sywat_auth_action', 'sywat_auth_nonce', 'action', 'key', 'login' ) );
+                $redirect = remove_query_arg( array( 'sywat_auth_action', 'sywat_auth_nonce', 'action', 'key', 'login', 'redirect_to' ) );
                 wp_safe_redirect( $redirect );
                 exit;
             }
@@ -56,8 +84,8 @@ if ( ! function_exists( 'sywat_handle_auth_actions' ) ) {
                 wp_set_current_user( $user->ID );
                 wp_set_auth_cookie( $user->ID, $remember );
                 
-                $redirect = remove_query_arg( array( 'sywat_auth_action', 'sywat_auth_nonce', 'action', 'key', 'login' ) );
-                wp_safe_redirect( $redirect );
+                $redirect_url = sywat_get_post_login_redirect_url( $user );
+                wp_safe_redirect( $redirect_url );
                 exit;
             }
         }
@@ -114,7 +142,7 @@ if ( ! function_exists( 'sywat_handle_auth_actions' ) ) {
             } else {
                 reset_password( $user, $pass1 );
                 $GLOBALS['sywat_auth_message'] = 'Your password has been reset. You may now sign in.';
-                $_GET['action'] = ''; // Clear action view parameter
+                $_GET['action'] = ''; // Clear action view state
             }
         }
     }
