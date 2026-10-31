@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.7.0
+ * Version: 1.7.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -252,6 +252,12 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
  */
 if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
     function sywat_render_login_shortcode() {
+        // Prevent page cache plugins (LiteSpeed, WP Rocket, Nginx, etc.) from caching this rendered view
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+        nocache_headers();
+
         ob_start();
         echo '<div class="sywat-app">';
 
