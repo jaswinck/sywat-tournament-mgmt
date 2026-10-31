@@ -3,14 +3,15 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.8.2
+ * Version: 2.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
     function sywat_render_registration_scripts() {
-        $tfaa_cache  = get_option( 'sywat_tfaa_cache', array() );
+        $tfaa_cache   = get_option( 'sywat_tfaa_cache', array() );
+        $phone_cache  = get_option( 'sywat_shooter_phones_cache', array() );
         $js_tfaa_data = array();
 
         // Extract shooter profiles robustly regardless of DB cache structure
@@ -61,11 +62,22 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
         ?>
         <script>
         const sywatTfaaShooters = <?php echo json_encode( array_values($js_tfaa_data) ); ?>;
+        const sywatPhoneCache   = <?php echo json_encode( is_array($phone_cache) ? $phone_cache : array() ); ?>;
         let archerRowCount = 1;
 
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function checkAndFillPhone(archerName) {
+            if (!archerName || typeof sywatPhoneCache !== 'object') return;
+            const cleanName = archerName.trim().toLowerCase();
+            const phoneInput = document.getElementById('sywat_group_phone');
+            if (phoneInput && !phoneInput.value && sywatPhoneCache[cleanName]) {
+                phoneInput.value = sywatPhoneCache[cleanName];
+                formatPhoneNumber(phoneInput);
+            }
         }
 
         function handleCallerNameInput(callerInput) {
@@ -77,6 +89,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                 handleTfaaAutocomplete(firstArcherInput);
                 recalculateGroupTotal();
             }
+            checkAndFillPhone(callerInput.value);
         }
 
         function handleArcherNameInput(archerInput) {
@@ -90,13 +103,13 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
             handleTfaaAutocomplete(archerInput);
             recalculateGroupTotal();
+            checkAndFillPhone(archerInput.value);
         }
 
         function matchTfaaDivision(tfaaDiv, selectEl) {
             if (!tfaaDiv || !selectEl) return;
             const cleanTfaa = tfaaDiv.trim().toLowerCase();
 
-            // Exact match check
             for (let opt of selectEl.options) {
                 if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
                     selectEl.value = opt.value;
@@ -105,7 +118,6 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                 }
             }
 
-            // Base category keyword match (e.g. "Adult" -> "Adult (18 - 49)", "Silver Senior" -> "Silver Senior (60 - 69)")
             const tfaaBaseName = cleanTfaa.split(' (')[0].trim();
 
             for (let opt of selectEl.options) {
@@ -131,7 +143,6 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
 
             const matches = sywatTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
 
-            // Auto-populate division immediately on exact or unique match
             const exactMatch = sywatTfaaShooters.find(s => s.name && s.name.trim().toLowerCase() === query);
             const targetMatch = exactMatch || (matches.length === 1 ? matches[0] : null);
 
@@ -173,6 +184,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                             matchTfaaDivision(m.division, divSelect);
                         }
                     }
+                    checkAndFillPhone(m.name);
                     recalculateGroupTotal();
                 });
 
