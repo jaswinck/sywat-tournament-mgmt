@@ -497,28 +497,31 @@
     background-color: #f1f5f9;
 }
 
-/* Desk Authentication Module & Top Bar */
+/* Desk Authentication Module & Master Top Bar */
 .sywat-auth-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: #0f172a;
     color: #ffffff;
-    padding: 14px 24px;
+    padding: 10px 20px;
     border-radius: 8px;
     max-width: 1100px;
-    margin: 24px auto;
+    margin: 20px auto;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
 }
 
 .sywat-auth-nav-link {
     color: #e2e8f0;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    padding: 8px 14px;
+    padding: 6px 12px;
     border-radius: 6px;
+    white-space: nowrap !important;
+    display: inline-flex;
+    align-items: center;
     transition: background 0.2s ease, color 0.2s ease;
 }
 
@@ -535,8 +538,8 @@
 
 .sywat-dropdown-caret {
     display: inline-block;
-    font-size: 11px;
-    margin-left: 6px;
+    font-size: 10px;
+    margin-left: 5px;
     color: #38bdf8;
     transition: transform 0.2s ease, color 0.2s ease;
 }
@@ -568,6 +571,7 @@
     display: block;
     font-size: 13px;
     font-weight: 600;
+    white-space: nowrap !important;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
