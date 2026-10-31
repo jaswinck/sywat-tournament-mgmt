@@ -536,3 +536,12 @@
 .sywat-table th[style*="text-align:right"] {
     text-align: right;
 }
+
+/* Force Hide Astra Theme Header Bar & Navigation */
+#masthead,
+header.site-header,
+.ast-site-title-wrap,
+.site-branding,
+.main-header-bar {
+    display: none !important;
+}
