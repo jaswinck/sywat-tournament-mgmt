@@ -526,6 +526,46 @@
     color: #38bdf8;
 }
 
+/* Auth Header Hover Dropdown Menu */
+.sywat-auth-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.sywat-auth-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #0f172a;
+    min-width: 210px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 0;
+    z-index: 99999;
+    margin-top: 4px;
+}
+
+.sywat-auth-dropdown-menu a {
+    color: #e2e8f0;
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sywat-auth-dropdown-menu a:hover {
+    background-color: #1e293b;
+    color: #38bdf8;
+}
+
+.sywat-auth-dropdown:hover .sywat-auth-dropdown-menu {
+    display: block;
+}
+
 .sywat-login-card {
     max-width: 420px;
     margin: 40px auto;
