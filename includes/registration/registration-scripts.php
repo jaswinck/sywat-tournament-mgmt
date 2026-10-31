@@ -3,16 +3,112 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
     function sywat_render_registration_scripts() {
+        $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
+        $tfaa_shooters = isset( $tfaa_cache['shooters'] ) && is_array( $tfaa_cache['shooters'] ) 
+            ? $tfaa_cache['shooters'] 
+            : ( is_array( $tfaa_cache ) ? $tfaa_cache : array() );
+
+        $js_tfaa_data = array();
+        foreach ( $tfaa_shooters as $s ) {
+            $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
+            if ( ! empty( $name ) ) {
+                $js_tfaa_data[] = array(
+                    'name'     => $name,
+                    'division' => isset( $s['division'] ) ? $s['division'] : '',
+                    'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
+                    'style'    => isset( $s['style'] ) ? $s['style'] : '',
+                );
+            }
+        }
         ?>
         <script>
+        const sywatTfaaShooters = <?php echo json_encode( array_values($js_tfaa_data) ); ?>;
         let archerRowCount = 1;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function matchTfaaDivision(tfaaDiv, selectEl) {
+            if (!tfaaDiv || !selectEl) return;
+            const cleanTfaa = tfaaDiv.trim().toLowerCase();
+
+            for (let opt of selectEl.options) {
+                if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
+                    selectEl.value = opt.value;
+                    selectEl.dataset.userChosen = 'true';
+                    return;
+                }
+            }
+
+            for (let opt of selectEl.options) {
+                if (!opt.value) continue;
+                const optLower = opt.value.trim().toLowerCase();
+                if (optLower.includes(cleanTfaa) || cleanTfaa.includes(optLower.split(' ')[0])) {
+                    selectEl.value = opt.value;
+                    selectEl.dataset.userChosen = 'true';
+                    return;
+                }
+            }
+        }
+
+        function handleTfaaAutocomplete(input) {
+            const query = input.value.trim().toLowerCase();
+            closeAllTfaaAutocompletes();
+
+            if (query.length < 2 || !Array.isArray(sywatTfaaShooters) || sywatTfaaShooters.length === 0) {
+                return;
+            }
+
+            const matches = sywatTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
+            if (matches.length === 0) return;
+
+            const parent = input.parentElement;
+            if (getComputedStyle(parent).position === 'static') {
+                parent.style.position = 'relative';
+            }
+
+            const dropdown = document.createElement('div');
+            dropdown.className = 'sywat-tfaa-autocomplete-dropdown';
+            dropdown.style.cssText = 'position:absolute; top:100%; left:0; width:100%; min-width:220px; z-index:99999; background:#fff; border:1px solid #94a3b8; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:180px; overflow-y:auto; margin-top:2px;';
+
+            matches.forEach(m => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:6px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:12px; display:flex; justify-content:space-between; align-items:center; color:#1e293b;';
+                item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span style="font-size:11px; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:3px;">${escapeHtml(m.division || '')}</span>`;
+
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    input.value = m.name;
+                    closeAllTfaaAutocompletes();
+
+                    const row = input.closest('.sywat-archer-input-row');
+                    if (row) {
+                        const divSelect = row.querySelector('.sywat-division-select');
+                        if (divSelect && m.division) {
+                            matchTfaaDivision(m.division, divSelect);
+                        }
+                    }
+                    recalculateGroupTotal();
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            parent.appendChild(dropdown);
+        }
+
+        function closeAllTfaaAutocompletes() {
+            document.querySelectorAll('.sywat-tfaa-autocomplete-dropdown').forEach(el => el.remove());
+        }
 
         function formatPhoneNumber(input) {
             let digits = input.value.replace(/\D/g, '');
@@ -75,7 +171,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
 
             rowDiv.innerHTML = `
-                <input type="text" name="archers[${archerRowCount}][name]" placeholder="Archer Full Name *" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="recalculateGroupTotal()">
+                <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleTfaaAutocomplete(this); recalculateGroupTotal();">
                 
                 <select name="archers[${archerRowCount}][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                     <option value="20yd" selected>20yd</option>
@@ -119,7 +215,6 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             const rows = document.querySelectorAll('.sywat-archer-input-row');
             const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
 
-            // Group rows by line_idx for per-line family capping
             const lineMap = {};
 
             rows.forEach(row => {
@@ -180,6 +275,18 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
 
             if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
         }
+
+        document.addEventListener('input', function(e) {
+            if (e.target && e.target.name && e.target.name.includes('[name]')) {
+                handleTfaaAutocomplete(e.target);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && (!e.target.name || !e.target.name.includes('[name]'))) {
+                closeAllTfaaAutocompletes();
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             const defaultLineSelect = document.getElementById('sywat_default_line_idx');
