@@ -1,11 +1,50 @@
-/* SYWAT Archery - Master Admin Stylesheet */
+/* SYWAT / TFAA Archery - Master Admin & Desk Stylesheet */
 
-/* Layout & Containers */
-.sywat-wrap {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+/* Layout & Master Containers */
+.sywat-wrap,
+.sywat-app {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     color: #2c3338;
     max-width: 1100px;
     margin: 0 auto;
+    box-sizing: border-box;
+}
+
+/* Form Inputs & Elements Theme Isolation */
+.sywat-wrap input[type="text"],
+.sywat-wrap input[type="tel"],
+.sywat-wrap input[type="number"],
+.sywat-wrap input[type="password"],
+.sywat-wrap select,
+.sywat-wrap textarea,
+.sywat-app input[type="text"],
+.sywat-app input[type="tel"],
+.sywat-app input[type="number"],
+.sywat-app input[type="password"],
+.sywat-app select,
+.sywat-app textarea {
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 13px;
+    color: #1e293b;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 6px 10px;
+    height: 32px;
+    line-height: 1.2;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sywat-wrap input:focus,
+.sywat-wrap select:focus,
+.sywat-wrap textarea:focus,
+.sywat-app input:focus,
+.sywat-app select:focus,
+.sywat-app textarea:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
 }
 
 /* Card Containers */
@@ -40,7 +79,7 @@
     margin-bottom: 15px;
 }
 
-/* Navigation Tabs (Restored Original Style) */
+/* Navigation Tabs */
 .sywat-nav-tabs {
     display: flex;
     border-bottom: 1px solid #c3c4c7;
@@ -94,7 +133,7 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Primary & Secondary Action Buttons (White BG, Blue Border, Solid Blue Hover) */
+/* Primary & Secondary Action Buttons */
 .sywat-btn-primary,
 .sywat-btn-secondary {
     background-color: #ffffff;
@@ -108,7 +147,7 @@
     color: #ffffff !important;
 }
 
-/* Success / Add / Check-In Button (White BG, Green Border, Solid Green Hover) */
+/* Success / Add / Check-In Button */
 .sywat-btn-success {
     background-color: #ffffff;
     border: 1px solid #008a20;
@@ -120,7 +159,7 @@
     color: #ffffff !important;
 }
 
-/* Danger / Delete / Purge Button (White BG, Red Border, Solid Red Hover) */
+/* Danger / Delete / Purge Button */
 .sywat-btn-danger {
     background-color: #ffffff;
     border: 1px solid #dc3545;
@@ -132,7 +171,7 @@
     color: #ffffff !important;
 }
 
-/* Checked-In Active Indicator Button (Soft Muted Green Fill) */
+/* Checked-In Active Indicator Button */
 .sywat-btn-checkedin {
     background-color: #d4edda;
     border: 1px solid #c3e6cb;
@@ -144,7 +183,7 @@
     color: #155724 !important;
 }
 
-/* Push Standings Action Button (White BG, Slate Border, Solid Slate Hover) */
+/* Push Standings Action Button */
 .sywat-btn-push {
     background-color: #ffffff;
     border: 1px solid #475569;
@@ -156,7 +195,7 @@
     color: #ffffff !important;
 }
 
-/* Standings Live Indicator Button (White BG, Green Border, Solid Green Hover) */
+/* Standings Live Indicator Button */
 .sywat-btn-live {
     background-color: #ffffff;
     border: 1px solid #008a20;
@@ -168,7 +207,7 @@
     color: #ffffff !important;
 }
 
-/* Gray Button (Muted Dark Neutral) */
+/* Gray Button */
 .sywat-btn-gray {
     background-color: #6c757d;
     border: 1px solid #6c757d;
@@ -192,7 +231,7 @@
     max-width: 130px;
 }
 
-/* Tab & Button Icon Utilities (Controlled via CSS ::before Pseudo-elements) */
+/* Tab & Button Icons */
 .sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
 .sywat-tab-icon-member::before     { content: "👤\00a0"; }
 .sywat-tab-icon-board::before      { content: "🏛️\00a0"; }
@@ -252,7 +291,7 @@
     border: 1px solid #f5c6cb;
 }
 
-/* Alert Banners */
+/* Alert Banners & Notifications */
 .sywat-alert {
     padding: 10px 15px;
     border-radius: 4px;
@@ -411,7 +450,6 @@
     margin-bottom: 5px;
 }
 
-/* Left-Aligned, High-Contrast Style Sub-Header */
 .sywat-style-header {
     margin: 0 0 12px 0;
     font-size: 14px;
@@ -427,13 +465,66 @@
     text-align: left;
 }
 
-/* Ensure nested edit archer modal overlays display above primary modals */
+/* TFAA Live Autocomplete Dropdown */
+.sywat-tfaa-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    min-width: 220px;
+    z-index: 99999;
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+.sywat-tfaa-autocomplete-dropdown > div {
+    padding: 6px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1e293b;
+}
+
+.sywat-tfaa-autocomplete-dropdown > div:hover {
+    background-color: #f1f5f9;
+}
+
+/* Desk Authentication Module & Top Bar */
+.sywat-auth-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.sywat-login-card {
+    max-width: 400px;
+    margin: 40px auto;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
 #sywat_edit_archer_modal,
 .sywat-modal-backdrop.sywat-nested-modal {
     z-index: 100050 !important;
 }
 
-/* Retain explicit center and right alignments for numeric/action headers */
 .sywat-table th.text-center,
 .sywat-table th[style*="text-align: center"],
 .sywat-table th[style*="text-align:center"] {
