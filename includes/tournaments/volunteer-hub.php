@@ -3,6 +3,7 @@
  * Sub-Module: Volunteer Hub Portal View Renderer
  * Path: includes/tournaments/volunteer-hub.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -37,11 +38,17 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
 
         $registrations = array();
         $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
-        foreach ($results as $row) {
-            $reg_data = maybe_unserialize($row->option_value);
-            if (is_array($reg_data) && isset($reg_data['id'])) {
-                $registrations[] = $reg_data;
+        if ( is_array( $results ) ) {
+            foreach ($results as $row) {
+                $reg_data = maybe_unserialize($row->option_value);
+                if (is_array($reg_data) && isset($reg_data['id'])) {
+                    $registrations[] = $reg_data;
+                }
             }
+        }
+
+        if ( empty( $registrations ) && function_exists( 'sywat_get_registrations' ) ) {
+            $registrations = sywat_get_registrations();
         }
 
         $count_checked_in = function( $t_name, $l_idx ) use ( &$registrations ) {
