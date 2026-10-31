@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -105,7 +105,9 @@ function sywat_desk_handle_actions(&$data) {
         }
 
         if ($is_duplicate) {
-            return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Blocked!</strong> <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>';
+            $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js($name_val) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
+            return '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ Walk-In Blocked! <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
+                   '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
         }
 
         $new_id    = uniqid('reg_');
@@ -254,14 +256,39 @@ function sywat_desk_handle_actions(&$data) {
         $reg       = get_option($opt_key);
         
         if ($reg) {
+            $edit_name = trim(sanitize_text_field($_POST['edit_name']));
             $line_idx  = sanitize_text_field($_POST['edit_line_index']);
+            $orig_name = isset($reg['name']) ? trim($reg['name']) : '';
+            $orig_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
+
+            // Duplicate check if archer name or line is edited to match an existing registrant on that line
+            if ( (strcasecmp($orig_name, $edit_name) !== 0 || (string)$orig_line !== (string)$line_idx) ) {
+                $dupe_found = false;
+                foreach ($registrations as $other) {
+                    if (isset($other['id']) && $other['id'] === $target_id) continue;
+                    if (isset($other['tournament'], $other['line_index'], $other['name']) &&
+                        strcasecmp(trim($other['tournament']), trim($selected_tournament)) === 0 &&
+                        (string)$other['line_index'] === (string)$line_idx &&
+                        strcasecmp(trim($other['name']), trim($edit_name)) === 0) {
+                        $dupe_found = true;
+                        break;
+                    }
+                }
+
+                if ($dupe_found) {
+                    $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js($edit_name) . ' is already registered on this shooting line.';
+                    return '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ Edit Blocked! <strong>' . esc_html($edit_name) . '</strong> is already registered on this shooting line.</div>' .
+                           '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
+                }
+            }
+
             $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
             $division  = sanitize_text_field($_POST['edit_division']);
             $distance  = ($division === 'Cub (8 - 11)' || $division === 'No Show') ? 'Cub' : '20yd';
             $pay_opt   = sanitize_text_field($_POST['edit_pay_option']);
             $style     = sanitize_text_field($_POST['edit_style']);
 
-            $reg['name']        = sanitize_text_field($_POST['edit_name']);
+            $reg['name']        = $edit_name;
             $reg['line_index']  = $line_idx;
             $reg['line_name']   = $line_name;
             $reg['distance']    = $distance;
