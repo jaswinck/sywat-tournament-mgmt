@@ -14,12 +14,21 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             return '<div class="sywat-wrap" style="max-width: 600px; margin: 20px auto;"><div class="sywat-alert sywat-alert-danger">Access denied. Member management is restricted to authorized TFAA Officers and Administrators.</div></div>';
         }
 
-        $notice = '';
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_member_action'] ) ) {
-            $notice = sywat_handle_member_post_actions();
+        $notice     = '';
+        $subtab     = isset( $_REQUEST['subtab'] ) ? sanitize_text_field( $_REQUEST['subtab'] ) : 'directory';
+
+        // POST Action Handling (Aligned with Tournament Portal Pattern)
+        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) );
+        $action         = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+
+        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce ) {
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
+        } elseif ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
+            if ( function_exists( 'sywat_handle_member_post_actions' ) ) {
+                $notice = sywat_handle_member_post_actions();
+            }
         }
 
-        $subtab              = isset( $_REQUEST['subtab'] ) ? sanitize_text_field( $_REQUEST['subtab'] ) : 'directory';
         $all_members         = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
         $board_members       = function_exists( 'sywat_get_all_board_members' ) ? sywat_get_all_board_members() : array();
         $all_board_positions = function_exists( 'sywat_get_tfaa_board_positions_list' ) ? sywat_get_tfaa_board_positions_list() : array();
@@ -28,8 +37,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         $edit_user_obj   = ( $edit_target_id > 0 ) ? get_userdata( $edit_target_id ) : null;
         $open_edit_modal = ( $edit_user_obj !== null );
 
-        $edit_board_id       = isset( $_REQUEST['edit_board_id'] ) ? intval( $_REQUEST['edit_board_id'] ) : 0;
-        $edit_board_user_obj = ( $edit_board_id > 0 ) ? get_userdata( $edit_board_id ) : null;
+        $edit_board_id         = isset( $_REQUEST['edit_board_id'] ) ? intval( $_REQUEST['edit_board_id'] ) : 0;
+        $edit_board_user_obj   = ( $edit_board_id > 0 ) ? get_userdata( $edit_board_id ) : null;
         $open_edit_board_modal = ( $edit_board_user_obj !== null );
 
         ob_start();
@@ -101,9 +110,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
                                                 <a href="?tab=members&subtab=board&edit_board_id=<?php echo $bm->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px; height: 26px;">Edit</a>
                                                 <?php if ( function_exists( 'sywat_can_manage_board' ) && sywat_can_manage_board() ): ?>
-                                                    <form method="post" action="" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove \'<?php echo esc_js( $bm->display_name ); ?>\' from the Board of Directors?');">
-                                                        <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                                                        <input type="hidden" name="sywat_member_action" value="remove_board_member">
+                                                    <form method="post" action="?tab=members&subtab=board" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove \'<?php echo esc_js( $bm->display_name ); ?>\' from the Board of Directors?');">
+                                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_action" value="remove_board_member">
                                                         <input type="hidden" name="target_user_id" value="<?php echo $bm->ID; ?>">
                                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="font-size: 11px; padding: 3px 8px; height: 26px;">Remove</button>
                                                     </form>
@@ -177,9 +186,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
                                                 <a href="?tab=members&subtab=directory&edit_member_id=<?php echo $m->ID; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="font-size: 11px; padding: 3px 8px; height: 26px;">Edit</a>
                                                 <?php if ( get_current_user_id() !== $m->ID ): ?>
-                                                    <form method="post" action="" style="margin: 0;" onsubmit="return confirm('Are you sure you want to permanently delete member \'<?php echo esc_js( $m->display_name ); ?>\'? This action cannot be undone.');">
-                                                        <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                                                        <input type="hidden" name="sywat_member_action" value="delete_member">
+                                                    <form method="post" action="?tab=members&subtab=directory" style="margin: 0;" onsubmit="return confirm('Are you sure you want to permanently delete member \'<?php echo esc_js( $m->display_name ); ?>\'? This action cannot be undone.');">
+                                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_action" value="delete_member">
                                                         <input type="hidden" name="target_user_id" value="<?php echo $m->ID; ?>">
                                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="font-size: 11px; padding: 3px 8px; height: 26px;">Delete</button>
                                                     </form>
@@ -202,9 +211,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <button type="button" class="sywat-modal-close" onclick="sywatCloseAddMemberModal()">&times;</button>
                     </div>
                     <div class="sywat-modal-body">
-                        <form method="post" action="">
-                            <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                            <input type="hidden" name="sywat_member_action" value="create_member">
+                        <form method="post" action="?tab=members&subtab=directory">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="create_member">
 
                             <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 12px; color: #1e3a8a;">
                                 🆔 <strong>TFAA Member ID & Username:</strong> Username is auto-formatted as <code>Firstname.Lastname</code> and Member ID is auto-generated sequentially.
@@ -285,9 +294,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <button type="button" class="sywat-modal-close" onclick="sywatCloseEditMemberModal()">&times;</button>
                         </div>
                         <div class="sywat-modal-body">
-                            <form method="post" action="">
-                                <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                                <input type="hidden" name="sywat_member_action" value="update_member">
+                            <form method="post" action="?tab=members&subtab=directory">
+                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                <input type="hidden" name="sywat_action" value="update_member">
                                 <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
 
                                 <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px; color: #334155; display: flex; justify-content: space-between;">
@@ -365,9 +374,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <button type="button" class="sywat-modal-close" onclick="sywatCloseAddBoardModal()">&times;</button>
                     </div>
                     <div class="sywat-modal-body">
-                        <form method="post" action="">
-                            <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                            <input type="hidden" name="sywat_member_action" value="save_board_member">
+                        <form method="post" action="?tab=members&subtab=board">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="save_board_member">
 
                             <div style="margin-bottom: 15px;">
                                 <label style="display:block; font-weight:600; font-size:13px; margin-bottom:5px;">Select Member *</label>
@@ -413,9 +422,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <button type="button" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</button>
                         </div>
                         <div class="sywat-modal-body">
-                            <form method="post" action="">
-                                <?php wp_nonce_field( 'sywat_member_action_nonce', 'sywat_member_nonce' ); ?>
-                                <input type="hidden" name="sywat_member_action" value="save_board_member">
+                            <form method="post" action="?tab=members&subtab=board">
+                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                <input type="hidden" name="sywat_action" value="save_board_member">
                                 <input type="hidden" name="board_user_id" value="<?php echo $edit_board_user_obj->ID; ?>">
 
                                 <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px; color: #334155; display: flex; justify-content: space-between;">
