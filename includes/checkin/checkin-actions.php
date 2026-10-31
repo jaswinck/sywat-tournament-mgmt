@@ -1,6 +1,9 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Actions Handler
+ * Path: includes/checkin/checkin-actions.php
+ * Author: SYWAT Archery
+ * Version: 2.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -78,14 +81,39 @@ function sywat_desk_handle_actions(&$data) {
 
     // Add Walk-In
     if ($action === 'add_walkin') {
-        $new_id    = uniqid('reg_');
+        $name_val  = trim(sanitize_text_field($_POST['walkin_name']));
         $line_idx  = sanitize_text_field($_POST['walkin_line_index']);
+
+        if (empty($name_val)) {
+            return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
+        }
+
+        // Duplicate check: prevent registering the same archer on the same line twice
+        $is_duplicate = false;
+        if (function_exists('sywat_is_archer_on_line')) {
+            $is_duplicate = sywat_is_archer_on_line($selected_tournament, $line_idx, $name_val, $registrations);
+        } else {
+            foreach ($registrations as $r) {
+                if (isset($r['tournament'], $r['line_index'], $r['name']) &&
+                    strcasecmp(trim($r['tournament']), trim($selected_tournament)) === 0 &&
+                    (string)$r['line_index'] === (string)$line_idx &&
+                    strcasecmp(trim($r['name']), trim($name_val)) === 0) {
+                    $is_duplicate = true;
+                    break;
+                }
+            }
+        }
+
+        if ($is_duplicate) {
+            return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Blocked!</strong> <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>';
+        }
+
+        $new_id    = uniqid('reg_');
         $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
         $division  = sanitize_text_field($_POST['walkin_division']);
         $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
         $pay_opt   = sanitize_text_field($_POST['walkin_pay_option']);
         $style     = sanitize_text_field($_POST['walkin_style']);
-        $name_val  = sanitize_text_field($_POST['walkin_name']);
 
         $family_id = ''; $family_name = '';
 
@@ -134,6 +162,13 @@ function sywat_desk_handle_actions(&$data) {
 
         update_option('sywat_t_' . $active_t_slug . '_' . $new_id, $new_reg, false);
         $registrations[] = $new_reg;
+
+        // Synchronize into master tournament roster
+        $t_slug      = sanitize_title($selected_tournament);
+        $master_regs = get_option('sywat_registrations_' . $t_slug, array());
+        if (!is_array($master_regs)) $master_regs = array();
+        $master_regs[$new_id] = $new_reg;
+        update_option('sywat_registrations_' . $t_slug, $master_regs, false);
     }
 
     // Check-In
