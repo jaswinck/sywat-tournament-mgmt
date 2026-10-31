@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.3.2
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -18,8 +18,10 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $current_user = wp_get_current_user();
         $user_id      = $current_user->ID;
 
-        // Dynamic page links based on user role capabilities
+        // Dynamic capability checks
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
+        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
+        $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
         
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
@@ -38,9 +40,27 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <!-- Center: Primary App Navigation Links -->
                 <nav style="display:flex; align-items:center; gap:8px; margin-left:10px;">
                     <?php if ( $can_manage_tournaments ): ?>
-                        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link">
-                            🎯 Tournament Management
-                        </a>
+                        <!-- Dropdown Container -->
+                        <div class="sywat-auth-dropdown">
+                            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                                🎯 Tournament Management <span style="font-size:10px; margin-left:4px;">▾</span>
+                            </a>
+                            <div class="sywat-auth-dropdown-menu">
+                                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>">
+                                    📊 Admin Dashboard
+                                </a>
+                                <?php if ( $can_access_desk ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>">
+                                        📋 Check-In Desk
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ( $can_edit_scores ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-scores/' ) ); ?>">
+                                        ✏️ Score Entry
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     <?php endif; ?>
 
                     <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
