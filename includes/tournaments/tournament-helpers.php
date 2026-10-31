@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -190,5 +190,38 @@ if ( ! function_exists( 'sywat_is_archer_on_line' ) ) {
             }
         }
         return false;
+    }
+}
+
+// Partial search lookup against cached TFAA roster
+if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
+    function sywat_search_tfaa_shooters( $query, $limit = 10 ) {
+        $clean_query = strtolower( trim( $query ) );
+        if ( strlen( $clean_query ) < 2 ) return array();
+
+        $cache    = get_option( 'sywat_tfaa_cache', array() );
+        $shooters = isset( $cache['shooters'] ) && is_array( $cache['shooters'] ) 
+            ? $cache['shooters'] 
+            : ( is_array( $cache ) ? $cache : array() );
+
+        $matches = array();
+
+        foreach ( $shooters as $s ) {
+            $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
+            if ( empty( $name ) ) continue;
+
+            if ( strpos( strtolower( $name ), $clean_query ) !== false ) {
+                $matches[] = array(
+                    'name'     => $name,
+                    'division' => isset( $s['division'] ) ? $s['division'] : '',
+                    'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
+                    'style'    => isset( $s['style'] ) ? $s['style'] : '',
+                );
+
+                if ( count( $matches ) >= $limit ) break;
+            }
+        }
+
+        return $matches;
     }
 }
