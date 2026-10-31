@@ -1,6 +1,9 @@
 <?php
 /**
  * Sub-Module: Registration Engine Client Scripts
+ * Path: includes/registration/registration-scripts.php
+ * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -25,6 +28,9 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
         }
 
         function updateAllArcherLines(selectedLineIdx) {
+            if (selectedLineIdx !== undefined && selectedLineIdx !== null && selectedLineIdx !== '') {
+                sessionStorage.setItem('sywat_last_line_idx', selectedLineIdx);
+            }
             const lineSelects = document.querySelectorAll('.sywat-line-override-select');
             lineSelects.forEach(select => {
                 select.value = selectedLineIdx;
@@ -50,7 +56,11 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             const container = document.getElementById('sywat_archer_rows_container');
             if (!container) return;
 
-            const defaultLineIdx = document.getElementById('sywat_default_line_idx')?.value || '0';
+            const savedLineIdx = sessionStorage.getItem('sywat_last_line_idx');
+            const defaultLineIdx = savedLineIdx !== null 
+                ? savedLineIdx 
+                : (document.getElementById('sywat_default_line_idx')?.value || '0');
+
             const rowDiv = document.createElement('div');
             rowDiv.className = 'sywat-archer-input-row';
             rowDiv.style.cssText = 'display:flex; gap:10px; align-items:center; margin-bottom:8px;';
@@ -172,6 +182,14 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            const defaultLineSelect = document.getElementById('sywat_default_line_idx');
+            if (defaultLineSelect) {
+                const savedLineIdx = sessionStorage.getItem('sywat_last_line_idx');
+                if (savedLineIdx !== null && defaultLineSelect.querySelector('option[value="' + savedLineIdx + '"]')) {
+                    defaultLineSelect.value = savedLineIdx;
+                    updateAllArcherLines(savedLineIdx);
+                }
+            }
             recalculateGroupTotal();
         });
         </script>
