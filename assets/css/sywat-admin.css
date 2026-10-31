@@ -504,14 +504,30 @@
     align-items: center;
     background: #0f172a;
     color: #ffffff;
-    padding: 10px 16px;
+    padding: 14px 24px;
+    border-radius: 8px;
+    margin-top: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sywat-auth-nav-link {
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 8px 14px;
     border-radius: 6px;
-    margin-bottom: 18px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sywat-auth-nav-link:hover {
+    background-color: #1e293b;
+    color: #38bdf8;
 }
 
 .sywat-login-card {
-    max-width: 400px;
+    max-width: 420px;
     margin: 40px auto;
     background: #ffffff;
     border: 1px solid #cbd5e1;
