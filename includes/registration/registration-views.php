@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -62,7 +62,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <input type="hidden" name="modal_action" value="prereg">
 
                     <!-- Group Header Information -->
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:4px; margin-bottom:15px;">
+                    <div class="sywat-form-grid-4" style="background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:4px; margin-bottom:15px;">
                         <div>
                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller / Primary Archer Name</label>
                             <input type="text" name="group_name" id="sywat_group_name" placeholder="e.g. John Smith" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" oninput="handleCallerNameInput(this)">
@@ -93,8 +93,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <!-- Archer Rows Container -->
                     <div id="sywat_archer_rows_container">
                         <!-- Archer Row 1 -->
-                        <div class="sywat-archer-input-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                            <div style="flex:2; position:relative;">
+                        <div class="sywat-archer-input-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                            <div style="flex:2; min-width:180px; position:relative;">
                                 <input type="text" name="archers[0][name]" id="sywat_first_archer_name" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
                             </div>
 
@@ -192,54 +192,56 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             <!-- LINE SLOT USAGE TABLE -->
             <div>
                 <h4 style="margin:0 0 8px 0; font-size:14px; font-weight:600; color:#1e293b;">Current Line Slot Usage</h4>
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">Line Name</th>
-                            <th style="text-align:center;">20yd Capacity</th>
-                            <th style="text-align:center;">Cub Capacity</th>
-                            <th style="text-align:right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $available_lines as $idx => $line ): ?>
-                            <?php
-                                $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1);
-                                $c_20 = sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations );
-                                $m_20 = sywat_get_line_max_cap( $line, '20yd' );
-                                $c_cub = sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations );
-                                $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
-                                $total_line_shooters = $c_20 + $c_cub;
-                            ?>
+                <div class="sywat-table-responsive">
+                    <table class="sywat-table">
+                        <thead>
                             <tr>
-                                <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
-                                <td style="text-align:center;">
-                                    <?php echo $c_20 . ' / ' . $m_20; ?>
-                                    <span class="sywat-badge <?php echo ($c_20 >= $m_20) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_20 >= $m_20) ? 'Full' : 'Open'; ?></span>
-                                </td>
-                                <td style="text-align:center;">
-                                    <?php echo $c_cub . ' / ' . $m_cub; ?>
-                                    <span class="sywat-badge <?php echo ($c_cub >= $m_cub) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_cub >= $m_cub) ? 'Full' : 'Open'; ?></span>
-                                </td>
-                                <td style="text-align:right;">
-                                    <?php if ( $total_line_shooters > 0 ): ?>
-                                        <form method="post" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to clear ALL <?php echo $total_line_shooters; ?> archers from <?php echo esc_js( $line_title ); ?>?');">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                            <input type="hidden" name="sywat_action" value="purge_line">
-                                            <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                            <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
-                                            <input type="hidden" name="redirect_action" value="prereg">
-                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding: 3px 8px; font-size: 11px; height: auto;">Clear Line</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span style="font-size: 12px; color: #94a3b8;">(Empty)</span>
-                                    <?php endif; ?>
-                                </td>
+                                <th style="text-align:left;">Line Name</th>
+                                <th style="text-align:center;">20yd Capacity</th>
+                                <th style="text-align:center;">Cub Capacity</th>
+                                <th style="text-align:right;">Action</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $available_lines as $idx => $line ): ?>
+                                <?php
+                                    $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1);
+                                    $c_20 = sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations );
+                                    $m_20 = sywat_get_line_max_cap( $line, '20yd' );
+                                    $c_cub = sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations );
+                                    $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
+                                    $total_line_shooters = $c_20 + $c_cub;
+                                ?>
+                                <tr>
+                                    <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
+                                    <td style="text-align:center;">
+                                        <?php echo $c_20 . ' / ' . $m_20; ?>
+                                        <span class="sywat-badge <?php echo ($c_20 >= $m_20) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_20 >= $m_20) ? 'Full' : 'Open'; ?></span>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <?php echo $c_cub . ' / ' . $m_cub; ?>
+                                        <span class="sywat-badge <?php echo ($c_cub >= $m_cub) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_cub >= $m_cub) ? 'Full' : 'Open'; ?></span>
+                                    </td>
+                                    <td style="text-align:right;">
+                                        <?php if ( $total_line_shooters > 0 ): ?>
+                                            <form method="post" style="display: inline-block; margin: 0;" onsubmit="return confirm('Are you sure you want to clear ALL <?php echo $total_line_shooters; ?> archers from <?php echo esc_js( $line_title ); ?>?');">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="sywat_action" value="purge_line">
+                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                                <input type="hidden" name="redirect_action" value="prereg">
+                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding: 3px 8px; font-size: 11px; height: auto;">Clear Line</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span style="font-size: 12px; color: #94a3b8;">(Empty)</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
