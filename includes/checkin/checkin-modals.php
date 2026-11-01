@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.7.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -517,7 +517,6 @@ function sywat_desk_render_client_scripts($data) {
             if (partialMatches.length > 0) matches = partialMatches;
         }
 
-        // Sort match array so 'FS Pro' records take priority over standard 'FS'
         if (Array.isArray(matches) && matches.length > 1) {
             matches.sort((a, b) => {
                 const aPro = (a.style && a.style.indexOf('FS Pro') !== -1) ? 1 : 0;
@@ -544,21 +543,25 @@ function sywat_desk_render_client_scripts($data) {
         return null;
     }
 
+    // UPDATED: Strict prefix matching that prevents FS from overriding FS Pro
     function matchDeskTfaaSelect(value, selectEl) {
         if (!value || !selectEl) return;
         const clean = value.trim().toLowerCase();
 
         for (let opt of selectEl.options) {
-            if (opt.value && opt.value.trim().toLowerCase() === clean) {
+            if (!opt.value) continue;
+            const optLower = opt.value.trim().toLowerCase();
+            
+            if (optLower === clean) {
                 selectEl.value = opt.value;
                 return;
             }
-        }
-
-        for (let opt of selectEl.options) {
-            if (!opt.value) continue;
-            const optLower = opt.value.trim().toLowerCase();
-            if (optLower.includes(clean) || clean.includes(optLower.split(' ')[0])) {
+            
+            // Cleanly split at the dash or parenthesis (e.g. "fs pro" vs "fs")
+            const cleanPrefix = clean.split(' –')[0].split(' (')[0].trim();
+            const optPrefix   = optLower.split(' –')[0].split(' (')[0].trim();
+            
+            if (cleanPrefix === optPrefix) {
                 selectEl.value = opt.value;
                 return;
             }
@@ -716,9 +719,10 @@ function sywat_desk_render_client_scripts($data) {
             const uGen = currGen.toLowerCase();
             const uSty = currStyle.toLowerCase();
 
-            const divMatch   = uDiv.includes(cDiv.split(' ')[0]) || cDiv.includes(uDiv.split(' ')[0]);
-            const genMatch   = uGen.startsWith(cGen.charAt(0)) || cGen.startsWith(uGen.charAt(0));
-            const styleMatch = uSty.includes(cSty.split(' ')[0]) || cSty.includes(uSty.split(' ')[0]);
+            // UPDATED: Strict prefix separation to prevent "Senior" matching "Silver Senior" and "FS" matching "FS Pro"
+            const divMatch   = (cDiv === uDiv) || (cDiv && uDiv && cDiv.split(' (')[0].trim() === uDiv.split(' (')[0].trim());
+            const genMatch   = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
+            const styleMatch = (cSty === uSty) || (cSty && uSty && cSty.split(' –')[0].trim() === uSty.split(' –')[0].trim());
 
             if (divMatch && genMatch && styleMatch) {
                 isExactMatch = true;
