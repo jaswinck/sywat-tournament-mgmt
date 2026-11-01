@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Modals & Scripts
  * Path: includes/members/members-modals.php
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,7 +24,7 @@ function sywat_members_render_modals( $data ) {
 
     <!-- MODAL 1: ADD NEW MEMBER MODAL -->
     <div class="sywat-modal-backdrop" id="sywat_add_member_modal">
-        <div class="sywat-modal-content" style="max-width: 600px;">
+        <div class="sywat-modal-content sywat-modal-md">
             <div class="sywat-modal-header no-print" style="padding: 12px 20px;">
                 <h3 style="font-size: 1.05em; margin: 0;">Create New Member Account</h3>
                 <button type="button" class="sywat-modal-close" onclick="sywatCloseAddMemberModal()">&times;</button>
@@ -38,7 +38,7 @@ function sywat_members_render_modals( $data ) {
                         🆔 <strong>TFAA Member ID & Username:</strong> Auto-formatted as <code>Firstname.Lastname</code>; ID generated sequentially.
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                    <div class="sywat-form-grid-2" style="margin-bottom: 10px;">
                         <div>
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">First Name *</label>
                             <input type="text" name="first_name" required style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -54,7 +54,7 @@ function sywat_members_render_modals( $data ) {
                         <input type="email" name="email" required style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                    <div class="sywat-form-grid-2" style="margin-bottom: 10px;">
                         <div>
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Phone Number</label>
                             <input type="text" name="phone" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -68,10 +68,10 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
-                    <!-- MULTI-ROLE CHECKBOX GRID (NO SCROLLBAR) -->
+                    <!-- MULTI-ROLE CHECKBOX GRID -->
                     <div style="margin-bottom: 10px;">
                         <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                             <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                 <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                 <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -82,7 +82,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+                    <div class="sywat-form-grid-2" style="margin-bottom: 8px;">
                         <div>
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Initial Password *</label>
                             <input type="password" id="sywat_add_pw" name="password" required oninput="sywatValidatePasswordRules('sywat_add_pw', 'sywat_add_pw_confirm', 'add_rule')" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -123,7 +123,7 @@ function sywat_members_render_modals( $data ) {
                 $e_nfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_is_nfaa_member', true );
                 $current_user_roles = (array) $edit_user_obj->roles;
             ?>
-            <div class="sywat-modal-content" style="max-width: 600px;">
+            <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print" style="padding: 12px 20px;">
                     <h3 style="font-size: 1.05em; margin: 0;">Edit Member: <?php echo esc_html( $edit_user_obj->display_name ); ?></h3>
                     <button type="button" class="sywat-modal-close" onclick="sywatCloseEditMemberModal()">&times;</button>
@@ -134,12 +134,12 @@ function sywat_members_render_modals( $data ) {
                         <input type="hidden" name="sywat_action" value="update_member">
                         <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
 
-                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 12px; color: #334155; display: flex; justify-content: space-between;">
+                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 12px; color: #334155; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
                             <span>🆔 <strong>TFAA Member #:</strong> <span style="font-family: monospace; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( ! empty( $e_tfaa ) ? $e_tfaa : 'Unassigned' ); ?></span></span>
                             <span>👤 <strong>Username:</strong> <span style="font-family: monospace; font-weight: bold; color: #334155;"><?php echo esc_html( $edit_user_obj->user_login ); ?></span></span>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="sywat-form-grid-2" style="margin-bottom: 10px;">
                             <div>
                                 <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">First Name *</label>
                                 <input type="text" name="first_name" value="<?php echo esc_attr( $edit_user_obj->first_name ); ?>" required style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -155,7 +155,7 @@ function sywat_members_render_modals( $data ) {
                             <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="sywat-form-grid-2" style="margin-bottom: 10px;">
                             <div>
                                 <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Phone Number</label>
                                 <input type="text" name="phone" value="<?php echo esc_attr( $e_phone ); ?>" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -169,10 +169,10 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
-                        <!-- MULTI-ROLE CHECKBOX GRID (NO SCROLLBAR) -->
+                        <!-- MULTI-ROLE CHECKBOX GRID -->
                         <div style="margin-bottom: 10px;">
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                                 <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                     <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                     <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -183,7 +183,7 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+                        <div class="sywat-form-grid-2" style="margin-bottom: 8px;">
                             <div>
                                 <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Reset Password (Optional)</label>
                                 <input type="password" id="sywat_edit_pw" name="new_password" placeholder="Leave blank to keep..." oninput="sywatValidatePasswordRules('sywat_edit_pw', 'sywat_edit_pw_confirm', 'edit_rule')" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; box-sizing:border-box;">
@@ -218,7 +218,7 @@ function sywat_members_render_modals( $data ) {
 
     <!-- MODAL 3: ADD / ASSIGN BOARD MEMBER MODAL -->
     <div class="sywat-modal-backdrop" id="sywat_add_board_modal">
-        <div class="sywat-modal-content" style="max-width: 600px;">
+        <div class="sywat-modal-content sywat-modal-md">
             <div class="sywat-modal-header no-print" style="padding: 12px 20px;">
                 <h3 style="font-size: 1.05em; margin: 0;">Assign Board Member Positions</h3>
                 <button type="button" class="sywat-modal-close" onclick="sywatCloseAddBoardModal()">&times;</button>
@@ -241,7 +241,7 @@ function sywat_members_render_modals( $data ) {
                     </div>
 
                     <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assign Board Position(s) *</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; background: #f8fafc; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <div class="sywat-form-grid-2" style="gap: 6px; margin-bottom: 16px; background: #f8fafc; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                         <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
                             <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                 <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>">
@@ -266,7 +266,7 @@ function sywat_members_render_modals( $data ) {
                 $cur_positions = get_user_meta( $edit_board_user_obj->ID, 'sywat_board_positions', true );
                 if ( ! is_array( $cur_positions ) ) $cur_positions = array();
             ?>
-            <div class="sywat-modal-content" style="max-width: 600px;">
+            <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print" style="padding: 12px 20px;">
                     <h3 style="font-size: 1.05em; margin: 0;">Edit Board Member: <?php echo esc_html( $edit_board_user_obj->display_name ); ?></h3>
                     <button type="button" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</button>
@@ -277,13 +277,13 @@ function sywat_members_render_modals( $data ) {
                         <input type="hidden" name="sywat_action" value="save_board_member">
                         <input type="hidden" name="board_user_id" value="<?php echo $edit_board_user_obj->ID; ?>">
 
-                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; color: #334155; display: flex; justify-content: space-between;">
+                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; color: #334155; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
                             <span>👤 <strong>Name:</strong> <?php echo esc_html( $edit_board_user_obj->display_name ); ?></span>
                             <span>✉️ <strong>Email:</strong> <?php echo esc_html( $edit_board_user_obj->user_email ); ?></span>
                         </div>
 
                         <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned Position(s)</label>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 16px; background: #f8fafc; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <div class="sywat-form-grid-2" style="gap: 6px; margin-bottom: 16px; background: #f8fafc; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                             <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
                                 <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                     <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>" <?php checked( in_array( $pos_key, $cur_positions ), true ); ?>>
