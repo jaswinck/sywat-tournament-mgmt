@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -130,17 +130,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
                 <?php if ( $can_manage_seasons ): ?>
                     <a href="?tab=seasons" class="sywat-tab-item sywat-tab-icon-season <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Season Management</a>
-                    <a href="?tab=shops" class="sywat-tab-item sywat-tab-icon-shop <?php echo $active_tab === 'shops' ? 'active' : ''; ?>">Shop Management</a>
                 <?php endif; ?>
             </div>
 
             <?php if ( $active_tab === 'seasons' && $can_manage_seasons ): ?>
                 <!-- TAB 2: SEASONS MANAGEMENT -->
                 <?php if ( function_exists( 'sywat_render_seasons_tab' ) ) sywat_render_seasons_tab(); ?>
-
-            <?php elseif ( $active_tab === 'shops' && $can_manage_seasons ): ?>
-                <!-- TAB 3: SHOP MANAGEMENT -->
-                <?php if ( function_exists( 'sywat_render_shops_tab' ) ) sywat_render_shops_tab(); ?>
 
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
