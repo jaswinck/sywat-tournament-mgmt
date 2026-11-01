@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-roster.php
  * Description: Archer editing logic, division/style restrictions, strict family line-scoping, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -308,7 +308,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         <div class="no-print">
             <!-- Filter & Search Controls Header -->
             <div style="margin-bottom: 15px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-                <form method="get" style="display: flex; gap: 12px; flex: 1; align-items: flex-end; margin: 0;">
+                <form method="get" style="display: flex; gap: 12px; flex: 1; align-items: flex-end; margin: 0; flex-wrap: wrap;">
                     <input type="hidden" name="tab" value="manage">
                     <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                     <input type="hidden" name="modal_action" value="manage">
@@ -326,7 +326,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     </div>
                 </form>
 
-                <div style="flex: 2;">
+                <div style="flex: 2; min-width: 200px;">
                     <label for="search_shooter" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Search Archer Name</label>
                     <div style="display:flex; gap:5px; align-items:center;">
                         <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
