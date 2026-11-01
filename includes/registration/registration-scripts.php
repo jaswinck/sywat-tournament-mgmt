@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 2.8.6
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -106,6 +106,42 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             checkAndFillPhone(archerInput.value);
         }
 
+        function handleDivisionChange(divSelect) {
+            if (!divSelect) return;
+            divSelect.dataset.userChosen = 'true';
+
+            const row = divSelect.closest('.sywat-archer-input-row');
+            if (row) {
+                const distSelect = row.querySelector('.sywat-distance-select');
+                if (distSelect) {
+                    const selectedDiv = divSelect.value;
+                    if (selectedDiv && selectedDiv.includes('Cub')) {
+                        distSelect.value = 'Cub';
+                    } else if (selectedDiv !== '') {
+                        distSelect.value = '20yd';
+                    }
+                }
+            }
+
+            recalculateGroupTotal();
+        }
+
+        function handleDistanceChange(distSelect) {
+            const row = distSelect.closest('.sywat-archer-input-row');
+            if (!row) return;
+            const divSelect = row.querySelector('.sywat-division-select');
+            if (!divSelect) return;
+
+            if (distSelect.value === 'Cub') {
+                divSelect.value = 'Cub (8 - 11)';
+                divSelect.dataset.userChosen = 'true';
+            } else if (distSelect.value === '20yd' && divSelect.value === 'Cub (8 - 11)') {
+                divSelect.value = '';
+                delete divSelect.dataset.userChosen;
+            }
+            recalculateGroupTotal();
+        }
+
         function matchTfaaDivision(tfaaDiv, selectEl) {
             if (!tfaaDiv || !selectEl) return;
             const cleanTfaa = tfaaDiv.trim().toLowerCase();
@@ -113,7 +149,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             for (let opt of selectEl.options) {
                 if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
                     selectEl.value = opt.value;
-                    selectEl.dataset.userChosen = 'true';
+                    handleDivisionChange(selectEl);
                     return;
                 }
             }
@@ -127,7 +163,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
 
                 if (optBaseName === tfaaBaseName || optLower.includes(cleanTfaa) || cleanTfaa.includes(optBaseName)) {
                     selectEl.value = opt.value;
-                    selectEl.dataset.userChosen = 'true';
+                    handleDivisionChange(selectEl);
                     return;
                 }
             }
@@ -227,20 +263,6 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             recalculateGroupTotal();
         }
 
-        function handleDistanceChange(distSelect) {
-            const row = distSelect.closest('.sywat-archer-input-row');
-            if (!row) return;
-            const divSelect = row.querySelector('.sywat-division-select');
-            if (!divSelect) return;
-
-            if (distSelect.value === 'Cub') {
-                divSelect.value = 'Cub (8 - 11)';
-            } else if (distSelect.value === '20yd') {
-                divSelect.value = '';
-            }
-            recalculateGroupTotal();
-        }
-
         function addArcherRow() {
             const container = document.getElementById('sywat_archer_rows_container');
             if (!container) return;
@@ -252,7 +274,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
 
             const rowDiv = document.createElement('div');
             rowDiv.className = 'sywat-archer-input-row';
-            rowDiv.style.cssText = 'display:flex; gap:10px; align-items:center; margin-bottom:8px;';
+            rowDiv.style.cssText = 'display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap;';
 
             let lineOptionsHtml = '';
             const defaultLineSelect = document.getElementById('sywat_default_line_idx');
@@ -264,7 +286,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
 
             rowDiv.innerHTML = `
-                <div style="flex:2; position:relative;">
+                <div style="flex:2; min-width:180px; position:relative;">
                     <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
                 </div>
                 
@@ -273,7 +295,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                     <option value="Cub">Cub (10yd)</option>
                 </select>
 
-                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();">
+                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDivisionChange(this);">
                     <option value="" disabled selected hidden>Select Division</option>
                     <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
                     <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
@@ -288,7 +310,7 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
                     ${lineOptionsHtml}
                 </select>
 
-                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; width:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
             `;
 
             container.appendChild(rowDiv);
