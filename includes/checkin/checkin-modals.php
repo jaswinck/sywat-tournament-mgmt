@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -41,6 +41,9 @@ function sywat_desk_render_modals($data) {
     <?php 
         $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
         $is_family = isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family';
+        $curr_div_check = isset($modal_archer['division']) ? $modal_archer['division'] : '';
+        $is_youth_check = (stripos($curr_div_check, 'Cub') !== false || stripos($curr_div_check, 'Youth') !== false || stripos($curr_div_check, 'Young Adult') !== false);
+        $display_due    = $is_family ? $modal_due : ($is_youth_check ? 25.00 : 30.00);
     ?>
     <div class="sywat-modal-backdrop active">
         <div class="sywat-modal-content" style="max-width:480px;">
@@ -70,7 +73,7 @@ function sywat_desk_render_modals($data) {
                     <?php if ($modal_due > 0): ?>
                         <div id="sywat_unpaid_warning_banner" style="background:#f8d7da; color:#721c24; padding:12px; border-radius:6px; border:1px solid #f5c6cb; margin-bottom:15px; text-align:center;">
                             <div style="font-size:16px; font-weight:bold;">
-                                ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($modal_due, 2); ?>
+                                ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
                             </div>
                             <div style="font-size:13px; margin-top:4px; font-weight:600;">
                                 <?php if ($is_family): ?>
@@ -716,7 +719,7 @@ function sywat_desk_render_client_scripts($data) {
 
                 if (divEl && shopMatch.division) matchDeskTfaaSelect(shopMatch.division, divEl);
                 if (genEl && shopMatch.gender) matchDeskTfaaSelect(shopMatch.gender, genEl);
-                if (styleEl && shopMatch.style) matchDeskTfaaSelect(shopMatch.style, styleEl);
+                if (styleEl && shopMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
                 if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
 
                 handleStyleRestrictions(prefix);
