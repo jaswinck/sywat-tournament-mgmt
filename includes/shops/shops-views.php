@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Outdoor Club Administration Views & Modals
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -16,6 +16,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
             return;
         }
 
+        $page_url        = site_url( '/sywat-manage-shops/' );
         $notice          = sywat_handle_shop_actions();
         $all_shops       = sywat_get_shops();
         $edit_target_id  = isset( $_REQUEST['edit_shop'] ) ? sanitize_text_field( $_REQUEST['edit_shop'] ) : '';
@@ -53,7 +54,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>Linked Staff for Location: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></span>
-                    <a href="?tab=shops" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Shops & Clubs</a>
+                    <a href="<?php echo esc_url( $page_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Shops & Clubs</a>
                 </div>
 
                 <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
@@ -61,7 +62,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     <?php if ( empty( $unlinked_staff ) ): ?>
                         <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to a location.</p>
                     <?php else: ?>
-                        <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                        <form method="post" action="<?php echo esc_url( add_query_arg( 'manage_staff', $managing_shop['id'], $page_url ) ); ?>" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                             <input type="hidden" name="sywat_shop_action" value="assign_staff_to_shop">
                             <input type="hidden" name="target_shop_id" value="<?php echo esc_attr( $managing_shop['id'] ); ?>">
@@ -105,7 +106,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     <td><?php echo esc_html( $ls_user->user_login ); ?><br><span style="font-size:11px; color:#646970;"><?php echo esc_html( $ls_user->user_email ); ?></span></td>
                                     <td><span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( implode( ', ', $ls_user->roles ) ); ?></span></td>
                                     <td style="text-align:right;">
-                                        <form method="post" action="?tab=shops&manage_staff=<?php echo urlencode($managing_shop['id']); ?>" style="margin:0;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this shop?');">
+                                        <form method="post" action="<?php echo esc_url( add_query_arg( 'manage_staff', $managing_shop['id'], $page_url ) ); ?>" style="margin:0;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this shop?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                             <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
@@ -128,10 +129,10 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
                     <span>Edit Shop / Club: <strong><?php echo esc_html( $editing_shop['name'] ); ?></strong></span>
-                    <a href="?tab=shops" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel Editing</a>
+                    <a href="<?php echo esc_url( $page_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel Editing</a>
                 </div>
 
-                <form method="post" action="?tab=shops">
+                <form method="post" action="<?php echo esc_url( $page_url ); ?>">
                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                     <input type="hidden" name="sywat_shop_action" value="update_shop">
                     <input type="hidden" name="shop_id" value="<?php echo esc_attr( $editing_shop['id'] ); ?>">
@@ -245,7 +246,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
 
                     <div style="display:flex; gap:10px;">
                         <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Changes</button>
-                        <a href="?tab=shops" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
+                        <a href="<?php echo esc_url( $page_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
                     </div>
                 </form>
             </div>
@@ -352,9 +353,9 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                                     <td style="text-align:right;">
                                         <div style="display:inline-flex; gap:4px; align-items:center; justify-content:flex-end;">
-                                            <a href="?tab=shops&manage_staff=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
-                                            <a href="?tab=shops&edit_shop=<?php echo urlencode( $s_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:2px 6px; font-size:11px; height:28px;">Edit</a>
-                                            <form method="post" action="?tab=shops" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
+                                            <a href="<?php echo esc_url( add_query_arg( 'manage_staff', $s_id, $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
+                                            <a href="<?php echo esc_url( add_query_arg( 'edit_shop', $s_id, $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:2px 6px; font-size:11px; height:28px;">Edit</a>
+                                            <form method="post" action="<?php echo esc_url( $page_url ); ?>" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                                 <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
@@ -377,7 +378,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                         <button type="button" class="sywat-modal-close" onclick="closeAddShopModal()">&times;</button>
                     </div>
                     <div class="sywat-modal-body">
-                        <form method="post" action="?tab=shops">
+                        <form method="post" action="<?php echo esc_url( $page_url ); ?>">
                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                             <input type="hidden" name="sywat_shop_action" value="create_shop">
                             
@@ -552,4 +553,24 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         <?php endif; ?>
         <?php
     }
+}
+
+/**
+ * Shortcode Handler: [sywat_manage_shops]
+ * Renders the standalone Shops & Outdoor Clubs Management view.
+ */
+if ( ! function_exists( 'sywat_manage_shops_shortcode' ) ) {
+    function sywat_manage_shops_shortcode() {
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+        nocache_headers();
+
+        ob_start();
+        echo '<div class="sywat-wrap">';
+        sywat_render_shops_tab();
+        echo '</div>';
+        return ob_get_clean();
+    }
+    add_shortcode( 'sywat_manage_shops', 'sywat_manage_shops_shortcode' );
 }
