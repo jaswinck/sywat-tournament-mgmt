@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded for print reliability), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.3.8
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -217,64 +217,68 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                 <div class="invoice-title">TFAA TOURNAMENT INVOICE</div>
                 <div class="invoice-subtitle">(Fill in all the Blue Shade Boxes)</div>
 
-                <table class="invoice-header-table">
-                    <tr><td class="invoice-header-label">SYWAT Tournament Date:</td><td class="invoice-header-val"><?php echo esc_html($tourn_dates_str); ?></td></tr>
-                    <tr><td class="invoice-header-label">Archery Shop/Club Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_name); ?></td></tr>
-                    <tr><td class="invoice-header-label">Contact Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_cont); ?></td></tr>
-                    <tr><td class="invoice-header-label">Email Address:</td><td class="invoice-header-val"><?php echo esc_html($shop_email); ?></td></tr>
-                    <tr><td class="invoice-header-label">Phone:</td><td class="invoice-header-val"><?php echo esc_html($shop_phone); ?></td></tr>
-                </table>
+                <div class="sywat-table-responsive" style="margin-bottom: 15px;">
+                    <table class="invoice-header-table" style="margin-bottom: 0;">
+                        <tr><td class="invoice-header-label">SYWAT Tournament Date:</td><td class="invoice-header-val"><?php echo esc_html($tourn_dates_str); ?></td></tr>
+                        <tr><td class="invoice-header-label">Archery Shop/Club Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_name); ?></td></tr>
+                        <tr><td class="invoice-header-label">Contact Name:</td><td class="invoice-header-val"><?php echo esc_html($shop_cont); ?></td></tr>
+                        <tr><td class="invoice-header-label">Email Address:</td><td class="invoice-header-val"><?php echo esc_html($shop_email); ?></td></tr>
+                        <tr><td class="invoice-header-label">Phone:</td><td class="invoice-header-val"><?php echo esc_html($shop_phone); ?></td></tr>
+                    </table>
+                </div>
 
                 <div style="font-weight:bold; font-size:13px; margin-bottom:6px;">Registration Tournament Fees:</div>
 
-                <table class="invoice-fee-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50%;">Fee Class</th>
-                            <th style="width: 15%; text-align: center;">#</th>
-                            <th style="width: 15%; text-align: right;">$</th>
-                            <th style="width: 20%; text-align: right;">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Cub/Youth/Young Adult</td>
-                            <td class="blue-shade" style="text-align: center;"><?php echo $acct['group1_youth']; ?></td>
-                            <td style="text-align: right;">$25</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['tot_g1'], 2); ?></td>
-                        </tr>
-                        <tr>
-                            <td>Adult/Senior/Silver Senior/Master</td>
-                            <td class="blue-shade" style="text-align: center;"><?php echo $acct['group2_adult']; ?></td>
-                            <td style="text-align: right;">$30</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['tot_g2'], 2); ?></td>
-                        </tr>
-                        <tr>
-                            <td>Family</td>
-                            <td class="blue-shade" style="text-align: center;"><?php echo $acct['group3_families']; ?></td>
-                            <td style="text-align: right;">$75</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['tot_g3'], 2); ?></td>
-                        </tr>
-                        <tr>
-                            <td>Field Governor <span style="font-size:10px; font-style:italic;">(1 free per weekend)</span></td>
-                            <td class="blue-shade" style="text-align: center;"><?php echo $acct['group4_fg']; ?></td>
-                            <td style="text-align: right;">$0</td>
-                            <td class="blue-shade">$0.00</td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" style="font-weight: bold; text-align: right;">TOTAL SYWAT FEES</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['total_sywat_fees'], 2); ?></td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" style="font-weight: bold; text-align: right;">Host Retains 50%</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['host_retains'], 2); ?></td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" style="font-weight: bold; text-align: right;">TFAA to be Paid 50%</td>
-                            <td class="blue-shade">$<?php echo number_format($acct['tfaa_to_pay'], 2); ?></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="sywat-table-responsive" style="margin-bottom: 15px;">
+                    <table class="invoice-fee-table" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Fee Class</th>
+                                <th style="width: 15%; text-align: center;">#</th>
+                                <th style="width: 15%; text-align: right;">$</th>
+                                <th style="width: 20%; text-align: right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Cub/Youth/Young Adult</td>
+                                <td class="blue-shade" style="text-align: center;"><?php echo $acct['group1_youth']; ?></td>
+                                <td style="text-align: right;">$25</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['tot_g1'], 2); ?></td>
+                            </tr>
+                            <tr>
+                                <td>Adult/Senior/Silver Senior/Master</td>
+                                <td class="blue-shade" style="text-align: center;"><?php echo $acct['group2_adult']; ?></td>
+                                <td style="text-align: right;">$30</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['tot_g2'], 2); ?></td>
+                            </tr>
+                            <tr>
+                                <td>Family</td>
+                                <td class="blue-shade" style="text-align: center;"><?php echo $acct['group3_families']; ?></td>
+                                <td style="text-align: right;">$75</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['tot_g3'], 2); ?></td>
+                            </tr>
+                            <tr>
+                                <td>Field Governor <span style="font-size:10px; font-style:italic;">(1 free per weekend)</span></td>
+                                <td class="blue-shade" style="text-align: center;"><?php echo $acct['group4_fg']; ?></td>
+                                <td style="text-align: right;">$0</td>
+                                <td class="blue-shade">$0.00</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="font-weight: bold; text-align: right;">TOTAL SYWAT FEES</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['total_sywat_fees'], 2); ?></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="font-weight: bold; text-align: right;">Host Retains 50%</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['host_retains'], 2); ?></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="font-weight: bold; text-align: right;">TFAA to be Paid 50%</td>
+                                <td class="blue-shade">$<?php echo number_format($acct['tfaa_to_pay'], 2); ?></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="invoice-footer">
                     <p>Please remit TFAA Payment via Check or Zelle and a copy of this Invoice within 7 days to:</p>
@@ -319,7 +323,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         ?>
 
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
-            <form method="get" action="" style="display: flex; gap: 12px; align-items: center; margin: 0;">
+            <form method="get" action="" style="display: flex; gap: 12px; align-items: center; margin: 0; flex-wrap: wrap;">
                 <input type="hidden" name="tab" value="manage">
                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="modal_action" value="print">
@@ -369,87 +373,89 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
             <?php if ( empty( $filtered_registrations ) && ! $is_specific_line ): ?>
                 <p style="color: #646970; font-style: italic;">No archer records available for this filter.</p>
             <?php else: ?>
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 4%;">#</th>
-                            <th style="width: 22%;">Name</th>
-                            <th style="width: 14%;">Line</th>
-                            <th style="width: 11%;">Division</th>
-                            <th style="width: 7%;">Gender</th>
-                            <th style="width: 16%;">Style</th>
-                            <th style="width: 12%;">Paid</th>
-                            <th style="width: 7%; text-align: center;">Score</th>
-                            <th style="width: 7%; text-align: center;">X Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $num = 1; foreach ( $filtered_registrations as $reg ): ?>
-                            <?php 
-                                $is_checked_in = ! empty( $reg['checked_in'] );
-                                $is_no_show    = ( isset( $reg['division'] ) && $reg['division'] === 'No Show' );
-
-                                if ( $is_no_show ) {
-                                    $division_disp = 'No Show';
-                                    $gender_disp   = 'No Show';
-                                    $style_disp    = 'No Show';
-                                    $print_score   = '';
-                                    $print_x       = '';
-                                } elseif ( $is_checked_in ) {
-                                    $division_disp = ! empty( $reg['division'] ) ? esc_html( $reg['division'] ) : '';
-                                    $gender_disp   = ! empty( $reg['gender'] ) ? esc_html( $reg['gender'] ) : '';
-                                    $style_disp    = ! empty( $reg['style'] ) ? esc_html( $reg['style'] ) : '';
-                                    $print_score   = ( isset( $reg['score'] ) && $reg['score'] !== '' ) ? esc_html( $reg['score'] ) : '';
-                                    $print_x       = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' ) ? esc_html( $reg['x_count'] ) : '';
-                                } else {
-                                    $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
-                                    $gender_disp   = 'M | F';
-                                    $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
-                                    $print_score   = '';
-                                    $print_x       = '';
-                                }
-
-                                $due_amt = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                                if ($due_amt > 0) {
-                                    $paid_cat = 'DUE: $' . number_format($due_amt, 2);
-                                } else {
-                                    $paid_cat = ! empty( $reg['paid'] ) ? $reg['paid'] : 'Youth / Adult / Fam';
-                                    if ( $paid_cat === 'Family' ) {
-                                        $fam_id_str = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
-                                        if ( $fam_id_str ) $paid_cat .= ' <span style="font-size:8px;">(' . esc_html( $fam_id_str ) . ')</span>';
-                                    }
-                                }
-                            ?>
+                <div class="sywat-table-responsive">
+                    <table class="sywat-table">
+                        <thead>
                             <tr>
-                                <td><strong><?php echo $num++; ?></strong></td>
-                                <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
-                                <td style="font-size: 9px;"><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : '' ); ?></td>
-                                <td style="font-size: 8px; line-height: 1.1;"><?php echo $division_disp; ?></td>
-                                <td style="font-size: 9px;"><?php echo $gender_disp; ?></td>
-                                <td style="font-size: 8px; line-height: 1.1;"><?php echo $style_disp; ?></td>
-                                <td class="paid-col" style="<?php echo ($due_amt > 0) ? 'color:#dc3545;' : ''; ?>"><strong><?php echo $paid_cat; ?></strong></td>
-                                <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_score; ?></td>
-                                <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_x; ?></td>
+                                <th style="width: 4%;">#</th>
+                                <th style="width: 22%;">Name</th>
+                                <th style="width: 14%;">Line</th>
+                                <th style="width: 11%;">Division</th>
+                                <th style="width: 7%;">Gender</th>
+                                <th style="width: 16%;">Style</th>
+                                <th style="width: 12%;">Paid</th>
+                                <th style="width: 7%; text-align: center;">Score</th>
+                                <th style="width: 7%; text-align: center;">X Count</th>
                             </tr>
-                        <?php endforeach; ?>
+                        </thead>
+                        <tbody>
+                            <?php $num = 1; foreach ( $filtered_registrations as $reg ): ?>
+                                <?php 
+                                    $is_checked_in = ! empty( $reg['checked_in'] );
+                                    $is_no_show    = ( isset( $reg['division'] ) && $reg['division'] === 'No Show' );
 
-                        <?php if ( $is_specific_line && $num <= 100 ) {
-                            while ( $num <= 100 ) { ?>
+                                    if ( $is_no_show ) {
+                                        $division_disp = 'No Show';
+                                        $gender_disp   = 'No Show';
+                                        $style_disp    = 'No Show';
+                                        $print_score   = '';
+                                        $print_x       = '';
+                                    } elseif ( $is_checked_in ) {
+                                        $division_disp = ! empty( $reg['division'] ) ? esc_html( $reg['division'] ) : '';
+                                        $gender_disp   = ! empty( $reg['gender'] ) ? esc_html( $reg['gender'] ) : '';
+                                        $style_disp    = ! empty( $reg['style'] ) ? esc_html( $reg['style'] ) : '';
+                                        $print_score   = ( isset( $reg['score'] ) && $reg['score'] !== '' ) ? esc_html( $reg['score'] ) : '';
+                                        $print_x       = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' ) ? esc_html( $reg['x_count'] ) : '';
+                                    } else {
+                                        $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
+                                        $gender_disp   = 'M | F';
+                                        $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
+                                        $print_score   = '';
+                                        $print_x       = '';
+                                    }
+
+                                    $due_amt = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
+                                    if ($due_amt > 0) {
+                                        $paid_cat = 'DUE: $' . number_format($due_amt, 2);
+                                    } else {
+                                        $paid_cat = ! empty( $reg['paid'] ) ? $reg['paid'] : 'Youth / Adult / Fam';
+                                        if ( $paid_cat === 'Family' ) {
+                                            $fam_id_str = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
+                                            if ( $fam_id_str ) $paid_cat .= ' <span style="font-size:8px;">(' . esc_html( $fam_id_str ) . ')</span>';
+                                        }
+                                    }
+                                ?>
                                 <tr>
                                     <td><strong><?php echo $num++; ?></strong></td>
-                                    <td></td>
-                                    <td style="font-size: 9px;"><?php echo esc_html($available_lines[$filter_line_idx]['name']); ?></td>
-                                    <td style="font-size: 8px; line-height: 1.1;">A | S | SS | MS<br>C | Y | YA | PRO</td>
-                                    <td style="font-size: 9px;">M | F</td>
-                                    <td style="font-size: 8px; line-height: 1.1;">FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS</td>
-                                    <td class="paid-col"><strong>YOUTH | ADULT | FAMILY</strong></td>
-                                    <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
-                                    <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
+                                    <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
+                                    <td style="font-size: 9px;"><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : '' ); ?></td>
+                                    <td style="font-size: 8px; line-height: 1.1;"><?php echo $division_disp; ?></td>
+                                    <td style="font-size: 9px;"><?php echo $gender_disp; ?></td>
+                                    <td style="font-size: 8px; line-height: 1.1;"><?php echo $style_disp; ?></td>
+                                    <td class="paid-col" style="<?php echo ($due_amt > 0) ? 'color:#dc3545;' : ''; ?>"><strong><?php echo $paid_cat; ?></strong></td>
+                                    <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_score; ?></td>
+                                    <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_x; ?></td>
                                 </tr>
-                            <?php }
-                        } ?>
-                    </tbody>
-                </table>
+                            <?php endforeach; ?>
+
+                            <?php if ( $is_specific_line && $num <= 100 ) {
+                                while ( $num <= 100 ) { ?>
+                                    <tr>
+                                        <td><strong><?php echo $num++; ?></strong></td>
+                                        <td></td>
+                                        <td style="font-size: 9px;"><?php echo esc_html($available_lines[$filter_line_idx]['name']); ?></td>
+                                        <td style="font-size: 8px; line-height: 1.1;">A | S | SS | MS<br>C | Y | YA | PRO</td>
+                                        <td style="font-size: 9px;">M | F</td>
+                                        <td style="font-size: 8px; line-height: 1.1;">FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS</td>
+                                        <td class="paid-col"><strong>YOUTH | ADULT | FAMILY</strong></td>
+                                        <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
+                                        <td style="border-bottom: 1px solid #1d2327; text-align: center;"></td>
+                                    </tr>
+                                <?php }
+                            } ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
         <?php
