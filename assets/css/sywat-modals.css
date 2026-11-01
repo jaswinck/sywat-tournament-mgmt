@@ -15,19 +15,28 @@
     box-sizing: border-box;
 }
 
-.sywat-modal-backdrop.active { display: flex; }
+.sywat-modal-backdrop.active { 
+    display: flex; 
+}
 
+/* Base Fluid Modal Box */
 .sywat-modal-content {
-    background: #fff;
-    width: 100%;
-    max-width: 900px;
+    background: #ffffff;
+    width: min(94vw, 560px);
     border-radius: 6px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     max-height: 90vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin: auto;
+    box-sizing: border-box;
 }
+
+/* Modal Sizing Modifiers for Responsive Layout Templates */
+.sywat-modal-sm { width: min(94vw, 480px); }  /* Standard Desk Check-In & Walk-In Modals */
+.sywat-modal-md { width: min(94vw, 620px); }  /* Manage Shooters Roster Edit Modal */
+.sywat-modal-lg { width: min(94vw, 920px); }  /* Phone Intake & Bulk Upload Roster Modals */
 
 .sywat-modal-header {
     display: flex;
@@ -38,7 +47,12 @@
     background: #f6f7f7;
 }
 
-.sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
+.sywat-modal-header h3 { 
+    margin: 0; 
+    font-size: 1.1em; 
+    color: #1d2327; 
+    font-weight: 600; 
+}
 
 .sywat-modal-close {
     background: none;
@@ -50,8 +64,14 @@
     line-height: 1;
 }
 
-.sywat-modal-close:hover { color: #d63638; }
-.sywat-modal-body { padding: 20px; overflow-y: auto; }
+.sywat-modal-close:hover { 
+    color: #d63638; 
+}
+
+.sywat-modal-body { 
+    padding: 20px; 
+    overflow-y: auto; 
+}
 
 /* TFAA Autocomplete Dropdown */
 .sywat-tfaa-autocomplete-dropdown {
@@ -81,5 +101,28 @@
     color: #1e293b;
 }
 
-.sywat-tfaa-autocomplete-dropdown > div:hover { background-color: #f1f5f9; }
-#sywat_edit_archer_modal, .sywat-modal-backdrop.sywat-nested-modal { z-index: 100050 !important; }
+.sywat-tfaa-autocomplete-dropdown > div:hover { 
+    background-color: #f1f5f9; 
+}
+
+#sywat_edit_archer_modal, 
+.sywat-modal-backdrop.sywat-nested-modal { 
+    z-index: 100050 !important; 
+}
+
+/* Mobile & Small Screen Adaptations */
+@media screen and (max-width: 600px) {
+    .sywat-modal-backdrop {
+        padding: 10px;
+    }
+    .sywat-modal-content,
+    .sywat-modal-sm,
+    .sywat-modal-md,
+    .sywat-modal-lg {
+        width: 100% !important;
+        max-height: 95vh;
+    }
+    .sywat-modal-body {
+        padding: 14px;
+    }
+}
