@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -109,20 +109,6 @@ function render_sywat_scores_app() {
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_tournament, $active_hubs);
     ?>
 
-    <style>
-        .sywat-score-input { width: 80px; padding: 6px 8px; border: 1px solid #94a3b8; border-radius: 4px; font-size: 14px; text-align: center; font-weight: bold; transition: all 0.15s ease-in-out; }
-        .sywat-score-input:focus { border-color: #2271b1; outline: 2px solid #2271b1; }
-        .sywat-score-input:disabled { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; cursor: not-allowed; }
-        .sywat-score-input.invalid-input { border: 2px solid #dc3545 !important; background-color: #f8d7da !important; color: #721c24 !important; }
-
-        .sywat-save-status { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; white-space: nowrap; }
-        .sywat-status-saved { color: #008a20; background: #d4edda; border: 1px solid #c3e6cb; }
-        .sywat-status-draft { color: #b45309; background: #fef3c7; border: 1px solid #fde68a; }
-        .sywat-status-saving { color: #0369a1; background: #e0f2fe; border: 1px solid #bae6fd; }
-        .sywat-status-error { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
-        .sywat-status-locked { color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; }
-    </style>
-
     <div class="sywat-wrap">
         <div class="no-print"><?php echo $notice; ?></div>
 
@@ -226,7 +212,6 @@ function render_sywat_scores_app() {
                 </div>
 
                 <?php if (!empty($tourn_registrations)): ?>
-                    <!-- Restored Responsive Table Scroll Wrapper -->
                     <div class="sywat-table-responsive">
                         <table class="sywat-table">
                             <thead>
@@ -273,10 +258,12 @@ function render_sywat_scores_app() {
                                             <?php else: ?>
                                                 <span class="sywat-save-status sywat-status-saved" id="status_<?php echo esc_attr($reg_id); ?>">✓ Saved</span>
                                             <?php endif; ?>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                         <?php if ($is_admin): ?>
