@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -406,19 +406,28 @@ function sywat_desk_render_modals($data) {
 
 function sywat_desk_render_client_scripts($data) {
     $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
-    $tfaa_shooters = isset( $tfaa_cache['shooters'] ) && is_array( $tfaa_cache['shooters'] ) 
-        ? $tfaa_cache['shooters'] 
-        : ( is_array( $tfaa_cache ) ? $tfaa_cache : array() );
+    $exact_entries = isset( $tfaa_cache['exact'] ) && is_array( $tfaa_cache['exact'] ) ? $tfaa_cache['exact'] : array();
 
     $js_tfaa_desk_data = array();
-    foreach ( $tfaa_shooters as $s ) {
-        $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
+    foreach ( $exact_entries as $norm_key => $records ) {
+        if ( ! is_array( $records ) || empty( $records ) ) continue;
+
+        // Prioritize Pro style if multiple records exist for this archer
+        $best_rec = $records[0];
+        foreach ( $records as $rec ) {
+            if ( isset( $rec['style'] ) && stripos( $rec['style'], 'FS Pro' ) !== false ) {
+                $best_rec = $rec;
+                break;
+            }
+        }
+
+        $name = isset( $best_rec['full_name'] ) ? $best_rec['full_name'] : ( isset( $best_rec['name'] ) ? $best_rec['name'] : '' );
         if ( ! empty( $name ) ) {
             $js_tfaa_desk_data[] = array(
                 'name'     => $name,
-                'division' => isset( $s['division'] ) ? $s['division'] : '',
-                'gender'   => isset( $s['gender'] ) ? $s['gender'] : '',
-                'style'    => isset( $s['style'] ) ? $s['style'] : '',
+                'division' => isset( $best_rec['division'] ) ? $best_rec['division'] : '',
+                'gender'   => isset( $best_rec['gender'] ) ? $best_rec['gender'] : '',
+                'style'    => isset( $best_rec['style'] ) ? $best_rec['style'] : '',
             );
         }
     }
@@ -482,15 +491,19 @@ function sywat_desk_render_client_scripts($data) {
         const clean = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
         if (!clean || clean.length < 2) return null;
 
-        if (tfaaData.exact && tfaaData.exact[clean]) return tfaaData.exact[clean];
+        let matches = null;
 
-        const parts = clean.split(' ');
-        if (parts.length > 1) {
-            const flKey = parts[0] + '___' + parts[parts.length - 1];
-            if (tfaaData.fl && tfaaData.fl[flKey]) return tfaaData.fl[flKey];
+        if (tfaaData.exact && tfaaData.exact[clean]) {
+            matches = tfaaData.exact[clean];
+        } else {
+            const parts = clean.split(' ');
+            if (parts.length > 1) {
+                const flKey = parts[0] + '___' + parts[parts.length - 1];
+                if (tfaaData.fl && tfaaData.fl[flKey]) matches = tfaaData.fl[flKey];
+            }
         }
 
-        if (tfaaData.exact) {
+        if (!matches && tfaaData.exact) {
             let partialMatches = [];
             const keys = Object.keys(tfaaData.exact);
             for (let i = 0; i < keys.length; i++) {
@@ -501,10 +514,19 @@ function sywat_desk_render_client_scripts($data) {
                     }
                 }
             }
-            if (partialMatches.length > 0) return partialMatches;
+            if (partialMatches.length > 0) matches = partialMatches;
         }
 
-        return null;
+        // Sort match array so 'FS Pro' records take priority over standard 'FS'
+        if (Array.isArray(matches) && matches.length > 1) {
+            matches.sort((a, b) => {
+                const aPro = (a.style && a.style.indexOf('FS Pro') !== -1) ? 1 : 0;
+                const bPro = (b.style && b.style.indexOf('FS Pro') !== -1) ? 1 : 0;
+                return bPro - aPro;
+            });
+        }
+
+        return matches;
     }
 
     function findShopHistoryMatch(typedName) {
@@ -558,11 +580,18 @@ function sywat_desk_render_client_scripts($data) {
                 if (keys[i].includes(query)) {
                     const arr = tfaaData.exact[keys[i]];
                     if (Array.isArray(arr) && arr.length > 0) {
+                        let best = arr[0];
+                        for (let k = 0; k < arr.length; k++) {
+                            if (arr[k].style && arr[k].style.indexOf('FS Pro') !== -1) {
+                                best = arr[k];
+                                break;
+                            }
+                        }
                         matches.push({
-                            name: arr[0].full_name || keys[i],
-                            division: arr[0].division || '',
-                            gender: arr[0].gender || '',
-                            style: arr[0].style || ''
+                            name: best.full_name || keys[i],
+                            division: best.division || '',
+                            gender: best.gender || '',
+                            style: best.style || ''
                         });
                     }
                     if (matches.length >= 8) break;
@@ -606,7 +635,7 @@ function sywat_desk_render_client_scripts($data) {
 
                     if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
                     if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
-                    if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
+                    if (styleEl && m.style) matchDeskTfaaSelect(m.style, styleEl);
                 }
 
                 if (typeof autoFillOnNameChange === 'function' && (prefix === 'walkin' || prefix === 'checkin')) {
@@ -750,20 +779,17 @@ function sywat_desk_render_client_scripts($data) {
         const typedName = nameInput.value;
         const tfaaMatches = findTfaaMatch(typedName);
 
-        if (tfaaMatches && tfaaMatches.length === 1) {
-            const single = tfaaMatches[0];
+        if (tfaaMatches && tfaaMatches.length > 0) {
+            const targetMatch = tfaaMatches[0];
             const divEl   = document.getElementById(prefix + '_division');
             const genEl   = document.getElementById(prefix + '_gender');
             const styleEl = document.getElementById(prefix + '_style');
 
-            if (divEl && single.division) matchDeskTfaaSelect(single.division, divEl);
-            if (genEl && single.gender) matchDeskTfaaSelect(single.gender, genEl);
-            if (styleEl && single.style) matchDeskTfaaSelect(styleEl, styleEl);
+            if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
+            if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
+            if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
 
             handleStyleRestrictions(prefix);
-        } else if (tfaaMatches && tfaaMatches.length > 1 && prefix === 'walkin') {
-            const firstCat = tfaaMatches[0];
-            loadTfaaCategory(prefix, firstCat.division, firstCat.gender, firstCat.style);
         } else if (prefix === 'walkin') {
             const shopMatch = findShopHistoryMatch(typedName);
             if (shopMatch) {
