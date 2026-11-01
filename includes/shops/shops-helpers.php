@@ -1,149 +1,138 @@
 <?php
 /**
- * Sub-Module: Shop Helpers & WP User Profile Integration
- * Path: includes/shops/shops-helpers.php
+ * Sub-Module: Shop & Club Action Processing & CRUD Logic
+ * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
  * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/**
- * Standardize Phone Number Formatting (XXX-XXX-XXXX)
- */
-if ( ! function_exists( 'sywat_format_phone_number' ) ) {
-    function sywat_format_phone_number( $phone ) {
-        $digits = preg_replace( '/\D/', '', $phone );
-        if ( strlen( $digits ) === 10 ) {
-            return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6, 4 );
-        }
-        return sanitize_text_field( $phone );
-    }
-}
+if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
+    function sywat_handle_shop_actions() {
+        $can_manage = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
+        if ( ! $can_manage ) return '';
+        if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) return '';
+        if ( ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) return '';
 
-/**
- * Ensure default seed shop exists upon loading
- */
-add_action( 'init', 'sywat_ensure_default_shop_exists' );
-if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
-    function sywat_ensure_default_shop_exists() {
-        $shops = get_option( 'sywat_shops_list', array() );
-        if ( empty( $shops ) || ! is_array( $shops ) ) {
+        $action = sanitize_text_field( $_POST['sywat_shop_action'] );
+        $shops  = sywat_get_shops();
+
+        if ( $action === 'create_shop' ) {
+            $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
+            if ( empty( $shop_name ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Shop / Club Name is required.</div>';
+            }
+            $shop_slug = 'shop_' . sanitize_title( $shop_name );
+            if ( isset( $shops[$shop_slug] ) ) {
+                $shop_slug .= '_' . substr( md5( time() ), 0, 4 );
+            }
+
             $default_lines = array(
                 array( 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
                 array( 'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
                 array( 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
                 array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
             );
-            $shops = array(
-                'shop_ccr' => array(
-                    'id'            => 'shop_ccr',
-                    'name'          => 'Cinnamon Creek Ranch',
-                    'district'      => '', // Defaults to Unassigned
-                    'facilities'    => array( 'pro_shop', 'indoor_range', '3d_range' ),
-                    'contact'       => 'Hannah Lange / Beau Brennan',
-                    'email'         => 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com',
-                    'phone'         => '817-439-8998',
-                    'address_1'     => '13795 Old Denton Rd',
-                    'address_2'     => '',
-                    'city'          => 'Roanoke',
-                    'state'         => 'TX',
-                    'zip'           => '76262',
-                    'default_lines' => $default_lines,
-                    'created_at'    => current_time( 'mysql' ),
-                )
+
+            $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
+
+            $shops[$shop_slug] = array(
+                'id'            => $shop_slug,
+                'name'          => $shop_name,
+                'district'      => isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '',
+                'facilities'    => $facilities,
+                'contact'       => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
+                'email'         => isset( $_POST['shop_email'] ) ? sanitize_text_field( $_POST['shop_email'] ) : '',
+                'phone'         => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( $_POST['shop_phone'] ) : '',
+                'address_1'     => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( $_POST['shop_address_1'] ) : '',
+                'address_2'     => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( $_POST['shop_address_2'] ) : '',
+                'city'          => isset( $_POST['shop_city'] ) ? sanitize_text_field( $_POST['shop_city'] ) : '',
+                'state'         => isset( $_POST['shop_state'] ) ? sanitize_text_field( $_POST['shop_state'] ) : '',
+                'zip'           => isset( $_POST['shop_zip'] ) ? sanitize_text_field( $_POST['shop_zip'] ) : '',
+                'default_lines' => $default_lines,
+                'created_at'    => current_time( 'mysql' ),
             );
+
             update_option( 'sywat_shops_list', $shops );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created shop / club <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
         }
-    }
-}
 
-/**
- * Fetch All Configured Archery Shops & Clubs
- */
-if ( ! function_exists( 'sywat_get_shops' ) ) {
-    function sywat_get_shops() {
-        $shops = get_option( 'sywat_shops_list', array() );
-        return is_array( $shops ) ? $shops : array();
-    }
-}
+        if ( $action === 'update_shop' ) {
+            $shop_id = sanitize_text_field( $_POST['shop_id'] );
+            if ( isset( $shops[$shop_id] ) ) {
+                $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
 
-/**
- * Fetch Current User's Assigned Shop ID
- * Allows Administrators, Management, and TFAA Admin roles to switch shop views
- */
-if ( ! function_exists( 'sywat_get_current_user_shop_id' ) ) {
-    function sywat_get_current_user_shop_id() {
-        $user = wp_get_current_user();
-        if ( ! $user || ! $user->ID ) return 'shop_ccr';
+                $shops[$shop_id]['name']       = sanitize_text_field( $_POST['shop_name'] );
+                $shops[$shop_id]['district']   = isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '';
+                $shops[$shop_id]['facilities'] = $facilities;
+                $shops[$shop_id]['contact']    = sanitize_text_field( $_POST['shop_contact'] );
+                $shops[$shop_id]['email']      = sanitize_text_field( $_POST['shop_email'] );
+                $shops[$shop_id]['phone']      = sywat_format_phone_number( $_POST['shop_phone'] );
+                $shops[$shop_id]['address_1']  = sanitize_text_field( $_POST['shop_address_1'] );
+                $shops[$shop_id]['address_2']  = sanitize_text_field( $_POST['shop_address_2'] );
+                $shops[$shop_id]['city']       = sanitize_text_field( $_POST['shop_city'] );
+                $shops[$shop_id]['state']      = sanitize_text_field( $_POST['shop_state'] );
+                $shops[$shop_id]['zip']        = sanitize_text_field( $_POST['shop_zip'] );
 
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
-        if ( array_intersect( $admin_roles, (array) $user->roles ) ) {
-            if ( isset( $_REQUEST['sywat_shop_filter'] ) ) {
-                return sanitize_text_field( $_REQUEST['sywat_shop_filter'] );
+                if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
+                    $new_lines = array();
+                    foreach ( $_POST['line_names'] as $index => $name ) {
+                        if ( trim( $name ) !== '' ) {
+                            $new_lines[] = array(
+                                'name'     => sanitize_text_field( $name ),
+                                'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
+                                'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
+                            );
+                        }
+                    }
+                    if ( ! empty( $new_lines ) ) {
+                        $shops[$shop_id]['default_lines'] = $new_lines;
+                    }
+                }
+
+                update_option( 'sywat_shops_list', $shops );
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated details for <strong>' . esc_html( $shops[$shop_id]['name'] ) . '</strong>.</div>';
             }
         }
 
-        $shop_id = get_user_meta( $user->ID, 'sywat_shop_id', true );
-        return ! empty( $shop_id ) ? $shop_id : 'shop_ccr';
-    }
-}
+        if ( $action === 'delete_shop' ) {
+            $shop_id = sanitize_text_field( $_POST['shop_id'] );
+            if ( isset( $shops[$shop_id] ) ) {
+                $deleted_name = $shops[$shop_id]['name'];
+                unset( $shops[$shop_id] );
+                update_option( 'sywat_shops_list', $shops );
 
-/**
- * WP Admin User Profile Integration (Users > Edit User)
- */
-add_action( 'show_user_profile', 'sywat_render_user_profile_shop_field' );
-add_action( 'edit_user_profile', 'sywat_render_user_profile_shop_field' );
+                $assigned_users = get_users( array( 'meta_key' => 'sywat_shop_id', 'meta_value' => $shop_id ) );
+                foreach ( $assigned_users as $u ) {
+                    delete_user_meta( $u->ID, 'sywat_shop_id' );
+                }
 
-if ( ! function_exists( 'sywat_render_user_profile_shop_field' ) ) {
-    function sywat_render_user_profile_shop_field( $user ) {
-        $curr_user = wp_get_current_user();
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
-        if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
-
-        if ( ! array_intersect( array( 'sywat_shop_manager', 'sywat_shop_user' ), (array) $user->roles ) ) {
-            return;
-        }
-        $current_shop = get_user_meta( $user->ID, 'sywat_shop_id', true );
-        $shops = sywat_get_shops();
-        ?>
-        <h3>SYWAT Tournament Shop / Club Assignment</h3>
-        <table class="form-table">
-            <tr>
-                <th><label for="sywat_shop_id">Assigned Location</label></th>
-                <td>
-                    <select name="sywat_shop_id" id="sywat_shop_id">
-                        <option value="" <?php selected( empty( $current_shop ), true ); ?>>-- Unassigned (No Shop/Club Linked) --</option>
-                        <?php foreach ( $shops as $s_id => $shop ): ?>
-                            <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $current_shop, $s_id ); ?>>
-                                <?php echo esc_html( $shop['name'] ); ?> (ID: <?php echo esc_html( $s_id ); ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="description">Select the shop or club this user account belongs to for tournament management and scoping.</p>
-                </td>
-            </tr>
-        </table>
-        <?php
-    }
-}
-
-add_action( 'personal_options_update', 'sywat_save_user_profile_shop_field' );
-add_action( 'edit_user_profile_update', 'sywat_save_user_profile_shop_field' );
-
-if ( ! function_exists( 'sywat_save_user_profile_shop_field' ) ) {
-    function sywat_save_user_profile_shop_field( $user_id ) {
-        $curr_user = wp_get_current_user();
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
-        if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
-
-        if ( isset( $_POST['sywat_shop_id'] ) ) {
-            $val = sanitize_text_field( $_POST['sywat_shop_id'] );
-            if ( empty( $val ) ) {
-                delete_user_meta( $user_id, 'sywat_shop_id' );
-            } else {
-                update_user_meta( $user_id, 'sywat_shop_id', $val );
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted shop / club <strong>' . esc_html( $deleted_name ) . '</strong>.</div>';
             }
         }
+
+        if ( $action === 'assign_staff_to_shop' ) {
+            $target_user_id = intval( $_POST['staff_user_id'] );
+            $target_shop_id = sanitize_text_field( $_POST['target_shop_id'] );
+            if ( $target_user_id > 0 && isset( $shops[$target_shop_id] ) ) {
+                update_user_meta( $target_user_id, 'sywat_shop_id', $target_shop_id );
+                $u = get_userdata( $target_user_id );
+                $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Assigned <strong>' . esc_html( $u_name ) . '</strong> to <strong>' . esc_html( $shops[$target_shop_id]['name'] ) . '</strong>.</div>';
+            }
+        }
+
+        if ( $action === 'remove_staff_from_shop' ) {
+            $target_user_id = intval( $_POST['staff_user_id'] );
+            if ( $target_user_id > 0 ) {
+                delete_user_meta( $target_user_id, 'sywat_shop_id' );
+                $u = get_userdata( $target_user_id );
+                $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Unlinked <strong>' . esc_html( $u_name ) . '</strong> from shop assignment.</div>';
+            }
+        }
+
+        return '';
     }
 }
