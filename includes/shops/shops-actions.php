@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.5.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -21,7 +21,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         if ( $action === 'create_shop' ) {
             $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
             if ( empty( $shop_name ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Shop / Club Name is required.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Location Name is required.</div>';
             }
             $shop_slug = 'shop_' . sanitize_title( $shop_name );
             if ( isset( $shops[$shop_slug] ) ) {
@@ -36,10 +36,12 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             );
 
             $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
+            $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
 
             $shops[$shop_slug] = array(
                 'id'            => $shop_slug,
                 'name'          => $shop_name,
+                'location_type' => $loc_type,
                 'district'      => isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '',
                 'facilities'    => $facilities,
                 'contact'       => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
@@ -55,7 +57,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             );
 
             update_option( 'sywat_shops_list', $shops );
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created shop / club <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created location <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
         }
 
         if ( $action === 'update_shop' ) {
@@ -63,17 +65,18 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             if ( isset( $shops[$shop_id] ) ) {
                 $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
 
-                $shops[$shop_id]['name']       = sanitize_text_field( $_POST['shop_name'] );
-                $shops[$shop_id]['district']   = isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '';
-                $shops[$shop_id]['facilities'] = $facilities;
-                $shops[$shop_id]['contact']    = sanitize_text_field( $_POST['shop_contact'] );
-                $shops[$shop_id]['email']      = sanitize_text_field( $_POST['shop_email'] );
-                $shops[$shop_id]['phone']      = sywat_format_phone_number( $_POST['shop_phone'] );
-                $shops[$shop_id]['address_1']  = sanitize_text_field( $_POST['shop_address_1'] );
-                $shops[$shop_id]['address_2']  = sanitize_text_field( $_POST['shop_address_2'] );
-                $shops[$shop_id]['city']       = sanitize_text_field( $_POST['shop_city'] );
-                $shops[$shop_id]['state']      = sanitize_text_field( $_POST['shop_state'] );
-                $shops[$shop_id]['zip']        = sanitize_text_field( $_POST['shop_zip'] );
+                $shops[$shop_id]['name']          = sanitize_text_field( $_POST['shop_name'] );
+                $shops[$shop_id]['location_type'] = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
+                $shops[$shop_id]['district']      = isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '';
+                $shops[$shop_id]['facilities']    = $facilities;
+                $shops[$shop_id]['contact']       = sanitize_text_field( $_POST['shop_contact'] );
+                $shops[$shop_id]['email']         = sanitize_text_field( $_POST['shop_email'] );
+                $shops[$shop_id]['phone']         = sywat_format_phone_number( $_POST['shop_phone'] );
+                $shops[$shop_id]['address_1']     = sanitize_text_field( $_POST['shop_address_1'] );
+                $shops[$shop_id]['address_2']     = sanitize_text_field( $_POST['shop_address_2'] );
+                $shops[$shop_id]['city']          = sanitize_text_field( $_POST['shop_city'] );
+                $shops[$shop_id]['state']         = sanitize_text_field( $_POST['shop_state'] );
+                $shops[$shop_id]['zip']           = sanitize_text_field( $_POST['shop_zip'] );
 
                 if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
                     $new_lines = array();
@@ -108,7 +111,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     delete_user_meta( $u->ID, 'sywat_shop_id' );
                 }
 
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted shop / club <strong>' . esc_html( $deleted_name ) . '</strong>.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted location <strong>' . esc_html( $deleted_name ) . '</strong>.</div>';
             }
         }
 
@@ -129,7 +132,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 delete_user_meta( $target_user_id, 'sywat_shop_id' );
                 $u = get_userdata( $target_user_id );
                 $u_name = ( $u && isset( $u->display_name ) ) ? $u->display_name : 'User';
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Unlinked <strong>' . esc_html( $u_name ) . '</strong> from shop assignment.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Unlinked <strong>' . esc_html( $u_name ) . '</strong> from location assignment.</div>';
             }
         }
 
