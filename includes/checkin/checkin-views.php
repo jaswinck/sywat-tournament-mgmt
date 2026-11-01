@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -249,18 +249,18 @@ function sywat_desk_render_archers_table($data) {
         </div>
 
         <?php if (!empty($tourn_registrations)): ?>
-            <table class="sywat-table">
+            <table class="sywat-table" style="table-layout: auto;">
                 <thead>
                     <tr>
-                        <th style="text-align:left;">Name</th>
-                        <th style="text-align:center;">Type</th>
-                        <th style="text-align:left;">Line</th>
-                        <th style="text-align:left;">Division</th>
-                        <th style="text-align:center;">Gender</th>
-                        <th style="text-align:left;">Style</th>
-                        <th style="text-align:left;">Paid Status</th>
-                        <th style="text-align:center;">Distance</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th style="width: 20%; text-align:left;">Name</th>
+                        <th style="width: 8%; text-align:center;">Type</th>
+                        <th style="width: 10%; text-align:left;">Line</th>
+                        <th style="width: 16%; text-align:left;">Division</th>
+                        <th style="width: 7%; text-align:center;">Gender</th>
+                        <th style="width: 11%; text-align:left;">Style</th>
+                        <th style="width: 8%; text-align:left;">Paid Status</th>
+                        <th style="width: 6%; text-align:center;">Distance</th>
+                        <th style="width: 22%; text-align:right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -301,13 +301,13 @@ function sywat_desk_render_archers_table($data) {
                                 <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
                             </td>
                             <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'N/A'); ?></td>
-                            <td><?php echo esc_html($div_disp); ?></td>
+                            <td style="white-space: nowrap;"><?php echo esc_html($div_disp); ?></td>
                             <td style="text-align:center;"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
                             <td><?php echo esc_html($style_disp); ?></td>
                             <td style="font-weight:bold; color:#0073aa;"><?php echo esc_html($paid_disp); ?></td>
                             <td style="text-align:center;"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
                             <td style="text-align:right;">
-                                <div style="display:inline-flex; gap:4px; align-items:center;">
+                                <div style="display:inline-flex; gap:4px; align-items:center; justify-content:flex-end; white-space:nowrap;">
                                     <form method="post" style="margin:0;">
                                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                         <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
