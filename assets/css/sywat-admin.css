@@ -331,7 +331,7 @@ body {
 /* Line Capacity Tracker Grid & Responsive Cards */
 .sywat-tracker-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 12px;
     margin-top: 10px;
 }
@@ -420,6 +420,7 @@ body {
 
 .sywat-table {
     width: 100%;
+    min-width: 880px; /* Forces optimal column spacing at all mid-tier screen sizes */
     border-collapse: collapse;
     margin-top: 10px;
     font-size: 13px;
@@ -432,6 +433,7 @@ body {
     font-weight: 600;
     color: #1d2327;
     border-bottom: 1px solid #c3c4c7;
+    white-space: nowrap;
 }
 
 .sywat-table td {
@@ -441,13 +443,13 @@ body {
     vertical-align: middle;
 }
 
-/* Action Buttons Flex Container & Stacking Support */
+/* Action Buttons Flex Container */
 .sywat-table-actions {
     display: flex;
     gap: 4px;
     align-items: center;
     justify-content: flex-end;
-    flex-wrap: wrap;
+    white-space: nowrap;
 }
 
 .sywat-table th.text-center,
