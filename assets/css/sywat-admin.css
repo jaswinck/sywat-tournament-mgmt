@@ -328,6 +328,61 @@ body {
     border: 1px solid #f5c6cb;
 }
 
+/* Filter Bar Control Panel Toolbar */
+.sywat-filter-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.sywat-filter-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.sywat-filter-form {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+
+.sywat-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.sywat-filter-field label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1;
+}
+
+.sywat-filter-field select {
+    height: 30px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #ffffff;
+    min-width: 180px;
+}
+
 /* Line Capacity Tracker Grid & Responsive Cards */
 .sywat-tracker-grid {
     display: grid;
@@ -420,7 +475,7 @@ body {
 
 .sywat-table {
     width: 100%;
-    min-width: 880px; /* Forces optimal column spacing at all mid-tier screen sizes */
+    min-width: 880px;
     border-collapse: collapse;
     margin-top: 10px;
     font-size: 13px;
