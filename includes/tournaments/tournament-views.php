@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -125,11 +125,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <!-- Navigation Tabs -->
+            <!-- Navigation Tabs (Option A: Action-Driven Navigation) -->
             <div class="sywat-nav-tabs no-print">
-                <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Tournament Management</a>
+                <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_manage_seasons ): ?>
-                    <a href="?tab=seasons" class="sywat-tab-item sywat-tab-icon-season <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Season Management</a>
+                    <a href="?tab=seasons" class="sywat-tab-item sywat-tab-icon-season <?php echo $active_tab === 'seasons' ? 'active' : ''; ?>">Manage Seasons</a>
                 <?php endif; ?>
             </div>
 
@@ -270,7 +270,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         </td>
                                         <td style="text-align: right;">
                                             <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check-In Desk</a>
+                                                <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check In Archers</a>
                                                 <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Enter Scores</a>
 
                                                 <form method="post" class="sywat-table-action-form" onsubmit="return confirm('<?php echo esc_js( $confirm_msg_raw ); ?>');">
