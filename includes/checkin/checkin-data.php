@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: checkin-data.php
  * Author: SYWAT Archery
- * Version: 3.3.1
+ * Version: 3.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -143,7 +143,7 @@ function sywat_desk_get_data() {
         'updated_at' => isset($tfaa_cache_option['updated_at']) ? $tfaa_cache_option['updated_at'] : 'Never'
     );
 
-    // Build Line-Scoped & Smart-Named Family Groups
+    // Build Line-Scoped & Smart-Named Family Groups (STRICT FILTER)
     $existing_families_by_line = array();
     $family_members_by_id      = array();
 
@@ -151,9 +151,9 @@ function sywat_desk_get_data() {
         $fid = !empty($r['family_id']) ? trim($r['family_id']) : '';
         if (empty($fid)) continue;
 
-        $is_fam = (isset($r['paid']) && $r['paid'] === 'Family')
-               || (!empty($r['rate_type']) && strtolower($r['rate_type']) === 'family')
-               || !empty($r['family_id']);
+        // Strict Check: Only include if explicitly paid/registered as Family Rate
+        $is_fam = (isset($r['paid']) && strcasecmp($r['paid'], 'Family') === 0)
+               || (!empty($r['rate_type']) && stripos($r['rate_type'], 'family') !== false);
 
         if (!$is_fam) continue;
 
