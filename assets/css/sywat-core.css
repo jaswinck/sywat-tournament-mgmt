@@ -10,8 +10,9 @@ body {
 .sywat-app {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     color: #2c3338;
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
+    padding: 0 16px;
     box-sizing: border-box;
 }
 
@@ -27,7 +28,7 @@ body {
 }
 
 .sywat-auth-bar-inner {
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
     display: flex;
@@ -486,10 +487,52 @@ body {
     display: none !important;
 }
 
+/* Responsive Form Grids & Structural Layout Helpers */
+.sywat-form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.sywat-form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.sywat-form-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.sywat-full-width {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+.sywat-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.sywat-field-group label {
+    font-weight: 700;
+    font-size: 12px;
+    color: #1e293b;
+}
+
 @media (max-width: 768px) {
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
     .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
     .sywat-wrap, .sywat-app { padding: 0 10px; }
     .sywat-nav-tabs { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
     .sywat-nav-tabs::-webkit-scrollbar { display: none; }
+
+    .sywat-form-grid-2,
+    .sywat-form-grid-3 {
+        grid-template-columns: 1fr !important;
+    }
 }
