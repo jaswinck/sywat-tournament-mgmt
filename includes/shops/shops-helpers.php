@@ -2,7 +2,8 @@
 /**
  * Sub-Module: Shop Helpers & WP User Profile Integration
  * Path: includes/shops/shops-helpers.php
- * Author: SYWAT Archery
+ * Author: SYWAT Archery / TFAA
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -38,6 +39,8 @@ if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
                 'shop_ccr' => array(
                     'id'            => 'shop_ccr',
                     'name'          => 'Cinnamon Creek Ranch',
+                    'district'      => '', // Defaults to Unassigned
+                    'facilities'    => array( 'pro_shop', 'indoor_range', '3d_range' ),
                     'contact'       => 'Hannah Lange / Beau Brennan',
                     'email'         => 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com',
                     'phone'         => '817-439-8998',
@@ -56,7 +59,7 @@ if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
 }
 
 /**
- * Fetch All Configured Archery Shops
+ * Fetch All Configured Archery Shops & Clubs
  */
 if ( ! function_exists( 'sywat_get_shops' ) ) {
     function sywat_get_shops() {
@@ -104,20 +107,20 @@ if ( ! function_exists( 'sywat_render_user_profile_shop_field' ) ) {
         $current_shop = get_user_meta( $user->ID, 'sywat_shop_id', true );
         $shops = sywat_get_shops();
         ?>
-        <h3>SYWAT Tournament Shop Assignment</h3>
+        <h3>SYWAT Tournament Shop / Club Assignment</h3>
         <table class="form-table">
             <tr>
-                <th><label for="sywat_shop_id">Assigned Archery Shop</label></th>
+                <th><label for="sywat_shop_id">Assigned Location</label></th>
                 <td>
                     <select name="sywat_shop_id" id="sywat_shop_id">
-                        <option value="" <?php selected( empty( $current_shop ), true ); ?>>-- Unassigned (No Shop Linked) --</option>
+                        <option value="" <?php selected( empty( $current_shop ), true ); ?>>-- Unassigned (No Shop/Club Linked) --</option>
                         <?php foreach ( $shops as $s_id => $shop ): ?>
                             <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $current_shop, $s_id ); ?>>
                                 <?php echo esc_html( $shop['name'] ); ?> (ID: <?php echo esc_html( $s_id ); ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="description">Select the shop this user account belongs to for tournament management and scoping.</p>
+                    <p class="description">Select the shop or club this user account belongs to for tournament management and scoping.</p>
                 </td>
             </tr>
         </table>
