@@ -2,9 +2,9 @@
 /**
  * Module: Archer Roster Management & Validation
  * Path: includes/class-sywat-roster.php
- * Description: Archer editing logic, division/style restrictions, family group assignments, line purges, and manage modal HTML.
+ * Description: Archer editing logic, division/style restrictions, strict family line-scoping, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -36,6 +36,28 @@ if ( ! function_exists( 'sywat_sanitize_style_for_division' ) ) {
     }
 }
 
+if ( ! function_exists( 'sywat_roster_resolve_line_idx' ) ) {
+    function sywat_roster_resolve_line_idx($reg, $lines) {
+        if (isset($reg['line_index']) && $reg['line_index'] !== '') {
+            $idx = (string)$reg['line_index'];
+            if (isset($lines[$idx])) return $idx;
+            foreach ($lines as $l_key => $l_data) {
+                if (isset($l_data['name']) && strcasecmp(trim($l_data['name']), trim($idx)) === 0) {
+                    return (string)$l_key;
+                }
+            }
+        }
+        if (isset($reg['line_name']) && !empty($reg['line_name'])) {
+            foreach ($lines as $l_key => $l_data) {
+                if (isset($l_data['name']) && strcasecmp(trim($l_data['name']), trim($reg['line_name'])) === 0) {
+                    return (string)$l_key;
+                }
+            }
+        }
+        return isset($reg['line_index']) ? (string)$reg['line_index'] : '0';
+    }
+}
+
 if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
     function sywat_handle_save_edit( $tournaments, &$registrations ) {
         $edit_id       = sanitize_text_field( $_POST['registration_id'] ?? '' );
@@ -45,7 +67,6 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         $opt_key = 'sywat_t_' . $t_slug . '_' . $edit_id;
         $reg     = get_option($opt_key);
 
-        // Fallback: search in-memory registrations array if single option doesn't exist
         if ( ! $reg && ! empty( $registrations ) ) {
             foreach ( $registrations as $r ) {
                 if ( isset( $r['id'] ) && (string)$r['id'] === (string)$edit_id ) {
@@ -56,6 +77,7 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         }
 
         if ($reg) {
+            $edit_name = trim(sanitize_text_field($_POST['edit_name'] ?? ''));
             $line_idx  = sanitize_text_field($_POST['edit_line_index'] ?? '0');
             $line_name = isset($tournaments[$tourn_context][$line_idx]['name']) ? $tournaments[$tourn_context][$line_idx]['name'] : 'Line ' . ((int)$line_idx + 1);
             $division  = sanitize_text_field($_POST['edit_division'] ?? '');
@@ -63,8 +85,11 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $pay_opt   = sanitize_text_field($_POST['edit_pay_option'] ?? '');
             $style     = sanitize_text_field($_POST['edit_style'] ?? '');
             $due_val   = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
+            
+            $orig_name = isset($reg['name']) ? trim($reg['name']) : '';
+            $orig_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
 
-            $reg['name']        = sanitize_text_field($_POST['edit_name'] ?? '');
+            $reg['name']        = $edit_name;
             $reg['line_index']  = $line_idx;
             $reg['line_name']   = $line_name;
             $reg['distance']    = $distance;
@@ -74,24 +99,34 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $reg['paid']        = sywat_calculate_paid_status($pay_opt, $division);
             $reg['balance_due'] = $due_val;
 
+            // Handle strict Family Anchor assignments
             if ($reg['paid'] === 'Family') {
-                if (!empty($_POST['edit_family_group_id'])) {
-                    $reg['family_id'] = sanitize_text_field($_POST['edit_family_group_id']);
-                } elseif (!empty($_POST['edit_new_family_name'])) {
-                    $reg['family_id']   = 'fam_' . sanitize_title($_POST['edit_new_family_name']);
-                    $reg['family_name'] = sanitize_text_field($_POST['edit_new_family_name']);
-                } elseif (empty($reg['family_id'])) {
-                    $reg['family_id']   = uniqid('fam_');
+                $sel_fam_id = isset($_POST['edit_family_group_id']) ? sanitize_text_field($_POST['edit_family_group_id']) : '';
+
+                if (!empty($sel_fam_id)) {
+                    $reg['family_id'] = $sel_fam_id;
+                    
+                    // Re-calculate the label just in case it wasn't passed, though we mostly just need the ID
+                    $existing_label = 'Family Group';
+                    foreach ($registrations as $other) {
+                        if (isset($other['family_id']) && $other['family_id'] === $sel_fam_id && !empty($other['family_name'])) {
+                            $existing_label = $other['family_name'];
+                            break;
+                        }
+                    }
+                    $reg['family_name'] = $existing_label;
+                } elseif (empty($reg['family_id']) || $orig_line !== $line_idx) {
+                    // Generate new Anchor Family ID if moved to a new line or previously unassigned
+                    $reg['family_id']   = 'fam_' . $t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($edit_name) . '_' . substr(md5(uniqid()), 0, 4);
+                    $reg['family_name'] = $edit_name . ' (Family Cap)';
                 }
             } else {
                 unset($reg['family_id']);
                 unset($reg['family_name']);
             }
 
-            // 1. Update single option key
             update_option($opt_key, $reg, false);
 
-            // 2. Update memory array
             foreach ($registrations as &$r) {
                 if (isset($r['id']) && (string)$r['id'] === (string)$edit_id) {
                     $r = $reg;
@@ -100,7 +135,6 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             }
             unset($r);
 
-            // 3. Synchronize master tournament array options
             $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
             if ( ! is_array( $master_regs ) ) $master_regs = array();
             $master_regs[$edit_id] = $reg;
@@ -133,7 +167,6 @@ if ( ! function_exists( 'sywat_handle_delete_shooter' ) ) {
 
         $registrations = $new_registrations;
 
-        // Synchronize master array options
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
         if ( is_array( $master_regs ) && isset( $master_regs[$delete_id] ) ) {
             unset( $master_regs[$delete_id] );
@@ -171,7 +204,6 @@ if ( ! function_exists( 'sywat_handle_purge_line' ) ) {
 
         $registrations = array_values($registrations);
 
-        // Synchronize master array options
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
 
@@ -181,11 +213,68 @@ if ( ! function_exists( 'sywat_handle_purge_line' ) ) {
 
 // Manage Archers Modal UI Renderer
 if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
-    function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '', $existing_families = array() ) {
+    function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '' ) {
         
         $divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)', 'Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)');
         $genders = array('Male', 'Female');
         $sywat_styles = array('FS – Freestyle', 'FS Pro – Freestyle Pro', 'FSL – Freestyle Limited', 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)', 'BHFS – Bowhunter Freestyle', 'MBH – Modern Bowhunter', 'BB Barebow', 'BBC – Barebow Compound', 'BBR – Barebow Recurve', 'TRAD – Traditional', 'LB – Longbow', 'Genesis');
+
+        // STRICT FILTER: Build Line-Scoped & Smart-Named Family Groups array for JS dynamic dropdowns
+        $existing_families_by_line = array();
+        $family_members_by_id      = array();
+
+        foreach ($registrations as $r) {
+            $fid = !empty($r['family_id']) ? trim($r['family_id']) : '';
+            if (empty($fid)) continue;
+
+            $is_fam = (isset($r['paid']) && strcasecmp($r['paid'], 'Family') === 0)
+                   || (!empty($r['rate_type']) && stripos($r['rate_type'], 'family') !== false);
+
+            if (!$is_fam) continue;
+
+            $resolved_l_idx = sywat_roster_resolve_line_idx($r, $available_lines);
+
+            if (!isset($family_members_by_id[$fid])) {
+                $family_members_by_id[$fid] = array(
+                    'line_idx'    => $resolved_l_idx,
+                    'family_name' => !empty($r['family_name']) ? trim($r['family_name']) : '',
+                    'names'       => array(),
+                );
+            }
+            if (!empty($r['name'])) {
+                $family_members_by_id[$fid]['names'][] = trim($r['name']);
+            }
+        }
+
+        foreach ($family_members_by_id as $fid => $fam_info) {
+            $l_idx     = $fam_info['line_idx'];
+            $raw_fname = $fam_info['family_name'];
+            $names     = $fam_info['names'];
+
+            if (!empty($raw_fname) && stripos($raw_fname, 'fam_') === false && stripos($raw_fname, 'Booking') === false && strlen($raw_fname) > 2) {
+                $label = $raw_fname;
+            } elseif (!empty($names)) {
+                if (count($names) == 1) {
+                    $label = $names[0] . ' Group';
+                } elseif (count($names) <= 3) {
+                    $last_names = array_map(function($n) {
+                        $p = explode(' ', trim($n));
+                        return end($p);
+                    }, $names);
+                    $label = implode(' / ', array_unique($last_names)) . ' Group';
+                } else {
+                    $p = explode(' ', trim($names[0]));
+                    $label = end($p) . ' Family Group (' . count($names) . ' Archers)';
+                }
+            } else {
+                $label = 'Family Group (' . substr($fid, -6) . ')';
+            }
+
+            if (!isset($existing_families_by_line[$l_idx])) {
+                $existing_families_by_line[$l_idx] = array();
+            }
+            $existing_families_by_line[$l_idx][$fid] = $label;
+        }
 
         // Filter registrations for this tournament
         $filtered_registrations = array_filter( $registrations, function( $reg ) use ( $selected_tournament, $filter_line_idx, $available_lines ) {
@@ -270,7 +359,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     <thead>
                         <tr>
                             <th style="text-align:left;">Shooter Name</th>
-                            <th style="text-align:center;">Type</th>
+                            <th style="text-align:center;">Type / Payment</th>
                             <th style="text-align:left;">Line</th>
                             <th style="text-align:center;">Distance</th>
                             <th style="text-align:right;">Action</th>
@@ -280,12 +369,33 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <?php foreach ( $filtered_registrations as $reg ): ?>
                             <?php 
                                 $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
-                                $badge_type  = ! empty( $reg['is_walkin'] ) ? 'Walk-In' : 'Pre-Reg';
+                                $badge_type  = ! empty( $reg['is_walkin'] ) || (isset($reg['type']) && $reg['type'] === 'Walk-In') ? 'Walk-In' : 'Pre-Reg';
                                 $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+
+                                $paid_status = isset($reg['paid']) ? $reg['paid'] : '';
+                                $fam_label = '';
+                                if ($paid_status === 'Family' && !empty($reg['family_id'])) {
+                                    $lidx = sywat_roster_resolve_line_idx($reg, $available_lines);
+                                    if (isset($existing_families_by_line[$lidx][$reg['family_id']])) {
+                                        $fam_label = $existing_families_by_line[$lidx][$reg['family_id']];
+                                    }
+                                }
                             ?>
                             <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
-                                <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
-                                <td style="text-align:center;"><span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span></td>
+                                <td>
+                                    <strong><?php echo esc_html( $reg['name'] ); ?></strong>
+                                    <?php if (!empty($fam_label)): ?>
+                                        <div style="font-size:11px; color:#155724; background:#d4edda; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:2px;">
+                                            🟢 <?php echo esc_html($fam_label); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align:center;">
+                                    <span class="sywat-badge <?php echo $badge_class; ?>" style="margin-bottom:3px;"><?php echo esc_html( $badge_type ); ?></span>
+                                    <?php if ($paid_status === 'Family'): ?>
+                                        <br><span style="font-size:10px; font-weight:bold; color:#0284c7; background:#e0f2fe; padding:2px 4px; border-radius:3px;">Family Cap</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
                                 <td style="text-align:center;"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                 <td style="text-align:right;">
@@ -319,6 +429,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                 </div>
                 <div class="sywat-modal-body">
                     <?php if ( $target_archer ): ?>
+                        <?php 
+                            $curr_line = isset($target_archer['line_index']) ? $target_archer['line_index'] : '0'; 
+                            $curr_fam_id = isset($target_archer['family_id']) ? $target_archer['family_id'] : '';
+                            $modal_line_families = isset($existing_families_by_line[$curr_line]) ? $existing_families_by_line[$curr_line] : array();
+                        ?>
                         <form method="post" action="?tab=manage&view_tournament=<?php echo urlencode($selected_tournament); ?>&modal_action=manage">
                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                             <input type="hidden" name="sywat_action" value="save_edit">
@@ -333,8 +448,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </div>
                                 <div>
                                     <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line</label>
-                                    <select name="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
-                                        <?php $curr_line = isset($target_archer['line_index']) ? $target_archer['line_index'] : ''; ?>
+                                    <select name="edit_line_index" id="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required onchange="updateRosterEditFamilyOptions(this.value)">
                                         <?php foreach ($available_lines as $idx => $line): ?>
                                             <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>><?php echo esc_html(isset($line['name']) ? $line['name'] : 'Line ' . ($idx + 1)); ?></option>
                                         <?php endforeach; ?>
@@ -372,13 +486,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     </select>
                                 </div>
                                 <div id="edit_family_group_box" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>">
-                                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Assign to Family Group</label>
-                                    <select name="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-                                        <option value="">[ + Create New Family Group ]</option>
-                                        <?php $curr_fam_id = isset($target_archer['family_id']) ? $target_archer['family_id'] : '';
-                                        foreach ($existing_families as $fid => $flabel) echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>'; ?>
+                                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Assign to Line Family Group</label>
+                                    <select name="edit_family_group_id" id="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+                                        <option value="">[ + Start New Family Group for This Line ]</option>
+                                        <?php foreach ($modal_line_families as $fid => $flabel) echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>'; ?>
                                     </select>
-                                    <input type="text" name="edit_new_family_name" placeholder="Or type new family name..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; margin-top:5px;">
                                 </div>
                                 <div>
                                     <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Balance Due ($)</label>
@@ -406,6 +518,24 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         </div>
 
         <script>
+        const existingFamiliesByLine = <?php echo json_encode($existing_families_by_line); ?>;
+
+        function updateRosterEditFamilyOptions(lineIdx) {
+            const famSelect = document.getElementById('edit_family_group_id');
+            if (!famSelect) return;
+
+            famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+
+            const fams = (existingFamiliesByLine && existingFamiliesByLine[lineIdx]) ? existingFamiliesByLine[lineIdx] : {};
+
+            Object.keys(fams).forEach(fid => {
+                const opt = document.createElement('option');
+                opt.value = fid;
+                opt.textContent = fams[fid];
+                famSelect.appendChild(opt);
+            });
+        }
+
         function closeEditArcherModal() {
             const modal = document.getElementById('sywat_edit_archer_modal');
             if (modal) modal.classList.remove('active');
