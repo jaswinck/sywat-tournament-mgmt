@@ -4,14 +4,14 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Register clean, essential organizational roles safely in WordPress.
- * Uses clean display labels (omits redundant "TFAA" prefix) while maintaining database slug safety.
+ * Updates role display labels in the WP database option to strip redundant "TFAA" prefixes.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
@@ -35,16 +35,27 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
         );
 
         global $wp_roles;
+        if ( ! isset( $wp_roles ) ) {
+            $wp_roles = new WP_Roles();
+        }
+
+        $needs_db_update = false;
 
         foreach ( $roles_definition as $slug => $display_name ) {
             if ( null === get_role( $slug ) ) {
                 add_role( $slug, $display_name, array( 'read' => true ) );
             } else {
-                // Update display label in memory if role already exists in DB
-                if ( isset( $wp_roles->roles[ $slug ] ) ) {
+                // Update display label in memory and flag DB option update if mismatched
+                if ( isset( $wp_roles->roles[ $slug ] ) && $wp_roles->roles[ $slug ]['name'] !== $display_name ) {
                     $wp_roles->roles[ $slug ]['name'] = $display_name;
+                    $wp_roles->role_names[ $slug ]     = $display_name;
+                    $needs_db_update = true;
                 }
             }
+        }
+
+        if ( $needs_db_update ) {
+            update_option( $wp_roles->role_key, $wp_roles->roles );
         }
     }
 }
