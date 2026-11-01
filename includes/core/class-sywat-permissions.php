@@ -4,60 +4,54 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Register clean, essential TFAA & Shop roles safely in WordPress.
+ * Register clean, essential organizational roles safely in WordPress.
+ * Uses clean display labels (omits redundant "TFAA" prefix) while maintaining database slug safety.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
-        // 1. Multi-Shop Roles
-        if ( null === get_role( 'sywat_shop_manager' ) ) {
-            add_role( 'sywat_shop_manager', 'SYWAT Shop Manager', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'sywat_shop_user' ) ) {
-            add_role( 'sywat_shop_user', 'SYWAT Shop User', array( 'read' => true ) );
-        }
+        $roles_definition = array(
+            // Multi-Shop Roles
+            'sywat_shop_manager'         => 'Shop Manager',
+            'sywat_shop_user'            => 'Shop User',
 
-        // 2. TFAA Executive Board Roles
-        if ( null === get_role( 'tfaa_president' ) ) {
-            add_role( 'tfaa_president', 'TFAA President', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_vice_president' ) ) {
-            add_role( 'tfaa_vice_president', 'TFAA Vice-President', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_treasurer' ) ) {
-            add_role( 'tfaa_treasurer', 'TFAA Treasurer', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_secretary' ) ) {
-            add_role( 'tfaa_secretary', 'TFAA Secretary', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_tournament_director' ) ) {
-            add_role( 'tfaa_tournament_director', 'TFAA Tournament Director', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_social_media_director' ) ) {
-            add_role( 'tfaa_social_media_director', 'TFAA Social Media Director', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_webmaster' ) ) {
-            add_role( 'tfaa_webmaster', 'TFAA Webmaster', array( 'read' => true ) );
-        }
-        if ( null === get_role( 'tfaa_field_governor' ) ) {
-            add_role( 'tfaa_field_governor', 'TFAA Field Governor', array( 'read' => true ) );
-        }
+            // Executive Board Roles
+            'tfaa_president'             => 'President',
+            'tfaa_vice_president'        => 'Vice-President',
+            'tfaa_treasurer'             => 'Treasurer',
+            'tfaa_secretary'             => 'Secretary',
+            'tfaa_tournament_director'   => 'Tournament Director',
+            'tfaa_social_media_director' => 'Social Media Director',
+            'tfaa_webmaster'             => 'Webmaster',
+            'tfaa_field_governor'        => 'Field Governor',
 
-        // 3. Standard TFAA General Membership
-        if ( null === get_role( 'tfaa_member' ) ) {
-            add_role( 'tfaa_member', 'TFAA Member', array( 'read' => true ) );
+            // General Membership
+            'tfaa_member'                => 'Member',
+        );
+
+        global $wp_roles;
+
+        foreach ( $roles_definition as $slug => $display_name ) {
+            if ( null === get_role( $slug ) ) {
+                add_role( $slug, $display_name, array( 'read' => true ) );
+            } else {
+                // Update display label in memory if role already exists in DB
+                if ( isset( $wp_roles->roles[ $slug ] ) ) {
+                    $wp_roles->roles[ $slug ]['name'] = $display_name;
+                }
+            }
         }
     }
 }
 add_action( 'init', 'sywat_register_custom_roles' );
 
 /**
- * Utility: Returns array of official TFAA organizational role slugs.
+ * Utility: Returns array of official organizational role slugs.
  * Excludes generic site administrators so maintenance accounts do not appear in directories.
  */
 if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
