@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -244,101 +244,103 @@ function sywat_desk_render_archers_table($data) {
         </div>
 
         <?php if (!empty($tourn_registrations)): ?>
-            <table class="sywat-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Line</th>
-                        <th>Division</th>
-                        <th>Gender</th>
-                        <th>Style</th>
-                        <th>Paid Status</th>
-                        <th>Distance</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($tourn_registrations as $reg): ?>
-                        <?php 
-                            $reg_type   = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
-                            $badge_class= ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-                            $balance_due= isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                            $paid_disp  = !empty($reg['paid']) ? $reg['paid'] : '—';
-                            $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
-                            $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
-                            
-                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
-                        ?>
-                        <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
-                            <td>
-                                <div style="font-weight:bold; color:#0f172a;"><?php echo esc_html($reg['name']); ?></div>
-                                <?php if ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—'): ?>
-                                    <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
-                                        <div style="margin-top:4px;">
-                                            <span class="sywat-badge sywat-badge-full">
-                                                <?php if ($is_family_due): ?>
-                                                    ⚠️ OWE: FAMILY
-                                                <?php else: ?>
-                                                    <?php 
-                                                        $is_youth_div = (stripos($div_disp, 'Cub') !== false || stripos($div_disp, 'Youth') !== false || stripos($div_disp, 'Young Adult') !== false);
-                                                        $fixed_due = $is_youth_div ? 25.00 : 30.00;
-                                                    ?>
-                                                    ⚠️ OWE $<?php echo number_format($fixed_due, 2); ?>
-                                                <?php endif; ?>
-                                            </span>
-                                        </div>
-                                    <?php } ?>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
-                            </td>
-                            <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'N/A'); ?></td>
-                            <td><?php echo esc_html($div_disp); ?></td>
-                            <td><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
-                            <td><?php echo esc_html($style_disp); ?></td>
-                            <td style="font-weight:bold; color:#0073aa;"><?php echo esc_html($paid_disp); ?></td>
-                            <td><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
-                            <td>
-                                <div style="display:inline-flex; gap:4px; align-items:center; justify-content:flex-end;">
-                                    <form method="post" style="margin:0;">
-                                        <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                        <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
-                                        <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                                        <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
-                                    </form>
-
-                                    <?php if (!empty($reg['checked_in'])): ?>
+            <div class="sywat-table-responsive">
+                <table class="sywat-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th style="text-align:center;">Type</th>
+                            <th>Line</th>
+                            <th>Division</th>
+                            <th style="text-align:center;">Gender</th>
+                            <th>Style</th>
+                            <th>Paid Status</th>
+                            <th style="text-align:center;">Distance</th>
+                            <th style="text-align:right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($tourn_registrations as $reg): ?>
+                            <?php 
+                                $reg_type   = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
+                                $badge_class= ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                $balance_due= isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
+                                $paid_disp  = !empty($reg['paid']) ? $reg['paid'] : '—';
+                                $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
+                                $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
+                                
+                                $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
+                            ?>
+                            <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
+                                <td>
+                                    <div style="font-weight:bold; color:#0f172a;"><?php echo esc_html($reg['name']); ?></div>
+                                    <?php if ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—'): ?>
+                                        <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
+                                            <div style="margin-top:4px;">
+                                                <span class="sywat-badge sywat-badge-full">
+                                                    <?php if ($is_family_due): ?>
+                                                        ⚠️ OWE: FAMILY
+                                                    <?php else: ?>
+                                                        <?php 
+                                                            $is_youth_div = (stripos($div_disp, 'Cub') !== false || stripos($div_disp, 'Youth') !== false || stripos($div_disp, 'Young Adult') !== false);
+                                                            $fixed_due = $is_youth_div ? 25.00 : 30.00;
+                                                        ?>
+                                                        ⚠️ OWE $<?php echo number_format($fixed_due, 2); ?>
+                                                    <?php endif; ?>
+                                                </span>
+                                            </div>
+                                        <?php } ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align:center;">
+                                    <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
+                                </td>
+                                <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'N/A'); ?></td>
+                                <td><?php echo esc_html($div_disp); ?></td>
+                                <td style="text-align:center;"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
+                                <td><?php echo esc_html($style_disp); ?></td>
+                                <td style="font-weight:bold; color:#0073aa;"><?php echo esc_html($paid_disp); ?></td>
+                                <td style="text-align:center;"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
+                                <td style="text-align:right;">
+                                    <div class="sywat-table-actions">
                                         <form method="post" style="margin:0;">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                                            <input type="hidden" name="sywat_action" value="undo_checkin">
-                                            <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
+                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                            <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
                                         </form>
-                                    <?php else: ?>
-                                        <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
-                                            <span class="sywat-badge sywat-badge-full">Line Closed</span>
-                                        <?php else: ?>
+
+                                        <?php if (!empty($reg['checked_in'])): ?>
                                             <form method="post" style="margin:0;">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                                 <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                                                <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Archer</button>
+                                                <input type="hidden" name="sywat_action" value="undo_checkin">
+                                                <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                                <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                             </form>
+                                        <?php else: ?>
+                                            <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
+                                                <span class="sywat-badge sywat-badge-full">Line Closed</span>
+                                            <?php else: ?>
+                                                <form method="post" style="margin:0;">
+                                                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                                                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                                                    <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                                    <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Archer</button>
+                                                </form>
+                                            <?php endif; ?>
                                         <?php endif; ?>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <p style="color:#666;">No archers registered for this selection.</p>
         <?php endif; ?>
