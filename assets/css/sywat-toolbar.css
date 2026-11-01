@@ -3,13 +3,13 @@
 .sywat-filter-toolbar {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: center;
     flex-wrap: wrap;
     gap: 16px;
 }
 
 .sywat-filter-title {
-    margin: 0 0 4px 0;
+    margin: 0;
     font-size: 16px;
     font-weight: 700;
     color: #0f172a;
@@ -22,6 +22,10 @@
     align-items: flex-end;
     flex-wrap: wrap;
     margin: 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 14px;
 }
 
 .sywat-filter-field {
@@ -31,8 +35,8 @@
 }
 
 .sywat-filter-field label {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 800;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.5px;
