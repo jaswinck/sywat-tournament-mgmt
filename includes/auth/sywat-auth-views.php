@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.9.0
+ * Version: 2.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -71,21 +71,32 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     <?php endif; ?>
 
                     <!-- 2. Administrative Dropdown (Staff Only) -->
-                    <?php if ( $can_manage_members || $is_admin || ! empty( $user_shop_id ) ): ?>
+                    <?php if ( $can_manage_members ): ?>
                         <div class="sywat-auth-dropdown">
                             <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
                                 ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
-                                <?php if ( $can_manage_members ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>">
-                                        👥 Member Directory
-                                    </a>
-                                <?php endif; ?>
-                                
+                                <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>">
+                                    👥 Member Directory
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- 3. Shops & Clubs Navigation Item (Dropdown for Staff, Direct Link for Public) -->
+                    <?php if ( $is_admin || ! empty( $user_shop_id ) ): ?>
+                        <div class="sywat-auth-dropdown">
+                            <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                                🏪 Shops & Clubs <span class="sywat-dropdown-caret">▼</span>
+                            </a>
+                            <div class="sywat-auth-dropdown-menu">
+                                <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>">
+                                    🌐 View Public Directory
+                                </a>
                                 <?php if ( $is_admin ): ?>
                                     <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/' ) ); ?>">
-                                        🏪 Shops & Clubs Management
+                                        ⚙️ Shops & Clubs Management
                                     </a>
                                 <?php elseif ( ! empty( $user_shop_id ) ): ?>
                                     <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/?edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
@@ -94,14 +105,13 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 <?php endif; ?>
                             </div>
                         </div>
+                    <?php else: ?>
+                        <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link">
+                            🏪 Shops & Clubs
+                        </a>
                     <?php endif; ?>
 
-                    <!-- 3. Public Shops & Clubs Directory (Visible to Everyone) -->
-                    <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link">
-                        🏪 Shops & Clubs
-                    </a>
-
-                    <!-- 4. Public Tournament Results (Visible to Everyone) -->
+                    <!-- 4. Public Tournament Results -->
                     <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
                         🏆 Results
                     </a>
@@ -132,7 +142,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
 add_action( 'wp_body_open', 'sywat_render_auth_header', 5 );
 
 /**
- * Render Custom TFAA Front-End Auth Screen
+ * Render Custom TFAA Front-End Auth Screen (Sign In, Lost Password, & Set New Password)
  */
 if ( ! function_exists( 'sywat_render_login_screen' ) ) {
     function sywat_render_login_screen() {
@@ -155,6 +165,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         ?>
         <div class="sywat-login-card">
             
+            <!-- Card Header -->
             <div style="background:#0f172a; padding:28px 20px; text-align:center; color:#ffffff;">
                 <?php if ( ! empty( $logo_url ) ): ?>
                     <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:64px; width:auto; margin:0 auto 10px auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));" onerror="this.style.display='none';">
@@ -162,6 +173,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                 <h3 style="margin:0; font-size:19px; font-weight:700; color:#ffffff;">Texas Field Archery Association</h3>
             </div>
 
+            <!-- Card Body -->
             <div style="padding:24px; background:#f8fafc;">
                 
                 <?php if ( ! empty( $auth_error ) ): ?>
@@ -177,6 +189,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                 <?php endif; ?>
 
                 <?php if ( $action === 'lost_password' ): ?>
+                    <!-- STATE 2: REQUEST PASSWORD RESET -->
                     <p style="font-size:13px; color:#475569; margin-top:0; margin-bottom:16px;">
                         Enter your username or email address below. You will receive an email with instructions to reset your password.
                     </p>
@@ -202,6 +215,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                     </div>
 
                 <?php elseif ( $action === 'rp' ): ?>
+                    <!-- STATE 3: SET NEW PASSWORD -->
                     <p style="font-size:13px; color:#475569; margin-top:0; margin-bottom:16px;">
                         Please enter your new password below.
                     </p>
@@ -234,6 +248,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                     </div>
 
                 <?php else: ?>
+                    <!-- STATE 1: STANDARD SIGN IN -->
                     <form method="post" id="sywat_plugin_login_form">
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="login">
