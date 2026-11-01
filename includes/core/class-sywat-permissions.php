@@ -4,7 +4,7 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -57,7 +57,8 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
 add_action( 'init', 'sywat_register_custom_roles' );
 
 /**
- * Utility: Returns array of active custom system role slugs.
+ * Utility: Returns array of official TFAA organizational role slugs.
+ * Excludes generic site administrators so maintenance accounts do not appear in directories.
  */
 if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
     function sywat_get_custom_roles_slugs() {
@@ -73,7 +74,6 @@ if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
             'tfaa_field_governor',
             'sywat_shop_manager',
             'sywat_shop_user',
-            'administrator',
         );
     }
 }
