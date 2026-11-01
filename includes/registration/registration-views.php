@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -90,6 +90,15 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         </div>
                     </div>
 
+                    <!-- Column Headings Bar -->
+                    <div class="sywat-archer-header-row" style="display:flex; gap:10px; align-items:center; margin-bottom:6px; padding:0 2px; font-weight:700; font-size:12px; color:#475569;">
+                        <div style="flex:2; min-width:180px;">Archer Full Name *</div>
+                        <div style="flex:1; min-width:100px;">Target Distance *</div>
+                        <div style="flex:1.5; min-width:160px;">Division *</div>
+                        <div style="flex:1.2; min-width:130px;">Line Override</div>
+                        <div style="width:32px;"></div>
+                    </div>
+
                     <!-- Archer Rows Container -->
                     <div id="sywat_archer_rows_container">
                         <!-- Archer Row 1 -->
@@ -105,7 +114,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                             </select>
 
                             <!-- Full 7 TFAA Age Division Selection (Age Order) -->
-                            <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="this.dataset.userChosen='true'; recalculateGroupTotal();">
+                            <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDivisionChange(this);">
                                 <option value="" disabled selected hidden>Select Division</option>
                                 <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
                                 <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
@@ -125,7 +134,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <?php endforeach; ?>
                             </select>
 
-                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; width:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
                         </div>
                     </div>
 
