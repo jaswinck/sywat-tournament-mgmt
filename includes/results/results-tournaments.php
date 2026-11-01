@@ -3,6 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -125,37 +126,41 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             </div>
 
             <div class="sywat-filter-bar">
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Division</label>
-                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 140px;">
+                <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px;">
+                    <label>Division</label>
+                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Divisions</option>
                         <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Gender</label>
-                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 120px;">
+
+                <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px;">
+                    <label>Gender</label>
+                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                     </select>
                 </div>
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Style</label>
-                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 160px;">
+
+                <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px;">
+                    <label>Style</label>
+                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Styles</option>
                         <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div style="flex-grow: 1; min-width: 180px;">
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Search Archer</label>
-                    <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="width:100%; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; box-sizing:border-box;">
+
+                <div class="sywat-field-group" style="flex: 2 1 200px; min-width: 180px;">
+                    <label>Search Archer</label>
+                    <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="width: 100%; height: 36px; box-sizing: border-box;">
                 </div>
-                <div>
+
+                <div style="flex: 0 0 auto;">
                     <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetTournFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
                 </div>
             </div>
@@ -181,37 +186,39 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                         🏹 <?php echo esc_html( $style_name ); ?>
                                     </h4>
 
-                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 50px; text-align: center;">Place</th>
-                                                <th>Archer Name</th>
-                                                <th style="text-align: right; width: 140px;">Score / X</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ( $archers as $idx => $a ): ?>
-                                                <?php $archer_identifier = ! empty( $a['id'] ) ? $a['id'] : $a['name']; ?>
-                                                <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
-                                                    <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
-                                                    <td>
-                                                        <strong style="font-size: 14px; color: #0f172a;"><?php echo esc_html( $a['name'] ); ?></strong>
-                                                        <?php if ( $can_edit_scores ): ?>
-                                                            <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $tournament_name ); ?>&edit_archer=<?php echo urlencode( $archer_identifier ); ?>" 
-                                                               class="sywat-btn-edit-shortcut" 
-                                                               style="font-size: 11px; padding: 2px 6px; margin-left: 8px; text-decoration: none; background: #2271b1; color: #ffffff; border-radius: 3px; display: inline-block; font-weight: 600;" 
-                                                               title="Edit Archer Score & Details">
-                                                                ✏️ Edit
-                                                            </a>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td style="text-align: right; font-size: 15px; color: #0f172a;">
-                                                        <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
-                                                    </td>
+                                    <div class="sywat-table-responsive" style="margin-bottom: 15px;">
+                                        <table class="sywat-table" style="margin-top: 0;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 50px; text-align: center;">Place</th>
+                                                    <th>Archer Name</th>
+                                                    <th style="text-align: right; width: 140px;">Score / X</th>
                                                 </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ( $archers as $idx => $a ): ?>
+                                                    <?php $archer_identifier = ! empty( $a['id'] ) ? $a['id'] : $a['name']; ?>
+                                                    <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                        <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
+                                                        <td>
+                                                            <strong style="font-size: 14px; color: #0f172a;"><?php echo esc_html( $a['name'] ); ?></strong>
+                                                            <?php if ( $can_edit_scores ): ?>
+                                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $tournament_name ); ?>&edit_archer=<?php echo urlencode( $archer_identifier ); ?>" 
+                                                                   class="sywat-btn-edit-shortcut" 
+                                                                   style="font-size: 11px; padding: 2px 6px; margin-left: 8px; text-decoration: none; background: #2271b1; color: #ffffff; border-radius: 3px; display: inline-block; font-weight: 600;" 
+                                                                   title="Edit Archer Score & Details">
+                                                                    ✏️ Edit
+                                                                </a>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td style="text-align: right; font-size: 15px; color: #0f172a;">
+                                                            <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
