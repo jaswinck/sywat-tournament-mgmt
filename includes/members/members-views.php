@@ -3,6 +3,7 @@
  * Sub-Module: Member & Board Management Portal Views & Modals
  * Path: includes/members/members-views.php
  * Author: SYWAT Archery
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,7 +30,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             }
         }
 
-        $all_members         = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
+        $raw_members     = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
+        $tfaa_role_slugs = function_exists( 'sywat_get_custom_roles_slugs' ) ? sywat_get_custom_roles_slugs() : array();
+
+        // Filter directory list to only include accounts with active TFAA roles (excludes standalone admins)
+        $all_members = array();
+        foreach ( $raw_members as $m_user ) {
+            $u_roles = (array) $m_user->roles;
+            if ( ! empty( array_intersect( $tfaa_role_slugs, $u_roles ) ) ) {
+                $all_members[] = $m_user;
+            }
+        }
+
         $board_members       = function_exists( 'sywat_get_all_board_members' ) ? sywat_get_all_board_members() : array();
         $all_board_positions = function_exists( 'sywat_get_tfaa_board_positions_list' ) ? sywat_get_tfaa_board_positions_list() : array();
 
@@ -40,6 +52,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         $edit_board_id         = isset( $_REQUEST['edit_board_id'] ) ? intval( $_REQUEST['edit_board_id'] ) : 0;
         $edit_board_user_obj   = ( $edit_board_id > 0 ) ? get_userdata( $edit_board_id ) : null;
         $open_edit_board_modal = ( $edit_board_user_obj !== null );
+
+        global $wp_roles;
+        $wp_role_names = $wp_roles ? $wp_roles->get_names() : array();
 
         ob_start();
         ?>
@@ -140,20 +155,21 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         </div>
                     </div>
 
-                    <div class="sywat-subtitle">Overview of registered TFAA members, contact details, and NFAA membership status.</div>
+                    <div class="sywat-subtitle">Overview of registered TFAA members, contact details, assigned roles, and NFAA membership status.</div>
 
                     <?php if ( empty( $all_members ) ): ?>
-                        <p style="color: #646970; font-style: italic; padding: 20px 0;">No members found in system database.</p>
+                        <p style="color: #646970; font-style: italic; padding: 20px 0;">No TFAA members found in system database.</p>
                     <?php else: ?>
                         <table class="sywat-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 14%; text-align: center;">TFAA Member #</th>
-                                    <th style="width: 22%;">Member Name</th>
-                                    <th style="width: 24%;">Email Address</th>
-                                    <th style="width: 14%; text-align: center;">Phone</th>
-                                    <th style="width: 10%; text-align: center;">NFAA Status</th>
-                                    <th style="width: 16%; text-align: right;">Actions</th>
+                                    <th style="width: 12%; text-align: center;">TFAA Member #</th>
+                                    <th style="width: 18%;">Member Name</th>
+                                    <th style="width: 20%;">Assigned Role(s)</th>
+                                    <th style="width: 20%;">Email Address</th>
+                                    <th style="width: 11%; text-align: center;">Phone</th>
+                                    <th style="width: 9%; text-align: center;">NFAA Status</th>
+                                    <th style="width: 10%; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -164,14 +180,31 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         $m_nfaa   = get_user_meta( $m->ID, 'sywat_is_nfaa_member', true );
                                         $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
                                         $is_nfaa_active = ( $m_nfaa === 'yes' );
+
+                                        // Role Badges Formatting
+                                        $m_roles     = (array) $m->roles;
+                                        $role_badges = array();
+                                        $role_names  = array();
+                                        foreach ( $m_roles as $r_slug ) {
+                                            $r_name = isset( $wp_role_names[$r_slug] ) ? $wp_role_names[$r_slug] : ucfirst( str_replace( '_', ' ', $r_slug ) );
+                                            $role_names[] = $r_name;
+                                            $role_badges[] = '<span class="sywat-badge sywat-badge-prereg" style="font-size: 10px; padding: 2px 6px;">' . esc_html( $r_name ) . '</span>';
+                                        }
+                                        $roles_html   = ! empty( $role_badges ) ? implode( ' ', $role_badges ) : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No Role</span>';
+                                        $roles_search = implode( ' ', $role_names );
                                     ?>
-                                    <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone ) ); ?>">
+                                    <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone . ' ' . $roles_search ) ); ?>">
                                         <td style="text-align: center;">
                                             <strong style="color: #1e3a8a; font-family: monospace; font-size: 13px;"><?php echo esc_html( $disp_id ); ?></strong>
                                         </td>
                                         <td>
                                             <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                             <div style="font-size: 11px; color: #64748b; font-family: monospace; margin-top: 1px;">👤 <?php echo esc_html( $m->user_login ); ?></div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-wrap: wrap; gap: 3px;">
+                                                <?php echo $roles_html; ?>
+                                            </div>
                                         </td>
                                         <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" style="color: #2271b1; text-decoration: none;"><?php echo esc_html( $m->user_email ); ?></a></td>
                                         <td style="text-align: center;"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
@@ -251,7 +284,6 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                             <!-- MULTI-ROLE CHECKBOX GRID (ADD MODAL) -->
                             <?php
-                            global $wp_roles;
                             $editable_roles = $wp_roles ? $wp_roles->roles : array();
                             ?>
                             <div style="margin-bottom: 15px;">
