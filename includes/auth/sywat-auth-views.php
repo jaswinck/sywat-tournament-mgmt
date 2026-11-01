@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.7.3
+ * Version: 1.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,11 +19,13 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $user_id      = $current_user->ID;
 
         // Dynamic capability checks
+        $is_admin               = current_user_can( 'administrator' );
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
         $can_manage_members     = function_exists( 'sywat_can_manage_members' ) ? sywat_can_manage_members( $user_id ) : current_user_can( 'manage_options' );
-        
+        $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
+
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
         <div class="sywat-auth-bar">
@@ -42,8 +44,9 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
 
                 <!-- Center: Primary App Navigation Links -->
                 <nav style="display:flex; align-items:center; gap:6px;">
+                    
+                    <!-- 1. Operational Tournaments Dropdown -->
                     <?php if ( $can_manage_tournaments ): ?>
-                        <!-- Dropdown Container -->
                         <div class="sywat-auth-dropdown">
                             <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
                                 🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
@@ -66,12 +69,33 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         </div>
                     <?php endif; ?>
 
-                    <?php if ( $can_manage_members ): ?>
-                        <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>" class="sywat-auth-nav-link">
-                            👥 Members
-                        </a>
+                    <!-- 2. Administrative & Infrastructure Dropdown -->
+                    <?php if ( $can_manage_members || $is_admin || ! empty( $user_shop_id ) ): ?>
+                        <div class="sywat-auth-dropdown">
+                            <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
+                                ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
+                            </a>
+                            <div class="sywat-auth-dropdown-menu">
+                                <?php if ( $can_manage_members ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>">
+                                        👥 Member Directory
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <?php if ( $is_admin ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=shops' ) ); ?>">
+                                        🏪 Shops & Clubs Management
+                                    </a>
+                                <?php elseif ( ! empty( $user_shop_id ) ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=shops&edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
+                                        🏪 My Shop / Club Profile
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     <?php endif; ?>
 
+                    <!-- 3. Results Link -->
                     <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
                         🏆 Results
                     </a>
