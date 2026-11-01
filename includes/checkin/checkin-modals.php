@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -50,7 +50,7 @@ function sywat_desk_render_modals($data) {
         $checkin_families = isset($existing_families_by_line[$checkin_line_idx]) ? $existing_families_by_line[$checkin_line_idx] : $existing_families;
     ?>
     <div class="sywat-modal-backdrop active">
-        <div class="sywat-modal-content" style="max-width:480px;">
+        <div class="sywat-modal-content sywat-modal-sm">
             <div class="sywat-modal-header no-print">
                 <h3>Check In Archer</h3>
                 <form method="post" style="margin:0;">
@@ -183,7 +183,7 @@ function sywat_desk_render_modals($data) {
         $edit_families = isset($existing_families_by_line[$edit_line_idx]) ? $existing_families_by_line[$edit_line_idx] : $existing_families;
     ?>
     <div class="sywat-modal-backdrop active">
-        <div class="sywat-modal-content" style="max-width:480px;">
+        <div class="sywat-modal-content sywat-modal-sm">
             <div class="sywat-modal-header no-print">
                 <h3>Edit Archer Registration</h3>
                 <form method="post" style="margin:0;">
@@ -310,7 +310,7 @@ function sywat_desk_render_modals($data) {
 
     <!-- ADD WALK-IN MODAL -->
     <div id="walkinModal" class="sywat-modal-backdrop">
-        <div class="sywat-modal-content" style="max-width:480px;">
+        <div class="sywat-modal-content sywat-modal-sm">
             <div class="sywat-modal-header no-print">
                 <h3>Add Walk-In Registration</h3>
                 <button type="button" class="sywat-modal-close" onclick="closeWalkinModal()">&times;</button>
@@ -758,7 +758,7 @@ function sywat_desk_render_client_scripts($data) {
 
             if (divEl && single.division) matchDeskTfaaSelect(single.division, divEl);
             if (genEl && single.gender) matchDeskTfaaSelect(single.gender, genEl);
-            if (styleEl && single.style) matchDeskTfaaSelect(single.style, styleEl);
+            if (styleEl && single.style) matchDeskTfaaSelect(styleEl, styleEl);
 
             handleStyleRestrictions(prefix);
         } else if (tfaaMatches && tfaaMatches.length > 1 && prefix === 'walkin') {
