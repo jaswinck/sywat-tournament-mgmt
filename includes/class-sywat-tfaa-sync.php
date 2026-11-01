@@ -4,7 +4,7 @@
  * Description: Synchronizes archer membership records, caches state standings data, 
  *              and verifies TFAA shooter eligibility across active tournament rosters.
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -155,13 +155,13 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
         $spaced_body = str_replace( '>', '> ', $body );
         $spaced_body = str_replace( '<', ' <', $spaced_body );
 
-        // 2. Convert table rows, table header/data cells, and block elements to actual newlines
-        $clean_html = preg_replace( '/<\/?(?:tr|td|th|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_body );
+        // 2. Convert block-level structure tags and table rows to actual newlines (REMOVED td/th to fix row splitting)
+        $clean_html = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_body );
         
-        // 3. Strip all remaining HTML tags
+        // 3. Strip all the remaining tags
         $plain_text = wp_strip_all_tags( $clean_html );
         
-        // 4. Break into clean individual lines
+        // 4. Break into clean lines
         $lines = explode( "\n", $plain_text );
         $debug_log[] = "Total Lines: " . count($lines);
 
