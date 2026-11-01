@@ -6,10 +6,23 @@
     -webkit-overflow-scrolling: touch;
 }
 
-.sywat-table-responsive::-webkit-scrollbar { height: 6px; }
-.sywat-table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-.sywat-table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-.sywat-table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.sywat-table-responsive::-webkit-scrollbar { 
+    height: 6px; 
+}
+
+.sywat-table-responsive::-webkit-scrollbar-track { 
+    background: #f1f5f9; 
+    border-radius: 4px; 
+}
+
+.sywat-table-responsive::-webkit-scrollbar-thumb { 
+    background: #cbd5e1; 
+    border-radius: 4px; 
+}
+
+.sywat-table-responsive::-webkit-scrollbar-thumb:hover { 
+    background: #94a3b8; 
+}
 
 .sywat-table {
     width: 100%;
@@ -42,13 +55,23 @@
     font-size: 12px;
 }
 
+/* Action Buttons Flex Container with Vertical Stacking Support */
 .sywat-table-actions {
     display: flex;
     gap: 4px;
     align-items: center;
     justify-content: flex-end;
-    white-space: nowrap;
+    flex-wrap: wrap; /* Restored: Allows Edit and Check-In buttons to wrap vertically when narrow */
 }
 
-.sywat-table th.text-center, .sywat-table td.text-center { text-align: center; }
-.sywat-table th.text-right, .sywat-table td.text-right, .sywat-table td:last-child, .sywat-table th:last-child { text-align: right; }
+.sywat-table th.text-center, 
+.sywat-table td.text-center { 
+    text-align: center; 
+}
+
+.sywat-table th.text-right, 
+.sywat-table td.text-right, 
+.sywat-table td:last-child, 
+.sywat-table th:last-child { 
+    text-align: right; 
+}
