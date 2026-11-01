@@ -3,6 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -74,37 +75,41 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             </div>
 
             <div class="sywat-filter-bar">
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Division</label>
-                    <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 140px;">
+                <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px;">
+                    <label>Division</label>
+                    <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Divisions</option>
                         <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Gender</label>
-                    <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 120px;">
+
+                <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px;">
+                    <label>Gender</label>
+                    <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                     </select>
                 </div>
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Style</label>
-                    <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; min-width: 160px;">
+
+                <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px;">
+                    <label>Style</label>
+                    <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
                         <option value="all">All Styles</option>
                         <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div style="flex-grow: 1; min-width: 180px;">
-                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:4px;">Search Archer</label>
-                    <input type="text" id="sywat_standings_search" oninput="sywatApplyStandingsFilters()" placeholder="Type archer name..." style="width:100%; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 36px; box-sizing:border-box;">
+
+                <div class="sywat-field-group" style="flex: 2 1 200px; min-width: 180px;">
+                    <label>Search Archer</label>
+                    <input type="text" id="sywat_standings_search" oninput="sywatApplyStandingsFilters()" placeholder="Type archer name..." style="width: 100%; height: 36px; box-sizing: border-box;">
                 </div>
-                <div>
+
+                <div style="flex: 0 0 auto;">
                     <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetStandingsFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
                 </div>
             </div>
@@ -130,43 +135,45 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                                         🏹 <?php echo esc_html( $style_name ); ?>
                                     </h4>
 
-                                    <table class="sywat-table" style="margin-top: 0; margin-bottom: 15px;">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 50px; text-align: center;">Rank</th>
-                                                <th>Archer Name</th>
-                                                <th style="text-align: center; width: 110px;">Score 1</th>
-                                                <th style="text-align: center; width: 110px;">Score 2</th>
-                                                <th style="text-align: center; width: 110px;">Score 3</th>
-                                                <th style="text-align: center; width: 110px;">State</th>
-                                                <th style="text-align: right; width: 130px;">Total Score</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ( $archers as $idx => $a ): ?>
-                                                <?php 
-                                                    $rank = $idx + 1;
-                                                    $rank_badge = '';
-                                                    if ( $rank === 1 ) $rank_badge = '🥇';
-                                                    elseif ( $rank === 2 ) $rank_badge = '🥈';
-                                                    elseif ( $rank === 3 ) $rank_badge = '🥉';
-                                                ?>
-                                                <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
-                                                    <td style="text-align: center; font-weight: bold; font-size: 14px;">
-                                                        <?php echo $rank_badge ? $rank_badge : $rank; ?>
-                                                    </td>
-                                                    <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
-                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
-                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_2'] ); ?></td>
-                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_3'] ); ?></td>
-                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['state_score'] ); ?></td>
-                                                    <td style="text-align: right; font-size: 15px; color: #0f172a;">
-                                                        <strong><?php echo intval( $a['total_score'] ) . ' / ' . intval( $a['total_x_count'] ) . 'X'; ?></strong>
-                                                    </td>
+                                    <div class="sywat-table-responsive" style="margin-bottom: 15px;">
+                                        <table class="sywat-table" style="margin-top: 0;">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 50px; text-align: center;">Rank</th>
+                                                    <th>Archer Name</th>
+                                                    <th style="text-align: center; width: 110px;">Score 1</th>
+                                                    <th style="text-align: center; width: 110px;">Score 2</th>
+                                                    <th style="text-align: center; width: 110px;">Score 3</th>
+                                                    <th style="text-align: center; width: 110px;">State</th>
+                                                    <th style="text-align: right; width: 130px;">Total Score</th>
                                                 </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ( $archers as $idx => $a ): ?>
+                                                    <?php 
+                                                        $rank = $idx + 1;
+                                                        $rank_badge = '';
+                                                        if ( $rank === 1 ) $rank_badge = '🥇';
+                                                        elseif ( $rank === 2 ) $rank_badge = '🥈';
+                                                        elseif ( $rank === 3 ) $rank_badge = '🥉';
+                                                    ?>
+                                                    <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                        <td style="text-align: center; font-weight: bold; font-size: 14px;">
+                                                            <?php echo $rank_badge ? $rank_badge : $rank; ?>
+                                                        </td>
+                                                        <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
+                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
+                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_2'] ); ?></td>
+                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_3'] ); ?></td>
+                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['state_score'] ); ?></td>
+                                                        <td style="text-align: right; font-size: 15px; color: #0f172a;">
+                                                            <strong><?php echo intval( $a['total_score'] ) . ' / ' . intval( $a['total_x_count'] ) . 'X'; ?></strong>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
