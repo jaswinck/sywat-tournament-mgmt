@@ -1,6 +1,9 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Data Layer
+ * File: checkin-data.php
+ * Author: SYWAT Archery
+ * Version: 3.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -120,11 +123,41 @@ function sywat_desk_get_data() {
         'updated_at' => isset($tfaa_cache_option['updated_at']) ? $tfaa_cache_option['updated_at'] : 'Never'
     );
 
+    // Build Line-Scoped & Anchor-Named Family Groups
+    $family_anchors = array();
+    foreach ($registrations as $r) {
+        if (!empty($r['family_id']) && !empty($r['name'])) {
+            $fid = $r['family_id'];
+            if (!isset($family_anchors[$fid])) {
+                $family_anchors[$fid] = trim($r['name']);
+            }
+        }
+    }
+
     $existing_families = array();
     foreach ($registrations as $r) {
-        if (isset($r['paid']) && $r['paid'] === 'Family' && !empty($r['family_id'])) {
+        $is_fam = (isset($r['paid']) && $r['paid'] === 'Family') || (!empty($r['rate_type']) && strtolower($r['rate_type']) === 'family') || !empty($r['family_id']);
+        
+        if ($is_fam && !empty($r['family_id'])) {
             $fid = $r['family_id'];
-            $fname = !empty($r['family_name']) ? $r['family_name'] : (!empty($r['booking_id']) ? 'Booking ' . $r['booking_id'] : 'Family Group (' . substr($fid, -6) . ')');
+
+            // Scope strictly to current shooting line if a line filter is active
+            if ($selected_line_idx !== 'all' && isset($r['line_index']) && (string)$r['line_index'] !== (string)$selected_line_idx) {
+                continue;
+            }
+
+            // Format clean anchor label
+            $anchor_name = isset($family_anchors[$fid]) ? $family_anchors[$fid] : '';
+            $raw_fname   = !empty($r['family_name']) ? trim($r['family_name']) : '';
+
+            if (!empty($raw_fname) && stripos($raw_fname, 'fam_') === false && stripos($raw_fname, 'Booking') === false && strlen($raw_fname) > 2) {
+                $fname = $raw_fname;
+            } elseif (!empty($anchor_name)) {
+                $fname = $anchor_name . ' (Family Cap)';
+            } else {
+                $fname = 'Family Group (' . substr($fid, -6) . ')';
+            }
+
             $existing_families[$fid] = $fname;
         }
     }
