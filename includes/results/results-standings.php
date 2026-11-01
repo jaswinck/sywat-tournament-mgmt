@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,7 +29,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         $best_n      = $season_data['best_n'];
         $groups      = $season_data['groups'];
 
-        // Collect unique divisions and styles dynamically for dropdown filters
         $all_divisions = array();
         $all_styles    = array();
 
@@ -44,7 +43,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         }
         ksort($all_divisions);
 
-        // Sort filter styles dropdown by style priority weight
         uksort( $all_styles, function( $a, $b ) {
             $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $a ) : 50;
             $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $b ) : 50;
@@ -52,6 +50,20 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             return strcasecmp( $a, $b );
         });
         ?>
+
+        <style>
+            .sywat-single-category-header {
+                background: #1e3a8a;
+                color: #ffffff;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: 700;
+                border-radius: 6px 6px 0 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+        </style>
 
         <div class="sywat-public-card">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
@@ -122,61 +134,62 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                         $card_div_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['division'] ) ) );
                         $card_gen_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['gender'] ) ) );
                     ?>
-                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>">
-                        <div class="sywat-div-gen-header">
-                            🎯 <?php echo esc_html( $group_data['heading'] ); ?>
-                        </div>
+                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>" style="margin-bottom: 20px; background: transparent; border: none; box-shadow: none; padding: 0;">
 
-                        <div style="padding: 15px;">
-                            <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <?php $style_slug = strtolower( trim( $style_name ) ); ?>
-                                <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>">
-                                    <h4 class="sywat-style-header">
-                                        🏹 <?php echo esc_html( $style_name ); ?>
-                                    </h4>
-
-                                    <div class="sywat-table-responsive" style="margin-bottom: 15px;">
-                                        <table class="sywat-table" style="margin-top: 0;">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 50px; text-align: center;">Rank</th>
-                                                    <th>Archer Name</th>
-                                                    <th style="text-align: center; width: 110px;">Score 1</th>
-                                                    <th style="text-align: center; width: 110px;">Score 2</th>
-                                                    <th style="text-align: center; width: 110px;">Score 3</th>
-                                                    <th style="text-align: center; width: 110px;">State</th>
-                                                    <th style="text-align: right; width: 130px;">Total Score</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ( $archers as $idx => $a ): ?>
-                                                    <?php 
-                                                        $rank = $idx + 1;
-                                                        $rank_badge = '';
-                                                        if ( $rank === 1 ) $rank_badge = '🥇';
-                                                        elseif ( $rank === 2 ) $rank_badge = '🥈';
-                                                        elseif ( $rank === 3 ) $rank_badge = '🥉';
-                                                    ?>
-                                                    <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
-                                                        <td style="text-align: center; font-weight: bold; font-size: 14px;">
-                                                            <?php echo $rank_badge ? $rank_badge : $rank; ?>
-                                                        </td>
-                                                        <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
-                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
-                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_2'] ); ?></td>
-                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_3'] ); ?></td>
-                                                        <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['state_score'] ); ?></td>
-                                                        <td style="text-align: right; font-size: 15px; color: #0f172a;">
-                                                            <strong><?php echo intval( $a['total_score'] ) . ' / ' . intval( $a['total_x_count'] ) . 'X'; ?></strong>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                        <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
+                            <?php 
+                                $style_slug = strtolower( trim( $style_name ) );
+                                $combined_title = function_exists('sywat_format_combined_category_header') 
+                                    ? sywat_format_combined_category_header( $group_data['division'], $group_data['gender'], $style_name )
+                                    : trim( $group_data['division'] . ' ' . $group_data['gender'] . ' ' . $style_name );
+                            ?>
+                            <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>" style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #ffffff;">
+                                <div class="sywat-single-category-header">
+                                    🎯 <?php echo esc_html( $combined_title ); ?>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
+
+                                <div class="sywat-table-responsive" style="margin-bottom: 0;">
+                                    <table class="sywat-table" style="margin-top: 0;">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px; text-align: center;">Rank</th>
+                                                <th>Archer Name</th>
+                                                <th style="text-align: center; width: 110px;">Score 1</th>
+                                                <th style="text-align: center; width: 110px;">Score 2</th>
+                                                <th style="text-align: center; width: 110px;">Score 3</th>
+                                                <th style="text-align: center; width: 110px;">State</th>
+                                                <th style="text-align: right; width: 130px;">Total Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ( $archers as $idx => $a ): ?>
+                                                <?php 
+                                                    $rank = $idx + 1;
+                                                    $rank_badge = '';
+                                                    if ( $rank === 1 ) $rank_badge = '🥇';
+                                                    elseif ( $rank === 2 ) $rank_badge = '🥈';
+                                                    elseif ( $rank === 3 ) $rank_badge = '🥉';
+                                                ?>
+                                                <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                    <td style="text-align: center; font-weight: bold; font-size: 14px;">
+                                                        <?php echo $rank_badge ? $rank_badge : $rank; ?>
+                                                    </td>
+                                                    <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
+                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
+                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_2'] ); ?></td>
+                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['score_3'] ); ?></td>
+                                                    <td style="text-align: center;"><?php echo sywat_format_score_cell( $a['state_score'] ); ?></td>
+                                                    <td style="text-align: right; font-size: 15px; color: #0f172a;">
+                                                        <strong><?php echo intval( $a['total_score'] ) . ' / ' . intval( $a['total_x_count'] ) . 'X'; ?></strong>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
