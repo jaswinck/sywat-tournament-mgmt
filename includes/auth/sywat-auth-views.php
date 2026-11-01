@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.8.0
+ * Version: 1.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -83,11 +83,11 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 <?php endif; ?>
                                 
                                 <?php if ( $is_admin ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=shops' ) ); ?>">
+                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/' ) ); ?>">
                                         🏪 Shops & Clubs Management
                                     </a>
                                 <?php elseif ( ! empty( $user_shop_id ) ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=shops&edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
+                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/?edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
                                         🏪 My Shop / Club Profile
                                     </a>
                                 <?php endif; ?>
@@ -274,7 +274,6 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
  */
 if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
     function sywat_render_login_shortcode() {
-        // Prevent page cache plugins (LiteSpeed, WP Rocket, Nginx, etc.) from caching this rendered view
         if ( ! defined( 'DONOTCACHEPAGE' ) ) {
             define( 'DONOTCACHEPAGE', true );
         }
