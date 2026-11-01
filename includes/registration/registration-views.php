@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 2.8.5
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -64,8 +64,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <!-- Group Header Information -->
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#fff; padding:12px; border:1px solid #e2e8f0; border-radius:4px; margin-bottom:15px;">
                         <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller Name</label>
-                            <input type="text" name="group_name" id="sywat_group_name" placeholder="e.g. John Smith or Smith Family" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" oninput="handleCallerNameInput(this)">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Caller / Primary Archer Name</label>
+                            <input type="text" name="group_name" id="sywat_group_name" placeholder="e.g. John Smith" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" oninput="handleCallerNameInput(this)">
                         </div>
 
                         <div>
