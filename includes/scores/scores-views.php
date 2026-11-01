@@ -1,6 +1,8 @@
 <?php
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
+ * File: score-entry-views.php
+ * Version: 2.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -124,16 +126,16 @@ function render_sywat_scores_app() {
     <div class="sywat-wrap">
         <div class="no-print"><?php echo $notice; ?></div>
 
-        <!-- Master Navigation Tabs (Anchored Above Card Header) -->
+        <!-- Master Navigation Tabs (Option A: Action-Driven Navigation) -->
         <div class="sywat-nav-tabs no-print">
             <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item">
-                🎯 Tournament Management
+                🎯 Manage Tournaments
             </a>
             <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item">
-                📋 Check-In Desk
+                📋 Check In Archers
             </a>
             <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active">
-                ✏️ Score Entry
+                ✏️ Enter Scores
             </a>
         </div>
 
@@ -142,7 +144,7 @@ function render_sywat_scores_app() {
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                 
                 <h3 style="margin:0; font-size:17px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                    ✏️ Score Entry
+                    ✏️ Enter Scores
                 </h3>
 
                 <form method="post" id="sywat_score_filter_form" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
