@@ -4,7 +4,7 @@
  * Description: Main entry point and shortcode definition for the Check-In Desk portal.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 2.3.2
+ * Version: 2.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -18,10 +18,9 @@ require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-modals.php';
 add_shortcode('sywat_desk', 'render_sywat_desk_app');
 
 function render_sywat_desk_app() {
-    // 0. Permissions Check
-    $user = wp_get_current_user();
-    if (!is_user_logged_in() || !array_intersect(array('administrator', 'management', 'non-shooting-member', 'staff_shooter', 'sywat_shop_manager', 'sywat_shop_user'), (array) $user->roles)) {
-        return '<p style="color:red; padding:20px;">Access denied. Management access required.</p>';
+    // Central Permissions Check
+    if (function_exists('sywat_can_access_desk') && !sywat_can_access_desk()) {
+        return '<div class="sywat-wrap" style="max-width:600px; margin:20px auto;"><div class="sywat-alert sywat-alert-danger">Access denied. Management or staff access required.</div></div>';
     }
 
     ob_start();
