@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 2.8.5
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -75,13 +75,14 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
-        // Group archers by shooting line for per-line family capping
-        $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'] . ' Group';
+        // Anchor group naming to primary archer if caller name is blank
+        $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'];
         $line_groups      = array();
 
         foreach ($valid_archers as $archer) {
             $l_idx = $archer['line_idx'];
             if (!isset($line_groups[$l_idx])) {
+                $fam_hash = 'fam_' . $t_slug . '_l' . sanitize_title($l_idx) . '_' . sanitize_title($family_base_name) . '_' . substr(md5(uniqid()), 0, 4);
                 $line_groups[$l_idx] = array(
                     'archers'     => array(),
                     'youth_count' => 0,
@@ -91,7 +92,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     'line_fee'    => 0,
                     'paid_amount' => 0,
                     'balance_due' => 0,
-                    'family_id'   => 'fam_' . sanitize_title($family_base_name) . '_l' . sanitize_title($l_idx) . '_' . uniqid(),
+                    'family_id'   => $fam_hash,
                 );
             }
 
@@ -193,6 +194,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 }
 
                 $paid_status = $grp['is_capped'] ? 'Family' : $archer['paid_tier'];
+                $display_fam_name = $grp['is_capped'] ? ($family_base_name . ' (Family Cap)') : $family_base_name;
 
                 $new_reg = array(
                     'id'          => uniqid( 'reg_' ),
@@ -207,7 +209,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     'style'       => '',
                     'paid'        => $paid_status,
                     'family_id'   => $grp['family_id'],
-                    'family_name' => $family_base_name,
+                    'family_name' => $display_fam_name,
                     'balance_due' => $grp['per_archer_due'],
                     'status'      => 'Pre-Reg',
                     'created_at'  => current_time( 'mysql' ),
