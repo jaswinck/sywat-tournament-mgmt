@@ -2,6 +2,8 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
+ * Author: SYWAT Archery
+ * Version: 2.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -48,16 +50,16 @@ function sywat_desk_render_filter_bar($data) {
     // Volunteer Hub is strictly enabled ONLY for active tournaments hosted by Cinnamon Creek Ranch (shop_ccr)
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
     ?>
-    <!-- Master Navigation Tabs (Anchored Above Card Header) -->
+    <!-- Master Navigation Tabs (Option A: Action-Driven Navigation) -->
     <div class="sywat-nav-tabs no-print">
         <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item">
-            🎯 Tournament Management
+            🎯 Manage Tournaments
         </a>
         <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active">
-            📋 Check-In Desk
+            📋 Check In Archers
         </a>
         <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item">
-            ✏️ Score Entry
+            ✏️ Enter Scores
         </a>
     </div>
 
@@ -66,7 +68,7 @@ function sywat_desk_render_filter_bar($data) {
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
             
             <h3 style="margin:0; font-size:17px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                📋 Check-In Desk
+                📋 Check In Archers
             </h3>
 
             <form method="post" id="sywat_filter_form" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
@@ -262,7 +264,6 @@ function sywat_desk_render_archers_table($data) {
                             $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
                             $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
                             
-                            // Check if family cap was applied to THIS archer's line
                             $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family');
                         ?>
                         <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
