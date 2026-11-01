@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and TFAA sync.
- * Version:     2.6.0
+ * Version:     3.1.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '2.6.0' );
+define( 'SYWAT_PLUGIN_VERSION', '3.1.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -28,18 +28,18 @@ function sywat_archery_activate() {
     }
 }
 
-// Enqueue standard jQuery and global styles
+// Enqueue standard jQuery and modular global styles
 add_action( 'wp_enqueue_scripts', 'sywat_archery_enqueue_assets' );
 function sywat_archery_enqueue_assets() {
     wp_enqueue_script( 'jquery' );
 
-    // Enqueue Master Admin Stylesheet
-    wp_enqueue_style(
-        'sywat-admin-css',
-        SYWAT_PLUGIN_URL . 'assets/css/sywat-admin.css',
-        array(),
-        SYWAT_PLUGIN_VERSION
-    );
+    $base_css_url = SYWAT_PLUGIN_URL . 'assets/css/';
+
+    // Enqueue Modular Admin & Operations Stylesheets
+    wp_enqueue_style( 'sywat-core',    $base_css_url . 'sywat-core.css',    array(), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-toolbar', $base_css_url . 'sywat-toolbar.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-tables',  $base_css_url . 'sywat-tables.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-modals',  $base_css_url . 'sywat-modals.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
 }
 
 // Load TFAA Authentication Engine Sub-Modules
