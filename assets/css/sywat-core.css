@@ -1,0 +1,278 @@
+/* SYWAT Archery - Core Styles (Body, Cards, Navigation, Buttons, Badges) */
+
+body {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+.sywat-wrap,
+.sywat-app {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    color: #2c3338;
+    max-width: 1100px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+/* Form Inputs Theme Isolation */
+.sywat-wrap input[type="text"],
+.sywat-wrap input[type="tel"],
+.sywat-wrap input[type="number"],
+.sywat-wrap input[type="password"],
+.sywat-wrap select,
+.sywat-wrap textarea,
+.sywat-app input[type="text"],
+.sywat-app input[type="tel"],
+.sywat-app input[type="number"],
+.sywat-app input[type="password"],
+.sywat-app select,
+.sywat-app textarea {
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 13px;
+    color: #1e293b;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 6px 10px;
+    height: 32px;
+    line-height: 1.2;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sywat-wrap input:focus,
+.sywat-wrap select:focus,
+.sywat-wrap textarea:focus,
+.sywat-app input:focus,
+.sywat-app select:focus,
+.sywat-app textarea:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+/* Card Containers */
+.sywat-card,
+.sywat-shop-card {
+    background: #ffffff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.sywat-card-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #1d2327;
+    margin: 0 0 15px 0;
+    border-bottom: 1px solid #dcdcde;
+    padding-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.sywat-subtitle {
+    font-size: 13px;
+    color: #646970;
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+/* Navigation Tabs */
+.sywat-nav-tabs {
+    display: flex;
+    border-bottom: 1px solid #c3c4c7;
+    margin-bottom: 20px;
+    gap: 5px;
+}
+
+.sywat-tab-item {
+    padding: 10px 18px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #50575e;
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    font-size: 14px;
+}
+
+.sywat-tab-item.active {
+    background: #ffffff;
+    color: #1d2327;
+    border-bottom: 1px solid #ffffff;
+    margin-bottom: -1px;
+}
+
+/* Button Standard Base */
+.sywat-btn,
+.sywat-btn-primary,
+.sywat-btn-secondary,
+.sywat-btn-success,
+.sywat-btn-danger,
+.sywat-btn-gray,
+.sywat-btn-checkedin,
+.sywat-btn-push,
+.sywat-btn-live {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none !important;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sywat-btn-primary,
+.sywat-btn-secondary {
+    background-color: #ffffff;
+    border: 1px solid #2271b1;
+    color: #2271b1 !important;
+}
+.sywat-btn-primary:hover,
+.sywat-btn-secondary:hover {
+    background-color: #2271b1;
+    border-color: #2271b1;
+    color: #ffffff !important;
+}
+
+.sywat-btn-success {
+    background-color: #ffffff;
+    border: 1px solid #008a20;
+    color: #008a20 !important;
+}
+.sywat-btn-success:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+    color: #ffffff !important;
+}
+
+.sywat-btn-danger {
+    background-color: #ffffff;
+    border: 1px solid #dc3545;
+    color: #dc3545 !important;
+}
+.sywat-btn-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #ffffff !important;
+}
+
+.sywat-btn-checkedin {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724 !important;
+}
+.sywat-btn-checkedin:hover {
+    background-color: #c3e6cb;
+    border-color: #b1dfbb;
+    color: #155724 !important;
+}
+
+.sywat-btn-push {
+    background-color: #ffffff;
+    border: 1px solid #475569;
+    color: #475569 !important;
+}
+.sywat-btn-push:hover {
+    background-color: #475569;
+    border-color: #475569;
+    color: #ffffff !important;
+}
+
+.sywat-btn-live {
+    background-color: #ffffff;
+    border: 1px solid #008a20;
+    color: #008a20 !important;
+}
+.sywat-btn-live:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+    color: #ffffff !important;
+}
+
+.sywat-btn-gray {
+    background-color: #6c757d;
+    border: 1px solid #6c757d;
+    color: #ffffff !important;
+}
+.sywat-btn-gray:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+    color: #ffffff !important;
+}
+
+/* Button Icons */
+.sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-member::before     { content: "👤\00a0"; }
+.sywat-tab-icon-board::before      { content: "🏛️\00a0"; }
+.sywat-tab-icon-season::before     { content: "🏆\00a0"; }
+.sywat-tab-icon-shop::before       { content: "🏪\00a0"; }
+.sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
+.sywat-tab-icon-results::before    { content: "🎯\00a0"; }
+
+.sywat-btn-icon-save::before       { content: "💾\00a0"; }
+.sywat-btn-icon-edit::before       { content: "✏️\00a0"; }
+.sywat-btn-icon-manage::before     { content: "👥\00a0"; }
+.sywat-btn-icon-add::before        { content: "➕\00a0"; }
+.sywat-btn-icon-delete::before     { content: "🗑️\00a0"; }
+.sywat-btn-icon-checkin::before    { content: "📋\00a0"; }
+.sywat-btn-icon-checkedin::before  { content: "✓\00a0"; }
+.sywat-btn-icon-export::before     { content: "📥\00a0"; }
+.sywat-btn-icon-invoice::before    { content: "📄\00a0"; }
+.sywat-btn-icon-print::before      { content: "🖨️\00a0"; }
+.sywat-btn-icon-lock::before       { content: "🔒\00a0"; }
+.sywat-btn-icon-unlock::before     { content: "🔓\00a0"; }
+.sywat-btn-icon-sync::before       { content: "🔄\00a0"; }
+.sywat-btn-icon-reset::before      { content: "↺\00a0"; }
+.sywat-btn-icon-clear::before      { content: "✕\00a0"; }
+.sywat-btn-icon-back::before       { content: "←\00a0"; }
+
+/* Badges & Alerts */
+.sywat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 12px;
+    white-space: nowrap;
+    line-height: 1;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+.sywat-badge-prereg { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+.sywat-badge-walkin { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.sywat-badge-open   { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.sywat-badge-full   { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+.sywat-alert { padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
+.sywat-alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.sywat-alert-danger  { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+/* Theme Overrides & Mobile Layout */
+#masthead, header.site-header, .ast-site-title-wrap, .site-branding, .main-header-bar, .entry-header, h1.entry-title {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .sywat-wrap, .sywat-app { padding: 0 10px; }
+    .sywat-nav-tabs { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .sywat-nav-tabs::-webkit-scrollbar { display: none; }
+}
