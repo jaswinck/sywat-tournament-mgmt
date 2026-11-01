@@ -3,9 +3,41 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Cleanly formats Division, Gender, and Style into a single unified category header.
+ * Example: Pro Adult (18 - 49) Male Freestyle
+ * Example: Cub (8 - 11) Male Bowhunter Freestyle
+ */
+if ( ! function_exists( 'sywat_format_combined_category_header' ) ) {
+    function sywat_format_combined_category_header( $division, $gender, $style ) {
+        $is_pro = ( stripos( $style, 'Pro' ) !== false || stripos( $division, 'Pro' ) !== false );
+        
+        $clean_div = trim( $division );
+        if ( $is_pro && stripos( $clean_div, 'Pro' ) === false ) {
+            $clean_div = 'Pro ' . $clean_div;
+        }
+
+        $clean_style = trim( $style );
+        if ( strpos( $clean_style, ' – ' ) !== false ) {
+            $parts = explode( ' – ', $clean_style );
+            $clean_style = end( $parts );
+        } elseif ( strpos( $clean_style, ' - ' ) !== false ) {
+            $parts = explode( ' - ', $clean_style );
+            $clean_style = end( $parts );
+        }
+
+        if ( $is_pro && preg_match( '/\s+Pro$/i', $clean_style ) ) {
+            $clean_style = preg_replace( '/\s+Pro$/i', '', $clean_style );
+        }
+
+        return trim( "{$clean_div} {$gender} {$clean_style}" );
+    }
+}
 
 /**
  * Calculates numeric sort weight for Division + Gender groupings.
@@ -134,7 +166,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             $t_season     = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
             $is_published = ! empty( $t_data['scores_published'] );
 
-            // Only include tournaments matching this season AND explicitly published by the TD
             if ( $t_season === $season_slug && $is_published ) {
                 $matching_tournaments[] = $t_name;
             }
@@ -146,14 +177,12 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             $raw_scores = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
-            // Explicitly filter out any score where style is 'Guest' or name contains '[Guest]'
             $official_scores = array_filter( $raw_scores, function( $s ) {
                 $st = strtolower( trim( $s['style'] ) );
                 $nm = strtolower( trim( $s['name'] ) );
                 return ( $st !== 'guest' && strpos( $nm, '[guest]' ) === false );
             });
 
-            // Group per Archer + D/G/S to ensure only top official score per tournament counts
             $grouped_per_tournament = array();
             foreach ( $official_scores as $s ) {
                 $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
@@ -170,7 +199,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                         }
                         return $q['score'] - $p['score'];
                     });
-                    // Only top official score is promoted
                     $deduped_scores[] = $entries[0];
                 }
             }
@@ -213,7 +241,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             }
         }
 
-        // Sort Division + Gender groups (Cub -> Youth -> Young Adult -> Adult Pro Male -> Adult Male -> etc.)
         uksort( $groups, function( $keyA, $keyB ) {
             list( $divA, $genA ) = explode( '|||', $keyA );
             list( $divB, $genB ) = explode( '|||', $keyB );
@@ -227,7 +254,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Sort styles inside each group by 11-tier style weight priority
         foreach ( $groups as $dg_key => &$group ) {
             uksort( $group['styles'], function( $stA, $stB ) {
                 $wA = sywat_get_style_sort_weight( $stA );
@@ -276,7 +302,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                     );
                 }
 
-                // Rank category: Total Score DESC, Total X DESC
                 usort( $processed, function( $x, $y ) {
                     if ( $x['total_score'] === $y['total_score'] ) {
                         return $y['total_x_count'] - $x['total_x_count'];
