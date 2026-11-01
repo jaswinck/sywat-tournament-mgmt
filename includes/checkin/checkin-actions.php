@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -26,7 +26,10 @@ function sywat_desk_handle_actions(&$data) {
     $closed_lines_key    = $data['closed_lines_key'];
     $registrations       = &$data['registrations'];
     $lines               = $data['lines'];
-    $existing_families   = $data['existing_families'];
+    
+    // Use line-scoped family groups if available, otherwise fallback to generic existing families
+    $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
+    $existing_families         = $data['existing_families'];
 
     $calculate_paid_status = function($pay_option, $division) {
         if ($pay_option === 'Family') return 'Family';
@@ -121,19 +124,15 @@ function sywat_desk_handle_actions(&$data) {
 
         if ($pay_opt === 'Family') {
             $sel_fam_id = isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '';
-            $typed_fam  = isset($_POST['walkin_new_family_name']) ? trim(sanitize_text_field($_POST['walkin_new_family_name'])) : '';
+            $checkin_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
 
             if (!empty($sel_fam_id)) {
                 $family_id   = $sel_fam_id;
-                $family_name = isset($existing_families[$sel_fam_id]) ? $existing_families[$sel_fam_id] : 'Family Group';
-            } elseif (!empty($typed_fam)) {
-                $family_id   = 'fam_' . sanitize_title($typed_fam) . '_' . substr(md5($typed_fam), 0, 4);
-                $family_name = $typed_fam . ' Family';
+                $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
             } else {
-                $name_parts  = array_values(array_filter(explode(' ', $name_val)));
-                $last_part   = !empty($name_parts) ? end($name_parts) : 'Family';
-                $family_id   = 'fam_' . sanitize_title($last_part) . '_' . uniqid();
-                $family_name = $last_part . ' Family';
+                // Generate Anchor Family ID
+                $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($name_val) . '_' . substr(md5(uniqid()), 0, 4);
+                $family_name = $name_val . ' (Family Cap)';
             }
 
             $GLOBALS['sywat_added_family_prompt'] = array(
@@ -200,6 +199,24 @@ function sywat_desk_handle_actions(&$data) {
                 $reg['paid']        = $calculate_paid_status($pay_opt, $division);
                 $reg['checked_in']  = 1;
                 $reg['balance_due'] = 0;
+                
+                // Process Family Option changes on check-in
+                if ($reg['paid'] === 'Family') {
+                    $sel_fam_id = isset($_POST['checkin_family_group_id']) ? sanitize_text_field($_POST['checkin_family_group_id']) : '';
+                    $line_idx   = isset($reg['line_index']) ? $reg['line_index'] : '0';
+                    $checkin_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
+
+                    if (!empty($sel_fam_id)) {
+                        $reg['family_id']   = $sel_fam_id;
+                        $reg['family_name'] = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
+                    } elseif (empty($reg['family_id'])) {
+                        // Generate Anchor Family ID if changing to family at check-in
+                        $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($reg['name']) . '_' . substr(md5(uniqid()), 0, 4);
+                        $reg['family_name'] = $reg['name'] . ' (Family Cap)';
+                    }
+                } else {
+                    unset($reg['family_id']); unset($reg['family_name']);
+                }
                 
                 update_option($opt_key, $reg, false);
 
@@ -299,15 +316,16 @@ function sywat_desk_handle_actions(&$data) {
             $reg['balance_due'] = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
             
             if ($reg['paid'] === 'Family') {
-                if (!empty($_POST['edit_family_group_id'])) {
-                    $reg['family_id']   = sanitize_text_field($_POST['edit_family_group_id']);
-                    $reg['family_name'] = isset($existing_families[$reg['family_id']]) ? $existing_families[$reg['family_id']] : 'Family Group';
-                } elseif (!empty($_POST['edit_new_family_name'])) {
-                    $typed_f = trim(sanitize_text_field($_POST['edit_new_family_name']));
-                    $reg['family_id']   = 'fam_' . sanitize_title($typed_f) . '_' . substr(md5($typed_f), 0, 4);
-                    $reg['family_name'] = $typed_f . ' Family';
-                } elseif (empty($reg['family_id'])) {
-                    $reg['family_id']   = uniqid('fam_');
+                $sel_fam_id = isset($_POST['edit_family_group_id']) ? sanitize_text_field($_POST['edit_family_group_id']) : '';
+                $edit_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
+
+                if (!empty($sel_fam_id)) {
+                    $reg['family_id']   = $sel_fam_id;
+                    $reg['family_name'] = isset($edit_families[$sel_fam_id]) ? $edit_families[$sel_fam_id] : 'Family Group';
+                } elseif (empty($reg['family_id']) || $orig_line !== $line_idx) {
+                    // Generate new Anchor Family ID if moved to a new line or previously unassigned
+                    $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($edit_name) . '_' . substr(md5(uniqid()), 0, 4);
+                    $reg['family_name'] = $edit_name . ' (Family Cap)';
                 }
             } else {
                 unset($reg['family_id']); unset($reg['family_name']);
