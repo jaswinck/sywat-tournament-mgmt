@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 2.2.0
+ * Version: 3.3.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -126,57 +126,59 @@ function render_sywat_scores_app() {
     <div class="sywat-wrap">
         <div class="no-print"><?php echo $notice; ?></div>
 
-        <!-- Master Navigation Tabs (Option A: Action-Driven Navigation) -->
+        <!-- Master Navigation Tabs -->
         <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item">
-                🎯 Manage Tournaments
+            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">
+                Manage Tournaments
             </a>
-            <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item">
-                📋 Check In Archers
+            <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-results">
+                Check In Archers
             </a>
-            <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active">
-                ✏️ Enter Scores
+            <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-season">
+                Enter Scores
             </a>
         </div>
 
-        <!-- Integrated Top Card Header & Filters -->
+        <!-- Integrated Control Panel Filter Toolbar -->
         <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+            <div class="sywat-filter-toolbar">
                 
-                <h3 style="margin:0; font-size:17px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                    ✏️ Enter Scores
-                </h3>
+                <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                    <h3 class="sywat-filter-title">
+                        🎯 Active Roster Filter
+                    </h3>
 
-                <form method="post" id="sywat_score_filter_form" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
-                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                    
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Tournament:</label>
-                        <select name="selected_tournament" id="selected_tournament_val" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:32px; font-size:13px;" onchange="document.getElementById('sywat_score_filter_form').submit();">
-                            <?php foreach ($tournaments as $t_name => $t_lines): ?>
-                                <option value="<?php echo esc_attr($t_name); ?>" <?php selected($selected_tournament, $t_name); ?>>
-                                    <?php echo esc_html($t_name); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <form method="post" id="sywat_score_filter_form" class="sywat-filter-form">
+                        <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                        
+                        <div class="sywat-filter-field">
+                            <label>Tournament</label>
+                            <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();">
+                                <?php foreach ($tournaments as $t_name => $t_lines): ?>
+                                    <option value="<?php echo esc_attr($t_name); ?>" <?php selected($selected_tournament, $t_name); ?>>
+                                        <?php echo esc_html($t_name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Shooting Line:</label>
-                        <select name="selected_line_idx" id="selected_line_val" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:32px; font-size:13px;" onchange="document.getElementById('sywat_score_filter_form').submit();">
-                            <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
-                            <?php foreach ($lines as $idx => $line): ?>
-                                <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?>>
-                                    <?php echo esc_html($line['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                        <div class="sywat-filter-field">
+                            <label>Shooting Line</label>
+                            <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();">
+                                <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
+                                <?php foreach ($lines as $idx => $line): ?>
+                                    <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?>>
+                                        <?php echo esc_html($line['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </form>
+                </div>
 
-                    <?php if ($is_hub_enabled): ?>
-                        <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="font-size:12px; height:32px;">Back to Hub</a>
-                    <?php endif; ?>
-                </form>
+                <?php if ($is_hub_enabled): ?>
+                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
+                <?php endif; ?>
 
             </div>
         </div>
