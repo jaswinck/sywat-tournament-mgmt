@@ -4,7 +4,7 @@
  * Description: Synchronizes archer membership records, caches state standings data, 
  *              and verifies TFAA shooter eligibility across active tournament rosters.
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -92,10 +92,10 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
     function sywat_parse_tfaa_style( $text ) {
         if ( strlen( $text ) > 80 ) return '';
         $style = '';
-        $is_pro = ( stripos( $text, 'Pro' ) !== false );
+        $is_pro = ( stripos( $text, 'Pro' ) !== false || stripos( $text, 'PAMFS' ) !== false || stripos( $text, 'PASL' ) !== false || stripos( $text, 'PSMFS' ) !== false );
 
         // Check "Modern Bowhunter" BEFORE "Bowhunter Freestyle"
-        if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSL-R – Freestyle Limited Recurve (or Olympic Recurve)';
+        if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)';
         elseif ( stripos( $text, 'Freestyle Limited' ) !== false || stripos( $text, 'FSL' ) !== false ) $style = 'FSL – Freestyle Limited';
         elseif ( stripos( $text, 'Modern Bowhunter' ) !== false || stripos( $text, 'MBH' ) !== false ) $style = 'MBH – Modern Bowhunter';
         elseif ( stripos( $text, 'Bowhunter Freestyle' ) !== false || stripos( $text, 'BHFS' ) !== false ) $style = 'BHFS – Bowhunter Freestyle';
@@ -168,9 +168,10 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
         $fl_cache    = array();
         $total_count = 0;
 
-        $current_div   = '';
-        $current_gen   = 'Male';
-        $current_style = '';
+        $current_div    = '';
+        $current_gen    = 'Male';
+        $current_style  = '';
+        $current_is_pro = false;
         
         $stat_divs = 0;
         $stat_styles = 0;
@@ -186,8 +187,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
 
             $div_check = sywat_parse_tfaa_div_gen( $line );
             if ( ! empty( $div_check['division'] ) ) {
-                $current_div = $div_check['division'];
-                $current_gen = $div_check['gender'];
+                $current_div    = $div_check['division'];
+                $current_gen    = $div_check['gender'];
+                $current_is_pro = ( stripos( $line, 'Pro' ) !== false );
                 $stat_divs++;
                 continue;
             }
@@ -195,7 +197,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
             $style_check = sywat_parse_tfaa_style( $line );
             if ( ! empty( $style_check ) ) {
                 $current_style = $style_check;
-                if ( stripos( $line, 'Pro' ) !== false && $current_style === 'FS – Freestyle' ) {
+                if ( ( $current_is_pro || stripos( $line, 'Pro' ) !== false ) && $current_style === 'FS – Freestyle' ) {
                     $current_style = 'FS Pro – Freestyle Pro';
                 }
                 $stat_styles++;
