@@ -3,7 +3,7 @@
  * Sub-Module: Volunteer Hub Portal View Renderer
  * Path: includes/tournaments/volunteer-hub.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -67,7 +67,7 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
         <style>
             .sywat-vhub-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1000px; margin: 0 auto; color: #2c3338; }
             .sywat-vhub-card { background: #ffffff; border: 1px solid #c3c4c7; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px; }
-            .sywat-vhub-title { font-size: 1.3em; font-weight: 700; color: #1d2327; margin: 0 0 15px 0; border-bottom: 2px solid #2271b1; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+            .sywat-vhub-title { font-size: 1.3em; font-weight: 700; color: #1d2327; margin: 0 0 15px 0; border-bottom: 2px solid #2271b1; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
             .sywat-vhub-day-title { font-size: 1.05em; font-weight: 700; color: #1e293b; margin: 15px 0 8px 0; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; display: flex; align-items: center; gap: 6px; }
             .sywat-vhub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 10px; margin-bottom: 15px; }
             @media (max-width: 650px) { .sywat-vhub-grid { grid-template-columns: 1fr; } }
@@ -75,9 +75,9 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
             .sywat-vhub-line-name { font-size: 1.1em; font-weight: 700; color: #1d2327; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
             .sywat-vhub-stat { font-size: 15px; color: #334155; line-height: 1.6; }
             .sywat-vhub-stat-num { font-size: 16px; font-weight: 700; color: #0f172a; }
-            .sywat-vhub-actions { display: flex; gap: 10px; margin-top: 10px; }
-            .sywat-vhub-btn-checkin { flex: 1; background: #008a20; color: #ffffff !important; border: 1px solid #008a20; text-align: center; padding: 11px 10px; border-radius: 5px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
-            .sywat-vhub-btn-scores { flex: 1; background: #2271b1; color: #ffffff !important; border: 1px solid #2271b1; text-align: center; padding: 11px 10px; border-radius: 5px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+            .sywat-vhub-actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+            .sywat-vhub-btn-checkin { flex: 1 1 130px; background: #008a20; color: #ffffff !important; border: 1px solid #008a20; text-align: center; padding: 11px 10px; border-radius: 5px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+            .sywat-vhub-btn-scores { flex: 1 1 130px; background: #2271b1; color: #ffffff !important; border: 1px solid #2271b1; text-align: center; padding: 11px 10px; border-radius: 5px; font-weight: 700; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
             .sywat-vhub-badge { font-size: 13px; padding: 4px 8px; border-radius: 4px; font-weight: 700; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
         </style>
 
