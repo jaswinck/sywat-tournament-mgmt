@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.3.1
+ * Version: 3.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -207,7 +207,7 @@ function sywat_desk_render_modals($data) {
 
                     <div style="margin-bottom:12px;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
-                        <select name="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                        <select name="edit_line_index" id="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="updateEditFamilyOptions(this.value)">
                             <?php $curr_line = isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : ''; ?>
                             <?php foreach ($lines as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>>
@@ -278,7 +278,7 @@ function sywat_desk_render_modals($data) {
 
                     <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="edit_family_box">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
-                        <select name="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <select name="edit_family_group_id" id="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
@@ -450,6 +450,22 @@ function sywat_desk_render_client_scripts($data) {
             opt.value = fid;
             opt.textContent = fams[fid];
             if (fid === currentVal) opt.selected = true;
+            famSelect.appendChild(opt);
+        });
+    }
+
+    function updateEditFamilyOptions(lineIdx) {
+        const famSelect = document.getElementById('edit_family_group_id');
+        if (!famSelect) return;
+
+        famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+
+        const fams = (existingFamiliesByLine && existingFamiliesByLine[lineIdx]) ? existingFamiliesByLine[lineIdx] : {};
+
+        Object.keys(fams).forEach(fid => {
+            const opt = document.createElement('option');
+            opt.value = fid;
+            opt.textContent = fams[fid];
             famSelect.appendChild(opt);
         });
     }
