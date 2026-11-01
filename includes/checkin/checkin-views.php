@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -50,16 +50,16 @@ function sywat_desk_render_filter_bar($data) {
     // Volunteer Hub is strictly enabled ONLY for active tournaments hosted by Cinnamon Creek Ranch (shop_ccr)
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
     ?>
-    <!-- Master Navigation Tabs (Option A: Action-Driven Navigation) -->
+    <!-- Master Navigation Tabs -->
     <div class="sywat-nav-tabs no-print">
-        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item">
-            🎯 Manage Tournaments
+        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">
+            Manage Tournaments
         </a>
-        <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active">
-            📋 Check In Archers
+        <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-results">
+            Check In Archers
         </a>
-        <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item">
-            ✏️ Enter Scores
+        <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">
+            Enter Scores
         </a>
     </div>
 
@@ -68,7 +68,7 @@ function sywat_desk_render_filter_bar($data) {
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
             
             <h3 style="margin:0; font-size:17px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                📋 Check In Archers
+                Check In Archers
             </h3>
 
             <form method="post" id="sywat_filter_form" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
@@ -76,7 +76,7 @@ function sywat_desk_render_filter_bar($data) {
                 
                 <div style="display:flex; align-items:center; gap:6px;">
                     <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Tournament:</label>
-                    <select name="selected_tournament" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:32px; font-size:13px;" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();">
                         <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                             <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
                                 <?php echo esc_html($t_name); ?>
@@ -87,7 +87,7 @@ function sywat_desk_render_filter_bar($data) {
 
                 <div style="display:flex; align-items:center; gap:6px;">
                     <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Shooting Line:</label>
-                    <select name="selected_line_idx" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; height:32px; font-size:13px;" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();">
                         <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
                         <?php foreach ($data['lines'] as $idx => $line): ?>
                             <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
@@ -98,7 +98,7 @@ function sywat_desk_render_filter_bar($data) {
                 </div>
 
                 <?php if ($is_hub_enabled): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="font-size:12px; height:32px;">Back to Hub</a>
+                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                 <?php endif; ?>
             </form>
 
@@ -170,33 +170,42 @@ function sywat_desk_render_capacity_tracker($data) {
                         $cap_20yd_num = max(0, intval(isset($line['cap_20yd']) ? $line['cap_20yd'] : 0) - $booked_20yd);
                         $cap_cub_num  = max(0, intval(isset($line['cap_cub']) ? $line['cap_cub'] : 0) - $booked_cub);
 
-                        $disp_20yd = ($cap_20yd_num === 0) ? '<span style="color:#dc2626; font-weight:bold;">FULL</span>' : $cap_20yd_num . ' Open';
-                        $disp_cub  = ($cap_cub_num === 0) ? '<span style="color:#dc2626; font-weight:bold;">FULL</span>' : $cap_cub_num . ' Open';
+                        $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
+                        $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
                         $is_closed_line = in_array((string)$idx, $closed_lines);
-                        $closed_badge = $is_closed_line ? '<span style="color:#dc2626; font-size:11px; font-weight:bold; margin-left:8px;">[CLOSED]</span>' : '';
+                        $closed_badge = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
-                            <strong style="color:#0f172a; font-size:14px;"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
-                            <span style="font-size:11px; background:#0073aa; color:#fff; padding:2px 6px; border-radius:12px; font-weight:bold; white-space:nowrap;">
-                                <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
-                            </span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; font-size:13px; color:#475569;">
-                            <span><strong>20yd:</strong> <?php echo $disp_20yd; ?></span>
-                            <span><strong>Cub:</strong> <?php echo $disp_cub; ?></span>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
+                                <strong style="color:#0f172a; font-size:14px;"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
+                                <span class="sywat-badge sywat-badge-prereg">
+                                    <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
+                                </span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:13px; color:#475569;">
+                                <span><strong>20yd:</strong> <?php echo $disp_20yd; ?></span>
+                                <span><strong>Cub:</strong> <?php echo $disp_cub; ?></span>
+                            </div>
                         </div>
                         
-                        <?php if ($is_admin): ?>
-                            <div style="margin-top:10px; border-top:1px dashed #cbd5e1; padding-top:8px; display:flex; justify-content:flex-end;">
+                        <!-- Line Check-In Shortcut Button & Admin Toggle -->
+                        <div style="margin-top:4px; border-top:1px dashed #cbd5e1; padding-top:8px; display:flex; gap:6px; align-items:center; justify-content:space-between;">
+                            <form method="post" style="margin:0; flex:1;">
+                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
+                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="width:100%;">Check In Line</button>
+                            </form>
+
+                            <?php if ($is_admin): ?>
                                 <?php if ($is_closed_line): ?>
                                     <form method="post" style="margin:0;">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="reopen_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" style="font-size:11px; height:26px; padding:2px 8px;">Reopen Line</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Reopen</button>
                                     </form>
                                 <?php else: ?>
                                     <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to close this line? All un-checked-in archers will be permanently marked as No Show.');">
@@ -204,11 +213,11 @@ function sywat_desk_render_capacity_tracker($data) {
                                         <input type="hidden" name="sywat_action" value="close_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-lock" style="font-size:11px; height:26px; padding:2px 8px;">Close Line</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-lock">Close</button>
                                     </form>
                                 <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -232,10 +241,10 @@ function sywat_desk_render_archers_table($data) {
             <span>Registered Archers</span>
             <div style="display:flex; gap:8px; align-items:center;">
                 <div style="display:flex; gap:5px; margin:0; align-items:center;">
-                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:32px;" onclick="openWalkinModal()">Add Walk-In</button>
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
             </div>
         </div>
 
@@ -264,21 +273,28 @@ function sywat_desk_render_archers_table($data) {
                             $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
                             $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
                             
-                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family');
+                            $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
                         ?>
                         <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                             <td>
                                 <div style="font-weight:bold; color:#0f172a;"><?php echo esc_html($reg['name']); ?></div>
-                                <?php if ($balance_due > 0): ?>
-                                    <div style="margin-top:3px;">
-                                        <span style="font-size:11px; background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:2px 6px; border-radius:10px; font-weight:bold; white-space:nowrap; display:inline-block;">
-                                            <?php if ($is_family_due): ?>
-                                                ⚠️ OWE: FAMILY
-                                            <?php else: ?>
-                                                ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
-                                            <?php endif; ?>
-                                        </span>
-                                    </div>
+                                <!-- Clean CSS OWE Badge using .sywat-badge-full -->
+                                <?php if ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—'): ?>
+                                    <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
+                                        <div style="margin-top:4px;">
+                                            <span class="sywat-badge sywat-badge-full">
+                                                <?php if ($is_family_due): ?>
+                                                    ⚠️ OWE: FAMILY
+                                                <?php else: ?>
+                                                    <?php 
+                                                        $is_youth_div = (stripos($div_disp, 'Cub') !== false || stripos($div_disp, 'Youth') !== false || stripos($div_disp, 'Young Adult') !== false);
+                                                        $fixed_due = $is_youth_div ? 25.00 : 30.00;
+                                                    ?>
+                                                    ⚠️ OWE $<?php echo number_format($fixed_due, 2); ?>
+                                                <?php endif; ?>
+                                            </span>
+                                        </div>
+                                    <?php } ?>
                                 <?php endif; ?>
                             </td>
                             <td style="text-align:center;">
@@ -297,7 +313,7 @@ function sywat_desk_render_archers_table($data) {
                                         <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                         <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="height:28px; padding:2px 8px; font-size:12px;">Edit</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
                                     </form>
 
                                     <?php if (!empty($reg['checked_in'])): ?>
@@ -308,18 +324,18 @@ function sywat_desk_render_archers_table($data) {
                                             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                             <input type="hidden" name="sywat_action" value="undo_checkin">
                                             <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin" style="height:28px; padding:2px 8px; font-size:12px;">Checked In</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                         </form>
                                     <?php else: ?>
                                         <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
-                                            <span style="font-size:11px; color:#dc2626; font-weight:bold; padding:4px 8px;">Line Closed</span>
+                                            <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                         <?php else: ?>
                                             <form method="post" style="margin:0;">
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                                 <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                                 <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="height:28px; padding:2px 8px; font-size:12px;">Check In</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Archer</button>
                                             </form>
                                         <?php endif; ?>
                                     <?php endif; ?>
