@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -150,9 +150,9 @@ function sywat_desk_render_modals($data) {
                     </div>
 
                     <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="checkin_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Family Group Reference:</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
                         <select name="checkin_family_group_id" id="checkin_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">[ + Create New Family Group ]</option>
+                            <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_archer['family_id']) ? $modal_archer['family_id'] : '';
                             foreach ($existing_families as $fid => $flabel) {
@@ -160,7 +160,6 @@ function sywat_desk_render_modals($data) {
                             }
                             ?>
                         </select>
-                        <input type="text" name="checkin_new_family_name" id="checkin_new_family_name" placeholder="Or type new family name (e.g. Smith Family)..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-top:5px;">
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -270,9 +269,9 @@ function sywat_desk_render_modals($data) {
                     </div>
 
                     <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="edit_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Family Group Reference:</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
                         <select name="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">[ + Create New Family Group ]</option>
+                            <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
                             foreach ($existing_families as $fid => $flabel) {
@@ -280,7 +279,6 @@ function sywat_desk_render_modals($data) {
                             }
                             ?>
                         </select>
-                        <input type="text" name="edit_new_family_name" placeholder="Or type new family name..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-top:5px;">
                     </div>
 
                     <div style="margin-bottom:12px;">
@@ -378,14 +376,13 @@ function sywat_desk_render_modals($data) {
                     </div>
 
                     <div style="margin-bottom:12px; display:none;" id="walkin_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Family Group Reference:</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
                         <select name="walkin_family_group_id" id="walkin_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">[ + Start New Family Group ]</option>
+                            <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php foreach ($existing_families as $fid => $flabel): ?>
                                 <option value="<?php echo esc_attr($fid); ?>"><?php echo esc_html($flabel); ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <input type="text" name="walkin_new_family_name" id="walkin_new_family_name" placeholder="Or type new family name (e.g. Smith Family)..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-top:5px;">
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -770,9 +767,6 @@ function sywat_desk_render_client_scripts($data) {
 
         const famSel = document.getElementById('walkin_family_group_id');
         if (famSel) famSel.value = '';
-
-        const famTxt = document.getElementById('walkin_new_family_name');
-        if (famTxt) famTxt.value = '';
 
         toggleFamilyBox('walkin');
         handleStyleRestrictions('walkin');
