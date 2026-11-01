@@ -349,7 +349,6 @@ body {
     font-weight: 600;
     color: #1d2327;
     border-bottom: 1px solid #c3c4c7;
-    white-space: nowrap;
 }
 
 .sywat-table td {
@@ -359,23 +358,25 @@ body {
     vertical-align: middle;
 }
 
-/* Table Alignment Classes & Column Width Locks */
+/* Action Buttons Flex Container & Stacking Support */
+.sywat-table-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap; /* Allows buttons to stack vertically when space is limited */
+}
+
 .sywat-table th.text-center,
 .sywat-table td.text-center {
     text-align: center;
 }
 
 .sywat-table th.text-right,
-.sywat-table td.text-right {
-    text-align: right;
-}
-
-/* Lock Actions Cell to Fit Action Buttons Tightly Without Horizontal Clipping */
+.sywat-table td.text-right,
 .sywat-table td:last-child,
 .sywat-table th:last-child {
-    white-space: nowrap !important;
     text-align: right;
-    width: 1%;
 }
 
 /* Modals */
