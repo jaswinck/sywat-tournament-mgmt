@@ -4,7 +4,7 @@
  * Description: Synchronizes archer membership records, caches state standings data, 
  *              and verifies TFAA shooter eligibility across active tournament rosters.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -62,18 +62,19 @@ function render_sywat_tfaa_sync_btn() {
 
 if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
     function sywat_parse_tfaa_div_gen( $text ) {
-        if ( strlen( $text ) > 80 ) return array( 'division' => '', 'gender' => '' );
+        if ( strlen( $text ) > 120 ) return array( 'division' => '', 'gender' => '', 'is_pro' => false );
 
         // Strict word boundaries so "Female" doesn't falsely trigger "Male"
         $has_female = preg_match( '/\bfemale\b/i', $text );
         $has_male   = preg_match( '/\bmale\b/i', $text );
 
         if ( ( ! $has_female && ! $has_male ) || ( $has_female && $has_male ) ) {
-            return array( 'division' => '', 'gender' => '' );
+            return array( 'division' => '', 'gender' => '', 'is_pro' => false );
         }
 
-        $gen = $has_female ? 'Female' : 'Male';
-        $div = '';
+        $gen    = $has_female ? 'Female' : 'Male';
+        $is_pro = ( stripos( $text, 'Pro' ) !== false );
+        $div    = '';
 
         if ( stripos( $text, 'Master Senior' ) !== false || stripos( $text, 'Master' ) !== false ) $div = 'Master Senior (70+)';
         elseif ( stripos( $text, 'Silver Senior' ) !== false ) $div = 'Silver Senior (60 - 69)';
@@ -83,16 +84,16 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
         elseif ( stripos( $text, 'Cub' ) !== false ) $div = 'Cub (8 - 11)';
         elseif ( stripos( $text, 'Adult' ) !== false ) $div = 'Adult (18 - 49)';
 
-        if ( empty( $div ) ) return array( 'division' => '', 'gender' => '' );
-        return array( 'division' => $div, 'gender' => $gen );
+        if ( empty( $div ) ) return array( 'division' => '', 'gender' => '', 'is_pro' => false );
+        return array( 'division' => $div, 'gender' => $gen, 'is_pro' => $is_pro );
     }
 }
 
 if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
-    function sywat_parse_tfaa_style( $text ) {
-        if ( strlen( $text ) > 80 ) return '';
-        $style = '';
-        $is_pro = ( stripos( $text, 'Pro' ) !== false || stripos( $text, 'PAMFS' ) !== false || stripos( $text, 'PASL' ) !== false || stripos( $text, 'PSMFS' ) !== false );
+    function sywat_parse_tfaa_style( $text, $is_pro_context = false ) {
+        if ( strlen( $text ) > 120 ) return '';
+        $style  = '';
+        $is_pro = $is_pro_context || ( stripos( $text, 'Pro' ) !== false || stripos( $text, 'PAMFS' ) !== false || stripos( $text, 'PASL' ) !== false || stripos( $text, 'PSMFS' ) !== false );
 
         // Check "Modern Bowhunter" BEFORE "Bowhunter Freestyle"
         if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)';
@@ -154,13 +155,13 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
         $spaced_body = str_replace( '>', '> ', $body );
         $spaced_body = str_replace( '<', ' <', $spaced_body );
 
-        // 2. Convert block-level structure tags and table rows to actual newlines
-        $clean_html = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_body );
+        // 2. Convert table rows, table header/data cells, and block elements to actual newlines
+        $clean_html = preg_replace( '/<\/?(?:tr|td|th|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_body );
         
-        // 3. Strip all the remaining tags
+        // 3. Strip all remaining HTML tags
         $plain_text = wp_strip_all_tags( $clean_html );
         
-        // 4. Break into clean lines
+        // 4. Break into clean individual lines
         $lines = explode( "\n", $plain_text );
         $debug_log[] = "Total Lines: " . count($lines);
 
@@ -189,17 +190,14 @@ if ( ! function_exists( 'sywat_sync_tfaa_standings' ) ) {
             if ( ! empty( $div_check['division'] ) ) {
                 $current_div    = $div_check['division'];
                 $current_gen    = $div_check['gender'];
-                $current_is_pro = ( stripos( $line, 'Pro' ) !== false );
+                $current_is_pro = $div_check['is_pro'];
                 $stat_divs++;
                 continue;
             }
 
-            $style_check = sywat_parse_tfaa_style( $line );
+            $style_check = sywat_parse_tfaa_style( $line, $current_is_pro );
             if ( ! empty( $style_check ) ) {
                 $current_style = $style_check;
-                if ( ( $current_is_pro || stripos( $line, 'Pro' ) !== false ) && $current_style === 'FS – Freestyle' ) {
-                    $current_style = 'FS Pro – Freestyle Pro';
-                }
                 $stat_styles++;
                 continue;
             }
