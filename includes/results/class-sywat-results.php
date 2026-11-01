@@ -4,7 +4,7 @@
  * Path: includes/results/class-sywat-results.php
  * Description: Main loader binding public shortcode [sywat_results].
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,43 +56,45 @@ function render_sywat_public_results_portal() {
             <?php if ( empty( $tournaments ) ): ?>
                 <p style="color: #646970; font-style: italic; padding: 20px 0;">No tournaments configured yet.</p>
             <?php else: ?>
-                <table class="sywat-table" style="margin-top: 15px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 25%;">Tournament Date</th>
-                            <th>Tournament Name</th>
-                            <th style="width: 220px; text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $tournaments as $t_name => $t_data ): ?>
-                            <?php 
-                                $s_date     = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
-                                $e_date     = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
-                                $disp_dates = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
-                                if ( empty( $disp_dates ) ) {
-                                    $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
-                                }
-                            ?>
+                <div class="sywat-table-responsive" style="margin-top: 15px;">
+                    <table class="sywat-table" style="margin-top: 0;">
+                        <thead>
                             <tr>
-                                <td>
-                                    <strong style="font-size: 15px; color: #0f172a; font-weight: 700;">📅 <?php echo esc_html( $disp_dates ); ?></strong>
-                                </td>
-                                <td>
-                                    <strong style="font-size: 15px; color: #0f172a; font-weight: 700;"><?php echo esc_html( $t_name ); ?></strong>
-                                </td>
-                                <td style="text-align: right;">
-                                    <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
-                                        <?php if ( function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores() ): ?>
-                                            <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-secondary" style="font-size: 12px; padding: 6px 10px;" title="Jump to Score Entry Desk">✏️ Enter Scores</a>
-                                        <?php endif; ?>
-                                        <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
-                                    </div>
-                                </td>
+                                <th style="width: 25%;">Tournament Date</th>
+                                <th>Tournament Name</th>
+                                <th style="width: 220px; text-align: right;">Action</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $tournaments as $t_name => $t_data ): ?>
+                                <?php 
+                                    $s_date     = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                                    $e_date     = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                                    $disp_dates = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
+                                    if ( empty( $disp_dates ) ) {
+                                        $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
+                                    }
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong style="font-size: 15px; color: #0f172a; font-weight: 700;">📅 <?php echo esc_html( $disp_dates ); ?></strong>
+                                    </td>
+                                    <td>
+                                        <strong style="font-size: 15px; color: #0f172a; font-weight: 700;"><?php echo esc_html( $t_name ); ?></strong>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                                            <?php if ( function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores() ): ?>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-secondary" style="font-size: 12px; padding: 6px 10px;" title="Jump to Score Entry Desk">✏️ Enter Scores</a>
+                                            <?php endif; ?>
+                                            <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary" style="font-size: 12px; padding: 6px 12px;">View Results</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
         <?php
