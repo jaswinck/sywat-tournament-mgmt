@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -61,43 +61,47 @@ function sywat_desk_render_filter_bar($data) {
         </a>
     </div>
 
-    <!-- Integrated Top Card Header & Filters -->
+    <!-- Integrated Control Panel Filter Toolbar -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-            <h3 style="margin:0; font-size:17px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                Check In Archers
-            </h3>
+        <div class="sywat-filter-toolbar">
+            
+            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                <h3 class="sywat-filter-title">
+                    🎯 Active Roster Filter
+                </h3>
 
-            <form method="post" id="sywat_filter_form" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0;">
-                <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
-                
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Tournament:</label>
-                    <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();">
-                        <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
-                            <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
-                                <?php echo esc_html($t_name); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                <form method="post" id="sywat_filter_form" class="sywat-filter-form">
+                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
+                    
+                    <div class="sywat-filter-field">
+                        <label>Tournament</label>
+                        <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();">
+                            <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
+                                <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
+                                    <?php echo esc_html($t_name); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <label style="font-weight:700; font-size:13px; color:#334155; white-space:nowrap;">Shooting Line:</label>
-                    <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();">
-                        <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
-                        <?php foreach ($data['lines'] as $idx => $line): ?>
-                            <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
-                                <?php echo esc_html($line['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                    <div class="sywat-filter-field">
+                        <label>Shooting Line</label>
+                        <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();">
+                            <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
+                            <?php foreach ($data['lines'] as $idx => $line): ?>
+                                <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
+                                    <?php echo esc_html($line['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </form>
+            </div>
 
-                <?php if ($is_hub_enabled): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
-                <?php endif; ?>
-            </form>
+            <?php if ($is_hub_enabled): ?>
+                <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
+            <?php endif; ?>
+
         </div>
     </div>
     <?php
