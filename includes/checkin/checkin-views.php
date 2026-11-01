@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -65,7 +65,7 @@ function sywat_desk_render_filter_bar($data) {
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
         <div class="sywat-filter-toolbar">
             
-            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap;">
                 <h3 class="sywat-filter-title">
                     🎯 Active Roster Filter
                 </h3>
@@ -99,7 +99,7 @@ function sywat_desk_render_filter_bar($data) {
             </div>
 
             <?php if ($is_hub_enabled): ?>
-                <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
+                <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="height:34px;">Back to Hub</a>
             <?php endif; ?>
 
         </div>
