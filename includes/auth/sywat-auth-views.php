@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -129,7 +129,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         </a>
                     <?php else: ?>
                         <a href="<?php echo esc_url( site_url( '/login/' ) ); ?>" class="sywat-btn sywat-btn-primary" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
-                            🔑 Staff Sign In
+                            🔑 Login
                         </a>
                     <?php endif; ?>
                 </div>
