@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Modals & Scripts
  * Path: includes/members/members-modals.php
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -68,10 +68,10 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
-                    <!-- MULTI-ROLE CHECKBOX GRID (ADD MODAL) -->
+                    <!-- MULTI-ROLE CHECKBOX GRID (NO SCROLLBAR) -->
                     <div style="margin-bottom: 10px;">
-                        <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assign System Role(s) *</label>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 115px; overflow-y: auto;">
+                        <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                             <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                 <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                 <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -169,10 +169,10 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
-                        <!-- MULTI-ROLE CHECKBOX GRID (EDIT MODAL) -->
+                        <!-- MULTI-ROLE CHECKBOX GRID (NO SCROLLBAR) -->
                         <div style="margin-bottom: 10px;">
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 115px; overflow-y: auto;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                                 <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                     <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                     <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
