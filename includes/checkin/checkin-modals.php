@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -431,7 +431,6 @@ function sywat_desk_render_client_scripts($data) {
             if (tfaaData.fl && tfaaData.fl[flKey]) return tfaaData.fl[flKey];
         }
 
-        // Substring partial search across tfaaData.exact dictionary
         if (tfaaData.exact) {
             let partialMatches = [];
             const keys = Object.keys(tfaaData.exact);
@@ -571,9 +570,9 @@ function sywat_desk_render_client_scripts($data) {
         const genEl   = document.getElementById(prefix + '_gender');
         const styleEl = document.getElementById(prefix + '_style');
 
-        if (divEl && divVal) divEl.value = divVal;
-        if (genEl && genVal) genEl.value = genVal;
-        if (styleEl && styleVal) styleEl.value = styleVal;
+        if (divEl && divVal) matchDeskTfaaSelect(divVal, divEl);
+        if (genEl && genVal) matchDeskTfaaSelect(genVal, genEl);
+        if (styleEl && styleVal) matchDeskTfaaSelect(styleVal, styleEl);
 
         handleStyleRestrictions(prefix);
         evaluateTfaaStatus(prefix);
@@ -583,7 +582,7 @@ function sywat_desk_render_client_scripts($data) {
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (nameInput && officialName) {
             nameInput.value = officialName;
-            evaluateTfaaStatus(prefix);
+            autoFillOnNameChange(prefix);
         }
     }
 
@@ -620,7 +619,20 @@ function sywat_desk_render_client_scripts($data) {
                 let shortSty = cat.style.split(' – ')[0];
                 if (!knownStyles.includes(shortSty)) knownStyles.push(shortSty);
             }
-            if (cat.division === currDiv && cat.gender === currGen && cat.style === currStyle) {
+
+            const cDiv = (cat.division || '').toLowerCase();
+            const cGen = (cat.gender || '').toLowerCase();
+            const cSty = (cat.style || '').toLowerCase();
+
+            const uDiv = currDiv.toLowerCase();
+            const uGen = currGen.toLowerCase();
+            const uSty = currStyle.toLowerCase();
+
+            const divMatch   = uDiv.includes(cDiv.split(' ')[0]) || cDiv.includes(uDiv.split(' ')[0]);
+            const genMatch   = uGen.startsWith(cGen.charAt(0)) || cGen.startsWith(uGen.charAt(0));
+            const styleMatch = uSty.includes(cSty.split(' ')[0]) || cSty.includes(uSty.split(' ')[0]);
+
+            if (divMatch && genMatch && styleMatch) {
                 isExactMatch = true;
             }
 
@@ -638,6 +650,7 @@ function sywat_desk_render_client_scripts($data) {
             buttonContainer.appendChild(pillBtn);
         });
 
+        // Only display selection pills if there are MULTIPLE profile choices
         if (tfaaMatches.length > 1) {
             const alertBox = document.createElement('div');
             alertBox.className = 'sywat-multi-style-alert';
@@ -649,8 +662,6 @@ function sywat_desk_render_client_scripts($data) {
             alertBox.appendChild(alertTitle);
             alertBox.appendChild(buttonContainer);
             pillsEl.appendChild(alertBox);
-        } else {
-            pillsEl.appendChild(buttonContainer);
         }
 
         let officialName = tfaaMatches[0].full_name || tfaaMatches[0].name || '';
@@ -681,36 +692,45 @@ function sywat_desk_render_client_scripts($data) {
         const typedName = nameInput.value;
         const tfaaMatches = findTfaaMatch(typedName);
 
-        if (prefix === 'walkin') {
-            if (tfaaMatches && tfaaMatches.length > 0) {
-                const firstCat = tfaaMatches[0];
-                loadTfaaCategory(prefix, firstCat.division, firstCat.gender, firstCat.style);
+        if (tfaaMatches && tfaaMatches.length === 1) {
+            const single = tfaaMatches[0];
+            const divEl   = document.getElementById(prefix + '_division');
+            const genEl   = document.getElementById(prefix + '_gender');
+            const styleEl = document.getElementById(prefix + '_style');
+
+            if (divEl && single.division) matchDeskTfaaSelect(single.division, divEl);
+            if (genEl && single.gender) matchDeskTfaaSelect(single.gender, genEl);
+            if (styleEl && single.style) matchDeskTfaaSelect(single.style, styleEl);
+
+            handleStyleRestrictions(prefix);
+        } else if (tfaaMatches && tfaaMatches.length > 1 && prefix === 'walkin') {
+            const firstCat = tfaaMatches[0];
+            loadTfaaCategory(prefix, firstCat.division, firstCat.gender, firstCat.style);
+        } else if (prefix === 'walkin') {
+            const shopMatch = findShopHistoryMatch(typedName);
+            if (shopMatch) {
+                const divEl   = document.getElementById(prefix + '_division');
+                const genEl   = document.getElementById(prefix + '_gender');
+                const styleEl = document.getElementById(prefix + '_style');
+                const payEl   = document.getElementById(prefix + '_pay_option');
+
+                if (divEl && shopMatch.division) matchDeskTfaaSelect(shopMatch.division, divEl);
+                if (genEl && shopMatch.gender) matchDeskTfaaSelect(shopMatch.gender, genEl);
+                if (styleEl && shopMatch.style) matchDeskTfaaSelect(shopMatch.style, styleEl);
+                if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
+
+                handleStyleRestrictions(prefix);
             } else {
-                const shopMatch = findShopHistoryMatch(typedName);
-                if (shopMatch) {
-                    const divEl   = document.getElementById(prefix + '_division');
-                    const genEl   = document.getElementById(prefix + '_gender');
-                    const styleEl = document.getElementById(prefix + '_style');
-                    const payEl   = document.getElementById(prefix + '_pay_option');
-
-                    if (divEl && shopMatch.division) divEl.value = shopMatch.division;
-                    if (genEl && shopMatch.gender) genEl.value = shopMatch.gender;
-                    if (styleEl && shopMatch.style) styleEl.value = shopMatch.style;
-                    if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
-
-                    handleStyleRestrictions(prefix);
-                } else {
-                    const divEl   = document.getElementById('walkin_division');
-                    const genEl   = document.getElementById('walkin_gender');
-                    const styleEl = document.getElementById('walkin_style');
-                    if (divEl) divEl.value = '';
-                    if (genEl) genEl.value = '';
-                    if (styleEl) styleEl.value = '';
-                    handleStyleRestrictions('walkin');
-                }
+                const divEl   = document.getElementById('walkin_division');
+                const genEl   = document.getElementById('walkin_gender');
+                const styleEl = document.getElementById('walkin_style');
+                if (divEl) divEl.value = '';
+                if (genEl) genEl.value = '';
+                if (styleEl) styleEl.value = '';
+                handleStyleRestrictions('walkin');
             }
         }
-        
+
         evaluateTfaaStatus(prefix);
     }
 
