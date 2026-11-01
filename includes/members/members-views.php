@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
  * Author: SYWAT Archery
- * Version: 2.3.0
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -189,8 +189,13 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         $role_names  = array();
                                         foreach ( $m_roles as $r_slug ) {
                                             if ( in_array( strtolower( $r_slug ), $excluded_roles, true ) ) continue;
+                                            
                                             $r_name = isset( $wp_role_names[$r_slug] ) ? $wp_role_names[$r_slug] : ucfirst( str_replace( '_', ' ', $r_slug ) );
-                                            $role_names[] = $r_name;
+                                            
+                                            // Fail-safe cleanup: Strip any legacy "TFAA " or "SYWAT " prefixes
+                                            $r_name = trim( str_replace( array( 'TFAA ', 'SYWAT ' ), '', $r_name ) );
+
+                                            $role_names[]  = $r_name;
                                             $role_badges[] = '<span class="sywat-badge sywat-badge-prereg" style="font-size: 10px; padding: 2px 6px;">' . esc_html( $r_name ) . '</span>';
                                         }
                                         $roles_html   = ! empty( $role_badges ) ? implode( ' ', $role_badges ) : '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">No Role</span>';
