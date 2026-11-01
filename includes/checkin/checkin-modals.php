@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.3.0
+ * Version: 3.3.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -358,7 +358,7 @@ function sywat_desk_render_modals($data) {
                             <option value="" disabled selected hidden>Select Gender</option>
                             <?php foreach ($genders as $g): ?>
                                 <?php if ($g === 'No Show') continue; ?>
-                                <option value="' . esc_attr($g) . '"><?php echo esc_html($g); ?></option>
+                                <option value="<?php echo esc_attr($g); ?>"><?php echo esc_html($g); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
