@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.3.0
+ * Version: 3.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -238,7 +238,7 @@ function sywat_desk_render_archers_table($data) {
     <div class="sywat-card no-print">
         <div class="sywat-card-title">
             <span>Registered Archers</span>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex; gap:5px; margin:0; align-items:center;">
                     <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
