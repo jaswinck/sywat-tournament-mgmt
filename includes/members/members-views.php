@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Views & Modals
  * Path: includes/members/members-views.php
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -55,6 +55,20 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
         global $wp_roles;
         $wp_role_names = $wp_roles ? $wp_roles->get_names() : array();
+
+        // System & legacy roles to hide from TFAA Member creation/editing modals
+        $excluded_roles = array(
+            'administrator',
+            'editor',
+            'author',
+            'contributor',
+            'subscriber',
+            'management',
+            'staff_shooter',
+            'staff-shooter',
+            'non-shooting-member',
+            'non_shooting_member',
+        );
 
         ob_start();
         ?>
@@ -186,6 +200,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         $role_badges = array();
                                         $role_names  = array();
                                         foreach ( $m_roles as $r_slug ) {
+                                            if ( in_array( strtolower( $r_slug ), $excluded_roles, true ) ) continue;
                                             $r_name = isset( $wp_role_names[$r_slug] ) ? $wp_role_names[$r_slug] : ucfirst( str_replace( '_', ' ', $r_slug ) );
                                             $role_names[] = $r_name;
                                             $role_badges[] = '<span class="sywat-badge sywat-badge-prereg" style="font-size: 10px; padding: 2px 6px;">' . esc_html( $r_name ) . '</span>';
@@ -290,7 +305,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <label style="display:block; font-weight:600; font-size:13px; margin-bottom:8px;">Assign System Role(s) *</label>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 150px; overflow-y: auto;">
                                     <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                        <?php if ( $r_key === 'administrator' ) continue; // Skip admin for safety in member creation ?>
+                                        <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                         <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                             <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?>>
                                             <?php echo esc_html( $r_details['name'] ); ?>
@@ -390,7 +405,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <label style="display:block; font-weight:600; font-size:13px; margin-bottom:8px;">Assigned System Role(s) *</label>
                                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 150px; overflow-y: auto;">
                                         <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                            <?php if ( $r_key === 'administrator' && ! current_user_can( 'administrator' ) ) continue; ?>
+                                            <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
                                             <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                                                 <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $current_user_roles ), true ); ?>>
                                                 <?php echo esc_html( $r_details['name'] ); ?>
