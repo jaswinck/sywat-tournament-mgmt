@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-roster.php
  * Description: Archer editing logic, division/style restrictions, strict family line-scoping, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -106,7 +106,6 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 if (!empty($sel_fam_id)) {
                     $reg['family_id'] = $sel_fam_id;
                     
-                    // Re-calculate the label just in case it wasn't passed, though we mostly just need the ID
                     $existing_label = 'Family Group';
                     foreach ($registrations as $other) {
                         if (isset($other['family_id']) && $other['family_id'] === $sel_fam_id && !empty($other['family_name'])) {
@@ -116,7 +115,6 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                     }
                     $reg['family_name'] = $existing_label;
                 } elseif (empty($reg['family_id']) || $orig_line !== $line_idx) {
-                    // Generate new Anchor Family ID if moved to a new line or previously unassigned
                     $reg['family_id']   = 'fam_' . $t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($edit_name) . '_' . substr(md5(uniqid()), 0, 4);
                     $reg['family_name'] = $edit_name . ' (Family Cap)';
                 }
@@ -355,74 +353,76 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             <?php if ( empty( $filtered_registrations ) ): ?>
                 <p style="color: #646970; font-style: italic; font-size: 13px; margin: 20px 0;">No archers found matching your filter criteria.</p>
             <?php else: ?>
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">Shooter Name</th>
-                            <th style="text-align:center;">Type / Payment</th>
-                            <th style="text-align:left;">Line</th>
-                            <th style="text-align:center;">Distance</th>
-                            <th style="text-align:right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $filtered_registrations as $reg ): ?>
-                            <?php 
-                                $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
-                                $badge_type  = ! empty( $reg['is_walkin'] ) || (isset($reg['type']) && $reg['type'] === 'Walk-In') ? 'Walk-In' : 'Pre-Reg';
-                                $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-
-                                $paid_status = isset($reg['paid']) ? $reg['paid'] : '';
-                                $fam_label = '';
-                                if ($paid_status === 'Family' && !empty($reg['family_id'])) {
-                                    $lidx = sywat_roster_resolve_line_idx($reg, $available_lines);
-                                    if (isset($existing_families_by_line[$lidx][$reg['family_id']])) {
-                                        $fam_label = $existing_families_by_line[$lidx][$reg['family_id']];
-                                    }
-                                }
-                            ?>
-                            <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
-                                <td>
-                                    <strong><?php echo esc_html( $reg['name'] ); ?></strong>
-                                    <?php if (!empty($fam_label)): ?>
-                                        <div style="font-size:11px; color:#155724; background:#d4edda; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:2px;">
-                                            🟢 <?php echo esc_html($fam_label); ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="text-align:center;">
-                                    <span class="sywat-badge <?php echo $badge_class; ?>" style="margin-bottom:3px;"><?php echo esc_html( $badge_type ); ?></span>
-                                    <?php if ($paid_status === 'Family'): ?>
-                                        <br><span style="font-size:10px; font-weight:bold; color:#0284c7; background:#e0f2fe; padding:2px 4px; border-radius:3px;">Family Cap</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
-                                <td style="text-align:center;"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
-                                <td style="text-align:right;">
-                                    <div style="display:inline-flex; gap:6px; justify-content:flex-end;">
-                                        <!-- Edit Button Link -->
-                                        <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding: 4px 10px; font-size: 12px; height: auto;">Edit</a>
-
-                                        <!-- Remove Form -->
-                                        <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
-                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                            <input type="hidden" name="sywat_action" value="delete_shooter">
-                                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                            <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
-                                        </form>
-                                    </div>
-                                </td>
+                <div class="sywat-table-responsive">
+                    <table class="sywat-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Shooter Name</th>
+                                <th style="text-align:center;">Type / Payment</th>
+                                <th style="text-align:left;">Line</th>
+                                <th style="text-align:center;">Distance</th>
+                                <th style="text-align:right;">Action</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $filtered_registrations as $reg ): ?>
+                                <?php 
+                                    $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
+                                    $badge_type  = ! empty( $reg['is_walkin'] ) || (isset($reg['type']) && $reg['type'] === 'Walk-In') ? 'Walk-In' : 'Pre-Reg';
+                                    $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+
+                                    $paid_status = isset($reg['paid']) ? $reg['paid'] : '';
+                                    $fam_label = '';
+                                    if ($paid_status === 'Family' && !empty($reg['family_id'])) {
+                                        $lidx = sywat_roster_resolve_line_idx($reg, $available_lines);
+                                        if (isset($existing_families_by_line[$lidx][$reg['family_id']])) {
+                                            $fam_label = $existing_families_by_line[$lidx][$reg['family_id']];
+                                        }
+                                    }
+                                ?>
+                                <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
+                                    <td>
+                                        <strong><?php echo esc_html( $reg['name'] ); ?></strong>
+                                        <?php if (!empty($fam_label)): ?>
+                                            <div style="font-size:11px; color:#155724; background:#d4edda; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:2px;">
+                                                🟢 <?php echo esc_html($fam_label); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span class="sywat-badge <?php echo $badge_class; ?>" style="margin-bottom:3px;"><?php echo esc_html( $badge_type ); ?></span>
+                                        <?php if ($paid_status === 'Family'): ?>
+                                            <br><span style="font-size:10px; font-weight:bold; color:#0284c7; background:#e0f2fe; padding:2px 4px; border-radius:3px;">Family Cap</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
+                                    <td style="text-align:center;"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
+                                    <td style="text-align:right;">
+                                        <div style="display:inline-flex; gap:6px; justify-content:flex-end;">
+                                            <!-- Edit Button Link -->
+                                            <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding: 4px 10px; font-size: 12px; height: auto;">Edit</a>
+
+                                            <!-- Remove Form -->
+                                            <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
+                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                <input type="hidden" name="sywat_action" value="delete_shooter">
+                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding: 4px 10px; font-size: 12px; height: auto;">Remove</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
 
         <!-- EDIT ARCHER POPUP MODAL OVERLAY -->
         <div class="sywat-modal-backdrop sywat-nested-modal <?php echo $open_edit_modal ? 'active' : ''; ?>" id="sywat_edit_archer_modal" style="z-index: 100050;">
-            <div class="sywat-modal-content" style="max-width: 600px;">
+            <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header">
                     <h3 style="margin: 0;">Edit Archer Registration</h3>
                     <button type="button" class="sywat-modal-close" onclick="closeEditArcherModal()">&times;</button>
@@ -441,8 +441,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             <input type="hidden" name="modal_action" value="manage">
                             <input type="hidden" name="registration_id" value="<?php echo esc_attr( $target_archer['id'] ); ?>">
 
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-                                <div style="grid-column: 1 / -1;">
+                            <div class="sywat-form-grid-2" style="margin-bottom:15px;">
+                                <div class="sywat-full-width">
                                     <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name</label>
                                     <input type="text" name="edit_name" value="<?php echo esc_attr($target_archer['name']); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;" required>
                                 </div>
