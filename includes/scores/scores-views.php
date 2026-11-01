@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -186,7 +186,7 @@ function render_sywat_scores_app() {
 
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <!-- Live Search Input -->
-                        <div style="display:flex; gap:5px; align-items:center; margin-right:5px;">
+                        <div style="display:flex; gap:5px; align-items:center; margin-right:5px; flex-wrap:wrap;">
                             <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
@@ -265,7 +265,7 @@ function render_sywat_scores_app() {
                         </table>
                     </div>
 
-                    <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                    <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
                         <?php if ($is_admin): ?>
                             <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                         <?php endif; ?>
