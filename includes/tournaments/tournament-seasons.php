@@ -3,6 +3,7 @@
  * Sub-Module: Season Management & Taxonomies
  * Path: includes/tournaments/tournament-seasons.php
  * Author: SYWAT Archery
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -79,7 +80,7 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
             <div class="sywat-card-title">
                 <span>Season Management</span>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <div style="display:flex; gap:5px; margin:0; align-items:center;">
+                    <div style="display:flex; gap:5px; margin:0; align-items:center; flex-wrap:wrap;">
                         <input type="text" id="sywat_season_search_input" placeholder="Search seasons..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_season_search_input').value=''; document.getElementById('sywat_season_search_input').dispatchEvent(new Event('input'));">Clear</button>
                     </div>
@@ -88,52 +89,54 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
             </div>
             <div class="sywat-subtitle">Configure SYWAT competition seasons and set active aggregate score rules.</div>
 
-            <table class="sywat-table" style="margin-bottom: 30px;">
-                <thead>
-                    <tr>
-                        <th>Season Name</th>
-                        <th style="text-align: center;">Type</th>
-                        <th style="text-align: center;">Season Duration</th>
-                        <th style="text-align: center;">Calculated Year</th>
-                        <th style="text-align: center;">Best-N Qualifier Rule</th>
-                        <th style="text-align: center;">Status</th>
-                        <th style="text-align: right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ( $seasons as $slug => $s ): ?>
-                        <?php 
-                            $s_start = ! empty( $s['start_date'] ) ? date( 'M j, Y', strtotime( $s['start_date'] ) ) : '—';
-                            $s_end   = ! empty( $s['end_date'] ) ? date( 'M j, Y', strtotime( $s['end_date'] ) ) : '—';
-                            $search_data = strtolower( $s['name'] . ' ' . $s['type'] . ' ' . ( isset( $s['year_label'] ) ? $s['year_label'] : '' ) );
-                        ?>
-                        <tr class="sywat-season-row" data-search="<?php echo esc_attr( $search_data ); ?>">
-                            <td><strong><?php echo esc_html( $s['name'] ); ?></strong></td>
-                            <td style="text-align: center;"><span class="sywat-badge"><?php echo esc_html( $s['type'] ); ?></span></td>
-                            <td style="text-align: center; font-size: 12px; color: #475569;"><?php echo esc_html( $s_start . ' – ' . $s_end ); ?></td>
-                            <td style="text-align: center; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( isset( $s['year_label'] ) ? $s['year_label'] : '—' ); ?></td>
-                            <td style="text-align: center;">Best <strong><?php echo intval( $s['best_n_count'] ); ?></strong> Scores</td>
-                            <td style="text-align: center;">
-                                <?php if ( $s['status'] === 'active' ): ?>
-                                    <span style="color: #008a20; font-weight: bold;">🟢 Active</span>
-                                <?php elseif ( $s['status'] === 'upcoming' ): ?>
-                                    <span style="color: #2271b1; font-weight: bold;">🔵 Upcoming</span>
-                                <?php else: ?>
-                                    <span style="color: #646970; font-weight: bold;">⚪ Archived</span>
-                                <?php endif; ?>
-                            </td>
-                            <td style="text-align: right;">
-                                <a href="?tab=seasons&edit_season=<?php echo urlencode( $slug ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding: 4px 8px; font-size: 11px;">Edit</a>
-                            </td>
+            <div class="sywat-table-responsive" style="margin-bottom: 30px;">
+                <table class="sywat-table" style="margin-bottom: 0;">
+                    <thead>
+                        <tr>
+                            <th>Season Name</th>
+                            <th style="text-align: center;">Type</th>
+                            <th style="text-align: center;">Season Duration</th>
+                            <th style="text-align: center;">Calculated Year</th>
+                            <th style="text-align: center;">Best-N Qualifier Rule</th>
+                            <th style="text-align: center;">Status</th>
+                            <th style="text-align: right;">Actions</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $seasons as $slug => $s ): ?>
+                            <?php 
+                                $s_start = ! empty( $s['start_date'] ) ? date( 'M j, Y', strtotime( $s['start_date'] ) ) : '—';
+                                $s_end   = ! empty( $s['end_date'] ) ? date( 'M j, Y', strtotime( $s['end_date'] ) ) : '—';
+                                $search_data = strtolower( $s['name'] . ' ' . $s['type'] . ' ' . ( isset( $s['year_label'] ) ? $s['year_label'] : '' ) );
+                            ?>
+                            <tr class="sywat-season-row" data-search="<?php echo esc_attr( $search_data ); ?>">
+                                <td><strong><?php echo esc_html( $s['name'] ); ?></strong></td>
+                                <td style="text-align: center;"><span class="sywat-badge"><?php echo esc_html( $s['type'] ); ?></span></td>
+                                <td style="text-align: center; font-size: 12px; color: #475569;"><?php echo esc_html( $s_start . ' – ' . $s_end ); ?></td>
+                                <td style="text-align: center; font-weight: bold; color: #1e3a8a;"><?php echo esc_html( isset( $s['year_label'] ) ? $s['year_label'] : '—' ); ?></td>
+                                <td style="text-align: center;">Best <strong><?php echo intval( $s['best_n_count'] ); ?></strong> Scores</td>
+                                <td style="text-align: center;">
+                                    <?php if ( $s['status'] === 'active' ): ?>
+                                        <span style="color: #008a20; font-weight: bold;">🟢 Active</span>
+                                    <?php elseif ( $s['status'] === 'upcoming' ): ?>
+                                        <span style="color: #2271b1; font-weight: bold;">🔵 Upcoming</span>
+                                    <?php else: ?>
+                                        <span style="color: #646970; font-weight: bold;">⚪ Archived</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align: right;">
+                                    <a href="?tab=seasons&edit_season=<?php echo urlencode( $slug ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding: 4px 8px; font-size: 11px;">Edit</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Add / Edit Season Pop-Up Modal -->
         <div class="sywat-modal-backdrop <?php echo $open_season_modal ? 'active' : ''; ?>" id="sywat_add_season_modal">
-            <div class="sywat-modal-content" style="max-width: 650px;">
+            <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print">
                     <h3><?php echo $edit_season ? 'Edit Season: ' . esc_html($edit_season['name']) : 'Create New Season'; ?></h3>
                     <button type="button" class="sywat-modal-close" onclick="closeAddSeasonModal()">&times;</button>
@@ -144,7 +147,7 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                         <input type="hidden" name="sywat_action" value="save_season">
                         <input type="hidden" name="original_season_slug" value="<?php echo esc_attr( $edit_slug ); ?>">
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="sywat-form-grid-2" style="margin-bottom: 15px;">
                             <div>
                                 <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Season Type *</label>
                                 <select name="season_type" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
@@ -164,7 +167,7 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="sywat-form-grid-3" style="margin-bottom: 20px;">
                             <div>
                                 <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
                                 <input type="date" name="start_date" value="<?php echo esc_attr( $edit_season ? (isset($edit_season['start_date']) ? $edit_season['start_date'] : '') : '' ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
