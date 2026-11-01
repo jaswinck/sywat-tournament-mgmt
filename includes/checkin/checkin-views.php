@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -141,7 +141,7 @@ function sywat_desk_render_capacity_tracker($data) {
                 });
             ?>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div class="sywat-tracker-grid">
                 <?php foreach ($ordered_lines as $item): ?>
                     <?php
                         $idx  = $item['idx'];
@@ -172,30 +172,30 @@ function sywat_desk_render_capacity_tracker($data) {
                         $is_closed_line = in_array((string)$idx, $closed_lines);
                         $closed_badge = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
+                    <div class="sywat-tracker-card">
                         <div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
-                                <strong style="color:#0f172a; font-size:14px;"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
+                            <div class="sywat-tracker-card-header">
+                                <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
                                 <span class="sywat-badge sywat-badge-prereg">
                                     <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                 </span>
                             </div>
-                            <div style="display:flex; justify-content:space-between; font-size:13px; color:#475569;">
+                            <div class="sywat-tracker-card-stats">
                                 <span><strong>20yd:</strong> <?php echo $disp_20yd; ?></span>
                                 <span><strong>Cub:</strong> <?php echo $disp_cub; ?></span>
                             </div>
                         </div>
                         
-                        <div style="margin-top:4px; border-top:1px dashed #cbd5e1; padding-top:8px; display:flex; gap:6px; align-items:center; justify-content:space-between;">
-                            <form method="post" style="margin:0; flex:1;">
+                        <div class="sywat-tracker-card-actions">
+                            <form method="post">
                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
-                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="width:100%;">Check In Line</button>
+                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
                             </form>
 
                             <?php if ($is_admin): ?>
                                 <?php if ($is_closed_line): ?>
-                                    <form method="post" style="margin:0;">
+                                    <form method="post">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="reopen_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
@@ -203,7 +203,7 @@ function sywat_desk_render_capacity_tracker($data) {
                                         <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Reopen</button>
                                     </form>
                                 <?php else: ?>
-                                    <form method="post" style="margin:0;" onsubmit="return confirm('Are you sure you want to close this line? All un-checked-in archers will be permanently marked as No Show.');">
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to close this line? All un-checked-in archers will be permanently marked as No Show.');">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="close_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
