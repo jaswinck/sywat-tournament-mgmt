@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -138,7 +138,7 @@ function sywat_desk_render_modals($data) {
 
                     <div style="margin-bottom:12px;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Paid Option:</label>
-                        <select name="checkin_pay_option" id="checkin_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                        <select name="checkin_pay_option" id="checkin_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="toggleFamilyBox('checkin')">
                             <?php
                             $curr_paid = isset($modal_archer['paid']) ? $modal_archer['paid'] : '';
                             $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
@@ -147,6 +147,20 @@ function sywat_desk_render_modals($data) {
                             <option value="Family" <?php selected($curr_pay_opt, 'Family'); ?>>Family</option>
                             <option value="Field Governor" <?php selected($curr_pay_opt, 'Field Governor'); ?>>Field Governor</option>
                         </select>
+                    </div>
+
+                    <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="checkin_family_box">
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Family Group Reference:</label>
+                        <select name="checkin_family_group_id" id="checkin_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            <option value="">[ + Create New Family Group ]</option>
+                            <?php
+                            $curr_fam_id = isset($modal_archer['family_id']) ? $modal_archer['family_id'] : '';
+                            foreach ($existing_families as $fid => $flabel) {
+                                echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                            }
+                            ?>
+                        </select>
+                        <input type="text" name="checkin_new_family_name" id="checkin_new_family_name" placeholder="Or type new family name (e.g. Smith Family)..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-top:5px;">
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -550,7 +564,7 @@ function sywat_desk_render_client_scripts($data) {
 
                     if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
                     if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
-                    if (styleEl && m.style) matchDeskTfaaSelect(m.style, styleEl);
+                    if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
                 }
 
                 if (typeof autoFillOnNameChange === 'function' && (prefix === 'walkin' || prefix === 'checkin')) {
@@ -816,6 +830,7 @@ function sywat_desk_render_client_scripts($data) {
                 autoFillOnNameChange('checkin');
             });
             autoFillOnNameChange('checkin');
+            toggleFamilyBox('checkin');
         }
 
         const searchInput = document.getElementById('sywat_search_input');
