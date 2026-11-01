@@ -4,7 +4,7 @@
  * Path: includes/members/class-sywat-members.php
  * Description: Main loader binding public/admin shortcode [sywat_members].
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 require_once plugin_dir_path( __FILE__ ) . 'members-helpers.php';
 require_once plugin_dir_path( __FILE__ ) . 'members-actions.php';
 require_once plugin_dir_path( __FILE__ ) . 'members-views.php';
+require_once plugin_dir_path( __FILE__ ) . 'members-modals.php';
 
 // Shortcode Registration
 if ( shortcode_exists( 'sywat_members' ) ) remove_shortcode( 'sywat_members' );
