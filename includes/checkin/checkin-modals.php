@@ -3,24 +3,25 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.3.0
  */
 
 if (!defined('ABSPATH')) exit;
 
 function sywat_desk_render_modals($data) {
-    $modal_archer        = $data['modal_archer'];
-    $modal_edit_archer   = $data['modal_edit_archer'];
-    $selected_tournament = $data['selected_tournament'];
-    $selected_line_idx   = $data['selected_line_idx'];
-    $search_query        = $data['search_query'];
-    $lines               = $data['lines'];
-    $closed_lines        = $data['closed_lines'];
-    $divs                = $data['divs'];
-    $genders             = $data['genders'];
-    $sywat_styles        = $data['sywat_styles'];
-    $legacy_div_map      = $data['legacy_div_map'];
-    $existing_families   = $data['existing_families'];
+    $modal_archer              = $data['modal_archer'];
+    $modal_edit_archer         = $data['modal_edit_archer'];
+    $selected_tournament       = $data['selected_tournament'];
+    $selected_line_idx         = $data['selected_line_idx'];
+    $search_query              = $data['search_query'];
+    $lines                     = $data['lines'];
+    $closed_lines              = $data['closed_lines'];
+    $divs                      = $data['divs'];
+    $genders                   = $data['genders'];
+    $sywat_styles              = $data['sywat_styles'];
+    $legacy_div_map            = $data['legacy_div_map'];
+    $existing_families         = $data['existing_families'];
+    $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
 
     ?>
     <style>
@@ -44,6 +45,9 @@ function sywat_desk_render_modals($data) {
         $curr_div_check = isset($modal_archer['division']) ? $modal_archer['division'] : '';
         $is_youth_check = (stripos($curr_div_check, 'Cub') !== false || stripos($curr_div_check, 'Youth') !== false || stripos($curr_div_check, 'Young Adult') !== false);
         $display_due    = $is_family ? $modal_due : ($is_youth_check ? 25.00 : 30.00);
+
+        $checkin_line_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($modal_archer, $lines) : (isset($modal_archer['line_index']) ? $modal_archer['line_index'] : '0');
+        $checkin_families = isset($existing_families_by_line[$checkin_line_idx]) ? $existing_families_by_line[$checkin_line_idx] : $existing_families;
     ?>
     <div class="sywat-modal-backdrop active">
         <div class="sywat-modal-content" style="max-width:480px;">
@@ -155,7 +159,7 @@ function sywat_desk_render_modals($data) {
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_archer['family_id']) ? $modal_archer['family_id'] : '';
-                            foreach ($existing_families as $fid => $flabel) {
+                            foreach ($checkin_families as $fid => $flabel) {
                                 echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
                             }
                             ?>
@@ -174,6 +178,10 @@ function sywat_desk_render_modals($data) {
 
     <!-- EDIT ARCHER MODAL -->
     <?php if ($modal_edit_archer): ?>
+    <?php
+        $edit_line_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($modal_edit_archer, $lines) : (isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : '0');
+        $edit_families = isset($existing_families_by_line[$edit_line_idx]) ? $existing_families_by_line[$edit_line_idx] : $existing_families;
+    ?>
     <div class="sywat-modal-backdrop active">
         <div class="sywat-modal-content" style="max-width:480px;">
             <div class="sywat-modal-header no-print">
@@ -274,7 +282,7 @@ function sywat_desk_render_modals($data) {
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
-                            foreach ($existing_families as $fid => $flabel) {
+                            foreach ($edit_families as $fid => $flabel) {
                                 echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
                             }
                             ?>
@@ -323,7 +331,7 @@ function sywat_desk_render_modals($data) {
 
                     <div style="margin-bottom:12px;">
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
-                        <select name="walkin_line_index" id="walkin_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                        <select name="walkin_line_index" id="walkin_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="updateWalkinFamilyOptions(this.value)">
                             <?php foreach ($lines as $idx => $line): ?>
                                 <?php $is_c = in_array((string)$idx, $closed_lines); ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
@@ -350,7 +358,7 @@ function sywat_desk_render_modals($data) {
                             <option value="" disabled selected hidden>Select Gender</option>
                             <?php foreach ($genders as $g): ?>
                                 <?php if ($g === 'No Show') continue; ?>
-                                <option value="<?php echo esc_attr($g); ?>"><?php echo esc_html($g); ?></option>
+                                <option value="' . esc_attr($g) . '"><?php echo esc_html($g); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -414,15 +422,36 @@ function sywat_desk_render_client_scripts($data) {
             );
         }
     }
+
+    $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
     ?>
     <script>
-    const sywatHistory = <?php echo json_encode($data['history_profiles']); ?>;
-    const tfaaData     = <?php echo json_encode($data['tfaa_data_bundle']); ?>;
-    const sywatDeskTfaaShooters = <?php echo json_encode( array_values( $js_tfaa_desk_data ) ); ?>;
+    const sywatHistory           = <?php echo json_encode($data['history_profiles']); ?>;
+    const tfaaData               = <?php echo json_encode($data['tfaa_data_bundle']); ?>;
+    const sywatDeskTfaaShooters  = <?php echo json_encode( array_values( $js_tfaa_desk_data ) ); ?>;
+    const existingFamiliesByLine = <?php echo json_encode($existing_families_by_line); ?>;
 
     function escapeHtmlDesk(str) {
         if (!str) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function updateWalkinFamilyOptions(lineIdx) {
+        const famSelect = document.getElementById('walkin_family_group_id');
+        if (!famSelect) return;
+
+        const currentVal = famSelect.value;
+        famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+
+        const fams = (existingFamiliesByLine && existingFamiliesByLine[lineIdx]) ? existingFamiliesByLine[lineIdx] : {};
+
+        Object.keys(fams).forEach(fid => {
+            const opt = document.createElement('option');
+            opt.value = fid;
+            opt.textContent = fams[fid];
+            if (fid === currentVal) opt.selected = true;
+            famSelect.appendChild(opt);
+        });
     }
 
     function toggleUnpaidBanner(isChecked) {
@@ -664,7 +693,6 @@ function sywat_desk_render_client_scripts($data) {
             buttonContainer.appendChild(pillBtn);
         });
 
-        // Only display selection pills if there are MULTIPLE profile choices
         if (tfaaMatches.length > 1) {
             const alertBox = document.createElement('div');
             alertBox.className = 'sywat-multi-style-alert';
@@ -778,6 +806,12 @@ function sywat_desk_render_client_scripts($data) {
         closeWalkinModal();
         const modal = document.getElementById('walkinModal');
         if (modal) modal.classList.add('active');
+
+        const lineSel = document.getElementById('walkin_line_index');
+        if (lineSel) {
+            updateWalkinFamilyOptions(lineSel.value);
+        }
+
         const walkinNameInput = document.getElementById('walkin_name_input');
         if (walkinNameInput) walkinNameInput.focus();
     }
@@ -793,6 +827,12 @@ function sywat_desk_render_client_scripts($data) {
     function continueFamilyLoop(familyId, lineIdx) {
         openWalkinModal();
         
+        const lineSelect = document.getElementById('walkin_line_index');
+        if (lineSelect && lineIdx !== undefined) {
+            lineSelect.value = lineIdx;
+            updateWalkinFamilyOptions(lineIdx);
+        }
+
         const payOptSelect = document.getElementById('walkin_pay_option');
         if (payOptSelect) {
             payOptSelect.value = 'Family';
@@ -802,11 +842,6 @@ function sywat_desk_render_client_scripts($data) {
         const familySelect = document.getElementById('walkin_family_group_id');
         if (familySelect) {
             familySelect.value = familyId;
-        }
-
-        const lineSelect = document.getElementById('walkin_line_index');
-        if (lineSelect && lineIdx !== undefined) {
-            lineSelect.value = lineIdx;
         }
     }
 
