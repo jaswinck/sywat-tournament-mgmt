@@ -1,0 +1,85 @@
+/* SYWAT Archery - Modals, Dialogs, and TFAA Autocomplete Dropdowns */
+
+.sywat-modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 99999;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.sywat-modal-backdrop.active { display: flex; }
+
+.sywat-modal-content {
+    background: #fff;
+    width: 100%;
+    max-width: 900px;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sywat-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #dcdcde;
+    background: #f6f7f7;
+}
+
+.sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
+
+.sywat-modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    font-weight: bold;
+    color: #646970;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.sywat-modal-close:hover { color: #d63638; }
+.sywat-modal-body { padding: 20px; overflow-y: auto; }
+
+/* TFAA Autocomplete Dropdown */
+.sywat-tfaa-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    min-width: 220px;
+    z-index: 99999;
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+.sywat-tfaa-autocomplete-dropdown > div {
+    padding: 6px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #1e293b;
+}
+
+.sywat-tfaa-autocomplete-dropdown > div:hover { background-color: #f1f5f9; }
+#sywat_edit_archer_modal, .sywat-modal-backdrop.sywat-nested-modal { z-index: 100050 !important; }
