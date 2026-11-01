@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -12,7 +12,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
         $raw_scores = sywat_get_tournament_scores( $tournament_name );
 
-        // Group scores by Division + Gender + Style + Archer to separate re-entries into Guest
         $grouped_by_archer_dgs = array();
         foreach ( $raw_scores as $s ) {
             $dgs_key   = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
@@ -24,7 +23,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         foreach ( $grouped_by_archer_dgs as $dgs_key => $archers_map ) {
             foreach ( $archers_map as $archer_key => $entries ) {
-                // Sort entries: Score DESC, X-Count DESC
                 usort( $entries, function( $p, $q ) {
                     if ( $p['score'] === $q['score'] ) {
                         return $q['x_count'] - $p['x_count'];
@@ -32,10 +30,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     return $q['score'] - $p['score'];
                 });
 
-                // Top score stays in official style
                 $processed_scores[] = $entries[0];
 
-                // Lower scores get assigned to 'Guest' style and name gets '[Guest]' appended
                 for ( $i = 1; $i < count( $entries ); $i++ ) {
                     $guest_entry = $entries[$i];
                     $guest_entry['style'] = 'Guest';
@@ -75,7 +71,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         ksort($all_divisions);
 
-        // Sort filter styles dropdown by style priority weight
         uksort( $all_styles, function( $a, $b ) {
             $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $a ) : 50;
             $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $b ) : 50;
@@ -83,7 +78,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             return strcasecmp( $a, $b );
         });
 
-        // Sort Division + Gender groups by Pro-first weight
         uksort( $groups, function( $keyA, $keyB ) {
             list( $divA, $genA ) = explode( '|||', $keyA );
             list( $divB, $genB ) = explode( '|||', $keyB );
@@ -95,7 +89,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             return strcasecmp( $keyA, $keyB );
         });
 
-        // Sort styles inside each group using 11-tier style weight priority
         foreach ( $groups as $dg_key => &$group ) {
             uksort( $group['styles'], function( $stA, $stB ) {
                 $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $stA ) : 50;
@@ -118,6 +111,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
+
+        <style>
+            .sywat-single-category-header {
+                background: #1e3a8a;
+                color: #ffffff;
+                padding: 10px 14px;
+                font-size: 14px;
+                font-weight: 700;
+                border-radius: 6px 6px 0 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+        </style>
 
         <div class="sywat-public-card">
             <div style="margin-bottom: 20px;">
@@ -173,55 +180,56 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                         $card_div_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['division'] ) ) );
                         $card_gen_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['gender'] ) ) );
                     ?>
-                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>">
-                        <div class="sywat-div-gen-header">
-                            🎯 <?php echo esc_html( $group_data['heading'] ); ?>
-                        </div>
+                    <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>" style="margin-bottom: 20px; background: transparent; border: none; box-shadow: none; padding: 0;">
 
-                        <div style="padding: 15px;">
-                            <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                                <?php $style_slug = strtolower( trim( $style_name ) ); ?>
-                                <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>">
-                                    <h4 class="sywat-style-header">
-                                        🏹 <?php echo esc_html( $style_name ); ?>
-                                    </h4>
-
-                                    <div class="sywat-table-responsive" style="margin-bottom: 15px;">
-                                        <table class="sywat-table" style="margin-top: 0;">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 50px; text-align: center;">Place</th>
-                                                    <th>Archer Name</th>
-                                                    <th style="text-align: right; width: 140px;">Score / X</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ( $archers as $idx => $a ): ?>
-                                                    <?php $archer_identifier = ! empty( $a['id'] ) ? $a['id'] : $a['name']; ?>
-                                                    <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
-                                                        <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
-                                                        <td>
-                                                            <strong style="font-size: 14px; color: #0f172a;"><?php echo esc_html( $a['name'] ); ?></strong>
-                                                            <?php if ( $can_edit_scores ): ?>
-                                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $tournament_name ); ?>&edit_archer=<?php echo urlencode( $archer_identifier ); ?>" 
-                                                                   class="sywat-btn-edit-shortcut" 
-                                                                   style="font-size: 11px; padding: 2px 6px; margin-left: 8px; text-decoration: none; background: #2271b1; color: #ffffff; border-radius: 3px; display: inline-block; font-weight: 600;" 
-                                                                   title="Edit Archer Score & Details">
-                                                                    ✏️ Edit
-                                                                </a>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td style="text-align: right; font-size: 15px; color: #0f172a;">
-                                                            <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                        <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
+                            <?php 
+                                $style_slug = strtolower( trim( $style_name ) );
+                                $combined_title = function_exists('sywat_format_combined_category_header') 
+                                    ? sywat_format_combined_category_header( $group_data['division'], $group_data['gender'], $style_name )
+                                    : trim( $group_data['division'] . ' ' . $group_data['gender'] . ' ' . $style_name );
+                            ?>
+                            <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>" style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #ffffff;">
+                                <div class="sywat-single-category-header">
+                                    🎯 <?php echo esc_html( $combined_title ); ?>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
+
+                                <div class="sywat-table-responsive" style="margin-bottom: 0;">
+                                    <table class="sywat-table" style="margin-top: 0;">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px; text-align: center;">Place</th>
+                                                <th>Archer Name</th>
+                                                <th style="text-align: right; width: 140px;">Score / X</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ( $archers as $idx => $a ): ?>
+                                                <?php $archer_identifier = ! empty( $a['id'] ) ? $a['id'] : $a['name']; ?>
+                                                <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                    <td style="text-align: center; font-weight: bold;"><?php echo ($idx + 1); ?></td>
+                                                    <td>
+                                                        <strong style="font-size: 14px; color: #0f172a;"><?php echo esc_html( $a['name'] ); ?></strong>
+                                                        <?php if ( $can_edit_scores ): ?>
+                                                            <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $tournament_name ); ?>&edit_archer=<?php echo urlencode( $archer_identifier ); ?>" 
+                                                               class="sywat-btn-edit-shortcut" 
+                                                               style="font-size: 11px; padding: 2px 6px; margin-left: 8px; text-decoration: none; background: #2271b1; color: #ffffff; border-radius: 3px; display: inline-block; font-weight: 600;" 
+                                                               title="Edit Archer Score & Details">
+                                                                ✏️ Edit
+                                                            </a>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td style="text-align: right; font-size: 15px; color: #0f172a;">
+                                                        <strong><?php echo intval( $a['score'] ) . ' / ' . intval( $a['x_count'] ) . 'X'; ?></strong>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
