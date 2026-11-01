@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.2.0
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -44,7 +44,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 </div>
 
                 <!-- Center: Primary App Navigation Links -->
-                <nav style="display:flex; align-items:center; gap:6px;">
+                <nav style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     
                     <!-- 1. Operational Tournaments Dropdown (Staff Only) -->
                     <?php if ( $can_manage_tournaments ): ?>
@@ -304,7 +304,7 @@ if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
         if ( is_user_logged_in() ) {
             $user = wp_get_current_user();
             ?>
-            <div class="sywat-card" style="text-align:center; padding:30px; max-width:500px; margin:20px auto;">
+            <div class="sywat-card" style="text-align:center; padding:30px; max-width:500px; width:min(100%, 500px); margin:20px auto;">
                 <div style="font-size:32px; margin-bottom:8px;">🎯</div>
                 <h3 style="margin-top:0; color:#0f172a;">Welcome, <?php echo esc_html( $user->display_name ); ?>!</h3>
                 <p style="color:#64748b; font-size:14px;">You are currently signed in to the Texas Field Archery Association portal.</p>
