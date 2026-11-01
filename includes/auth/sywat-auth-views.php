@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 1.7.2
+ * Version: 1.7.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -77,19 +77,15 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     </a>
                 </nav>
 
-                <!-- Right: Compact User Profile & Logout -->
+                <!-- Right: Compact User Profile & Native Logout Link -->
                 <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
                     <span style="font-size:13px; font-weight:600; color:#e2e8f0; white-space:nowrap;">
                         👤 <?php echo esc_html( $current_user->display_name ); ?>
                     </span>
 
-                    <form method="post" style="margin:0; display:inline;">
-                        <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
-                        <input type="hidden" name="sywat_auth_action" value="logout">
-                        <button type="submit" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
-                            🚪 Log Out
-                        </button>
-                    </form>
+                    <a href="<?php echo esc_url( wp_logout_url( site_url( '/login/' ) ) ); ?>" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
+                        🚪 Log Out
+                    </a>
                 </div>
 
             </div>
@@ -111,7 +107,9 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         $action      = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : 'login';
         $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
         $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( $_GET['login'] ) : '';
-        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : '';
+        
+        // Default redirect target to /sywat-manage-tournaments/ if no explicit redirect is requested
+        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : site_url( '/sywat-manage-tournaments/' );
 
         if ( ! empty( $rp_key ) && ! empty( $rp_login ) ) {
             $action = 'rp';
@@ -210,9 +208,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                     <form method="post" id="sywat_plugin_login_form">
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="login">
-                        <?php if ( ! empty( $redirect_to ) ): ?>
-                            <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
-                        <?php endif; ?>
+                        <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
 
                         <div style="margin-bottom:14px;">
                             <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
