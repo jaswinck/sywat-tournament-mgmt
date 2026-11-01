@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 3.3.0
+ * Version: 3.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -226,56 +226,57 @@ function render_sywat_scores_app() {
                 </div>
 
                 <?php if (!empty($tourn_registrations)): ?>
-                    <table class="sywat-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 4%;">#</th>
-                                <th style="width: 20%; text-align: left;">Archer Name</th>
-                                <th style="width: 15%; text-align: left;">Shooting Line</th>
-                                <th style="width: 8%;">Gender</th>
-                                <th style="width: 10%; text-align: left;">Division</th>
-                                <th style="width: 12%; text-align: left;">Style</th>
-                                <th style="width: 11%; text-align: center;">Score (Max 300)</th>
-                                <th style="width: 11%; text-align: center;">X Count (Max 60)</th>
-                                <th style="width: 9%; text-align: center;">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php $num = 1; foreach ($tourn_registrations as $reg): ?>
-                                <?php 
-                                    $reg_id    = isset($reg['id']) ? $reg['id'] : '';
-                                    $score     = isset($reg['score']) && $reg['score'] !== '' ? $reg['score'] : 0;
-                                    $x_count   = isset($reg['x_count']) && $reg['x_count'] !== '' ? $reg['x_count'] : 0;
-                                    $gender_str= !empty($reg['gender']) ? $reg['gender'] : '—';
-                                    $div_str   = !empty($reg['division']) ? $reg['division'] : '—';
-                                    $style_str = !empty($reg['style']) ? $reg['style'] : '—';
-                                    $is_locked = !empty($locked_lines[$reg['line_index']]);
-                                    $dis_attr  = $is_locked ? 'disabled' : '';
-                                ?>
-                                <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr($reg_id); ?>" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
-                                    <td><strong><?php echo $num++; ?></strong></td>
-                                    <td><strong><?php echo esc_html($reg['name']); ?></strong></td>
-                                    <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'Line 1'); ?></td>
-                                    <td style="text-align: center;"><?php echo esc_html($gender_str); ?></td>
-                                    <td><?php echo esc_html($div_str); ?></td>
-                                    <td><?php echo esc_html($style_str); ?></td>
-                                    <td style="text-align: center;">
-                                        <input type="number" name="scores[<?php echo esc_attr($reg_id); ?>]" data-id="<?php echo esc_attr($reg_id); ?>" data-original-val="<?php echo esc_attr($score); ?>" value="<?php echo esc_attr($score); ?>" min="0" max="300" placeholder="0" class="sywat-score-input score-val" <?php echo $dis_attr; ?>>
-                                    </td>
-                                    <td style="text-align: center;">
-                                        <input type="number" name="x_counts[<?php echo esc_attr($reg_id); ?>]" data-id="<?php echo esc_attr($reg_id); ?>" data-original-val="<?php echo esc_attr($x_count); ?>" value="<?php echo esc_attr($x_count); ?>" min="0" max="60" placeholder="0" class="sywat-score-input x-val" <?php echo $dis_attr; ?>>
-                                    </td>
-                                    <td style="text-align: center;">
-                                        <?php if ($is_locked): ?>
-                                            <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins Only">🔒 Locked</span>
-                                        <?php else: ?>
-                                            <span class="sywat-save-status sywat-status-saved" id="status_<?php echo esc_attr($reg_id); ?>">✓ Saved</span>
-                                        <?php endif; ?>
-                                    </td>
+                    <!-- Restored Responsive Table Scroll Wrapper -->
+                    <div class="sywat-table-responsive">
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 4%;">#</th>
+                                    <th style="width: 20%; text-align: left;">Archer Name</th>
+                                    <th style="width: 15%; text-align: left;">Shooting Line</th>
+                                    <th style="width: 8%;">Gender</th>
+                                    <th style="width: 10%; text-align: left;">Division</th>
+                                    <th style="width: 12%; text-align: left;">Style</th>
+                                    <th style="width: 11%; text-align: center;">Score (Max 300)</th>
+                                    <th style="width: 11%; text-align: center;">X Count (Max 60)</th>
+                                    <th style="width: 9%; text-align: center;">Status</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php $num = 1; foreach ($tourn_registrations as $reg): ?>
+                                    <?php 
+                                        $reg_id    = isset($reg['id']) ? $reg['id'] : '';
+                                        $score     = isset($reg['score']) && $reg['score'] !== '' ? $reg['score'] : 0;
+                                        $x_count   = isset($reg['x_count']) && $reg['x_count'] !== '' ? $reg['x_count'] : 0;
+                                        $gender_str= !empty($reg['gender']) ? $reg['gender'] : '—';
+                                        $div_str   = !empty($reg['division']) ? $reg['division'] : '—';
+                                        $style_str = !empty($reg['style']) ? $reg['style'] : '—';
+                                        $is_locked = !empty($locked_lines[$reg['line_index']]);
+                                        $dis_attr  = $is_locked ? 'disabled' : '';
+                                    ?>
+                                    <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr($reg_id); ?>" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
+                                        <td><strong><?php echo $num++; ?></strong></td>
+                                        <td><strong><?php echo esc_html($reg['name']); ?></strong></td>
+                                        <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'Line 1'); ?></td>
+                                        <td style="text-align: center;"><?php echo esc_html($gender_str); ?></td>
+                                        <td><?php echo esc_html($div_str); ?></td>
+                                        <td><?php echo esc_html($style_str); ?></td>
+                                        <td style="text-align: center;">
+                                            <input type="number" name="scores[<?php echo esc_attr($reg_id); ?>]" data-id="<?php echo esc_attr($reg_id); ?>" data-original-val="<?php echo esc_attr($score); ?>" value="<?php echo esc_attr($score); ?>" min="0" max="300" placeholder="0" class="sywat-score-input score-val" <?php echo $dis_attr; ?>>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <input type="number" name="x_counts[<?php echo esc_attr($reg_id); ?>]" data-id="<?php echo esc_attr($reg_id); ?>" data-original-val="<?php echo esc_attr($x_count); ?>" value="<?php echo esc_attr($x_count); ?>" min="0" max="60" placeholder="0" class="sywat-score-input x-val" <?php echo $dis_attr; ?>>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <?php if ($is_locked): ?>
+                                                <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins Only">🔒 Locked</span>
+                                            <?php else: ?>
+                                                <span class="sywat-save-status sywat-status-saved" id="status_<?php echo esc_attr($reg_id); ?>">✓ Saved</span>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
 
                     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                         <?php if ($is_admin): ?>
