@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Modals & Scripts
  * Path: includes/members/members-modals.php
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -32,7 +32,7 @@ function sywat_members_render_modals( $data ) {
                 <button type="button" class="sywat-modal-close" onclick="sywatCloseAddMemberModal()">&times;</button>
             </div>
             <div class="sywat-modal-body" style="padding: 16px 20px;">
-                <form method="post" action="?tab=members&subtab=directory">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_add_member_form">
                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                     <input type="hidden" name="sywat_action" value="create_member">
 
@@ -70,7 +70,22 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
+                    <!-- MULTI-ROLE CHECKBOX GRID -->
                     <div style="margin-bottom: 10px;">
+                        <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
+                        <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
+                                <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?> onchange="sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container')">
+                                    <?php echo esc_html( $r_details['name'] ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- CONDITIONAL SHOP DROPDOWN -->
+                    <div id="sywat_add_shop_container" style="margin-bottom: 10px; display: none;">
                         <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Assigned Host Shop / Club</label>
                         <select name="sywat_shop_id" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; height:32px; box-sizing:border-box;">
                             <option value="" selected>-- None / Unassigned --</option>
@@ -80,20 +95,6 @@ function sywat_members_render_modals( $data ) {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                    </div>
-
-                    <!-- MULTI-ROLE CHECKBOX GRID -->
-                    <div style="margin-bottom: 10px;">
-                        <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
-                        <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                            <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
-                                <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                    <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?>>
-                                    <?php echo esc_html( $r_details['name'] ); ?>
-                                </label>
-                            <?php endforeach; ?>
-                        </div>
                     </div>
 
                     <div class="sywat-form-grid-2" style="margin-bottom: 8px;">
@@ -144,7 +145,7 @@ function sywat_members_render_modals( $data ) {
                     <button type="button" class="sywat-modal-close" onclick="sywatCloseEditMemberModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body" style="padding: 16px 20px;">
-                    <form method="post" action="?tab=members&subtab=directory">
+                    <form method="post" action="?tab=members&subtab=directory" id="sywat_edit_member_form">
                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="update_member">
                         <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -184,7 +185,22 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
+                        <!-- MULTI-ROLE CHECKBOX GRID -->
                         <div style="margin-bottom: 10px;">
+                            <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
+                            <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                                <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                    <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
+                                    <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                        <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $current_user_roles ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_member_form', 'sywat_edit_shop_container')">
+                                        <?php echo esc_html( $r_details['name'] ); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL SHOP DROPDOWN -->
+                        <div id="sywat_edit_shop_container" style="margin-bottom: 10px; display: none;">
                             <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Assigned Host Shop / Club</label>
                             <select name="sywat_shop_id" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; height:32px; box-sizing:border-box;">
                                 <option value="" <?php selected( empty($e_shop_id), true ); ?>>-- None / Unassigned --</option>
@@ -194,20 +210,6 @@ function sywat_members_render_modals( $data ) {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                        </div>
-
-                        <!-- MULTI-ROLE CHECKBOX GRID -->
-                        <div style="margin-bottom: 10px;">
-                            <label style="display:block; font-weight:600; font-size:12px; margin-bottom:4px;">Assigned System Role(s) *</label>
-                            <div class="sywat-form-grid-2" style="gap: 5px 12px; background: #f8fafc; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
-                                <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                    <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
-                                    <label style="font-size: 12px; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                        <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $current_user_roles ), true ); ?>>
-                                        <?php echo esc_html( $r_details['name'] ); ?>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
                         </div>
 
                         <div class="sywat-form-grid-2" style="margin-bottom: 8px;">
@@ -342,6 +344,30 @@ function sywat_members_render_modals( $data ) {
         }
     }
 
+    function sywatToggleShopVisibility(formId, containerId) {
+        const form = document.getElementById(formId);
+        const container = document.getElementById(containerId);
+        if (!form || !container) return;
+
+        const shopRoles = ['sywat_shop_manager', 'sywat_shop_user'];
+        const checkedRoles = form.querySelectorAll('input[name="sywat_roles[]"]:checked');
+
+        let isShopRoleChecked = false;
+        checkedRoles.forEach(cb => {
+            if (shopRoles.includes(cb.value)) {
+                isShopRoleChecked = true;
+            }
+        });
+
+        if (isShopRoleChecked) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+            const select = container.querySelector('select[name="sywat_shop_id"]');
+            if (select) select.value = '';
+        }
+    }
+
     function sywatValidatePasswordRules(pwId, confirmId, prefix) {
         const pwVal      = document.getElementById(pwId).value;
         const confirmVal = document.getElementById(confirmId).value;
@@ -377,6 +403,7 @@ function sywat_members_render_modals( $data ) {
     function sywatOpenAddMemberModal() {
         const modal = document.getElementById('sywat_add_member_modal');
         if (modal) modal.classList.add('active');
+        sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
     }
 
     function sywatCloseAddMemberModal() {
@@ -453,6 +480,9 @@ function sywat_members_render_modals( $data ) {
     }
 
     document.addEventListener("DOMContentLoaded", function() {
+        sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
+        sywatToggleShopVisibility('sywat_edit_member_form', 'sywat_edit_shop_container');
+
         const notice = document.getElementById('sywat-notice');
         if (notice) {
             setTimeout(function() {
