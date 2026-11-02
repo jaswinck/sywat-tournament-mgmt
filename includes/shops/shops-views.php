@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Administration Management Views
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.2.0
+ * Version: 3.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -223,7 +223,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
                                             <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
                                         </div>
-                                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopContactRow(this)" title="Remove Contact">🗑️</button>
+                                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopContactRow(this)">Remove</button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -296,7 +296,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     <th>Line Day / Time</th>
                                     <th style="width:180px;">Default 20yd Cap</th>
                                     <th style="width:180px;">Default Cub Cap</th>
-                                    <th style="width:80px; text-align:center;">Action</th>
+                                    <th style="width:110px; text-align:center;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -314,7 +314,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                         <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                         <td style="padding:6px;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                         <td style="padding:6px; text-align:center;">
-                                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopLineRow(this)" title="Remove Line">🗑️</button>
+                                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopLineRow(this)">Remove</button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -630,7 +630,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
                             <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
                         </div>
-                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopContactRow(this)" title="Remove Contact">🗑️</button>
+                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopContactRow(this)">Remove</button>
                     </div>
                 `;
                 container.appendChild(row);
@@ -657,7 +657,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                     <td style="padding:6px;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                     <td style="padding:6px; text-align:center;">
-                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopLineRow(this)" title="Remove Line">🗑️</button>
+                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopLineRow(this)">Remove</button>
                     </td>
                 `;
                 tableBody.appendChild(tr);
