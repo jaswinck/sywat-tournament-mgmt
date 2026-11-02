@@ -276,4 +276,3 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         return $notice;
     }
 }
-}
