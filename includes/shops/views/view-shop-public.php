@@ -75,10 +75,10 @@ foreach ( $all_shops as $s_id => $shop ) {
                 <table class="sywat-table">
                     <thead>
                         <tr>
-                            <th style="width:32%;">Location & Address</th>
-                            <th style="width:14%;">District</th>
-                            <th style="width:24%;">Range Amenities</th>
-                            <th style="width:18%;">Contact Info</th>
+                            <th style="width:30%;">Location & Address</th>
+                            <th style="width:12%;">District</th>
+                            <th style="width:20%;">Range Amenities</th>
+                            <th style="width:26%;">Contact Info</th>
                             <th style="width:12%;">Phone</th>
                         </tr>
                     </thead>
