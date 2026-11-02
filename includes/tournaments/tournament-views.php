@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -129,15 +129,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             <!-- Operational Navigation Tabs -->
             <div class="sywat-nav-tabs no-print">
-                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ($active_tab === 'manage') ? 'active' : ''; ?>">📊 Manage Tournaments</a>
+                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ($active_tab === 'manage') ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_access_desk ): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">📋 Check In Archers</a>
+                    <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <?php endif; ?>
                 <?php if ( $can_edit_scores ): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">✏️ Enter Scores</a>
+                    <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
                 <?php endif; ?>
                 <?php if ( $can_manage_seasons ): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season <?php echo ($active_tab === 'seasons') ? 'active' : ''; ?>">🏆 Manage Seasons</a>
+                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season <?php echo ($active_tab === 'seasons') ? 'active' : ''; ?>">Manage Seasons</a>
                 <?php endif; ?>
             </div>
 
