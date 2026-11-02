@@ -211,14 +211,14 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                         ?>
                             <tr>
                                 <td style="padding:6px; vertical-align:middle;">
-                                    <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+                                    <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this);">
                                         <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
                                     </select>
                                 </td>
-                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this);"></td>
                                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
                                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
                                 <td style="padding:6px; text-align:center; vertical-align:middle;">
@@ -263,14 +263,14 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                         ?>
                             <tr>
                                 <td style="padding:6px; vertical-align:middle;">
-                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this);">
                                         <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
                                     </select>
                                 </td>
-                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this);"></td>
                                 <td style="padding:6px; text-align:center; vertical-align:middle;">
                                     <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
                                 </td>
