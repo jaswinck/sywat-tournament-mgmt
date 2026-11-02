@@ -1,25 +1,31 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
- * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded for print reliability), dynamic shop header metadata, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Helper: Detect and embed Zelle QR Code as Base64 to guarantee print/PDF rendering
+// Helper: Embed Zelle QR Code from plugin assets/images/zelle-qr-code.png as Base64 for print/PDF reliability
 if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
     function sywat_get_zelle_qr_base64() {
-        // Use the exact confirmed URL as the primary fallback
-        $known_url = 'https://ccrstaffshooters.com/wp-content/uploads/2026/10/zelle-qr.png';
-        $raw_qr    = get_option( 'sywat_zelle_qr_url', $known_url );
-        
-        if ( empty( $raw_qr ) || $raw_qr === '/wp-content/uploads/zelle-qr.png' ) {
-            $raw_qr = $known_url;
+        // 1. Check local plugin asset path: assets/images/zelle-qr-code.png
+        $plugin_img_path = plugin_dir_path( dirname( __FILE__ ) ) . 'assets/images/zelle-qr-code.png';
+        if ( ! file_exists( $plugin_img_path ) ) {
+            $plugin_img_path = plugin_dir_path( __FILE__ ) . 'assets/images/zelle-qr-code.png';
         }
 
-        // 1. If stored as a numeric Media Attachment ID
+        if ( file_exists( $plugin_img_path ) ) {
+            $type = pathinfo( $plugin_img_path, PATHINFO_EXTENSION );
+            $data = file_get_contents( $plugin_img_path );
+            return 'data:image/' . $type . ';base64,' . base64_encode( $data );
+        }
+
+        // 2. Fallback: Check if custom option or Attachment ID is set in WordPress settings
+        $raw_qr = get_option( 'sywat_zelle_qr_url', '' );
+
         if ( is_numeric( $raw_qr ) ) {
             $file_path = get_attached_file( intval( $raw_qr ) );
             if ( $file_path && file_exists( $file_path ) ) {
@@ -27,11 +33,9 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
                 $data = file_get_contents( $file_path );
                 return 'data:image/' . $type . ';base64,' . base64_encode( $data );
             }
-            // Fallback to getting URL if physical path lookup fails
             $raw_qr = wp_get_attachment_url( intval( $raw_qr ) );
         }
 
-        // 2. Fetch the image directly via URL and encode to Base64
         if ( filter_var( $raw_qr, FILTER_VALIDATE_URL ) ) {
             $response = wp_remote_get( $raw_qr, array( 'timeout' => 5 ) );
             if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
@@ -42,19 +46,7 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
             }
         }
 
-        // 3. Ultimate Fallback: Try local physical path mapping
-        $parsed_url = parse_url( $raw_qr, PHP_URL_PATH );
-        if ( $parsed_url ) {
-            $clean_path = ltrim( $parsed_url, '/' );
-            if ( file_exists( ABSPATH . $clean_path ) ) {
-                $type = pathinfo( ABSPATH . $clean_path, PATHINFO_EXTENSION );
-                $data = file_get_contents( ABSPATH . $clean_path );
-                return 'data:image/' . $type . ';base64,' . base64_encode( $data );
-            }
-        }
-
-        // Return raw URL if all Base64 attempts fail (browser will try to render it natively)
-        return esc_url( $raw_qr );
+        return '';
     }
 }
 
@@ -162,7 +154,7 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email = ! empty( $shop_info['email'] ) ? $shop_info['email'] : '—';
         $shop_phone = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '—';
 
-        // Fetch Base64 Encoded QR Code
+        // Fetch Base64 Encoded QR Code from assets/images/zelle-qr-code.png
         $zelle_qr_src = sywat_get_zelle_qr_base64();
         ?>
 
@@ -286,11 +278,8 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                     <p style="margin-top: 8px;">Send Money with Zelle®, Tag: <strong style="color:#1e3a8a;">tfaachecking</strong></p>
                     
                     <div style="margin-top: 10px; text-align: center;">
-                        <?php if ( ! empty( $zelle_qr_src ) && strpos($zelle_qr_src, 'data:image') !== false ) : ?>
+                        <?php if ( ! empty( $zelle_qr_src ) ) : ?>
                             <img src="<?php echo $zelle_qr_src; ?>" alt="Zelle QR Code" style="width: 130px; height: auto; display: inline-block; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                        <?php else : ?>
-                            <!-- Fallback for standard URL rendering if Base64 fails -->
-                            <img src="<?php echo esc_url($zelle_qr_src); ?>" alt="Zelle QR Code" style="width: 130px; height: auto; display: inline-block; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                         <?php endif; ?>
                     </div>
                     
