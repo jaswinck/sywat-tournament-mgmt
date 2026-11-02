@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -154,15 +154,16 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $formatted_dates = sywat_format_tournament_dates( $start_date, $end_date );
             update_option( 'sywat_dates_' . $new_slug, $formatted_dates );
 
-            $form_line_count = isset( $_POST['line_count'] ) ? intval( $_POST['line_count'] ) : 4;
+            // Process Dynamic Shooting Lines Repeater
             $new_lines = array();
-            if ( ! empty( $_POST['line_names'] ) ) {
+            if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
                 foreach ( $_POST['line_names'] as $index => $name ) {
-                    if ( $index < $form_line_count ) {
+                    $clean_name = trim( sanitize_text_field( $name ) );
+                    if ( ! empty( $clean_name ) ) {
                         $new_lines[] = array(
-                            'name'     => sanitize_text_field( $name ),
-                            'cap_20yd' => intval( $_POST['cap_20yd'][$index] ),
-                            'cap_cub'  => intval( $_POST['cap_cub'][$index] ),
+                            'name'     => $clean_name,
+                            'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
+                            'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
                         );
                     }
                 }
