@@ -140,9 +140,29 @@
         overflow: visible !important;
     }
 
-    /* Hide WordPress Admin UI and Modal Header/Footer Controls */
-    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
-    .sywat-modal-header, .sywat-modal-footer, .sywat-modal-close {
+    /* Hide WordPress Admin UI, Theme Headers/Footers, Auth Bar, and Modal Controls */
+    #wpadminbar, 
+    #adminmenumain, 
+    #adminmenuback, 
+    #wpfooter, 
+    #masthead, 
+    header, 
+    footer, 
+    .site-header, 
+    .site-footer, 
+    .entry-header, 
+    h1.entry-title,
+    .sywat-auth-bar, 
+    .sywat-nav-tabs, 
+    .sywat-card, 
+    .sywat-shop-card, 
+    .sywat-public-card, 
+    .sywat-filter-bar, 
+    .sywat-filter-toolbar, 
+    .sywat-modal-header, 
+    .sywat-modal-footer, 
+    .sywat-modal-close, 
+    .no-print {
         display: none !important;
     }
 
