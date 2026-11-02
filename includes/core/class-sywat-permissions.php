@@ -4,14 +4,14 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 3.2.0
+ * Version: 3.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Register clean, essential organizational roles safely in WordPress.
- * Updates role display labels in the WP database option to strip redundant "TFAA" prefixes.
+ * Grants robust capabilities across all Executive Board roles so WP Core does not block private portal pages.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
@@ -41,15 +41,46 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
 
         $needs_db_update = false;
 
+        $exec_role_slugs = array(
+            'tfaa_president',
+            'tfaa_vice_president',
+            'tfaa_treasurer',
+            'tfaa_secretary',
+            'tfaa_tournament_director',
+            'tfaa_social_media_director',
+            'tfaa_webmaster',
+            'tfaa_field_governor',
+        );
+
         foreach ( $roles_definition as $slug => $display_name ) {
+            $caps = array(
+                'read'               => true,
+                'read_private_pages' => true,
+            );
+
+            if ( in_array( $slug, $exec_role_slugs, true ) ) {
+                $caps['edit_posts']     = true;
+                $caps['manage_options'] = true;
+            } elseif ( strpos( $slug, 'sywat_shop' ) === 0 ) {
+                $caps['edit_posts']     = true;
+            }
+
             if ( null === get_role( $slug ) ) {
-                add_role( $slug, $display_name, array( 'read' => true ) );
+                add_role( $slug, $display_name, $caps );
             } else {
-                // Update display label in memory and flag DB option update if mismatched
-                if ( isset( $wp_roles->roles[ $slug ] ) && $wp_roles->roles[ $slug ]['name'] !== $display_name ) {
-                    $wp_roles->roles[ $slug ]['name'] = $display_name;
-                    $wp_roles->role_names[ $slug ]     = $display_name;
-                    $needs_db_update = true;
+                // Update display label and ensure capabilities are mapped
+                if ( isset( $wp_roles->roles[ $slug ] ) ) {
+                    if ( $wp_roles->roles[ $slug ]['name'] !== $display_name ) {
+                        $wp_roles->roles[ $slug ]['name'] = $display_name;
+                        $wp_roles->role_names[ $slug ]     = $display_name;
+                        $needs_db_update = true;
+                    }
+                    foreach ( $caps as $cap_name => $cap_grant ) {
+                        if ( empty( $wp_roles->roles[ $slug ]['capabilities'][ $cap_name ] ) ) {
+                            $wp_roles->roles[ $slug ]['capabilities'][ $cap_name ] = $cap_grant;
+                            $needs_db_update = true;
+                        }
+                    }
                 }
             }
         }
@@ -63,7 +94,6 @@ add_action( 'init', 'sywat_register_custom_roles' );
 
 /**
  * Utility: Returns array of official organizational role slugs.
- * Excludes generic site administrators so maintenance accounts do not appear in directories.
  */
 if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
     function sywat_get_custom_roles_slugs() {
@@ -120,8 +150,23 @@ if ( ! function_exists( 'sywat_get_user_object' ) ) {
 }
 
 /**
- * Utility: Internal role match checker.
- * Automatically grants universal access to Administrators and Webmasters.
+ * Utility: Normalize role and board position slugs for uniform comparison.
+ * Strips 'tfaa_' and 'sywat_' prefixes and maps district governor variants to 'field_governor'.
+ */
+if ( ! function_exists( 'sywat_normalize_role_slug' ) ) {
+    function sywat_normalize_role_slug( $slug ) {
+        $s = strtolower( trim( (string) $slug ) );
+        $s = str_replace( array( 'tfaa_', 'sywat_' ), '', $s );
+        if ( strpos( $s, 'governor' ) === 0 ) {
+            return 'field_governor';
+        }
+        return $s;
+    }
+}
+
+/**
+ * Utility: Internal role & board position match checker.
+ * Checks WP Primary Roles AND User Meta board designations (sywat_board_position / sywat_tfaa_role).
  */
 if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
     function sywat_user_has_any_role( $allowed_roles, $user_id = 0 ) {
@@ -130,12 +175,25 @@ if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
             return false;
         }
 
-        // Global Super-Access Override: Administrators and Webmasters have access to ALL portal pages and features
-        if ( in_array( 'administrator', (array) $user->roles, true ) || in_array( 'tfaa_webmaster', (array) $user->roles, true ) ) {
-            return true;
+        $user_roles = (array) $user->roles;
+        $board_pos  = get_user_meta( $user->ID, 'sywat_board_position', true );
+        $tfaa_role  = get_user_meta( $user->ID, 'sywat_tfaa_role', true );
+
+        $user_all_inputs = array_filter( array_merge( $user_roles, array( $board_pos, $tfaa_role ) ) );
+        $user_normalized = array_map( 'sywat_normalize_role_slug', $user_all_inputs );
+
+        // Universal Super-Access: Administrators, Presidents, and Webmasters pass ALL permission checks
+        $super_roles = array( 'administrator', 'admin', 'president', 'webmaster' );
+        foreach ( $user_normalized as $norm_r ) {
+            if ( in_array( $norm_r, $super_roles, true ) ) {
+                return true;
+            }
         }
 
-        return (bool) array_intersect( (array) $allowed_roles, (array) $user->roles );
+        // Compare normalized allowed roles against normalized user roles & board positions
+        $allowed_normalized = array_map( 'sywat_normalize_role_slug', (array) $allowed_roles );
+
+        return (bool) array_intersect( $allowed_normalized, $user_normalized );
     }
 }
 
