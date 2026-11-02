@@ -6,6 +6,9 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+$can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+$fallback_list_url  = $can_manage_seasons ? add_query_arg( 'type', $type_filter, $page_url ) : site_url( '/shops-and-clubs/' );
+
 $curr_fac       = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
 $curr_dist      = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
 $curr_type      = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
@@ -19,7 +22,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
 <div class="sywat-card no-print">
     <div class="sywat-card-title">
         <span>Edit Location: <strong><?php echo esc_html( $editing_shop['name'] ); ?></strong></span>
-        <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
+        <a href="<?php echo esc_url( $fallback_list_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
     </div>
 
     <!-- Sub-Tabs Navigation -->
@@ -284,7 +287,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
         <!-- GLOBAL FORM ACTIONS -->
         <div style="display:flex; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid #cbd5e1;">
             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Changes</button>
-            <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
+            <a href="<?php echo esc_url( $fallback_list_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
         </div>
     </form>
 </div>
