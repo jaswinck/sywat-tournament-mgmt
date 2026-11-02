@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -96,11 +96,12 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>">
                                     🌐 View Public Directory
                                 </a>
-                                <?php if ( $can_manage_shops ): ?>
+                                <?php if ( $can_manage_seasons ): ?>
                                     <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/' ) ); ?>">
                                         ⚙️ Shops & Clubs Management
                                     </a>
-                                <?php elseif ( ! empty( $user_shop_id ) ): ?>
+                                <?php endif; ?>
+                                <?php if ( ! empty( $user_shop_id ) ): ?>
                                     <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/?edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
                                         🏪 My Shop / Club Profile
                                     </a>
