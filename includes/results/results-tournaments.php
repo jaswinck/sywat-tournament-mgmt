@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -69,6 +69,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             $groups[$div_gen_key]['styles'][$style_key][] = $s;
         }
 
+        $total_tourn_shooters = count( $processed_scores );
+
         ksort($all_divisions);
 
         uksort( $all_styles, function( $a, $b ) {
@@ -124,6 +126,21 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 align-items: center;
                 gap: 8px;
             }
+            .sywat-counter-banner {
+                margin-top: 15px;
+                margin-bottom: 20px;
+                padding: 9px 14px;
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #1e40af;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+            }
         </style>
 
         <div class="sywat-public-card">
@@ -170,6 +187,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 <div style="flex: 0 0 auto;">
                     <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetTournFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
                 </div>
+            </div>
+
+            <!-- DYNAMIC PARTICIPATION STAT BANNER -->
+            <div id="sywat_tourn_counter" class="sywat-counter-banner">
+                🎯 Total Tournament Shooters: <strong><?php echo $total_tourn_shooters; ?></strong>
             </div>
 
             <?php if ( empty( $groups ) ): ?>
@@ -244,6 +266,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
             const cards = document.querySelectorAll('.sywat-div-gen-card');
 
+            let totalCount = 0;
+            let visibleCount = 0;
+
             cards.forEach(card => {
                 const cardDiv = (card.getAttribute('data-division') || '').toLowerCase().trim();
                 const cardGen = (card.getAttribute('data-gender') || '').toLowerCase().trim();
@@ -265,9 +290,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                         const name = (row.getAttribute('data-name') || '').toLowerCase();
                         const searchMatch = (!searchFilter || name.includes(searchFilter));
 
+                        totalCount++;
+
                         if (divMatch && genMatch && styleMatch && searchMatch) {
                             row.style.display = '';
                             blockHasVisibleRow = true;
+                            visibleCount++;
                         } else {
                             row.style.display = 'none';
                         }
@@ -283,6 +311,24 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
                 card.style.display = cardHasVisibleBlock ? '' : 'none';
             });
+
+            // Update Counter Banner
+            const counterEl = document.getElementById('sywat_tourn_counter');
+            if (counterEl) {
+                const isFiltered = (divFilter !== 'all' || genFilter !== 'all' || styleFilter !== 'all' || searchFilter !== '');
+
+                if (!isFiltered || visibleCount === totalCount) {
+                    counterEl.style.background  = '#eff6ff';
+                    counterEl.style.borderColor = '#bfdbfe';
+                    counterEl.style.color       = '#1e40af';
+                    counterEl.innerHTML         = '🎯 Total Tournament Shooters: <strong>' + totalCount + '</strong>';
+                } else {
+                    counterEl.style.background  = '#dcfce7';
+                    counterEl.style.borderColor = '#86efac';
+                    counterEl.style.color       = '#166534';
+                    counterEl.innerHTML         = '🎯 Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Archers';
+                }
+            }
         }
 
         function sywatResetTournFilters() {
