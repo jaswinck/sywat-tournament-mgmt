@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-roster.php
  * Description: Archer editing logic, division/style restrictions, strict family line-scoping, line purges, and manage modal HTML.
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -372,13 +372,16 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
 
                                     $paid_status = isset($reg['paid']) ? $reg['paid'] : '';
+                                    $lidx        = sywat_roster_resolve_line_idx($reg, $available_lines);
+
                                     $fam_label = '';
                                     if ($paid_status === 'Family' && !empty($reg['family_id'])) {
-                                        $lidx = sywat_roster_resolve_line_idx($reg, $available_lines);
                                         if (isset($existing_families_by_line[$lidx][$reg['family_id']])) {
                                             $fam_label = $existing_families_by_line[$lidx][$reg['family_id']];
                                         }
                                     }
+
+                                    $line_disp = isset( $available_lines[$lidx]['name'] ) ? $available_lines[$lidx]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
                                 ?>
                                 <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                     <td>
@@ -395,7 +398,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             <br><span style="font-size:10px; font-weight:bold; color:#0284c7; background:#e0f2fe; padding:2px 4px; border-radius:3px;">Family Cap</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' ); ?></td>
+                                    <td><?php echo esc_html( $line_disp ); ?></td>
                                     <td style="text-align:center;"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                     <td style="text-align:right;">
                                         <div style="display:inline-flex; gap:6px; justify-content:flex-end;">
