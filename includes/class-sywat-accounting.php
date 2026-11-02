@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.6.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -154,7 +154,6 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $shop_email = ! empty( $shop_info['email'] ) ? $shop_info['email'] : '—';
         $shop_phone = ! empty( $shop_info['phone'] ) ? $shop_info['phone'] : '—';
 
-        // Fetch Base64 Encoded QR Code from assets/images/zelle-qr-code.png
         $zelle_qr_src = sywat_get_zelle_qr_base64();
         ?>
 
@@ -163,65 +162,6 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         </div>
 
         <div id="sywat_print_area">
-            <style>
-                .invoice-box { font-family: Arial, sans-serif; color: #000; width: 100%; max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
-                .invoice-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 2px; }
-                .invoice-subtitle { text-align: center; font-size: 11px; margin-bottom: 15px; font-style: italic; }
-                .invoice-header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-                .invoice-header-table td { padding: 4px 6px; font-size: 12px; }
-                .invoice-header-label { font-weight: bold; width: 28%; white-space: nowrap; }
-                .invoice-header-val { background-color: #DAE6F5 !important; border: 1px solid #7092BE !important; font-weight: bold; padding: 4px 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                .invoice-fee-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-                .invoice-fee-table th { background-color: #f1f5f9 !important; border: 1px solid #000 !important; padding: 6px; font-size: 12px; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                .invoice-fee-table td { border: 1px solid #000 !important; padding: 6px; font-size: 12px; }
-                .blue-shade { background-color: #DAE6F5 !important; font-weight: bold; text-align: right; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                .invoice-footer { text-align: center; font-size: 11px; margin-top: 15px; line-height: 1.5; }
-                .invoice-footer-bold { font-weight: bold; color: #1e3a8a; }
-
-                @media print {
-                    html, body {
-                        background: #ffffff !important;
-                        color: #000000 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-                    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
-                    .sywat-modal-header, .sywat-modal-footer {
-                        display: none !important;
-                    }
-                    .sywat-modal-overlay,
-                    .sywat-modal,
-                    .sywat-modal-content,
-                    .sywat-modal-body,
-                    #sywat_invoice_modal {
-                        position: static !important;
-                        top: auto !important;
-                        left: auto !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        min-height: 0 !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        background: #ffffff !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        transform: none !important;
-                    }
-                    #sywat_print_area {
-                        position: static !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        overflow: visible !important;
-                        display: block !important;
-                    }
-                }
-            </style>
-
             <div class="invoice-box">
                 <div class="invoice-title">TFAA TOURNAMENT INVOICE</div>
                 <div class="invoice-subtitle">(Fill in all the Blue Shade Boxes)</div>
@@ -347,63 +287,6 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         </div>
 
         <div id="sywat_print_area">
-            <style>
-                @media print {
-                    html, body {
-                        background: #ffffff !important;
-                        color: #000000 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-                    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
-                    .sywat-modal-header, .sywat-modal-footer {
-                        display: none !important;
-                    }
-                    .sywat-modal-overlay,
-                    .sywat-modal,
-                    .sywat-modal-content,
-                    .sywat-modal-body,
-                    #sywat_print_modal {
-                        position: static !important;
-                        top: auto !important;
-                        left: auto !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        min-height: 0 !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        background: #ffffff !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        transform: none !important;
-                    }
-                    #sywat_print_area {
-                        position: static !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        overflow: visible !important;
-                        display: block !important;
-                    }
-                    .sywat-table {
-                        width: 100% !important;
-                        border-collapse: collapse !important;
-                        page-break-inside: auto !important;
-                    }
-                    .sywat-table tr {
-                        page-break-inside: avoid !important;
-                        page-break-after: auto !important;
-                    }
-                    .sywat-table thead {
-                        display: table-header-group !important;
-                    }
-                }
-            </style>
-
             <div style="margin-bottom: 12px; border-bottom: 2px solid #1d2327; padding-bottom: 8px;">
                 <h2 style="margin: 0; font-size: 18px; color: #1d2327;">TFAA SYWAT Tournament Roster</h2>
                 <div style="font-size: 12px; color: #475569; font-weight: 600; margin-top: 4px;">
