@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -238,11 +238,14 @@ function render_sywat_scores_app() {
                                         $style_str = !empty($reg['style']) ? $reg['style'] : '—';
                                         $is_locked = !empty($locked_lines[$reg['line_index']]);
                                         $dis_attr  = $is_locked ? 'disabled' : '';
+
+                                        $lidx      = function_exists('sywat_roster_resolve_line_idx') ? sywat_roster_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
+                                        $line_disp = isset($lines[$lidx]['name']) ? $lines[$lidx]['name'] : (!empty($reg['line_name']) ? $reg['line_name'] : 'Line 1');
                                     ?>
                                     <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr($reg_id); ?>" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                         <td><strong><?php echo $num++; ?></strong></td>
                                         <td><strong><?php echo esc_html($reg['name']); ?></strong></td>
-                                        <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'Line 1'); ?></td>
+                                        <td><?php echo esc_html($line_disp); ?></td>
                                         <td style="text-align: center;"><?php echo esc_html($gender_str); ?></td>
                                         <td><?php echo esc_html($div_str); ?></td>
                                         <td><?php echo esc_html($style_str); ?></td>
