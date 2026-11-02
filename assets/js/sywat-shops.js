@@ -1,11 +1,11 @@
 /**
  * SYWAT Archery - Shops Module Client Scripts
  * Path: assets/js/sywat-shops.js
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 function switchEditShopTab(tabName) {
-    const tabs = ['profile', 'contacts', 'lines'];
+    const tabs = ['profile', 'contacts', 'indoor_lines', 'outdoor_lines'];
     tabs.forEach(t => {
         const btn = document.getElementById('sywat_edit_tab_btn_' + t);
         const content = document.getElementById('sywat_edit_tab_' + t);
@@ -19,6 +19,33 @@ function switchEditShopTab(tabName) {
             }
         }
     });
+}
+
+function updateFacilityTabVisibility() {
+    const indoorCheck = document.querySelector('input[name="facilities[]"][value="indoor_range"]');
+    const outdoorCheck = document.querySelector('input[name="facilities[]"][value="outdoor_field"]');
+
+    const indoorBtn = document.getElementById('sywat_edit_tab_btn_indoor_lines');
+    const outdoorBtn = document.getElementById('sywat_edit_tab_btn_outdoor_lines');
+
+    const indoorContent = document.getElementById('sywat_edit_tab_indoor_lines');
+    const outdoorContent = document.getElementById('sywat_edit_tab_outdoor_lines');
+
+    if (indoorBtn) {
+        const showIndoor = indoorCheck ? indoorCheck.checked : false;
+        indoorBtn.style.display = showIndoor ? 'inline-block' : 'none';
+        if (!showIndoor && indoorContent && indoorContent.style.display !== 'none') {
+            switchEditShopTab('profile');
+        }
+    }
+
+    if (outdoorBtn) {
+        const showOutdoor = outdoorCheck ? outdoorCheck.checked : false;
+        outdoorBtn.style.display = showOutdoor ? 'inline-block' : 'none';
+        if (!showOutdoor && outdoorContent && outdoorContent.style.display !== 'none') {
+            switchEditShopTab('profile');
+        }
+    }
 }
 
 function openAddShopModal() {
@@ -74,27 +101,53 @@ function removeShopContactRow(btn) {
     }
 }
 
-function addShopLineRow() {
-    const tableBody = document.querySelector('#sywat_shop_lines_table tbody');
+function addShopIndoorLineRow() {
+    const tableBody = document.querySelector('#sywat_shop_indoor_lines_table tbody');
     if (!tableBody) return;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td style="padding:6px;"><input type="text" name="line_names[]" value="Saturday 10AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px;"><input type="text" name="indoor_line_days[]" value="Saturday" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px; text-align:center;">
-            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopLineRow(this)">Remove</button>
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopIndoorLineRow(this)">Remove</button>
         </td>
     `;
     tableBody.appendChild(tr);
 }
 
-function removeShopLineRow(btn) {
+function removeShopIndoorLineRow(btn) {
     const tr = btn.closest('tr');
-    const tableBody = document.querySelector('#sywat_shop_lines_table tbody');
+    const tableBody = document.querySelector('#sywat_shop_indoor_lines_table tbody');
     if (tableBody && tableBody.children.length <= 1) {
-        alert('Location must have at least one shooting line defined.');
+        alert('Location must have at least one indoor shooting line defined.');
+        return;
+    }
+    if (tr) tr.remove();
+}
+
+function addShopOutdoorLineRow() {
+    const tableBody = document.querySelector('#sywat_shop_outdoor_lines_table tbody');
+    if (!tableBody) return;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td style="padding:6px;"><input type="text" name="outdoor_line_days[]" value="Saturday" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px; text-align:center;">
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
+        </td>
+    `;
+    tableBody.appendChild(tr);
+}
+
+function removeShopOutdoorLineRow(btn) {
+    const tr = btn.closest('tr');
+    const tableBody = document.querySelector('#sywat_shop_outdoor_lines_table tbody');
+    if (tableBody && tableBody.children.length <= 1) {
+        alert('Location must have at least one outdoor shooting line defined.');
         return;
     }
     if (tr) tr.remove();
@@ -157,6 +210,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const distSelect = document.getElementById('sywat_district_filter_select');
     if (distSelect) distSelect.addEventListener('change', sywatFilterShops);
+
+    const facilityCheckboxes = document.querySelectorAll('input[name="facilities[]"]');
+    facilityCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateFacilityTabVisibility);
+    });
+    updateFacilityTabVisibility();
 
     const notice = document.getElementById('sywat-notice');
     if (notice) {
