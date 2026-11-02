@@ -3,7 +3,7 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
- * Version: 2.6.2
+ * Version: 2.6.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -114,7 +114,8 @@ if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
 }
 
 /**
- * Fetch all completed score records for a given tournament
+ * Fetch all registered score records for a given tournament.
+ * Defaults blank/unset score fields to 0 so every roster entry is included.
  */
 if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     function sywat_get_tournament_scores( $t_name ) {
@@ -129,7 +130,10 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
         foreach ( $results as $row ) {
             $reg = maybe_unserialize( $row->option_value );
-            if ( is_array( $reg ) && isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) {
+            if ( is_array( $reg ) ) {
+                $score_val = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
+                $x_val     = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
+
                 $scores[] = array(
                     'id'          => isset( $reg['id'] ) ? $reg['id'] : '',
                     'name'        => isset( $reg['name'] ) ? trim( $reg['name'] ) : 'Archer',
@@ -137,8 +141,8 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                     'division'    => isset( $reg['division'] ) ? $reg['division'] : 'Adult (18 - 49)',
                     'gender'      => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
                     'style'       => isset( $reg['style'] ) ? $reg['style'] : 'FS – Freestyle',
-                    'score'       => intval( $reg['score'] ),
-                    'x_count'     => isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0,
+                    'score'       => $score_val,
+                    'x_count'     => $x_val,
                     'tournament'  => $t_name,
                 );
             }
