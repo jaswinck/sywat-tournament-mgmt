@@ -1,8 +1,18 @@
 /**
  * SYWAT Archery - Shops Module Client Scripts
  * Path: assets/js/sywat-shops.js
- * Version: 1.1.0
+ * Version: 1.2.0
  */
+
+let sywatIsFormDirty = false;
+
+function markFormDirty() {
+    sywatIsFormDirty = true;
+}
+
+function resetFormDirty() {
+    sywatIsFormDirty = false;
+}
 
 function switchEditShopTab(tabName) {
     const tabs = ['profile', 'contacts', 'indoor_lines', 'outdoor_lines'];
@@ -89,6 +99,7 @@ function addShopContactRow() {
     `;
     container.appendChild(row);
     attachPhoneFormatting(row.querySelector('.sywat-phone-input'));
+    markFormDirty();
 }
 
 function removeShopContactRow(btn) {
@@ -99,6 +110,7 @@ function removeShopContactRow(btn) {
     if (container && container.querySelectorAll('.sywat-contact-row').length === 0 && noMsg) {
         noMsg.style.display = 'block';
     }
+    markFormDirty();
 }
 
 function addShopIndoorLineRow() {
@@ -107,7 +119,13 @@ function addShopIndoorLineRow() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td style="padding:6px;"><input type="text" name="indoor_line_days[]" value="Saturday" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px;">
+            <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <option value="Friday">Friday</option>
+                <option value="Saturday" selected>Saturday</option>
+                <option value="Sunday">Sunday</option>
+            </select>
+        </td>
         <td style="padding:6px;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
@@ -116,6 +134,7 @@ function addShopIndoorLineRow() {
         </td>
     `;
     tableBody.appendChild(tr);
+    markFormDirty();
 }
 
 function removeShopIndoorLineRow(btn) {
@@ -126,6 +145,7 @@ function removeShopIndoorLineRow(btn) {
         return;
     }
     if (tr) tr.remove();
+    markFormDirty();
 }
 
 function addShopOutdoorLineRow() {
@@ -134,13 +154,20 @@ function addShopOutdoorLineRow() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td style="padding:6px;"><input type="text" name="outdoor_line_days[]" value="Saturday" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:6px;">
+            <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <option value="Friday">Friday</option>
+                <option value="Saturday" selected>Saturday</option>
+                <option value="Sunday">Sunday</option>
+            </select>
+        </td>
         <td style="padding:6px;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
         <td style="padding:6px; text-align:center;">
             <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
         </td>
     `;
     tableBody.appendChild(tr);
+    markFormDirty();
 }
 
 function removeShopOutdoorLineRow(btn) {
@@ -151,6 +178,17 @@ function removeShopOutdoorLineRow(btn) {
         return;
     }
     if (tr) tr.remove();
+    markFormDirty();
+}
+
+function confirmBackToList(event) {
+    if (sywatIsFormDirty) {
+        if (!confirm('You have unsaved changes. Are you sure you want to leave without saving?')) {
+            if (event) event.preventDefault();
+            return false;
+        }
+    }
+    return true;
 }
 
 function attachPhoneFormatting(input) {
@@ -202,6 +240,20 @@ function sywatFilterShops() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    const editForm = document.getElementById('sywat_edit_shop_form');
+    if (editForm) {
+        editForm.addEventListener('change', markFormDirty);
+        editForm.addEventListener('input', markFormDirty);
+        editForm.addEventListener('submit', resetFormDirty);
+    }
+
+    window.addEventListener('beforeunload', function(e) {
+        if (sywatIsFormDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
     const phoneInputs = document.querySelectorAll('.sywat-phone-input');
     phoneInputs.forEach(attachPhoneFormatting);
 
