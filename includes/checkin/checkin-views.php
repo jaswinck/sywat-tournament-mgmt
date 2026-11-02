@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -31,6 +31,7 @@ function sywat_desk_render_family_banner($added_family_prompt) {
 }
 
 function sywat_desk_render_filter_bar($data) {
+    $can_manage_seasons = function_exists('sywat_can_manage_seasons') && sywat_can_manage_seasons();
     $selected_t = isset($data['selected_tournament']) ? $data['selected_tournament'] : '';
     
     $all_tournaments = get_option('sywat_tournaments_list', array());
@@ -50,15 +51,12 @@ function sywat_desk_render_filter_bar($data) {
     ?>
     <!-- Master Navigation Tabs -->
     <div class="sywat-nav-tabs no-print">
-        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">
-            Manage Tournaments
-        </a>
-        <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-results">
-            Check In Archers
-        </a>
-        <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">
-            Enter Scores
-        </a>
+        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+        <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
+        <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+        <?php if ( $can_manage_seasons ): ?>
+            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
+        <?php endif; ?>
     </div>
 
     <!-- Integrated Control Panel Filter Toolbar -->
