@@ -4,14 +4,14 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Register clean, essential organizational roles safely in WordPress.
- * Grants robust capabilities across all Executive Board roles so WP Core does not block private portal pages.
+ * Grants read and private page access without elevating roles to WP site administrators.
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
@@ -41,45 +41,24 @@ if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
 
         $needs_db_update = false;
 
-        $exec_role_slugs = array(
-            'tfaa_president',
-            'tfaa_vice_president',
-            'tfaa_treasurer',
-            'tfaa_secretary',
-            'tfaa_tournament_director',
-            'tfaa_social_media_director',
-            'tfaa_webmaster',
-            'tfaa_field_governor',
-        );
-
         foreach ( $roles_definition as $slug => $display_name ) {
             $caps = array(
                 'read'               => true,
                 'read_private_pages' => true,
             );
 
-            if ( in_array( $slug, $exec_role_slugs, true ) ) {
-                $caps['edit_posts']     = true;
-                $caps['manage_options'] = true;
-            } elseif ( strpos( $slug, 'sywat_shop' ) === 0 ) {
-                $caps['edit_posts']     = true;
-            }
-
             if ( null === get_role( $slug ) ) {
                 add_role( $slug, $display_name, $caps );
             } else {
-                // Update display label and ensure capabilities are mapped
                 if ( isset( $wp_roles->roles[ $slug ] ) ) {
                     if ( $wp_roles->roles[ $slug ]['name'] !== $display_name ) {
                         $wp_roles->roles[ $slug ]['name'] = $display_name;
                         $wp_roles->role_names[ $slug ]     = $display_name;
                         $needs_db_update = true;
                     }
-                    foreach ( $caps as $cap_name => $cap_grant ) {
-                        if ( empty( $wp_roles->roles[ $slug ]['capabilities'][ $cap_name ] ) ) {
-                            $wp_roles->roles[ $slug ]['capabilities'][ $cap_name ] = $cap_grant;
-                            $needs_db_update = true;
-                        }
+                    if ( empty( $wp_roles->roles[ $slug ]['capabilities']['read_private_pages'] ) ) {
+                        $wp_roles->roles[ $slug ]['capabilities']['read_private_pages'] = true;
+                        $needs_db_update = true;
                     }
                 }
             }
@@ -182,15 +161,12 @@ if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
         $user_all_inputs = array_filter( array_merge( $user_roles, array( $board_pos, $tfaa_role ) ) );
         $user_normalized = array_map( 'sywat_normalize_role_slug', $user_all_inputs );
 
-        // Universal Super-Access: Administrators, Presidents, and Webmasters pass ALL permission checks
-        $super_roles = array( 'administrator', 'admin', 'president', 'webmaster' );
-        foreach ( $user_normalized as $norm_r ) {
-            if ( in_array( $norm_r, $super_roles, true ) ) {
-                return true;
-            }
+        // WordPress Site Administrators always pass permission checks
+        if ( in_array( 'administrator', $user_normalized, true ) || in_array( 'admin', $user_normalized, true ) ) {
+            return true;
         }
 
-        // Compare normalized allowed roles against normalized user roles & board positions
+        // Compare normalized allowed roles against normalized user roles & user meta board positions
         $allowed_normalized = array_map( 'sywat_normalize_role_slug', (array) $allowed_roles );
 
         return (bool) array_intersect( $allowed_normalized, $user_normalized );
@@ -198,7 +174,30 @@ if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
 }
 
 /**
- * Permission 1: Can access Master Tournament Management portal & shooter administration.
+ * Permission 1: Can view the Members Directory portal.
+ */
+if ( ! function_exists( 'sywat_can_view_members' ) ) {
+    function sywat_can_view_members( $user_id = 0 ) {
+        $allowed = array(
+            'administrator',
+            'tfaa_president',
+            'tfaa_vice_president',
+            'tfaa_treasurer',
+            'tfaa_secretary',
+            'tfaa_webmaster',
+            'tfaa_field_governor',
+            'tfaa_tournament_director',
+            'tfaa_social_media_director',
+            'sywat_shop_manager',
+            'sywat_shop_user',
+            'tfaa_member',
+        );
+        return sywat_user_has_any_role( $allowed, $user_id );
+    }
+}
+
+/**
+ * Permission 2: Can access Master Tournament Management portal & shooter administration.
  */
 if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
     function sywat_can_manage_tournaments( $user_id = 0 ) {
@@ -219,7 +218,7 @@ if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
 }
 
 /**
- * Permission 2: Can manage Season CRUD configurations & global settings.
+ * Permission 3: Can manage Season CRUD configurations & global settings.
  */
 if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
     function sywat_can_manage_seasons( $user_id = 0 ) {
@@ -235,7 +234,7 @@ if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
 }
 
 /**
- * Permission 3: Can add, edit, or delete archery shop profiles.
+ * Permission 4: Can add, edit, or delete archery shop profiles.
  */
 if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
     function sywat_can_manage_shops( $user_id = 0 ) {
@@ -252,7 +251,7 @@ if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
 }
 
 /**
- * Permission 4: Can enter or edit scores (Desk, Score Entry page, Public Results edit shortcuts).
+ * Permission 5: Can enter or edit scores (Desk, Score Entry page, Public Results edit shortcuts).
  */
 if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
     function sywat_can_edit_scores( $user_id = 0 ) {
@@ -275,7 +274,7 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
 }
 
 /**
- * Permission 5: Can access the Check-In Desk portal.
+ * Permission 6: Can access the Check-In Desk portal.
  */
 if ( ! function_exists( 'sywat_can_access_desk' ) ) {
     function sywat_can_access_desk( $user_id = 0 ) {
@@ -298,7 +297,7 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
 }
 
 /**
- * Permission 6: Can create or manage member user accounts.
+ * Permission 7: Can create or manage member user accounts.
  */
 if ( ! function_exists( 'sywat_can_create_members' ) ) {
     function sywat_can_create_members( $user_id = 0 ) {
@@ -315,7 +314,7 @@ if ( ! function_exists( 'sywat_can_create_members' ) ) {
 }
 
 /**
- * Permission 7: Can assign, edit, or remove Board Members.
+ * Permission 8: Can assign, edit, or remove Board Members.
  */
 if ( ! function_exists( 'sywat_can_manage_board' ) ) {
     function sywat_can_manage_board( $user_id = 0 ) {
