@@ -6,6 +6,10 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+$can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+$user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
+$is_admin           = current_user_can( 'administrator' );
+
 $filtered_shops = array();
 foreach ( $all_shops as $s_id => $shop ) {
     $s_type = isset($shop['location_type']) ? $shop['location_type'] : 'pro_shop';
@@ -40,7 +44,9 @@ foreach ( $all_shops as $s_id => $shop ) {
                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
             </div>
 
-            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:32px;" onclick="openAddShopModal()">Add Location</button>
+            <?php if ( $can_manage_seasons || $is_admin ): ?>
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:32px;" onclick="openAddShopModal()">Add Location</button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -139,14 +145,19 @@ foreach ( $all_shops as $s_id => $shop ) {
                             <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                             <td style="text-align:right;">
                                 <div style="display:inline-flex; gap:4px; align-items:center; justify-content:flex-end;">
-                                    <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
-                                    <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:2px 6px; font-size:11px; height:28px;">Edit</a>
-                                    <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
-                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                        <input type="hidden" name="sywat_shop_action" value="delete_shop">
-                                        <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding:2px 6px; font-size:11px; height:28px;">Delete</button>
-                                    </form>
+                                    <?php if ( $can_manage_seasons || $is_admin ): ?>
+                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:2px 6px; font-size:11px; height:28px;">Edit</a>
+                                        <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" style="margin:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
+                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                            <input type="hidden" name="sywat_shop_action" value="delete_shop">
+                                            <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
+                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding:2px 6px; font-size:11px; height:28px;">Delete</button>
+                                        </form>
+                                    <?php elseif ( ! empty( $user_shop_id ) && $s_id === $user_shop_id ): ?>
+                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" style="padding:2px 6px; font-size:11px; height:28px;">Edit My Shop</a>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
