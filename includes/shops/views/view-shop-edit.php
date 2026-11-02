@@ -6,13 +6,14 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-$curr_fac     = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
-$curr_dist    = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
-$curr_type    = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
-$add_contacts = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
+$curr_fac       = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
+$curr_dist      = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
+$curr_type      = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
+$add_contacts   = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
 
-$has_indoor   = in_array( 'indoor_range', $curr_fac );
-$has_outdoor  = in_array( 'outdoor_field', $curr_fac );
+$has_indoor     = in_array( 'indoor_range', $curr_fac );
+$has_outdoor    = in_array( 'outdoor_field', $curr_fac );
+$active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['active_tab'] ) : 'profile';
 ?>
 
 <div class="sywat-card no-print">
@@ -23,19 +24,20 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
 
     <!-- Sub-Tabs Navigation -->
     <div class="sywat-nav-tabs" style="margin-bottom:20px;">
-        <button type="button" class="sywat-tab-item active" id="sywat_edit_tab_btn_profile" onclick="switchEditShopTab('profile')">📍 Profile & Address</button>
-        <button type="button" class="sywat-tab-item" id="sywat_edit_tab_btn_contacts" onclick="switchEditShopTab('contacts')">👥 Contacts</button>
-        <button type="button" class="sywat-tab-item" id="sywat_edit_tab_btn_indoor_lines" onclick="switchEditShopTab('indoor_lines')" style="<?php echo $has_indoor ? '' : 'display:none;'; ?>">🎯 SYWAT Indoor Lines</button>
-        <button type="button" class="sywat-tab-item" id="sywat_edit_tab_btn_outdoor_lines" onclick="switchEditShopTab('outdoor_lines')" style="<?php echo $has_outdoor ? '' : 'display:none;'; ?>">🌲 SYWAT Outdoor Lines</button>
+        <button type="button" class="sywat-tab-item <?php echo ($active_sub_tab === 'profile') ? 'active' : ''; ?>" id="sywat_edit_tab_btn_profile" onclick="switchEditShopTab('profile')">📍 Profile & Address</button>
+        <button type="button" class="sywat-tab-item <?php echo ($active_sub_tab === 'contacts') ? 'active' : ''; ?>" id="sywat_edit_tab_btn_contacts" onclick="switchEditShopTab('contacts')">👥 Contacts</button>
+        <button type="button" class="sywat-tab-item <?php echo ($active_sub_tab === 'indoor_lines') ? 'active' : ''; ?>" id="sywat_edit_tab_btn_indoor_lines" onclick="switchEditShopTab('indoor_lines')" style="<?php echo $has_indoor ? '' : 'display:none;'; ?>">🎯 SYWAT Indoor Lines</button>
+        <button type="button" class="sywat-tab-item <?php echo ($active_sub_tab === 'outdoor_lines') ? 'active' : ''; ?>" id="sywat_edit_tab_btn_outdoor_lines" onclick="switchEditShopTab('outdoor_lines')" style="<?php echo $has_outdoor ? '' : 'display:none;'; ?>">🌲 SYWAT Outdoor Lines</button>
     </div>
 
     <form method="post" id="sywat_edit_shop_form" action="<?php echo esc_url( add_query_arg( array('edit_shop' => $editing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>">
         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
         <input type="hidden" name="sywat_shop_action" value="update_shop">
         <input type="hidden" name="shop_id" value="<?php echo esc_attr( $editing_shop['id'] ); ?>">
+        <input type="hidden" name="active_tab" id="sywat_active_tab_input" value="<?php echo esc_attr( $active_sub_tab ); ?>">
 
         <!-- TAB 1: PROFILE & ADDRESS -->
-        <div id="sywat_edit_tab_profile" class="sywat-edit-tab-content">
+        <div id="sywat_edit_tab_profile" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'profile') ? 'display:block;' : 'display:none;'; ?>">
             <div class="sywat-form-grid-3" style="margin-bottom:15px;">
                 <div>
                     <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Location Name *</label>
@@ -112,7 +114,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
         </div>
 
         <!-- TAB 2: CONTACTS -->
-        <div id="sywat_edit_tab_contacts" class="sywat-edit-tab-content" style="display:none;">
+        <div id="sywat_edit_tab_contacts" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'contacts') ? 'display:block;' : 'display:none;'; ?>">
             <!-- Primary Contact Section -->
             <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:#0f172a;">👤 Primary Contact Person</h4>
@@ -147,22 +149,22 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
                         <div class="sywat-contact-row sywat-form-grid-4" style="align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
-                                <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                             </div>
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Role / Title</label>
-                                <input type="text" name="add_contact_titles[]" value="<?php echo esc_attr( isset($ac['title']) ? $ac['title'] : '' ); ?>" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                <input type="text" name="add_contact_titles[]" value="<?php echo esc_attr( isset($ac['title']) ? $ac['title'] : '' ); ?>" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                             </div>
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
-                                <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                             </div>
                             <div style="display:flex; gap:6px; align-items:center;">
                                 <div style="flex:1;">
                                     <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
-                                    <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                    <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                                 </div>
-                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopContactRow(this)">Remove</button>
+                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopContactRow(this)">Remove</button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -174,7 +176,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
         </div>
 
         <!-- TAB 3: SYWAT INDOOR LINES -->
-        <div id="sywat_edit_tab_indoor_lines" class="sywat-edit-tab-content" style="display:none;">
+        <div id="sywat_edit_tab_indoor_lines" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'indoor_lines') ? 'display:block;' : 'display:none;'; ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h4 style="margin:0; font-size:15px; font-weight:bold;">SYWAT Indoor Lines & Capacity Templates</h4>
                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopIndoorLineRow()">Add New Line</button>
@@ -210,18 +212,18 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
                                 if ( empty($time_val) ) $time_val = '10:00 AM';
                         ?>
                             <tr>
-                                <td style="padding:6px;">
-                                    <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                <td style="padding:6px; vertical-align:middle;">
+                                    <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
                                     </select>
                                 </td>
-                                <td style="padding:6px;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                                <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                                <td style="padding:6px;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                                <td style="padding:6px; text-align:center;">
-                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopIndoorLineRow(this)">Remove</button>
+                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; text-align:center; vertical-align:middle;">
+                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopIndoorLineRow(this)">Remove</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -231,7 +233,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
         </div>
 
         <!-- TAB 4: SYWAT OUTDOOR LINES -->
-        <div id="sywat_edit_tab_outdoor_lines" class="sywat-edit-tab-content" style="display:none;">
+        <div id="sywat_edit_tab_outdoor_lines" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'outdoor_lines') ? 'display:block;' : 'display:none;'; ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h4 style="margin:0; font-size:15px; font-weight:bold;">SYWAT Outdoor Lines & Schedule Templates</h4>
                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopOutdoorLineRow()">Add New Line</button>
@@ -263,16 +265,16 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
                                 if ( empty($time_val) ) $time_val = '9:00 AM';
                         ?>
                             <tr>
-                                <td style="padding:6px;">
-                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                <td style="padding:6px; vertical-align:middle;">
+                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
                                     </select>
                                 </td>
-                                <td style="padding:6px;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                                <td style="padding:6px; text-align:center;">
-                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
+                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;"></td>
+                                <td style="padding:6px; text-align:center; vertical-align:middle;">
+                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
