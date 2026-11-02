@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: score-entry-views.php
- * Version: 3.6.1
+ * Version: 3.6.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -13,8 +13,9 @@ function render_sywat_scores_app() {
         return '<p style="color:red; padding:20px;">Access denied. Staff access required.</p>';
     }
 
-    $is_admin     = is_user_logged_in() && in_array('administrator', (array) $user->roles);
-    $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+    $is_admin           = is_user_logged_in() && in_array('administrator', (array) $user->roles);
+    $can_manage_seasons = function_exists('sywat_can_manage_seasons') && sywat_can_manage_seasons();
+    $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
     // Handle AJAX Autosave Early
     if (function_exists('sywat_scores_handle_ajax_autosave')) {
@@ -114,15 +115,12 @@ function render_sywat_scores_app() {
 
         <!-- Master Navigation Tabs -->
         <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">
-                Manage Tournaments
-            </a>
-            <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-results">
-                Check In Archers
-            </a>
-            <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-season">
-                Enter Scores
-            </a>
+            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+            <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
+            <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
+            <?php if ( $can_manage_seasons ): ?>
+                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
+            <?php endif; ?>
         </div>
 
         <!-- Integrated Control Panel Filter Toolbar -->
