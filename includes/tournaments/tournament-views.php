@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.2.0
+ * Version: 3.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -397,14 +397,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             ?>
                                             <tr>
                                                 <td style="padding:6px; vertical-align:middle;">
-                                                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;">
+                                                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkTournamentLineDuplicate(this);">
                                                         <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
                                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
                                                     </select>
                                                 </td>
-                                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
+                                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required onchange="checkTournamentLineDuplicate(this);"></td>
                                                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
                                                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
                                                 <td style="padding:6px; text-align:center; vertical-align:middle;">
@@ -484,6 +484,43 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             window.history.replaceState({}, document.title, url.toString());
         }
 
+        function checkTournamentLineDuplicate(el) {
+            const tr = el.closest('tr');
+            const table = el.closest('table');
+            if (!tr || !table) return true;
+
+            const daySelect = tr.querySelector('select[name="line_days[]"]');
+            const timeInput = tr.querySelector('input[name="line_times[]"]');
+
+            const dayVal = (daySelect?.value || '').trim();
+            const timeVal = (timeInput?.value || '').trim().toLowerCase();
+
+            if (!dayVal || !timeVal) return true;
+
+            const currentCombo = dayVal.toLowerCase() + ' @ ' + timeVal;
+
+            const allRows = table.querySelectorAll('tbody tr');
+            for (let row of allRows) {
+                if (row === tr) continue; // Skip the row being actively edited
+
+                const otherDaySelect = row.querySelector('select[name="line_days[]"]');
+                const otherTimeInput = row.querySelector('input[name="line_times[]"]');
+
+                const otherDay = (otherDaySelect?.value || '').trim().toLowerCase();
+                const otherTime = (otherTimeInput?.value || '').trim().toLowerCase();
+
+                if (otherDay && otherTime && (otherDay + ' @ ' + otherTime) === currentCombo) {
+                    alert(`Duplicate tournament line schedule detected: "${dayVal} ${timeInput.value}". This day and start time is already assigned to another line.`);
+                    if (daySelect) {
+                        daySelect.value = "";
+                        daySelect.focus();
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+
         function addTournamentLineRow() {
             const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
             if (!tableBody) return;
@@ -491,14 +528,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding:6px; vertical-align:middle;">
-                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;">
+                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkTournamentLineDuplicate(this);">
                         <option value="" disabled selected>-- Select Day --</option>
                         <option value="Friday">Friday</option>
                         <option value="Saturday">Saturday</option>
                         <option value="Sunday">Sunday</option>
                     </select>
                 </td>
-                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
+                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required onchange="checkTournamentLineDuplicate(this);"></td>
                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
                 <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
                 <td style="padding:6px; text-align:center; vertical-align:middle;">
