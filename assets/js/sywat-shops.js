@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Shops Module Client Scripts
  * Path: assets/js/sywat-shops.js
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 let sywatIsFormDirty = false;
@@ -29,6 +29,11 @@ function switchEditShopTab(tabName) {
             }
         }
     });
+
+    const activeTabInput = document.getElementById('sywat_active_tab_input');
+    if (activeTabInput) {
+        activeTabInput.value = tabName;
+    }
 }
 
 function updateFacilityTabVisibility() {
@@ -79,22 +84,22 @@ function addShopContactRow() {
     row.innerHTML = `
         <div>
             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
-            <input type="text" name="add_contact_names[]" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+            <input type="text" name="add_contact_names[]" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
         </div>
         <div>
             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Role / Title</label>
-            <input type="text" name="add_contact_titles[]" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+            <input type="text" name="add_contact_titles[]" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
         </div>
         <div>
             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
-            <input type="email" name="add_contact_emails[]" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+            <input type="email" name="add_contact_emails[]" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
         </div>
         <div style="display:flex; gap:6px; align-items:center;">
             <div style="flex:1;">
                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
-                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
             </div>
-            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopContactRow(this)">Remove</button>
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box;" onclick="removeShopContactRow(this)">Remove</button>
         </div>
     `;
     container.appendChild(row);
@@ -119,18 +124,18 @@ function addShopIndoorLineRow() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td style="padding:6px;">
-            <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+        <td style="padding:6px; vertical-align:middle;">
+            <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
                 <option value="Friday">Friday</option>
                 <option value="Saturday" selected>Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
-        <td style="padding:6px;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-        <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-        <td style="padding:6px;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-        <td style="padding:6px; text-align:center;">
-            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopIndoorLineRow(this)">Remove</button>
+        <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; text-align:center; vertical-align:middle;">
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopIndoorLineRow(this)">Remove</button>
         </td>
     `;
     tableBody.appendChild(tr);
@@ -154,16 +159,16 @@ function addShopOutdoorLineRow() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td style="padding:6px;">
-            <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+        <td style="padding:6px; vertical-align:middle;">
+            <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
                 <option value="Friday">Friday</option>
                 <option value="Saturday" selected>Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
-        <td style="padding:6px;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-        <td style="padding:6px; text-align:center;">
-            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
+        <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; text-align:center; vertical-align:middle;">
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
         </td>
     `;
     tableBody.appendChild(tr);
@@ -179,6 +184,40 @@ function removeShopOutdoorLineRow(btn) {
     }
     if (tr) tr.remove();
     markFormDirty();
+}
+
+function validateDuplicatesInTable(tableSelector, dayInputName, timeInputName, label) {
+    const table = document.querySelector(tableSelector);
+    if (!table) return true;
+
+    const daySelects = table.querySelectorAll(`select[name="${dayInputName}"]`);
+    const timeInputs = table.querySelectorAll(`input[name="${timeInputName}"]`);
+
+    const seen = new Set();
+    for (let i = 0; i < daySelects.length; i++) {
+        const dayVal = (daySelects[i]?.value || '').trim();
+        const timeVal = (timeInputs[i]?.value || '').trim().toLowerCase();
+        if (dayVal && timeVal) {
+            const combo = dayVal + ' @ ' + timeVal;
+            if (seen.has(combo)) {
+                alert(`Duplicate ${label} shooting line detected: "${dayVal} ${timeInputs[i].value}". Each line schedule must be unique.`);
+                return false;
+            }
+            seen.add(combo);
+        }
+    }
+    return true;
+}
+
+function validateShopForm() {
+    if (!validateDuplicatesInTable('#sywat_shop_indoor_lines_table', 'indoor_line_days[]', 'indoor_line_times[]', 'Indoor')) {
+        return false;
+    }
+    if (!validateDuplicatesInTable('#sywat_shop_outdoor_lines_table', 'outdoor_line_days[]', 'outdoor_line_times[]', 'Outdoor')) {
+        return false;
+    }
+    resetFormDirty();
+    return true;
 }
 
 function confirmBackToList(event) {
@@ -244,7 +283,11 @@ document.addEventListener("DOMContentLoaded", function() {
     if (editForm) {
         editForm.addEventListener('change', markFormDirty);
         editForm.addEventListener('input', markFormDirty);
-        editForm.addEventListener('submit', resetFormDirty);
+        editForm.addEventListener('submit', function(e) {
+            if (!validateShopForm()) {
+                e.preventDefault();
+            }
+        });
     }
 
     window.addEventListener('beforeunload', function(e) {
