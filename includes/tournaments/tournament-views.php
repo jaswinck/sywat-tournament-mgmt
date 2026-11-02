@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.9.2
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -63,10 +63,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
         // Modal Variables
         $default_lines = array(
-            array( 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-            array( 'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-            array( 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
-            array( 'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+            array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
         );
 
         $selected_tournament = isset( $_REQUEST['view_tournament'] ) ? sanitize_text_field( $_REQUEST['view_tournament'] ) : '';
@@ -374,7 +374,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <table class="sywat-table" id="sywat_tourn_lines_table" style="margin-bottom: 0;">
                                     <thead>
                                         <tr>
-                                            <th>Line Day / Time</th>
+                                            <th>Shooting Day</th>
+                                            <th>Start Time</th>
                                             <th style="width: 140px;">20yd Capacity</th>
                                             <th style="width: 140px;">Cub Capacity</th>
                                             <th style="width: 110px; text-align: center;">Action</th>
@@ -383,12 +384,22 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <tbody>
                                         <?php foreach ( $edit_t_lines as $i => $l ): ?>
                                             <?php 
-                                                $line_name = isset($l['name']) ? $l['name'] : 'Line ' . ($i + 1);
+                                                $day_val  = isset($l['day']) ? $l['day'] : '';
+                                                $time_val = isset($l['time']) ? $l['time'] : '';
+                                                if ( empty($day_val) && !empty($l['name']) ) {
+                                                    $parts    = explode(' ', trim($l['name']), 2);
+                                                    $day_val  = $parts[0];
+                                                    $time_val = isset($parts[1]) ? $parts[1] : '';
+                                                }
+                                                if ( empty($day_val) ) $day_val = 'Saturday';
+                                                if ( empty($time_val) ) $time_val = '10:00 AM';
+
                                                 $cap_20yd  = isset($l['cap_20yd']) ? $l['cap_20yd'] : 20;
                                                 $cap_cub   = isset($l['cap_cub']) ? $l['cap_cub'] : 5;
                                             ?>
                                             <tr>
-                                                <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $line_name ); ?>" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                                <td><input type="text" name="line_days[]" value="<?php echo esc_attr( $day_val ); ?>" placeholder="e.g. Saturday" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                                <td><input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td style="padding:6px; text-align:center;">
@@ -474,7 +485,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><input type="text" name="line_names[]" value="Saturday 10AM" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td><input type="text" name="line_days[]" value="Saturday" placeholder="e.g. Saturday" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td><input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td style="padding:6px; text-align:center;">
