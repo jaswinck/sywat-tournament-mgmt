@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.3.0
+ * Version: 3.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -87,7 +87,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         if ( empty( $edit_t_lines ) || ! is_array( $edit_t_lines ) ) {
             $edit_t_lines = $default_lines;
         }
-        $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( $can_manage_seasons ? '' : $user_shop_id );
+        $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( ! empty( $user_shop_id ) ? $user_shop_id : '' );
         $edit_t_season       = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start        = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end          = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
