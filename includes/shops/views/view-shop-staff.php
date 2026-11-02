@@ -61,9 +61,9 @@ foreach ( $eligible_users as $u ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th>User Display Name</th>
-                        <th>Username / Email</th>
-                        <th>WP Role</th>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Email</th>
                         <th style="text-align:right;">Action</th>
                     </tr>
                 </thead>
@@ -71,8 +71,8 @@ foreach ( $eligible_users as $u ) {
                     <?php foreach ( $linked_staff as $ls_user ): ?>
                         <tr>
                             <td style="font-weight:bold;"><?php echo esc_html( $ls_user->display_name ); ?></td>
-                            <td><?php echo esc_html( $ls_user->user_login ); ?><br><span style="font-size:11px; color:#646970;"><?php echo esc_html( $ls_user->user_email ); ?></span></td>
-                            <td><span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( implode( ', ', $ls_user->roles ) ); ?></span></td>
+                            <td><?php echo esc_html( $ls_user->user_login ); ?></td>
+                            <td><?php echo esc_html( $ls_user->user_email ); ?></td>
                             <td style="text-align:right;">
                                 <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="margin:0;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this location?');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
