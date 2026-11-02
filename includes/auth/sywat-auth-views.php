@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.3.0
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,12 +19,12 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $current_user = $is_logged_in ? wp_get_current_user() : null;
         $user_id      = $is_logged_in ? $current_user->ID : 0;
 
-        // Dynamic capability checks
+        // Dynamic capability checks tied directly to sywat-permissions
         $is_admin               = $is_logged_in && current_user_can( 'administrator' );
         $can_manage_tournaments = $is_logged_in && function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
         $can_access_desk        = $is_logged_in && function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         $can_edit_scores        = $is_logged_in && function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
-        $can_manage_members     = $is_logged_in && ( function_exists( 'sywat_can_manage_members' ) ? sywat_can_manage_members( $user_id ) : current_user_can( 'manage_options' ) );
+        $can_view_members       = $is_logged_in && function_exists( 'sywat_can_view_members' ) && sywat_can_view_members( $user_id );
         $user_shop_id           = $is_logged_in && function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
 
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
@@ -71,7 +71,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     <?php endif; ?>
 
                     <!-- 2. Administrative Dropdown (Staff Only) -->
-                    <?php if ( $can_manage_members ): ?>
+                    <?php if ( $can_view_members ): ?>
                         <div class="sywat-auth-dropdown">
                             <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
                                 ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
