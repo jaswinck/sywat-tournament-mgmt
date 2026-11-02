@@ -18,7 +18,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
 <div class="sywat-card no-print">
     <div class="sywat-card-title">
         <span>Edit Location: <strong><?php echo esc_html( $editing_shop['name'] ); ?></strong></span>
-        <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel Editing</a>
+        <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
     </div>
 
     <!-- Sub-Tabs Navigation -->
@@ -29,7 +29,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
         <button type="button" class="sywat-tab-item" id="sywat_edit_tab_btn_outdoor_lines" onclick="switchEditShopTab('outdoor_lines')" style="<?php echo $has_outdoor ? '' : 'display:none;'; ?>">🌲 SYWAT Outdoor Lines</button>
     </div>
 
-    <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>">
+    <form method="post" id="sywat_edit_shop_form" action="<?php echo esc_url( add_query_arg( array('edit_shop' => $editing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>">
         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
         <input type="hidden" name="sywat_shop_action" value="update_shop">
         <input type="hidden" name="shop_id" value="<?php echo esc_attr( $editing_shop['id'] ); ?>">
@@ -210,7 +210,13 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
                                 if ( empty($time_val) ) $time_val = '10:00 AM';
                         ?>
                             <tr>
-                                <td style="padding:6px;"><input type="text" name="indoor_line_days[]" value="<?php echo esc_attr( $day_val ); ?>" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                                <td style="padding:6px;">
+                                    <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                    </select>
+                                </td>
                                 <td style="padding:6px;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                 <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                 <td style="padding:6px;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
@@ -257,7 +263,13 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
                                 if ( empty($time_val) ) $time_val = '9:00 AM';
                         ?>
                             <tr>
-                                <td style="padding:6px;"><input type="text" name="outdoor_line_days[]" value="<?php echo esc_attr( $day_val ); ?>" placeholder="e.g. Saturday" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                                <td style="padding:6px;">
+                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                    </select>
+                                </td>
                                 <td style="padding:6px;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                 <td style="padding:6px; text-align:center;">
                                     <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
@@ -272,7 +284,7 @@ $has_outdoor  = in_array( 'outdoor_field', $curr_fac );
         <!-- GLOBAL FORM ACTIONS -->
         <div style="display:flex; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid #cbd5e1;">
             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Changes</button>
-            <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
+            <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
         </div>
     </form>
 </div>
