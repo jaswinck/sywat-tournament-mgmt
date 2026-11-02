@@ -117,8 +117,9 @@ foreach ( $all_shops as $s_id => $shop ) {
                                         </span>
                                     <?php endif; ?>
                                     <?php if ( ! empty( $full_address ) ): ?>
-                                        <div style="font-size:12px; color:#64748b; margin-top:4px; line-height:1.3;">
-                                            📍 <?php echo $full_address; ?>
+                                        <div style="display:flex; gap:6px; font-size:12px; color:#64748b; margin-top:4px; line-height:1.3;">
+                                            <span style="flex-shrink:0;">📍</span>
+                                            <div><?php echo $full_address; ?></div>
                                         </div>
                                     <?php endif; ?>
                                 </td>
@@ -150,26 +151,36 @@ foreach ( $all_shops as $s_id => $shop ) {
                                 </td>
                                 <td>
                                     <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong>
+                                    
                                     <?php if ( ! empty($s_add_cnt) ): ?>
-                                        <span class="sywat-badge" style="background:#f1f5f9; color:#475569; font-size:10px; cursor:help;" title="<?php foreach($s_add_cnt as $ac) { echo esc_attr(($ac['name'] ?? 'Contact') . ' (' . ($ac['title'] ?? 'Staff') . ') - ' . ($ac['email'] ?? 'No email') . "\n"); } ?>">
-                                            +<?php echo count($s_add_cnt); ?> more
-                                        </span>
+                                        <?php foreach ( $s_add_cnt as $ac ): ?>
+                                            <?php if ( ! empty( $ac['name'] ) ): ?>
+                                                <div style="font-size:12px; color:#475569; margin-top:2px;">
+                                                    <?php echo esc_html( $ac['name'] ); ?>
+                                                    <?php if ( ! empty( $ac['title'] ) ): ?>
+                                                        <span style="font-size:11px; opacity:0.8;">(<?php echo esc_html( $ac['title'] ); ?>)</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
                                     <?php endif; ?>
-                                    <br>
-                                    <?php 
-                                        $raw_email = isset($shop['email']) ? $shop['email'] : '';
-                                        if ( ! empty( $raw_email ) ) {
-                                            $email_parts = preg_split( '/[\s,\/]+/', $raw_email );
-                                            foreach ( $email_parts as $e_part ) {
-                                                $e_clean = trim( $e_part );
-                                                if ( $e_clean ) {
-                                                    echo '<a href="mailto:' . esc_attr($e_clean) . '" style="font-size:12px; color:#0073aa; word-break:break-all; display:block; text-decoration:none;">' . esc_html($e_clean) . '</a>';
+                                    
+                                    <div style="margin-top:6px;">
+                                        <?php 
+                                            $raw_email = isset($shop['email']) ? $shop['email'] : '';
+                                            if ( ! empty( $raw_email ) ) {
+                                                $email_parts = preg_split( '/[\s,\/]+/', $raw_email );
+                                                foreach ( $email_parts as $e_part ) {
+                                                    $e_clean = trim( $e_part );
+                                                    if ( $e_clean ) {
+                                                        echo '<a href="mailto:' . esc_attr($e_clean) . '" style="font-size:12px; color:#0073aa; word-break:break-all; display:block; text-decoration:none;">' . esc_html($e_clean) . '</a>';
+                                                    }
                                                 }
+                                            } else {
+                                                echo '<span style="font-size:12px; color:#94a3b8;">No email</span>';
                                             }
-                                        } else {
-                                            echo '<span style="font-size:12px; color:#94a3b8;">No email</span>';
-                                        }
-                                    ?>
+                                        ?>
+                                    </div>
                                 </td>
                                 <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                             </tr>
