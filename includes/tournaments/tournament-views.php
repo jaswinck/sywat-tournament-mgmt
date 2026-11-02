@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.9.1
+ * Version: 2.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -124,7 +124,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <!-- Navigation Tabs (Option A: Action-Driven Navigation) -->
+            <!-- Navigation Tabs -->
             <div class="sywat-nav-tabs no-print">
                 <a href="?tab=manage" class="sywat-tab-item sywat-tab-icon-tournament <?php echo $active_tab === 'manage' ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_manage_seasons ): ?>
@@ -337,32 +337,32 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </div>
                             </div>
 
-                            <div class="sywat-form-grid-2" style="margin-bottom: 15px;">
-                                <div>
-                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Host Archery Shop *</label>
-                                    <?php if ( $can_manage_seasons ): ?>
-                                        <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
-                                            <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
-                                            <?php foreach ( $all_shops as $s_id => $s_name ): ?>
-                                                <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
-                                                    <?php echo esc_html( $s_name['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    <?php else: ?>
-                                        <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
-                                        <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; background:#f0f0f1; font-weight:bold;">
-                                    <?php endif; ?>
-                                </div>
+                            <div style="margin-bottom: 15px;">
+                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Host Archery Shop *</label>
+                                <?php if ( $can_manage_seasons ): ?>
+                                    <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                        <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
+                                        <?php foreach ( $all_shops as $s_id => $s_name ): ?>
+                                            <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
+                                                <?php echo esc_html( $s_name['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php else: ?>
+                                    <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
+                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; background:#f0f0f1; font-weight:bold;">
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="sywat-form-grid-2" style="margin-bottom: 20px;">
                                 <div>
                                     <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
                                     <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
                                 </div>
-                            </div>
-
-                            <div style="margin-bottom: 20px;">
-                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date (Optional for multi-day)</label>
-                                <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
+                                <div>
+                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date (Optional for multi-day)</label>
+                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
+                                </div>
                             </div>
 
                             <!-- Dynamic Shooting Lines Repeater Table -->
