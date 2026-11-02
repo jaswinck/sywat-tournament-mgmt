@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Modals & Scripts
  * Path: includes/members/members-modals.php
  * Author: SYWAT Archery
- * Version: 1.3.1
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,6 +17,8 @@ function sywat_members_render_modals( $data ) {
 
     $open_edit_modal       = ( $edit_user_obj !== null );
     $open_edit_board_modal = ( $edit_board_user_obj !== null );
+
+    $all_shops = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
@@ -66,6 +68,18 @@ function sywat_members_render_modals( $data ) {
                                 <option value="yes">Yes</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Assigned Host Shop / Club</label>
+                        <select name="sywat_shop_id" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; height:32px; box-sizing:border-box;">
+                            <option value="" selected>-- None / Unassigned --</option>
+                            <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                <option value="<?php echo esc_attr( $s_id ); ?>">
+                                    <?php echo esc_html( isset($s_item['name']) ? $s_item['name'] : $s_id ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <!-- MULTI-ROLE CHECKBOX GRID -->
@@ -121,6 +135,7 @@ function sywat_members_render_modals( $data ) {
                 $e_tfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_tfaa_number', true );
                 $e_phone            = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
                 $e_nfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_is_nfaa_member', true );
+                $e_shop_id          = get_user_meta( $edit_user_obj->ID, 'sywat_shop_id', true );
                 $current_user_roles = (array) $edit_user_obj->roles;
             ?>
             <div class="sywat-modal-content sywat-modal-md">
@@ -167,6 +182,18 @@ function sywat_members_render_modals( $data ) {
                                     <option value="yes" <?php selected( $e_nfaa, 'yes' ); ?>>Yes</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <div style="margin-bottom: 10px;">
+                            <label style="display:block; font-weight:600; font-size:12px; margin-bottom:3px;">Assigned Host Shop / Club</label>
+                            <select name="sywat_shop_id" style="width:100%; padding:6px 8px; border:1px solid #8c8f94; border-radius:4px; height:32px; box-sizing:border-box;">
+                                <option value="" <?php selected( empty($e_shop_id), true ); ?>>-- None / Unassigned --</option>
+                                <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                    <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $e_shop_id, $s_id ); ?>>
+                                        <?php echo esc_html( isset($s_item['name']) ? $s_item['name'] : $s_id ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
 
                         <!-- MULTI-ROLE CHECKBOX GRID -->
