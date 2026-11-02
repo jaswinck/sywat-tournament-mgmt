@@ -58,6 +58,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $phone            = sanitize_text_field( $_POST['phone'] );
             $is_nfaa          = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
             $submitted_roles  = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array( 'tfaa_member' );
+            $shop_id          = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
 
             if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
@@ -108,6 +109,10 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
 
+            if ( ! empty( $shop_id ) ) {
+                update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
+            }
+
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | Member ID: <strong>' . esc_html( $tfaa_id ) . '</strong></div>';
         }
 
@@ -120,6 +125,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $phone           = sanitize_text_field( $_POST['phone'] );
             $is_nfaa         = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
             $submitted_roles = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array();
+            $shop_id         = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
             $new_pw          = $_POST['new_password'];
             $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
@@ -142,6 +148,12 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
+
+                if ( ! empty( $shop_id ) ) {
+                    update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
+                } else {
+                    delete_user_meta( $user_id, 'sywat_shop_id' );
+                }
 
                 // Sync multi-role changes to the database user capabilities
                 $user_obj = new WP_User( $user_id );
