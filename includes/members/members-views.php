@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
  * Author: SYWAT Archery
- * Version: 2.5.1
+ * Version: 2.5.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -33,11 +33,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         $raw_members     = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
         $tfaa_role_slugs = function_exists( 'sywat_get_custom_roles_slugs' ) ? sywat_get_custom_roles_slugs() : array();
 
-        // Filter directory list to only include accounts with active TFAA roles (excludes standalone admins)
+        // Include accounts with active TFAA roles or Administrator role
+        $allowed_directory_roles = array_merge( (array) $tfaa_role_slugs, array( 'administrator' ) );
         $all_members = array();
         foreach ( $raw_members as $m_user ) {
             $u_roles = (array) $m_user->roles;
-            if ( ! empty( array_intersect( $tfaa_role_slugs, $u_roles ) ) ) {
+            if ( ! empty( array_intersect( $allowed_directory_roles, $u_roles ) ) ) {
                 $all_members[] = $m_user;
             }
         }
@@ -54,7 +55,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         global $wp_roles;
         $wp_role_names  = $wp_roles ? $wp_roles->get_names() : array();
         $excluded_roles = array(
-            'administrator', 'editor', 'author', 'contributor', 'subscriber',
+            'editor', 'author', 'contributor', 'subscriber',
             'management', 'staff_shooter', 'staff-shooter', 'non-shooting-member', 'non_shooting_member',
         );
 
