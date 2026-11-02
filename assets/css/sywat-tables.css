@@ -56,21 +56,26 @@
 }
 
 /* Action Buttons Flex Container with Vertical Stacking Support */
-.sywat-table-actions,
-.sywat-table td:last-child > div {
+.sywat-table-actions {
     display: flex !important;
     gap: 4px !important;
     align-items: center !important;
     justify-content: flex-end !important;
     flex-wrap: wrap !important;
-    max-width: 95px !important; /* Constrains container so buttons wrap vertically */
-    margin-left: auto !important;
+}
+
+/* Target ONLY Manage Shooters Roster Action Cell */
+.sywat-manage-row td:last-child > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    gap: 4px !important;
 }
 
 .sywat-table-actions .sywat-btn,
 .sywat-table-actions form,
-.sywat-table td:last-child > div .sywat-btn,
-.sywat-table td:last-child > div form {
+.sywat-manage-row td:last-child > div .sywat-btn,
+.sywat-manage-row td:last-child > div form {
     margin: 0 !important;
     flex: 0 0 auto !important;
 }
