@@ -3,7 +3,7 @@
  * Module: Financial Accounting & Invoice Engine
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -184,23 +184,40 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
                         color: #000000 !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        height: auto !important;
+                        overflow: visible !important;
                     }
-                    body * {
-                        visibility: hidden !important;
+                    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
+                    .sywat-modal-header, .sywat-modal-footer {
+                        display: none !important;
                     }
-                    #sywat_print_area, #sywat_print_area * {
-                        visibility: visible !important;
+                    .sywat-modal-overlay,
+                    .sywat-modal,
+                    .sywat-modal-content,
+                    .sywat-modal-body,
+                    #sywat_invoice_modal {
+                        position: static !important;
+                        top: auto !important;
+                        left: auto !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        background: #ffffff !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        transform: none !important;
                     }
                     #sywat_print_area {
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
+                        position: static !important;
                         width: 100% !important;
                         margin: 0 !important;
-                        padding: 15px !important;
-                    }
-                    .no-print {
-                        display: none !important;
+                        padding: 0 !important;
+                        overflow: visible !important;
+                        display: block !important;
                     }
                 }
             </style>
@@ -332,11 +349,58 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         <div id="sywat_print_area">
             <style>
                 @media print {
-                    html, body { background: #ffffff !important; color: #000000 !important; margin: 0 !important; padding: 0 !important; }
-                    body * { visibility: hidden !important; }
-                    #sywat_print_area, #sywat_print_area * { visibility: visible !important; }
-                    #sywat_print_area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 15px !important; }
-                    .no-print { display: none !important; }
+                    html, body {
+                        background: #ffffff !important;
+                        color: #000000 !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+                    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
+                    .sywat-modal-header, .sywat-modal-footer {
+                        display: none !important;
+                    }
+                    .sywat-modal-overlay,
+                    .sywat-modal,
+                    .sywat-modal-content,
+                    .sywat-modal-body,
+                    #sywat_print_modal {
+                        position: static !important;
+                        top: auto !important;
+                        left: auto !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        background: #ffffff !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        transform: none !important;
+                    }
+                    #sywat_print_area {
+                        position: static !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: visible !important;
+                        display: block !important;
+                    }
+                    .sywat-table {
+                        width: 100% !important;
+                        border-collapse: collapse !important;
+                        page-break-inside: auto !important;
+                    }
+                    .sywat-table tr {
+                        page-break-inside: avoid !important;
+                        page-break-after: auto !important;
+                    }
+                    .sywat-table thead {
+                        display: table-header-group !important;
+                    }
                 }
             </style>
 
@@ -363,18 +427,18 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                 <p style="color: #646970; font-style: italic;">No archer records available for this filter.</p>
             <?php else: ?>
                 <div class="sywat-table-responsive">
-                    <table class="sywat-table">
+                    <table class="sywat-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr>
-                                <th style="width: 4%;">#</th>
-                                <th style="width: 22%;">Name</th>
-                                <th style="width: 14%;">Line</th>
-                                <th style="width: 11%;">Division</th>
-                                <th style="width: 7%;">Gender</th>
-                                <th style="width: 16%;">Style</th>
-                                <th style="width: 12%;">Paid</th>
-                                <th style="width: 7%; text-align: center;">Score</th>
-                                <th style="width: 7%; text-align: center;">X Count</th>
+                                <th style="width: 3%;">#</th>
+                                <th style="width: 20%;">Name</th>
+                                <th style="width: 12%;">Line</th>
+                                <th style="width: 15%;">Division</th>
+                                <th style="width: 6%;">Gender</th>
+                                <th style="width: 18%;">Style</th>
+                                <th style="width: 14%;">Paid</th>
+                                <th style="width: 6%; text-align: center;">Score</th>
+                                <th style="width: 6%; text-align: center;">X Count</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -405,12 +469,14 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
 
                                     $due_amt = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
                                     if ($due_amt > 0) {
-                                        $paid_cat = 'DUE: $' . number_format($due_amt, 2);
+                                        $paid_cat = '<span style="color:#dc3545;">DUE: $' . number_format($due_amt, 2) . '</span>';
                                     } else {
-                                        $paid_cat = ! empty( $reg['paid'] ) ? $reg['paid'] : 'Youth / Adult / Fam';
-                                        if ( $paid_cat === 'Family' ) {
+                                        $paid_cat = ! empty( $reg['paid'] ) ? esc_html($reg['paid']) : 'Youth / Adult / Fam';
+                                        if ( $reg['paid'] === 'Family' ) {
                                             $fam_id_str = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
-                                            if ( $fam_id_str ) $paid_cat .= ' <span style="font-size:8px;">(' . esc_html( $fam_id_str ) . ')</span>';
+                                            if ( $fam_id_str ) {
+                                                $paid_cat .= '<br><span style="font-size:7px; color:#646970; word-break:break-all; font-weight:normal;">(' . esc_html( $fam_id_str ) . ')</span>';
+                                            }
                                         }
                                     }
                                 ?>
@@ -418,10 +484,10 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                     <td><strong><?php echo $num++; ?></strong></td>
                                     <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
                                     <td style="font-size: 9px;"><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : '' ); ?></td>
-                                    <td style="font-size: 8px; line-height: 1.1;"><?php echo $division_disp; ?></td>
+                                    <td style="font-size: 9px; line-height: 1.1; white-space: nowrap;"><?php echo $division_disp; ?></td>
                                     <td style="font-size: 9px;"><?php echo $gender_disp; ?></td>
-                                    <td style="font-size: 8px; line-height: 1.1;"><?php echo $style_disp; ?></td>
-                                    <td class="paid-col" style="<?php echo ($due_amt > 0) ? 'color:#dc3545;' : ''; ?>"><strong><?php echo $paid_cat; ?></strong></td>
+                                    <td style="font-size: 9px; line-height: 1.1;"><?php echo $style_disp; ?></td>
+                                    <td class="paid-col" style="font-size: 9px; line-height: 1.1;"><strong><?php echo $paid_cat; ?></strong></td>
                                     <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_score; ?></td>
                                     <td style="border-bottom: 1px solid #1d2327; text-align: center; font-weight: bold;"><?php echo $print_x; ?></td>
                                 </tr>
