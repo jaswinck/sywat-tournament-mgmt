@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,8 +29,9 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         $best_n      = $season_data['best_n'];
         $groups      = $season_data['groups'];
 
-        $all_divisions = array();
-        $all_styles    = array();
+        $all_divisions  = array();
+        $all_styles     = array();
+        $unique_archers = array();
 
         foreach ( $groups as $g ) {
             $clean_d = trim( preg_replace( '/\s*\([^)]*\)/', '', $g['division'] ) );
@@ -39,8 +40,13 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             }
             foreach ( $g['styles'] as $s_name => $archers ) {
                 $all_styles[strtolower( trim( $s_name ) )] = trim( $s_name );
+                foreach ( $archers as $a ) {
+                    $key = ! empty( $a['tfaa_id'] ) ? 'id_' . strtolower( $a['tfaa_id'] ) : 'name_' . strtolower( $a['name'] );
+                    $unique_archers[$key] = true;
+                }
             }
         }
+        $total_season_shooters = count( $unique_archers );
         ksort($all_divisions);
 
         uksort( $all_styles, function( $a, $b ) {
@@ -62,6 +68,21 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 display: flex;
                 align-items: center;
                 gap: 8px;
+            }
+            .sywat-counter-banner {
+                margin-top: 15px;
+                margin-bottom: 20px;
+                padding: 9px 14px;
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #1e40af;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
             }
         </style>
 
@@ -124,6 +145,11 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 <div style="flex: 0 0 auto;">
                     <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetStandingsFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
                 </div>
+            </div>
+
+            <!-- DYNAMIC PARTICIPATION STAT BANNER -->
+            <div id="sywat_standings_counter" class="sywat-counter-banner">
+                🎯 Total Season Shooters: <strong><?php echo $total_season_shooters; ?></strong>
             </div>
 
             <?php if ( empty( $groups ) ): ?>
@@ -204,6 +230,9 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
             const cards = document.querySelectorAll('.sywat-div-gen-card');
 
+            const uniqueTotal = new Set();
+            const uniqueVisible = new Set();
+
             cards.forEach(card => {
                 const cardDiv = (card.getAttribute('data-division') || '').toLowerCase().trim();
                 const cardGen = (card.getAttribute('data-gender') || '').toLowerCase().trim();
@@ -225,9 +254,12 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                         const name = (row.getAttribute('data-name') || '').toLowerCase();
                         const searchMatch = (!searchFilter || name.includes(searchFilter));
 
+                        uniqueTotal.add(name);
+
                         if (divMatch && genMatch && styleMatch && searchMatch) {
                             row.style.display = '';
                             blockHasVisibleRow = true;
+                            uniqueVisible.add(name);
                         } else {
                             row.style.display = 'none';
                         }
@@ -243,6 +275,26 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                 card.style.display = cardHasVisibleBlock ? '' : 'none';
             });
+
+            // Update Counter Banner
+            const counterEl = document.getElementById('sywat_standings_counter');
+            if (counterEl) {
+                const total = uniqueTotal.size;
+                const vis   = uniqueVisible.size;
+                const isFiltered = (divFilter !== 'all' || genFilter !== 'all' || styleFilter !== 'all' || searchFilter !== '');
+
+                if (!isFiltered || vis === total) {
+                    counterEl.style.background  = '#eff6ff';
+                    counterEl.style.borderColor = '#bfdbfe';
+                    counterEl.style.color       = '#1e40af';
+                    counterEl.innerHTML         = '🎯 Total Season Shooters: <strong>' + total + '</strong>';
+                } else {
+                    counterEl.style.background  = '#dcfce7';
+                    counterEl.style.borderColor = '#86efac';
+                    counterEl.style.color       = '#166534';
+                    counterEl.innerHTML         = '🎯 Displaying <strong>' + vis + '</strong> of <strong>' + total + '</strong> Season Shooters';
+                }
+            }
         }
 
         function sywatResetStandingsFilters() {
