@@ -5,10 +5,11 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 ## Included Structure & Assets
 
 - **`sywat-archery-manager.php`** — Main plugin header (v2.6.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
-- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing uniform button palettes, card containers, centered division headers, left-aligned table data, form element theme resets, operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
+- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing uniform button palettes, card containers, centered division headers, left-aligned table data, form element theme resets with descender padding fixes (`min-height: 38px`, `line-height: 1.5`), operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
 - **`assets/css/sywat-modals.css`** — High-contrast modal overlay styling, dialog containers, backdrop filters, and popup animation rules.
 - **`assets/css/sywat-tables.css`** — Responsive data table structures, cell padding alignments, hover states, and ranking column layouts.
 - **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms, select input specificity overrides, and line capacity tracker responsive grid cards.
+- **`assets/js/sywat-shops.js`** — Extracted client-side JavaScript engine managing tabbed location editing, dynamic contact repeaters, shooting line schedule repeaters, phone number formatting, and live directory/district filtering.
 - **`assets/images/logo.png`** — TFAA brand asset image.
 - **`assets/images/zelle-qr-code.png`** — Accounting payment QR code graphic asset.
 
@@ -37,16 +38,21 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`class-sywat-tournament-config.php`** — Sub-module loader shell and shortcode bindings (`[sywat_manage]`, `[sywat_admin]`, `[sywat_manage_tournaments]`, `[sywat_volunteer_hub]`).
 - **`tournament-helpers.php`** — Line capacity calculations, date range formatting, and season getters.
 - **`tournament-seasons.php`** — Season Management CRUD UI (`tab=seasons`), live season search bar, pop-up modal overlay (`#sywat_add_season_modal`), auto-generated season names/year labels (e.g., *"2026–2027 Indoor"*), and newest-to-oldest sorting logic.
-- **`tournament-actions.php`** — POST request action handlers for tournament configuration, line counts, and role-restricted season management.
-- **`tournament-views.php`** — Master Admin Portal UI protected by `sywat_can_manage_tournaments()` with standardized navigation tabs (*Tournament Management*, *Season Management*, *Shop Management*), chronological tournament sorting (soonest to farthest out), side-by-side shop filter dropdown and search input, and compact TFAA stat chip.
+- **`tournament-actions.php`** — POST request action handlers for dynamic shooting line templates array processing without hardcoded limits, tournament configuration, and role-restricted season management.
+- **`tournament-views.php`** — Master Admin Portal UI protected by `sywat_can_manage_tournaments()` with standardized navigation tabs (*Tournament Management*, *Season Management*), chronological tournament sorting (soonest to farthest out), side-by-side shop filter dropdown and search input, side-by-side Start/End Date grid fields in the edit modal, dynamic shooting lines repeater (`➕ Add New Line` / `🗑️ Remove`), standardized action buttons, and compact TFAA stat chip.
 - **`volunteer-hub.php`** — Staff Volunteer Hub portal view (`[sywat_volunteer_hub]`) featuring line check-in/scoring shortcuts and real-time roster stats.
 
 #### 4. Archery Shops Sub-System (`includes/shops/`)
 - **`class-sywat-shops.php`** — Sub-module loader shell for multi-tenant shop scoping and management.
 - **`shops-helpers.php`** — Phone number auto-formatting, seed shop initialization, shop getters, current shop context resolution, and WP Admin user profile integration (`Users > Edit User`).
-- **`shops-actions.php`** — Shop CRUD action processing (creation, updates, deletions, and staff account linking/unlinking).
-- **`shops-views.php`** — Admin Shop Management UI (`tab=shops`), directory table with live shop search, edit shop view, staff assignment view, and pop-up shop creation modal overlay.
-- **`shops-public-views.php`** — Public-facing shop directory listing and shop profile cards.
+- **`shops-actions.php`** — Shop CRUD action processing (creation, updates, deletions, primary and additional contacts array parsing, dynamic default shooting lines, and staff account linking/unlinking).
+- **`shops-views.php`** — Admin shortcode controller (`[sywat_manage_shops]`) enqueuing `sywat-shops.js` and routing to modular view partials.
+- **`shops-public-views.php`** — Public shortcode controller (`[sywat_public_shops]`) enqueuing `sywat-shops.js` and loading the public directory view partial.
+- **`views/`** — Modular sub-folder containing focused UI template partials:
+  - **`view-shop-directory.php`** — Admin directory list table with district filtering, search, and pop-up location creation modal overlay.
+  - **`view-shop-edit.php`** — Tabbed Location Editor UI (*📍 Profile & Address*, *👥 Contacts*, *🎯 Shooting Lines*) featuring primary contact fields, dynamic additional contact repeaters (`➕ Add Additional Contact`), facilities checkboxes, address details, and dynamic default shooting line template repeaters (`➕ Add New Line`).
+  - **`view-shop-staff.php`** — Staff account assignment and unlinking management panel for shops and clubs.
+  - **`view-shop-public.php`** — Public-facing shop and club directory listing with primary/additional contact search integration and range amenity badges.
 
 #### 5. Public Results & Standings Sub-System (`includes/results/`)
 - **`class-sywat-results.php`** — Sub-module loader shell and shortcode binding (`[sywat_results]`). Features conditional `✏️ Enter Scores` desk shortcuts in the tournament directory table for authorized staff (`sywat_can_edit_scores()`).
