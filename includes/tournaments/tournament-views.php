@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -398,7 +398,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 $cap_cub   = isset($l['cap_cub']) ? $l['cap_cub'] : 5;
                                             ?>
                                             <tr>
-                                                <td><input type="text" name="line_days[]" value="<?php echo esc_attr( $day_val ); ?>" placeholder="e.g. Saturday" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                                <td>
+                                                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;">
+                                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                                    </select>
+                                                </td>
                                                 <td><input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
@@ -485,7 +491,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><input type="text" name="line_days[]" value="Saturday" placeholder="e.g. Saturday" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td>
+                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;">
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday" selected>Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                </td>
                 <td><input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
