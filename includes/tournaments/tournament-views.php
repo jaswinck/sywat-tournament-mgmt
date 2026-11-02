@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -153,12 +153,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             
                             <div style="display: flex; gap: 5px; margin: 0; align-items: center; flex-wrap: wrap;">
-                                <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; height: 32px; box-sizing: border-box; width: 140px;">
-                                    <option value="all">All Shops</option>
-                                    <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; height: 32px; box-sizing: border-box; width: 140px;">
+                                        <option value="all">All Shops</option>
+                                        <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                            <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
                                 <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; width: 130px; height: 32px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px; padding: 4px 8px;" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
