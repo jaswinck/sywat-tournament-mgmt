@@ -4,7 +4,7 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -245,6 +245,7 @@ if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
             'tfaa_webmaster',
             'tfaa_field_governor',
             'tfaa_tournament_director',
+            'sywat_shop_manager',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
