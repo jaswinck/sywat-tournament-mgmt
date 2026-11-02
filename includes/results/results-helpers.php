@@ -3,7 +3,7 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
