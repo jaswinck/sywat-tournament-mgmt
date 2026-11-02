@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 2.7.3
+ * Version: 2.7.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,9 +29,9 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         $best_n      = $season_data['best_n'];
         $groups      = $season_data['groups'];
 
-        $all_divisions  = array();
-        $all_styles     = array();
-        $unique_archers = array();
+        $all_divisions         = array();
+        $all_styles            = array();
+        $total_season_shooters = 0;
 
         foreach ( $groups as $g ) {
             $clean_d = trim( preg_replace( '/\s*\([^)]*\)/', '', $g['division'] ) );
@@ -40,13 +40,9 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             }
             foreach ( $g['styles'] as $s_name => $archers ) {
                 $all_styles[strtolower( trim( $s_name ) )] = trim( $s_name );
-                foreach ( $archers as $a ) {
-                    $key = ! empty( $a['tfaa_id'] ) ? 'id_' . strtolower( $a['tfaa_id'] ) : 'name_' . strtolower( $a['name'] );
-                    $unique_archers[$key] = true;
-                }
+                $total_season_shooters += count( $archers );
             }
         }
-        $total_season_shooters = count( $unique_archers );
         ksort($all_divisions);
 
         uksort( $all_styles, function( $a, $b ) {
@@ -201,8 +197,8 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
             const cards = document.querySelectorAll('.sywat-div-gen-card');
 
-            const uniqueTotal = new Set();
-            const uniqueVisible = new Set();
+            let totalCount = 0;
+            let visibleCount = 0;
 
             cards.forEach(card => {
                 const cardDiv = (card.getAttribute('data-division') || '').toLowerCase().trim();
@@ -225,12 +221,12 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                         const name = (row.getAttribute('data-name') || '').toLowerCase();
                         const searchMatch = (!searchFilter || name.includes(searchFilter));
 
-                        uniqueTotal.add(name);
+                        totalCount++;
 
                         if (divMatch && genMatch && styleMatch && searchMatch) {
                             row.style.display = '';
                             blockHasVisibleRow = true;
-                            uniqueVisible.add(name);
+                            visibleCount++;
                         } else {
                             row.style.display = 'none';
                         }
@@ -250,20 +246,18 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             // Update Counter Banner
             const counterEl = document.getElementById('sywat_standings_counter');
             if (counterEl) {
-                const total = uniqueTotal.size;
-                const vis   = uniqueVisible.size;
                 const isFiltered = (divFilter !== 'all' || genFilter !== 'all' || styleFilter !== 'all' || searchFilter !== '');
 
-                if (!isFiltered || vis === total) {
+                if (!isFiltered || visibleCount === totalCount) {
                     counterEl.style.background  = '#eff6ff';
                     counterEl.style.borderColor = '#bfdbfe';
                     counterEl.style.color       = '#1e40af';
-                    counterEl.innerHTML         = '🎯 Total Season Shooters: <strong>' + total + '</strong>';
+                    counterEl.innerHTML         = '🎯 Total Season Shooters: <strong>' + totalCount + '</strong>';
                 } else {
                     counterEl.style.background  = '#dcfce7';
                     counterEl.style.borderColor = '#86efac';
                     counterEl.style.color       = '#166534';
-                    counterEl.innerHTML         = '🎯 Displaying <strong>' + vis + '</strong> of <strong>' + total + '</strong> Season Shooters';
+                    counterEl.innerHTML         = '🎯 Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Season Shooters';
                 }
             }
         }
