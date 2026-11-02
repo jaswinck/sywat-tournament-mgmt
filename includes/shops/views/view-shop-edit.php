@@ -118,22 +118,22 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
             <!-- Primary Contact Section -->
             <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:#0f172a;">👤 Primary Contact Person</h4>
-                <div class="sywat-form-grid-4" style="gap:10px;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1.5fr 1fr; gap:10px;">
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Contact Name</label>
-                        <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" placeholder="e.g. Beau Brennan" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" placeholder="e.g. Beau Brennan" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                     </div>
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Title / Role</label>
-                        <input type="text" name="shop_contact_title" value="<?php echo esc_attr( isset($editing_shop['contact_title']) ? $editing_shop['contact_title'] : '' ); ?>" placeholder="e.g. Shop Owner" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="text" name="shop_contact_title" value="<?php echo esc_attr( isset($editing_shop['contact_title']) ? $editing_shop['contact_title'] : '' ); ?>" placeholder="e.g. Shop Owner" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                     </div>
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Email</label>
-                        <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. beau@domain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. beau@domain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                     </div>
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Phone</label>
-                        <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                     </div>
                 </div>
             </div>
@@ -146,7 +146,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                 </div>
                 <div id="sywat_shop_contacts_container" style="display:flex; flex-direction:column; gap:10px;">
                     <?php foreach ( $add_contacts as $idx => $ac ): ?>
-                        <div class="sywat-contact-row sywat-form-grid-4" style="align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">
+                        <div class="sywat-contact-row" style="display:grid; grid-template-columns: 1fr 1fr 1.5fr 1fr auto; gap:10px; align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">
                             <div>
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
                                 <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
@@ -159,11 +159,11 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                                 <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
                                 <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
                             </div>
-                            <div style="display:flex; gap:6px; align-items:center;">
-                                <div style="flex:1;">
-                                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
-                                    <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
-                                </div>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
+                                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+                            </div>
+                            <div>
                                 <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopContactRow(this)">Remove</button>
                             </div>
                         </div>
@@ -208,12 +208,11 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                                     $day_val  = $parts[0];
                                     $time_val = isset($parts[1]) ? $parts[1] : '';
                                 }
-                                if ( empty($day_val) ) $day_val = 'Saturday';
-                                if ( empty($time_val) ) $time_val = '10:00 AM';
                         ?>
                             <tr>
                                 <td style="padding:6px; vertical-align:middle;">
                                     <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
@@ -261,12 +260,11 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                                     $day_val  = $parts[0];
                                     $time_val = isset($parts[1]) ? $parts[1] : '';
                                 }
-                                if ( empty($day_val) ) $day_val = 'Saturday';
-                                if ( empty($time_val) ) $time_val = '9:00 AM';
                         ?>
                             <tr>
                                 <td style="padding:6px; vertical-align:middle;">
                                     <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
                                         <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
                                         <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
                                         <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
