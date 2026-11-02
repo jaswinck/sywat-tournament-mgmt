@@ -3,12 +3,13 @@
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
  * Author: SYWAT Archery
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Retrieve registered TFAA members matching custom system roles.
+ * Retrieve registered TFAA members matching custom system roles and administrators.
  */
 if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
     function sywat_get_all_tfaa_members() {
@@ -20,6 +21,10 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
                 'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager', 
                 'sywat_shop_user', 'administrator'
             );
+
+        if ( is_array( $allowed_roles ) && ! in_array( 'administrator', $allowed_roles, true ) ) {
+            $allowed_roles[] = 'administrator';
+        }
 
         return get_users( array(
             'role__in' => $allowed_roles,
