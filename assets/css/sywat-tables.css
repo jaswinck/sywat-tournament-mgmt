@@ -56,12 +56,13 @@
 }
 
 /* Action Buttons Flex Container with Vertical Stacking Support */
-.sywat-table-actions {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap; /* Restored: Allows Edit and Check-In buttons to wrap vertically when narrow */
+.sywat-table-actions,
+.sywat-table td:last-child > div {
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    flex-wrap: wrap !important; /* Forces Edit and Remove buttons to wrap vertically when column is narrow */
 }
 
 .sywat-table th.text-center, 
