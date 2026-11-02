@@ -110,7 +110,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     foreach ( $_POST['indoor_line_days'] as $index => $day ) {
                         $clean_day  = trim( sanitize_text_field( $day ) );
                         $clean_time = isset( $_POST['indoor_line_times'][$index] ) ? trim( sanitize_text_field( $_POST['indoor_line_times'][$index] ) ) : '';
-                        if ( ! empty( $clean_day ) || ! empty( $clean_time ) ) {
+                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
                             $indoor_lines[] = array(
                                 'day'      => $clean_day,
                                 'time'     => $clean_time,
@@ -150,7 +150,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     foreach ( $_POST['outdoor_line_days'] as $index => $day ) {
                         $clean_day  = trim( sanitize_text_field( $day ) );
                         $clean_time = isset( $_POST['outdoor_line_times'][$index] ) ? trim( sanitize_text_field( $_POST['outdoor_line_times'][$index] ) ) : '';
-                        if ( ! empty( $clean_day ) || ! empty( $clean_time ) ) {
+                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
                             $outdoor_lines[] = array(
                                 'day'  => $clean_day,
                                 'time' => $clean_time,
