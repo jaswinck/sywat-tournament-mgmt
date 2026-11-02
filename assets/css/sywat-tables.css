@@ -59,10 +59,20 @@
 .sywat-table-actions,
 .sywat-table td:last-child > div {
     display: flex !important;
-    gap: 6px !important;
+    gap: 4px !important;
     align-items: center !important;
     justify-content: flex-end !important;
-    flex-wrap: wrap !important; /* Forces Edit and Remove buttons to wrap vertically when column is narrow */
+    flex-wrap: wrap !important;
+    max-width: 95px !important; /* Constrains container so buttons wrap vertically */
+    margin-left: auto !important;
+}
+
+.sywat-table-actions .sywat-btn,
+.sywat-table-actions form,
+.sywat-table td:last-child > div .sywat-btn,
+.sywat-table td:last-child > div form {
+    margin: 0 !important;
+    flex: 0 0 auto !important;
 }
 
 .sywat-table th.text-center, 
