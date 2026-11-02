@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -25,6 +25,8 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $can_access_desk        = $is_logged_in && function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         $can_edit_scores        = $is_logged_in && function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
         $can_view_members       = $is_logged_in && function_exists( 'sywat_can_view_members' ) && sywat_can_view_members( $user_id );
+        $can_manage_seasons     = $is_logged_in && function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons( $user_id );
+        $can_manage_shops       = $is_logged_in && function_exists( 'sywat_can_manage_shops' ) && sywat_can_manage_shops( $user_id );
         $user_shop_id           = $is_logged_in && function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
 
         $logo_url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
@@ -70,8 +72,8 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- 2. Administrative Dropdown (Staff Only) -->
-                    <?php if ( $can_view_members ): ?>
+                    <!-- 2. Administrative Dropdown (Global Admins & Webmasters Only) -->
+                    <?php if ( $can_manage_seasons ): ?>
                         <div class="sywat-auth-dropdown">
                             <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
                                 ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
@@ -85,7 +87,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     <?php endif; ?>
 
                     <!-- 3. Shops & Clubs Navigation Item (Dropdown for Staff, Direct Link for Public) -->
-                    <?php if ( $is_admin || ! empty( $user_shop_id ) ): ?>
+                    <?php if ( $can_manage_shops || ! empty( $user_shop_id ) ): ?>
                         <div class="sywat-auth-dropdown">
                             <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
                                 🏪 Shops & Clubs <span class="sywat-dropdown-caret">▼</span>
@@ -94,7 +96,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>">
                                     🌐 View Public Directory
                                 </a>
-                                <?php if ( $is_admin ): ?>
+                                <?php if ( $can_manage_shops ): ?>
                                     <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/' ) ); ?>">
                                         ⚙️ Shops & Clubs Management
                                     </a>
