@@ -160,9 +160,9 @@ body {
     background-color: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
-    padding: 6px 10px;
-    height: 32px;
-    line-height: 1.2;
+    padding: 8px 12px;
+    min-height: 38px;
+    line-height: 1.5;
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
