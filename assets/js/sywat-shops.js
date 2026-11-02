@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Shops Module Client Scripts
  * Path: assets/js/sywat-shops.js
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 let sywatIsFormDirty = false;
@@ -79,8 +79,8 @@ function addShopContactRow() {
     if (noMsg) noMsg.style.display = 'none';
 
     const row = document.createElement('div');
-    row.className = 'sywat-contact-row sywat-form-grid-4';
-    row.style.cssText = 'align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px; margin-top:6px;';
+    row.className = 'sywat-contact-row';
+    row.style.cssText = 'display:grid; grid-template-columns: 1fr 1fr 1.5fr 1fr auto; gap:10px; align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px; margin-top:6px;';
     row.innerHTML = `
         <div>
             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
@@ -94,12 +94,12 @@ function addShopContactRow() {
             <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
             <input type="email" name="add_contact_emails[]" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
         </div>
-        <div style="display:flex; gap:6px; align-items:center;">
-            <div style="flex:1;">
-                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
-                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
-            </div>
-            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box;" onclick="removeShopContactRow(this)">Remove</button>
+        <div>
+            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
+            <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;">
+        </div>
+        <div>
+            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopContactRow(this)">Remove</button>
         </div>
     `;
     container.appendChild(row);
@@ -126,8 +126,9 @@ function addShopIndoorLineRow() {
     tr.innerHTML = `
         <td style="padding:6px; vertical-align:middle;">
             <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
+                <option value="" disabled selected>-- Select Day --</option>
                 <option value="Friday">Friday</option>
-                <option value="Saturday" selected>Saturday</option>
+                <option value="Saturday">Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
@@ -161,8 +162,9 @@ function addShopOutdoorLineRow() {
     tr.innerHTML = `
         <td style="padding:6px; vertical-align:middle;">
             <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
+                <option value="" disabled selected>-- Select Day --</option>
                 <option value="Friday">Friday</option>
-                <option value="Saturday" selected>Saturday</option>
+                <option value="Saturday">Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
@@ -193,17 +195,26 @@ function validateDuplicatesInTable(tableSelector, dayInputName, timeInputName, l
     const daySelects = table.querySelectorAll(`select[name="${dayInputName}"]`);
     const timeInputs = table.querySelectorAll(`input[name="${timeInputName}"]`);
 
-    const seen = new Set();
+    const seen = new Map();
     for (let i = 0; i < daySelects.length; i++) {
         const dayVal = (daySelects[i]?.value || '').trim();
         const timeVal = (timeInputs[i]?.value || '').trim().toLowerCase();
+        
+        if (!dayVal) {
+            alert(`Please select a Shooting Day for row ${i + 1} in ${label} lines.`);
+            if (daySelects[i]) daySelects[i].focus();
+            return false;
+        }
+
         if (dayVal && timeVal) {
             const combo = dayVal + ' @ ' + timeVal;
             if (seen.has(combo)) {
-                alert(`Duplicate ${label} shooting line detected: "${dayVal} ${timeInputs[i].value}". Each line schedule must be unique.`);
+                alert(`Duplicate ${label} shooting line detected: "${dayVal} ${timeInputs[i].value}". Please choose a different day or start time.`);
+                daySelects[i].value = "";
+                daySelects[i].focus();
                 return false;
             }
-            seen.add(combo);
+            seen.set(combo, i);
         }
     }
     return true;
