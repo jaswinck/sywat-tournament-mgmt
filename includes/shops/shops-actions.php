@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.8.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -39,21 +39,22 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
 
             $shops[$shop_slug] = array(
-                'id'            => $shop_slug,
-                'name'          => $shop_name,
-                'location_type' => $loc_type,
-                'district'      => isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '',
-                'facilities'    => $facilities,
-                'contact'       => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
-                'email'         => isset( $_POST['shop_email'] ) ? sanitize_text_field( $_POST['shop_email'] ) : '',
-                'phone'         => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( $_POST['shop_phone'] ) : '',
-                'address_1'     => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( $_POST['shop_address_1'] ) : '',
-                'address_2'     => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( $_POST['shop_address_2'] ) : '',
-                'city'          => isset( $_POST['shop_city'] ) ? sanitize_text_field( $_POST['shop_city'] ) : '',
-                'state'         => isset( $_POST['shop_state'] ) ? sanitize_text_field( $_POST['shop_state'] ) : '',
-                'zip'           => isset( $_POST['shop_zip'] ) ? sanitize_text_field( $_POST['shop_zip'] ) : '',
-                'default_lines' => $default_lines,
-                'created_at'    => current_time( 'mysql' ),
+                'id'                  => $shop_slug,
+                'name'                => $shop_name,
+                'location_type'       => $loc_type,
+                'district'            => isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '',
+                'facilities'          => $facilities,
+                'contact'             => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
+                'email'               => isset( $_POST['shop_email'] ) ? sanitize_text_field( $_POST['shop_email'] ) : '',
+                'phone'               => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( $_POST['shop_phone'] ) : '',
+                'additional_contacts' => array(),
+                'address_1'           => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( $_POST['shop_address_1'] ) : '',
+                'address_2'           => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( $_POST['shop_address_2'] ) : '',
+                'city'                => isset( $_POST['shop_city'] ) ? sanitize_text_field( $_POST['shop_city'] ) : '',
+                'state'               => isset( $_POST['shop_state'] ) ? sanitize_text_field( $_POST['shop_state'] ) : '',
+                'zip'                 => isset( $_POST['shop_zip'] ) ? sanitize_text_field( $_POST['shop_zip'] ) : '',
+                'default_lines'       => $default_lines,
+                'created_at'          => current_time( 'mysql' ),
             );
 
             update_option( 'sywat_shops_list', $shops );
@@ -78,6 +79,24 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 $shops[$shop_id]['state']         = sanitize_text_field( $_POST['shop_state'] );
                 $shops[$shop_id]['zip']           = sanitize_text_field( $_POST['shop_zip'] );
 
+                // Process Additional Contacts Repeater
+                $add_contacts = array();
+                if ( ! empty( $_POST['add_contact_names'] ) && is_array( $_POST['add_contact_names'] ) ) {
+                    foreach ( $_POST['add_contact_names'] as $idx => $c_name ) {
+                        $clean_name = trim( sanitize_text_field( $c_name ) );
+                        if ( ! empty( $clean_name ) ) {
+                            $add_contacts[] = array(
+                                'name'  => $clean_name,
+                                'title' => isset( $_POST['add_contact_titles'][$idx] ) ? sanitize_text_field( $_POST['add_contact_titles'][$idx] ) : '',
+                                'email' => isset( $_POST['add_contact_emails'][$idx] ) ? sanitize_text_field( $_POST['add_contact_emails'][$idx] ) : '',
+                                'phone' => isset( $_POST['add_contact_phones'][$idx] ) ? sywat_format_phone_number( $_POST['add_contact_phones'][$idx] ) : '',
+                            );
+                        }
+                    }
+                }
+                $shops[$shop_id]['additional_contacts'] = $add_contacts;
+
+                // Process Dynamic Shooting Lines
                 if ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
                     $new_lines = array();
                     foreach ( $_POST['line_names'] as $index => $name ) {
