@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -154,20 +154,26 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $formatted_dates = sywat_format_tournament_dates( $start_date, $end_date );
             update_option( 'sywat_dates_' . $new_slug, $formatted_dates );
 
-            // Process Dynamic Shooting Lines Repeater (Split Day & Time)
+            // Process Dynamic Shooting Lines Repeater (Split Day & Time + Deduplication)
             $new_lines = array();
+            $seen_combos = array();
+
             if ( ! empty( $_POST['line_days'] ) && is_array( $_POST['line_days'] ) ) {
                 foreach ( $_POST['line_days'] as $index => $day ) {
                     $clean_day  = trim( sanitize_text_field( $day ) );
                     $clean_time = isset( $_POST['line_times'][$index] ) ? trim( sanitize_text_field( $_POST['line_times'][$index] ) ) : '';
-                    if ( ! empty( $clean_day ) || ! empty( $clean_time ) ) {
-                        $new_lines[] = array(
-                            'day'      => $clean_day,
-                            'time'     => $clean_time,
-                            'name'     => trim( $clean_day . ' ' . $clean_time ),
-                            'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
-                            'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
-                        );
+                    if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
+                        $combo_key = strtolower( $clean_day . '_' . $clean_time );
+                        if ( ! in_array( $combo_key, $seen_combos ) ) {
+                            $seen_combos[] = $combo_key;
+                            $new_lines[]   = array(
+                                'day'      => $clean_day,
+                                'time'     => $clean_time,
+                                'name'     => trim( $clean_day . ' ' . $clean_time ),
+                                'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
+                                'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
+                            );
+                        }
                     }
                 }
             } elseif ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
@@ -175,14 +181,18 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 foreach ( $_POST['line_names'] as $index => $name ) {
                     $clean_name = trim( sanitize_text_field( $name ) );
                     if ( ! empty( $clean_name ) ) {
-                        $parts = explode( ' ', $clean_name, 2 );
-                        $new_lines[] = array(
-                            'day'      => $parts[0],
-                            'time'     => isset( $parts[1] ) ? $parts[1] : '',
-                            'name'     => $clean_name,
-                            'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
-                            'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
-                        );
+                        $parts     = explode( ' ', $clean_name, 2 );
+                        $combo_key = strtolower( $clean_name );
+                        if ( ! in_array( $combo_key, $seen_combos ) ) {
+                            $seen_combos[] = $combo_key;
+                            $new_lines[]   = array(
+                                'day'      => $parts[0],
+                                'time'     => isset( $parts[1] ) ? $parts[1] : '',
+                                'name'     => $clean_name,
+                                'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
+                                'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
+                            );
+                        }
                     }
                 }
             }
@@ -265,4 +275,5 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         return $notice;
     }
+}
 }
