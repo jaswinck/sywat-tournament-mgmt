@@ -126,3 +126,57 @@
         padding: 14px;
     }
 }
+
+/* ==========================================================================
+   Print Engine Reset for Modals & Dialogs
+   ========================================================================== */
+@media print {
+    html, body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Hide WordPress Admin UI and Modal Header/Footer Controls */
+    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, .no-print,
+    .sywat-modal-header, .sywat-modal-footer, .sywat-modal-close {
+        display: none !important;
+    }
+
+    /* Un-fix modal layers so print engines paginate naturally across pages */
+    .sywat-modal-backdrop,
+    .sywat-modal-content,
+    .sywat-modal-body,
+    .sywat-modal-sm,
+    .sywat-modal-md,
+    .sywat-modal-lg,
+    #sywat_print_modal,
+    #sywat_invoice_modal {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        transform: none !important;
+    }
+
+    #sywat_print_area {
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+}
