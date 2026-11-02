@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 2.7.3
+ * Version: 2.7.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -30,15 +30,27 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     return $q['score'] - $p['score'];
                 });
 
-                $processed_scores[] = $entries[0];
-
-                for ( $i = 1; $i < count( $entries ); $i++ ) {
-                    $guest_entry = $entries[$i];
-                    $guest_entry['style'] = 'Guest';
-                    if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
-                        $guest_entry['name'] .= ' [Guest]';
+                // If top score is 0, archer turned in a card but didn't record a score -> convert all entries to Guest
+                if ( intval( $entries[0]['score'] ) === 0 ) {
+                    foreach ( $entries as $zero_entry ) {
+                        $guest_entry = $zero_entry;
+                        $guest_entry['style'] = 'Guest';
+                        if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
+                            $guest_entry['name'] .= ' [Guest]';
+                        }
+                        $processed_scores[] = $guest_entry;
                     }
-                    $processed_scores[] = $guest_entry;
+                } else {
+                    $processed_scores[] = $entries[0];
+
+                    for ( $i = 1; $i < count( $entries ); $i++ ) {
+                        $guest_entry = $entries[$i];
+                        $guest_entry['style'] = 'Guest';
+                        if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
+                            $guest_entry['name'] .= ' [Guest]';
+                        }
+                        $processed_scores[] = $guest_entry;
+                    }
                 }
             }
         }
