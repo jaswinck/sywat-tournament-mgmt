@@ -4,7 +4,7 @@
  * Path: includes/core/class-sywat-permissions.php
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -121,6 +121,7 @@ if ( ! function_exists( 'sywat_get_user_object' ) ) {
 
 /**
  * Utility: Internal role match checker.
+ * Automatically grants universal access to Administrators and Webmasters.
  */
 if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
     function sywat_user_has_any_role( $allowed_roles, $user_id = 0 ) {
@@ -128,6 +129,12 @@ if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
         if ( ! $user || ! $user->exists() ) {
             return false;
         }
+
+        // Global Super-Access Override: Administrators and Webmasters have access to ALL portal pages and features
+        if ( in_array( 'administrator', (array) $user->roles, true ) || in_array( 'tfaa_webmaster', (array) $user->roles, true ) ) {
+            return true;
+        }
+
         return (bool) array_intersect( (array) $allowed_roles, (array) $user->roles );
     }
 }
