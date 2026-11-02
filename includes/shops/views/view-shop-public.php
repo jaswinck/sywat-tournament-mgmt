@@ -75,24 +75,45 @@ foreach ( $all_shops as $s_id => $shop ) {
                 <table class="sywat-table">
                     <thead>
                         <tr>
-                            <th style="width:30%;">Location & Address</th>
+                            <th style="width:28%;">Location & Address</th>
                             <th style="width:12%;">District</th>
-                            <th style="width:20%;">Range Amenities</th>
-                            <th style="width:26%;">Contact Info</th>
-                            <th style="width:12%;">Phone</th>
+                            <th style="width:22%;">Range Amenities</th>
+                            <th style="width:38%;">Contacts</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ( $filtered_shops as $s_id => $shop ): ?>
                             <?php 
-                                $s_contact = isset($shop['contact']) ? $shop['contact'] : '';
-                                $s_dist    = isset($shop['district']) ? $shop['district'] : '';
-                                $s_fac     = isset($shop['facilities']) && is_array($shop['facilities']) ? $shop['facilities'] : array();
-                                $s_type    = isset($shop['location_type']) ? $shop['location_type'] : 'pro_shop';
+                                $s_dist = isset($shop['district']) ? $shop['district'] : '';
+                                $s_fac  = isset($shop['facilities']) && is_array($shop['facilities']) ? $shop['facilities'] : array();
+                                $s_type = isset($shop['location_type']) ? $shop['location_type'] : 'pro_shop';
+                                
+                                // Build unified contacts array (Primary + Additional)
+                                $all_contacts = array();
+                                if ( !empty($shop['contact']) || !empty($shop['email']) || !empty($shop['phone']) ) {
+                                    $all_contacts[] = array(
+                                        'name'  => isset($shop['contact']) ? $shop['contact'] : '',
+                                        'title' => isset($shop['contact_title']) ? $shop['contact_title'] : '',
+                                        'email' => isset($shop['email']) ? $shop['email'] : '',
+                                        'phone' => isset($shop['phone']) ? $shop['phone'] : ''
+                                    );
+                                }
                                 $s_add_cnt = isset($shop['additional_contacts']) && is_array($shop['additional_contacts']) ? $shop['additional_contacts'] : array();
+                                foreach ( $s_add_cnt as $ac ) {
+                                    if ( !empty($ac['name']) || !empty($ac['email']) || !empty($ac['phone']) ) {
+                                        $all_contacts[] = $ac;
+                                    }
+                                }
 
-                                $all_cnt_names = array_filter( array_merge( array($s_contact), array_column($s_add_cnt, 'name') ) );
-                                $cnt_search_str = implode( ' ', $all_cnt_names );
+                                // Build search string from all contact data so live search still works
+                                $search_terms = array();
+                                foreach ($all_contacts as $c) {
+                                    $search_terms[] = isset($c['name']) ? $c['name'] : '';
+                                    $search_terms[] = isset($c['title']) ? $c['title'] : '';
+                                    $search_terms[] = isset($c['email']) ? $c['email'] : '';
+                                    $search_terms[] = isset($c['phone']) ? $c['phone'] : '';
+                                }
+                                $cnt_search_str = implode( ' ', array_filter($search_terms) );
 
                                 // Address formatting
                                 $addr1 = isset($shop['address_1']) ? $shop['address_1'] : '';
@@ -150,39 +171,32 @@ foreach ( $all_shops as $s_id => $shop ) {
                                     </div>
                                 </td>
                                 <td>
-                                    <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong>
-                                    
-                                    <?php if ( ! empty($s_add_cnt) ): ?>
-                                        <?php foreach ( $s_add_cnt as $ac ): ?>
-                                            <?php if ( ! empty( $ac['name'] ) ): ?>
-                                                <div style="font-size:12px; color:#475569; margin-top:2px;">
-                                                    <?php echo esc_html( $ac['name'] ); ?>
-                                                    <?php if ( ! empty( $ac['title'] ) ): ?>
-                                                        <span style="font-size:11px; opacity:0.8;">(<?php echo esc_html( $ac['title'] ); ?>)</span>
+                                    <?php if ( empty( $all_contacts ) ): ?>
+                                        <span style="font-size:12px; color:#94a3b8; font-style:italic;">No contact info available</span>
+                                    <?php else: ?>
+                                        <div style="display:flex; flex-direction:column; gap:12px;">
+                                            <?php foreach ( $all_contacts as $c ): ?>
+                                                <div style="font-size:12px; line-height:1.4;">
+                                                    <?php if ( !empty($c['name']) ): ?>
+                                                        <strong style="color:#0f172a;"><?php echo esc_html($c['name']); ?></strong>
+                                                        <?php if ( !empty($c['title']) ): ?>
+                                                            <span style="color:#64748b; font-size:11px;">(<?php echo esc_html($c['title']); ?>)</span>
+                                                        <?php endif; ?>
+                                                        <br>
+                                                    <?php endif; ?>
+                                                    
+                                                    <?php if ( !empty($c['email']) ): ?>
+                                                        <span style="color:#64748b; margin-right:4px;">📧</span><a href="mailto:<?php echo esc_attr($c['email']); ?>" style="color:#0073aa; text-decoration:none; word-break:break-all;"><?php echo esc_html($c['email']); ?></a><br>
+                                                    <?php endif; ?>
+                                                    
+                                                    <?php if ( !empty($c['phone']) ): ?>
+                                                        <span style="color:#64748b; margin-right:4px;">📞</span><span style="color:#334155;"><?php echo esc_html($c['phone']); ?></span>
                                                     <?php endif; ?>
                                                 </div>
-                                            <?php endif; ?>
-                                        <?php endforeach; ?>
+                                            <?php endforeach; ?>
+                                        </div>
                                     <?php endif; ?>
-                                    
-                                    <div style="margin-top:6px;">
-                                        <?php 
-                                            $raw_email = isset($shop['email']) ? $shop['email'] : '';
-                                            if ( ! empty( $raw_email ) ) {
-                                                $email_parts = preg_split( '/[\s,\/]+/', $raw_email );
-                                                foreach ( $email_parts as $e_part ) {
-                                                    $e_clean = trim( $e_part );
-                                                    if ( $e_clean ) {
-                                                        echo '<a href="mailto:' . esc_attr($e_clean) . '" style="font-size:12px; color:#0073aa; word-break:break-all; display:block; text-decoration:none;">' . esc_html($e_clean) . '</a>';
-                                                    }
-                                                }
-                                            } else {
-                                                echo '<span style="font-size:12px; color:#94a3b8;">No email</span>';
-                                            }
-                                        ?>
-                                    </div>
                                 </td>
-                                <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
