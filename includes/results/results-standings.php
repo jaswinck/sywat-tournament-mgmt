@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.7.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,35 +56,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             return strcasecmp( $a, $b );
         });
         ?>
-
-        <style>
-            .sywat-single-category-header {
-                background: #1e3a8a;
-                color: #ffffff;
-                padding: 10px 14px;
-                font-size: 14px;
-                font-weight: 700;
-                border-radius: 6px 6px 0 0;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .sywat-counter-banner {
-                margin-top: 15px;
-                margin-bottom: 20px;
-                padding: 9px 14px;
-                background: #eff6ff;
-                border: 1px solid #bfdbfe;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 600;
-                color: #1e40af;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-            }
-        </style>
 
         <div class="sywat-public-card">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
