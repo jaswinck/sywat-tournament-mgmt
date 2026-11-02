@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -81,14 +81,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         
         $edit_t_data         = ( ! empty( $edit_t_target ) && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
         $edit_t_lines        = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
+        if ( empty( $edit_t_lines ) || ! is_array( $edit_t_lines ) ) {
+            $edit_t_lines = $default_lines;
+        }
         $edit_t_shop         = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( $can_manage_seasons ? '' : $user_shop_id );
         $edit_t_season       = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start        = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end          = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
-
-        $form_line_count     = isset( $_POST['line_count'] ) ? intval( $_POST['line_count'] ) : count( $edit_t_lines );
-        if ( $form_line_count < 1 ) $form_line_count = 1;
-        if ( $form_line_count > 6 ) $form_line_count = 6;
 
         $available_lines = $open_modal ? sywat_get_tournament_lines( $tournaments[$selected_tournament] ) : array();
         $filter_line_idx = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( $_REQUEST['filter_line_idx'] ) : 'all';
@@ -366,42 +365,37 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
                             </div>
 
-                            <div style="margin-bottom: 20px;">
-                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Number of Shooting Lines (1 - 6)</label>
-                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                                    <select name="line_count" style="padding:6px 10px; border:1px solid #8c8f94; border-radius:4px; width:130px; height:34px;">
-                                        <?php for ($i = 1; $i <= 6; $i++): ?>
-                                            <option value="<?php echo $i; ?>" <?php selected( $form_line_count, $i ); ?>><?php echo $i; ?> Line<?php echo $i > 1 ? 's' : ''; ?></option>
-                                        <?php endfor; ?>
-                                    </select>
-                                    <button type="submit" name="sywat_action" value="update_line_rows" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" formnovalidate>Update Line Rows</button>
-                                </div>
+                            <!-- Dynamic Shooting Lines Repeater Table -->
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0 10px 0;">
+                                <h4 style="font-size: 14px; font-weight: 600; margin: 0;">Shooting Lines & Capacity Templates</h4>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
                             </div>
-
-                            <h4 style="font-size: 14px; font-weight: 600; margin-top: 15px; margin-bottom: 10px;">Shooting Lines & Capacity Templates</h4>
                             <div class="sywat-table-responsive" style="margin-bottom: 20px;">
-                                <table class="sywat-table" style="margin-bottom: 0;">
+                                <table class="sywat-table" id="sywat_tourn_lines_table" style="margin-bottom: 0;">
                                     <thead>
                                         <tr>
                                             <th>Line Day / Time</th>
                                             <th style="width: 140px;">20yd Capacity</th>
                                             <th style="width: 140px;">Cub Capacity</th>
+                                            <th style="width: 80px; text-align: center;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php for ($i = 0; $i < $form_line_count; $i++): ?>
+                                        <?php foreach ( $edit_t_lines as $i => $l ): ?>
                                             <?php 
-                                                $fallback  = isset($default_lines[$i]) ? $default_lines[$i] : array( 'name' => 'Line ' . ($i + 1), 'cap_20yd' => 20, 'cap_cub' => 5 );
-                                                $line_name = isset($edit_t_lines[$i]['name']) ? $edit_t_lines[$i]['name'] : $fallback['name'];
-                                                $cap_20yd  = isset($edit_t_lines[$i]['cap_20yd']) ? $edit_t_lines[$i]['cap_20yd'] : $fallback['cap_20yd'];
-                                                $cap_cub   = isset($edit_t_lines[$i]['cap_cub']) ? $edit_t_lines[$i]['cap_cub'] : $fallback['cap_cub'];
+                                                $line_name = isset($l['name']) ? $l['name'] : 'Line ' . ($i + 1);
+                                                $cap_20yd  = isset($l['cap_20yd']) ? $l['cap_20yd'] : 20;
+                                                $cap_cub   = isset($l['cap_cub']) ? $l['cap_cub'] : 5;
                                             ?>
                                             <tr>
                                                 <td><input type="text" name="line_names[]" value="<?php echo esc_attr( $line_name ); ?>" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                                                <td style="padding:6px; text-align:center;">
+                                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeTournamentLineRow(this)" title="Remove Line">🗑️</button>
+                                                </td>
                                             </tr>
-                                        <?php endfor; ?>
+                                        <?php endforeach; ?>
                                     </tbody>
                                 </table>
                             </div>
@@ -472,6 +466,32 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             url.searchParams.delete('filter_line_idx');
             url.searchParams.delete('search_shooter');
             window.history.replaceState({}, document.title, url.toString());
+        }
+
+        function addTournamentLineRow() {
+            const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
+            if (!tableBody) return;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" name="line_names[]" value="Saturday 10AM" placeholder="e.g. Saturday 10AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
+                <td style="padding:6px; text-align:center;">
+                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeTournamentLineRow(this)" title="Remove Line">🗑️</button>
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        }
+
+        function removeTournamentLineRow(btn) {
+            const tr = btn.closest('tr');
+            const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
+            if (tableBody && tableBody.children.length <= 1) {
+                alert('A tournament must have at least one shooting line defined.');
+                return;
+            }
+            if (tr) tr.remove();
         }
 
         function sywatApplyTournamentFilters() {
