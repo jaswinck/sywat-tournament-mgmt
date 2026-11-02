@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Administration Management Views
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -139,9 +139,10 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         <?php elseif ( $editing_shop ): ?>
             <!-- VIEW 2: EDIT LOCATION DETAILS & SCHEDULING TEMPLATES -->
             <?php 
-                $curr_fac  = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
-                $curr_dist = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
-                $curr_type = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
+                $curr_fac     = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
+                $curr_dist    = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
+                $curr_type    = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
+                $add_contacts = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
             ?>
             <div class="sywat-card no-print">
                 <div class="sywat-card-title">
@@ -177,19 +178,59 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                         </div>
                     </div>
 
-                    <div class="sywat-form-grid-3" style="margin-bottom:15px;">
-                        <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Primary Contact Name(s)</label>
-                            <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <!-- Primary Contact Section -->
+                    <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
+                        <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:#0f172a;">👤 Primary Contact Person</h4>
+                        <div class="sywat-form-grid-3" style="gap:10px;">
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Contact Name</label>
+                                <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" placeholder="e.g. Beau Brennan" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Email</label>
+                                <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. beau@domain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:12px;">Primary Phone</label>
+                                <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            </div>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Contact Email(s)</label>
-                            <input type="text" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. events@domain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    </div>
+
+                    <!-- Additional Contacts Dynamic Repeater -->
+                    <div style="background:#ffffff; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <h4 style="margin:0; font-size:14px; font-weight:bold; color:#0f172a;">👥 Additional Location Contacts</h4>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopContactRow()">Add Additional Contact</button>
                         </div>
-                        <div>
-                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Contact Phone</label>
-                            <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <div id="sywat_shop_contacts_container" style="display:flex; flex-direction:column; gap:10px;">
+                            <?php foreach ( $add_contacts as $idx => $ac ): ?>
+                                <div class="sywat-contact-row sywat-form-grid-4" style="align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">
+                                    <div>
+                                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
+                                        <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Role / Title</label>
+                                        <input type="text" name="add_contact_titles[]" value="<?php echo esc_attr( isset($ac['title']) ? $ac['title'] : '' ); ?>" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
+                                        <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <div style="flex:1;">
+                                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
+                                            <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                                        </div>
+                                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopContactRow(this)" title="Remove Contact">🗑️</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
+                        <?php if ( empty( $add_contacts ) ): ?>
+                            <p id="sywat_no_add_contacts_msg" style="color:#64748b; font-style:italic; font-size:12px; margin:5px 0 0 0;">No additional contacts added yet. Click "Add Additional Contact" above if needed.</p>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Facilities & Amenities Multi-Select -->
@@ -243,14 +284,19 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                         </div>
                     </div>
 
-                    <h4 style="margin:20px 0 10px 0; font-size:15px; font-weight:bold;">Default Shooting Lines & Capacity Templates</h4>
+                    <!-- Default Shooting Lines Repeater Table -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0 10px 0;">
+                        <h4 style="margin:0; font-size:15px; font-weight:bold;">Default Shooting Lines & Capacity Templates</h4>
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopLineRow()">Add New Line</button>
+                    </div>
                     <div class="sywat-table-responsive" style="margin-bottom:20px;">
-                        <table class="sywat-table">
+                        <table class="sywat-table" id="sywat_shop_lines_table">
                             <thead>
                                 <tr>
                                     <th>Line Day / Time</th>
                                     <th style="width:180px;">Default 20yd Cap</th>
                                     <th style="width:180px;">Default Cub Cap</th>
+                                    <th style="width:80px; text-align:center;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -267,6 +313,9 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                         <td style="padding:6px;"><input type="text" name="line_names[]" value="<?php echo esc_attr( $l['name'] ); ?>" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                         <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $l['cap_20yd'] ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
                                         <td style="padding:6px;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $l['cap_cub'] ); ?>" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                                        <td style="padding:6px; text-align:center;">
+                                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopLineRow(this)" title="Remove Line">🗑️</button>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -329,8 +378,8 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                 <tr>
                                     <th style="width:25%;">Location Name & ID</th>
                                     <th style="width:12%;">District</th>
-                                    <th style="width:22%;">Facilities</th>
-                                    <th style="width:20%;">Contact Info</th>
+                                    <th style="width:20%;">Facilities</th>
+                                    <th style="width:22%;">Contact Info</th>
                                     <th style="width:11%;">Phone</th>
                                     <th style="width:10%; text-align:right;">Actions</th>
                                 </tr>
@@ -343,12 +392,17 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                             $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
                                             if ( $u_shop === $s_id ) $linked_count++;
                                         }
-                                        $s_contact = isset($shop['contact']) ? $shop['contact'] : '';
-                                        $s_dist    = isset($shop['district']) ? $shop['district'] : '';
-                                        $s_fac     = isset($shop['facilities']) && is_array($shop['facilities']) ? $shop['facilities'] : array();
-                                        $s_type    = isset($shop['location_type']) ? $shop['location_type'] : 'pro_shop';
+                                        $s_contact  = isset($shop['contact']) ? $shop['contact'] : '';
+                                        $s_dist     = isset($shop['district']) ? $shop['district'] : '';
+                                        $s_fac      = isset($shop['facilities']) && is_array($shop['facilities']) ? $shop['facilities'] : array();
+                                        $s_type     = isset($shop['location_type']) ? $shop['location_type'] : 'pro_shop';
+                                        $s_add_cnt  = isset($shop['additional_contacts']) && is_array($shop['additional_contacts']) ? $shop['additional_contacts'] : array();
+
+                                        // Aggregate contacts for search matching
+                                        $all_cnt_names = array_filter( array_merge( array($s_contact), array_column($s_add_cnt, 'name') ) );
+                                        $cnt_search_str = implode( ' ', $all_cnt_names );
                                     ?>
-                                    <tr class="sywat-shop-row" data-name="<?php echo esc_attr(strtolower($shop['name'])); ?>" data-id="<?php echo esc_attr(strtolower($s_id)); ?>" data-contact="<?php echo esc_attr(strtolower($s_contact)); ?>" data-district="<?php echo esc_attr(strtolower($s_dist)); ?>">
+                                    <tr class="sywat-shop-row" data-name="<?php echo esc_attr(strtolower($shop['name'])); ?>" data-id="<?php echo esc_attr(strtolower($s_id)); ?>" data-contact="<?php echo esc_attr(strtolower($cnt_search_str)); ?>" data-district="<?php echo esc_attr(strtolower($s_dist)); ?>">
                                         <td>
                                             <strong><?php echo esc_html( $shop['name'] ); ?></strong>
                                             <?php if ($type_filter === 'all'): ?>
@@ -386,7 +440,13 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                             </div>
                                         </td>
                                         <td>
-                                            <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong><br>
+                                            <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong>
+                                            <?php if ( ! empty($s_add_cnt) ): ?>
+                                                <span class="sywat-badge" style="background:#f1f5f9; color:#475569; font-size:10px; cursor:help;" title="<?php foreach($s_add_cnt as $ac) { echo esc_attr(($ac['name'] ?? 'Contact') . ' (' . ($ac['title'] ?? 'Staff') . ') - ' . ($ac['email'] ?? 'No email') . "\n"); } ?>">
+                                                    +<?php echo count($s_add_cnt); ?> more
+                                                </span>
+                                            <?php endif; ?>
+                                            <br>
                                             <?php 
                                                 $raw_email = isset($shop['email']) ? $shop['email'] : '';
                                                 if ( ! empty( $raw_email ) ) {
@@ -460,18 +520,18 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Contact Phone</label>
+                                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Primary Contact Phone</label>
                                     <input type="text" name="shop_phone" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                                 </div>
                             </div>
 
                             <div style="margin-bottom:12px;">
-                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Primary Contact Name(s)</label>
-                                <input type="text" name="shop_contact" placeholder="e.g. Hannah Lange / Beau Brennan" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Primary Contact Name</label>
+                                <input type="text" name="shop_contact" placeholder="e.g. Beau Brennan" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                             </div>
                             <div style="margin-bottom:12px;">
-                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Contact Email(s)</label>
-                                <input type="text" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Primary Contact Email</label>
+                                <input type="email" name="shop_email" placeholder="e.g. events@cinnamoncreekranch.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                             </div>
 
                             <!-- Facilities Multi-Select -->
@@ -544,6 +604,93 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                 if (modal) modal.classList.remove('active');
             }
 
+            function addShopContactRow() {
+                const container = document.getElementById('sywat_shop_contacts_container');
+                const noMsg = document.getElementById('sywat_no_add_contacts_msg');
+                if (noMsg) noMsg.style.display = 'none';
+
+                const row = document.createElement('div');
+                row.className = 'sywat-contact-row sywat-form-grid-4';
+                row.style.cssText = 'align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px; margin-top:6px;';
+                row.innerHTML = `
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Contact Name</label>
+                        <input type="text" name="add_contact_names[]" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Role / Title</label>
+                        <input type="text" name="add_contact_titles[]" placeholder="e.g. Event Manager" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Email</label>
+                        <input type="email" name="add_contact_emails[]" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:11px;">Phone</label>
+                            <input type="text" name="add_contact_phones[]" class="sywat-phone-input" placeholder="817-439-8998" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                        </div>
+                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopContactRow(this)" title="Remove Contact">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(row);
+                attachPhoneFormatting(row.querySelector('.sywat-phone-input'));
+            }
+
+            function removeShopContactRow(btn) {
+                const row = btn.closest('.sywat-contact-row');
+                if (row) row.remove();
+                const container = document.getElementById('sywat_shop_contacts_container');
+                const noMsg = document.getElementById('sywat_no_add_contacts_msg');
+                if (container && container.children.length === 0 && noMsg) {
+                    noMsg.style.display = 'block';
+                }
+            }
+
+            function addShopLineRow() {
+                const tableBody = document.querySelector('#sywat_shop_lines_table tbody');
+                if (!tableBody) return;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:6px;"><input type="text" name="line_names[]" value="Saturday 10AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                    <td style="padding:6px;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                    <td style="padding:6px;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                    <td style="padding:6px; text-align:center;">
+                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeShopLineRow(this)" title="Remove Line">🗑️</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            }
+
+            function removeShopLineRow(btn) {
+                const tr = btn.closest('tr');
+                const tableBody = document.querySelector('#sywat_shop_lines_table tbody');
+                if (tableBody && tableBody.children.length <= 1) {
+                    alert('Location must have at least one shooting line defined.');
+                    return;
+                }
+                if (tr) tr.remove();
+            }
+
+            function attachPhoneFormatting(input) {
+                if (!input) return;
+                input.addEventListener('input', function() {
+                    let digits = this.value.replace(/\D/g, '').substring(0, 10);
+                    let formatted = '';
+                    if (digits.length > 0) {
+                        if (digits.length <= 3) {
+                            formatted = digits;
+                        } else if (digits.length <= 6) {
+                            formatted = digits.substring(0, 3) + '-' + digits.substring(3);
+                        } else {
+                            formatted = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
+                        }
+                    }
+                    this.value = formatted;
+                });
+            }
+
             function sywatFilterShops() {
                 const searchVal = (document.getElementById('sywat_shop_search_input')?.value || '').toLowerCase().trim();
                 const distVal = (document.getElementById('sywat_district_filter_select')?.value || '').toLowerCase().trim();
@@ -576,22 +723,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
 
             document.addEventListener("DOMContentLoaded", function() {
                 const phoneInputs = document.querySelectorAll('.sywat-phone-input');
-                phoneInputs.forEach(input => {
-                    input.addEventListener('input', function(e) {
-                        let digits = this.value.replace(/\D/g, '').substring(0, 10);
-                        let formatted = '';
-                        if (digits.length > 0) {
-                            if (digits.length <= 3) {
-                                formatted = digits;
-                            } else if (digits.length <= 6) {
-                                formatted = digits.substring(0, 3) + '-' + digits.substring(3);
-                            } else {
-                                formatted = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
-                            }
-                        }
-                        this.value = formatted;
-                    });
-                });
+                phoneInputs.forEach(attachPhoneFormatting);
 
                 const searchInput = document.getElementById('sywat_shop_search_input');
                 if (searchInput) {
