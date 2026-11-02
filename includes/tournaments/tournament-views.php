@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 2.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -377,7 +377,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <th>Line Day / Time</th>
                                             <th style="width: 140px;">20yd Capacity</th>
                                             <th style="width: 140px;">Cub Capacity</th>
-                                            <th style="width: 80px; text-align: center;">Action</th>
+                                            <th style="width: 110px; text-align: center;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -392,7 +392,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 <td><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                                                 <td style="padding:6px; text-align:center;">
-                                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeTournamentLineRow(this)" title="Remove Line">🗑️</button>
+                                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeTournamentLineRow(this)">Remove</button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -478,7 +478,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 <td><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px;" required></td>
                 <td style="padding:6px; text-align:center;">
-                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px; padding:0 10px;" onclick="removeTournamentLineRow(this)" title="Remove Line">🗑️</button>
+                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:32px;" onclick="removeTournamentLineRow(this)">Remove</button>
                 </td>
             `;
             tableBody.appendChild(tr);
