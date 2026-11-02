@@ -3,7 +3,7 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
- * Version: 2.6.1
+ * Version: 2.6.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -150,7 +150,7 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
 /**
  * Aggregates season standings grouped by Division + Gender -> Style
- * EXCLUDES all Guest scores and secondary re-entries entirely.
+ * EXCLUDES all Guest scores, score-0 cards, and secondary re-entries entirely.
  * ENFORCES 'scores_published' gate so unpublished scores remain hidden.
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
@@ -177,10 +177,12 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             $raw_scores = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
+            // Filter out Guests AND turned-in 0 scores
             $official_scores = array_filter( $raw_scores, function( $s ) {
                 $st = strtolower( trim( $s['style'] ) );
                 $nm = strtolower( trim( $s['name'] ) );
-                return ( $st !== 'guest' && strpos( $nm, '[guest]' ) === false );
+                $sc = intval( $s['score'] );
+                return ( $st !== 'guest' && strpos( $nm, '[guest]' ) === false && $sc > 0 );
             });
 
             $grouped_per_tournament = array();
