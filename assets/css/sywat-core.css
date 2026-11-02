@@ -355,6 +355,8 @@ body {
 
 /* Button Icons */
 .sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-checkin::before    { content: "📋\00a0"; }
+.sywat-tab-icon-edit::before       { content: "✏️\00a0"; }
 .sywat-tab-icon-member::before     { content: "👤\00a0"; }
 .sywat-tab-icon-board::before      { content: "🏛️\00a0"; }
 .sywat-tab-icon-season::before     { content: "🏆\00a0"; }
