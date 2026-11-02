@@ -3,15 +3,18 @@
  * Sub-Module: Shop & Club Administration Management Views Controller
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.4.0
+ * Version: 3.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
     function sywat_render_shops_tab() {
-        $can_manage = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
-        if ( ! $can_manage ) {
+        $can_manage_shops   = function_exists( 'sywat_can_manage_shops' ) && sywat_can_manage_shops();
+        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
+
+        if ( ! $can_manage_shops && empty( $user_shop_id ) ) {
             echo '<p style="color:red; padding:20px;">Management access required to manage shops and clubs.</p>';
             return;
         }
@@ -22,9 +25,22 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         $page_url        = site_url( '/sywat-manage-shops/' );
         $notice          = sywat_handle_shop_actions();
         $all_shops       = sywat_get_shops();
+
         $edit_target_id  = isset( $_REQUEST['edit_shop'] ) ? sanitize_text_field( $_REQUEST['edit_shop'] ) : '';
-        $editing_shop    = ( ! empty( $edit_target_id ) && isset( $all_shops[$edit_target_id] ) ) ? $all_shops[$edit_target_id] : null;
         $manage_staff_id = isset( $_REQUEST['manage_staff'] ) ? sanitize_text_field( $_REQUEST['manage_staff'] ) : '';
+
+        // Lock Shop Managers (non-board/admins) directly to their assigned shop profile or staff view
+        if ( ! $can_manage_seasons && ! empty( $user_shop_id ) ) {
+            if ( ! empty( $manage_staff_id ) && $manage_staff_id === $user_shop_id ) {
+                // Allow managing staff for their own shop
+            } else {
+                // Default to editing their own shop profile
+                $edit_target_id  = $user_shop_id;
+                $manage_staff_id = '';
+            }
+        }
+
+        $editing_shop    = ( ! empty( $edit_target_id ) && isset( $all_shops[$edit_target_id] ) ) ? $all_shops[$edit_target_id] : null;
         $managing_shop   = ( ! empty( $manage_staff_id ) && isset( $all_shops[$manage_staff_id] ) ) ? $all_shops[$manage_staff_id] : null;
 
         $type_filter     = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : 'all';
@@ -39,18 +55,20 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         );
         ?>
 
-        <!-- Sub-Tab Navigation Bar -->
-        <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( add_query_arg( 'type', 'all', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'all') ? 'active' : ''; ?>">
-                🌐 All Locations
-            </a>
-            <a href="<?php echo esc_url( add_query_arg( 'type', 'pro_shop', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'pro_shop') ? 'active' : ''; ?>">
-                🏪 Shops
-            </a>
-            <a href="<?php echo esc_url( add_query_arg( 'type', 'club', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'club') ? 'active' : ''; ?>">
-                🌲 Clubs
-            </a>
-        </div>
+        <!-- Sub-Tab Navigation Bar (Only for Global Admins/Board Members) -->
+        <?php if ( $can_manage_seasons ): ?>
+            <div class="sywat-nav-tabs no-print">
+                <a href="<?php echo esc_url( add_query_arg( 'type', 'all', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'all') ? 'active' : ''; ?>">
+                    🌐 All Locations
+                </a>
+                <a href="<?php echo esc_url( add_query_arg( 'type', 'pro_shop', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'pro_shop') ? 'active' : ''; ?>">
+                    🏪 Shops
+                </a>
+                <a href="<?php echo esc_url( add_query_arg( 'type', 'club', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'club') ? 'active' : ''; ?>">
+                    🌲 Clubs
+                </a>
+            </div>
+        <?php endif; ?>
 
         <div class="no-print"><?php echo $notice; ?></div>
 
