@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Shops Module Client Scripts
  * Path: assets/js/sywat-shops.js
- * Version: 1.4.0
+ * Version: 1.4.1
  */
 
 let sywatIsFormDirty = false;
@@ -118,6 +118,45 @@ function removeShopContactRow(btn) {
     markFormDirty();
 }
 
+function checkShopLineDuplicate(el) {
+    const tr = el.closest('tr');
+    const table = el.closest('table');
+    if (!tr || !table) return true;
+
+    const daySelect = tr.querySelector('select[name="indoor_line_days[]"], select[name="outdoor_line_days[]"]');
+    const timeInput = tr.querySelector('input[name="indoor_line_times[]"], input[name="outdoor_line_times[]"]');
+
+    const dayVal = (daySelect?.value || '').trim();
+    const timeVal = (timeInput?.value || '').trim().toLowerCase();
+
+    if (!dayVal || !timeVal) return true;
+
+    const currentCombo = dayVal.toLowerCase() + ' @ ' + timeVal;
+    const isIndoor = table.id.includes('indoor');
+    const label = isIndoor ? 'Indoor' : 'Outdoor';
+
+    const allRows = table.querySelectorAll('tbody tr');
+    for (let row of allRows) {
+        if (row === tr) continue; // Skip the row being actively edited
+
+        const otherDaySelect = row.querySelector('select[name="indoor_line_days[]"], select[name="outdoor_line_days[]"]');
+        const otherTimeInput = row.querySelector('input[name="indoor_line_times[]"], input[name="outdoor_line_times[]"]');
+
+        const otherDay = (otherDaySelect?.value || '').trim().toLowerCase();
+        const otherTime = (otherTimeInput?.value || '').trim().toLowerCase();
+
+        if (otherDay && otherTime && (otherDay + ' @ ' + otherTime) === currentCombo) {
+            alert(`Duplicate ${label} shooting line detected: "${dayVal} ${timeInput.value}". This day and start time is already assigned to another line.`);
+            if (daySelect) {
+                daySelect.value = "";
+                daySelect.focus();
+            }
+            return false;
+        }
+    }
+    return true;
+}
+
 function addShopIndoorLineRow() {
     const tableBody = document.querySelector('#sywat_shop_indoor_lines_table tbody');
     if (!tableBody) return;
@@ -125,14 +164,14 @@ function addShopIndoorLineRow() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td style="padding:6px; vertical-align:middle;">
-            <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
+            <select name="indoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this); markFormDirty();">
                 <option value="" disabled selected>-- Select Day --</option>
                 <option value="Friday">Friday</option>
                 <option value="Saturday">Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
-        <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; vertical-align:middle;"><input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this); markFormDirty();" oninput="markFormDirty()"></td>
         <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="20" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
         <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="5" min="0" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
         <td style="padding:6px; text-align:center; vertical-align:middle;">
@@ -161,14 +200,14 @@ function addShopOutdoorLineRow() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td style="padding:6px; vertical-align:middle;">
-            <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="markFormDirty()">
+            <select name="outdoor_line_days[]" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this); markFormDirty();">
                 <option value="" disabled selected>-- Select Day --</option>
                 <option value="Friday">Friday</option>
                 <option value="Saturday">Saturday</option>
                 <option value="Sunday">Sunday</option>
             </select>
         </td>
-        <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" oninput="markFormDirty()"></td>
+        <td style="padding:6px; vertical-align:middle;"><input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkShopLineDuplicate(this); markFormDirty();" oninput="markFormDirty()"></td>
         <td style="padding:6px; text-align:center; vertical-align:middle;">
             <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
         </td>
