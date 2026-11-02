@@ -3,7 +3,7 @@
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,12 +168,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 12%; text-align: center;">TFAA Member #</th>
-                                        <th style="width: 18%;">Member Name</th>
-                                        <th style="width: 20%;">Assigned Role(s)</th>
-                                        <th style="width: 20%;">Email Address</th>
-                                        <th style="width: 11%; text-align: center;">Phone</th>
-                                        <th style="width: 9%; text-align: center;">NFAA Status</th>
+                                        <th style="width: 22%;">Member Name</th>
+                                        <th style="width: 24%;">Assigned Role(s)</th>
+                                        <th style="width: 22%;">Email Address</th>
+                                        <th style="width: 12%; text-align: center;">Phone</th>
+                                        <th style="width: 10%; text-align: center;">NFAA Status</th>
                                         <th style="width: 10%; text-align: right;">Actions</th>
                                     </tr>
                                 </thead>
@@ -205,9 +204,6 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $roles_search = implode( ' ', $role_names );
                                         ?>
                                         <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone . ' ' . $roles_search ) ); ?>">
-                                            <td style="text-align: center;">
-                                                <strong style="color: #1e3a8a; font-family: monospace; font-size: 13px;"><?php echo esc_html( $disp_id ); ?></strong>
-                                            </td>
                                             <td>
                                                 <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                                 <div style="font-size: 11px; color: #64748b; font-family: monospace; margin-top: 1px;">👤 <?php echo esc_html( $m->user_login ); ?></div>
