@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -65,7 +65,9 @@ function sywat_desk_handle_actions(&$data) {
 
             $update_count = 0;
             foreach ($registrations as &$r) {
-                if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r['line_index'] === $target_line) {
+                // Safely resolve the line index to handle legacy string names
+                $r_resolved_lidx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($r, $lines) : (isset($r['line_index']) ? (string)$r['line_index'] : '0');
+                if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r_resolved_lidx === $target_line) {
                     if (empty($r['checked_in'])) {
                         $r['division'] = 'No Show'; $r['gender'] = 'No Show'; $r['style'] = 'No Show';
                         update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
