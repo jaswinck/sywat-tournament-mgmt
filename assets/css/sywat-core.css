@@ -214,22 +214,22 @@ body {
 .sywat-nav-tabs {
     display: inline-flex;
     align-items: center;
-    background-color: #e2e8f0;
+    background-color: #0f172a;
     padding: 4px 4px 0 4px;
     border-radius: 8px 8px 0 0;
     margin-bottom: -1px;
     gap: 4px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #0f172a;
     border-bottom: none;
     position: relative;
     z-index: 2;
 }
 
 .sywat-tab-item {
-    padding: 8px 16px;
-    font-weight: 600;
+    padding: 10px 18px;
+    font-weight: 700;
     text-decoration: none !important;
-    color: #475569;
+    color: #94a3b8;
     background: transparent;
     border: none;
     border-radius: 6px 6px 0 0;
@@ -239,14 +239,14 @@ body {
 }
 
 .sywat-tab-item:hover {
-    color: #0f172a;
-    background-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 .sywat-tab-item.active {
     background: #ffffff;
     color: #0f172a;
-    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
     margin-bottom: 0;
 }
 
