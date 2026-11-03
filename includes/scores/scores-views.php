@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.8.0
+ * Version: 3.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -49,16 +49,38 @@ function render_sywat_scores_app() {
     $selected_line_idx   = isset($_POST['selected_line_idx'])   ? sanitize_text_field($_POST['selected_line_idx'])   : (isset($_GET['selected_line_idx']) ? sanitize_text_field($_GET['selected_line_idx']) : 'all');
     $search_query        = isset($_POST['search_query'])        ? sanitize_text_field($_POST['search_query'])        : '';
 
+    // ALWAYS prefer global active tournament first when GET/POST is empty
+    if (empty($selected_tournament)) {
+        $global_curr = get_option('sywat_current_tournament', '');
+        if (!empty($global_curr) && isset($tournaments[$global_curr])) {
+            $selected_tournament = $global_curr;
+        }
+    }
+
+    // Secondary Fallback: User Meta Preference
+    if (empty($selected_tournament) && $user->ID) {
+        $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
+        if (!empty($saved_t) && isset($tournaments[$saved_t])) {
+            $selected_tournament = $saved_t;
+        }
+    }
+
     if (empty($selected_tournament) && !empty($tournaments)) {
         reset($tournaments);
         $selected_tournament = key($tournaments);
     }
 
+    if ($user->ID && !empty($selected_tournament)) {
+        update_user_meta($user->ID, 'sywat_desk_selected_tournament', $selected_tournament);
+    }
+
     $lines         = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
     $active_t_slug = sanitize_title($selected_tournament);
     
-    // Fetch Active Locks
-    $locked_lines        = get_option('sywat_locks_' . $active_t_slug, array());
+    // Fetch Active Locks with object cache flush
+    $locks_key = 'sywat_locks_' . $active_t_slug;
+    wp_cache_delete($locks_key, 'options');
+    $locked_lines        = get_option($locks_key, array());
     $current_view_locked = ($selected_line_idx !== 'all' && !empty($locked_lines[$selected_line_idx]));
 
     // Batch Action Handlers
