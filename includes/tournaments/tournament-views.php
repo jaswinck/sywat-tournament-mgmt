@@ -196,11 +196,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 24%; text-align: center;">Tournament, Season & Location</th>
+                                        <th style="width: 25%; text-align: center;">Tournament, Season & Location</th>
                                         <th style="width: 12%; text-align: center;">Volunteer Hub</th>
-                                        <th style="width: 36%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
-                                        <th style="width: 16%; text-align: center;">Shooter Management</th>
-                                        <th style="width: 12%; text-align: center;">Tournament Management</th>
+                                        <th style="width: 38%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
+                                        <th style="width: 25%; text-align: center;">Tournament Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -249,7 +248,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             </td>
                                             <td>
                                                 <?php if ( ! empty( $t_lines ) && is_array( $t_lines ) ): ?>
-                                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                                    <div class="sywat-lines-grid">
                                                         <?php foreach ( $t_lines as $idx => $line ): ?>
                                                             <?php 
                                                                 $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ($idx + 1);
@@ -260,37 +259,33 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                                 $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
                                                                 $rem_cub = max( 0, $m_cub - $c_cub );
                                                             ?>
-                                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8f9fa; padding: 5px 10px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 12px;">
-                                                                <strong style="color: #1d2327;"><?php echo esc_html( $line_title ); ?></strong>
-                                                                <div style="display: flex; gap: 10px; color: #50575e; align-items: center; flex-wrap: wrap;">
+                                                            <div class="sywat-line-slot-compact">
+                                                                <span class="sywat-line-slot-title"><?php echo esc_html( $line_title ); ?></span>
+                                                                <div class="sywat-line-slot-caps">
                                                                     <span>20yd: <strong><?php echo $c_20; ?>/<?php echo $m_20; ?></strong> <span style="color: <?php echo ($rem_20 > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_20; ?> open)</span></span>
+                                                                    <span>•</span>
                                                                     <span>Cub: <strong><?php echo $c_cub; ?>/<?php echo $m_cub; ?></strong> <span style="color: <?php echo ($rem_cub > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_cub; ?> open)</span></span>
-                                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print&filter_line_idx=<?php echo $idx; ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-print" style="margin-left:5px; height:24px; padding:2px 6px; font-size:11px;">Print Line</a>
                                                                 </div>
                                                             </div>
                                                         <?php endforeach; ?>
                                                     </div>
                                                 <?php endif; ?>
-                                                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #c3c4c7; font-size: 12px; color: #1d2327;">
+                                                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #c3c4c7; font-size: 12px; color: #1d2327; text-align: center;">
                                                     <strong>Total Registered:</strong> <?php echo $reg_count; ?> <?php echo ( $reg_count === 1 ? 'archer' : 'archers' ); ?>
                                                 </div>
                                             </td>
-                                            <td>
-                                                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="width: 100%;">Manage Shooters</a>
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print" style="width: 100%;">Print Roster</a>
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice" style="width: 100%;">Generate Invoice</a>
-                                                </div>
-                                            </td>
-                                            <td style="text-align: right;">
-                                                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                    <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Config</a>
+                                            <td style="text-align: center;">
+                                                <div style="display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center;">
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
+                                                    <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Tournament</a>
                                                     
                                                     <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                         <input type="hidden" name="sywat_action" value="delete_tournament">
                                                         <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Delete</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Delete Tournament</button>
                                                     </form>
                                                 </div>
                                             </td>
