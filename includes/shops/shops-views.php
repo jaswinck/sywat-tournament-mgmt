@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Administration Management Views Controller
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -47,11 +47,13 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         $eligible_users  = get_users( array( 'role__in' => array( 'sywat_shop_manager', 'sywat_shop_user' ), 'orderby' => 'display_name' ) );
 
         $districts = array(
-            'District 1' => 'District 1 (Panhandle / West Texas)',
-            'District 2' => 'District 2 (North Texas / DFW)',
-            'District 3' => 'District 3 (East Texas)',
-            'District 4' => 'District 4 (Central / Hill Country)',
-            'District 5' => 'District 5 (South Texas / Gulf)',
+            'District 1' => 'District 1 (West TX / Panhandle)',
+            'District 2' => 'District 2 (Vacant)',
+            'District 3' => 'District 3 (Southeast TX)',
+            'District 4' => 'District 4 (South TX)',
+            'District 5' => 'District 5 (DFW Area)',
+            'District 6' => 'District 6 (Central TX)',
+            'District 7' => 'District 7 (East TX / LA)',
         );
         ?>
 
