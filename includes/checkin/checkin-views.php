@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.6.3
+ * Version: 3.6.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -60,18 +60,18 @@ function sywat_desk_render_filter_bar($data) {
         <?php endif; ?>
     </div>
 
-    <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Controls Right) -->
+    <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Direct Controls Right) -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div class="sywat-filter-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-            <h3 class="sywat-filter-title" style="margin:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <h3 class="sywat-filter-title" style="margin:0; font-size:18px;">
                 🎯 Active Roster Filter
             </h3>
 
             <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                <form method="post" id="sywat_filter_form" class="sywat-filter-form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
-                    <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
                         <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Tournament:</label>
                         <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
@@ -82,7 +82,7 @@ function sywat_desk_render_filter_bar($data) {
                         </select>
                     </div>
 
-                    <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
                         <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Shooting Line:</label>
                         <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                             <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
@@ -237,10 +237,10 @@ function sywat_desk_render_archers_table($data) {
             <span>Registered Archers</span>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex; gap:5px; margin:0; align-items:center;">
-                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="height:38px; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;" onclick="openWalkinModal()">Add Walk-In</button>
             </div>
         </div>
 
