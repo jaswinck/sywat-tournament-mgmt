@@ -3,7 +3,7 @@
  * Sub-Module: Shop Helpers & WP User Profile Integration
  * Path: includes/shops/shops-helpers.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -18,6 +18,51 @@ if ( ! function_exists( 'sywat_format_phone_number' ) ) {
             return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6, 4 );
         }
         return sanitize_text_field( $phone );
+    }
+}
+
+/**
+ * Helper: Normalize District Input (e.g. "1", "6", "Dist 6", "District #7") to Standard Key ("District 1" - "District 7")
+ */
+if ( ! function_exists( 'sywat_normalize_district' ) ) {
+    function sywat_normalize_district( $input ) {
+        if ( empty( $input ) ) return '';
+        $num = preg_replace( '/[^0-9]/', '', (string) $input );
+        if ( ! empty( $num ) && intval( $num ) >= 1 && intval( $num ) <= 7 ) {
+            return 'District ' . intval( $num );
+        }
+        return sanitize_text_field( $input );
+    }
+}
+
+/**
+ * Helper: Normalize State Input to Match Form Dropdown Values
+ */
+if ( ! function_exists( 'sywat_normalize_state_code' ) ) {
+    function sywat_normalize_state_code( $input ) {
+        $clean = strtolower( trim( $input ) );
+        if ( empty( $clean ) ) return 'TX - Texas';
+
+        $state_map = array(
+            'tx'         => 'TX - Texas',
+            'texas'      => 'TX - Texas',
+            'la'         => 'LA - Louisiana',
+            'louisiana'  => 'LA - Louisiana',
+            'ok'         => 'OK - Oklahoma',
+            'oklahoma'   => 'OK - Oklahoma',
+            'nm'         => 'NM - New Mexico',
+            'new mexico' => 'NM - New Mexico',
+            'ar'         => 'AR - Arkansas',
+            'arkansas'   => 'AR - Arkansas',
+        );
+
+        foreach ( $state_map as $key => $full_val ) {
+            if ( strcasecmp( $clean, strtolower( $full_val ) ) === 0 ) {
+                return $full_val;
+            }
+        }
+
+        return isset( $state_map[$clean] ) ? $state_map[$clean] : 'TX - Texas';
     }
 }
 
@@ -39,7 +84,7 @@ if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
                 'shop_ccr' => array(
                     'id'            => 'shop_ccr',
                     'name'          => 'Cinnamon Creek Ranch',
-                    'district'      => '', // Defaults to Unassigned
+                    'district'      => 'District 5',
                     'facilities'    => array( 'pro_shop', 'indoor_range', '3d_range' ),
                     'contact'       => 'Hannah Lange / Beau Brennan',
                     'email'         => 'events@cinnamoncreekranch.com / beau@cinnamoncreekranch.com',
@@ -47,7 +92,7 @@ if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
                     'address_1'     => '13795 Old Denton Rd',
                     'address_2'     => '',
                     'city'          => 'Roanoke',
-                    'state'         => 'TX',
+                    'state'         => 'TX - Texas',
                     'zip'           => '76262',
                     'default_lines' => $default_lines,
                     'created_at'    => current_time( 'mysql' ),
