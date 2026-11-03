@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -149,13 +149,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                    <div class="sywat-card-header-bar">
+                    <!-- UNIFIED TOP CARD HEADER BAR -->
+                    <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:15px;">
                         <div>
-                            <h2>🎯 Configured Tournaments</h2>
+                            <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">🎯 Configured Tournaments</h2>
                             <div class="sywat-subtitle" style="margin-top:2px;">Overview of configured tournaments, shooting lines, and archer administration.</div>
                         </div>
 
-                        <div class="sywat-header-inline-controls" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <!-- FLUSH RIGHT-ALIGNED CONTROL TOOLBAR -->
+                        <div class="sywat-header-inline-controls" style="display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; margin-left:auto;">
                             <!-- Search & Filter Controls Group -->
                             <div style="display: flex; gap: 5px; margin: 0; align-items: center; white-space: nowrap;">
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
