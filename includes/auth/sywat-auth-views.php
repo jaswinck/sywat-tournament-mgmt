@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 2.6.2
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,6 +59,9 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                     📊 Manage Tournaments
                                 </a>
                                 <?php if ( $can_access_desk ): ?>
+                                    <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>">
+                                        📝 Register Shooters
+                                    </a>
                                     <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>">
                                         📋 Check In Archers
                                     </a>
