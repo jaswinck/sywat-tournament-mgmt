@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -72,10 +72,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
         $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
         <div class="sywat-public-card">
-            <div class="sywat-card-header">
-                <h2>🎯 Individual Tournament Directory</h2>
-                <div class="sywat-subtitle">
-                    Select a completed tournament below to view official scores and category leaderboards.
+            <div class="sywat-card-header-bar">
+                <div>
+                    <h2>🎯 Individual Tournament Directory</h2>
+                    <div class="sywat-subtitle">
+                        Select a completed tournament below to view official scores and category leaderboards.
+                    </div>
                 </div>
             </div>
 
@@ -422,14 +424,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                 <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
                                                     <td class="sywat-col-center"><strong><?php echo $current_rank; ?></strong></td>
                                                     <td>
-                                                        <strong><?php echo esc_html( $a['name'] ); ?></strong>
-                                                        <?php if ( $can_edit_scores && ! empty( $reg_id ) ): ?>
-                                                            <button type="button" 
-                                                                    class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit sywat-btn-sm" 
-                                                                    onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $a['name'] ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $gender_val ); ?>', '<?php echo esc_js( $a['style'] ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>)">
-                                                                ✏️ Edit
-                                                            </button>
-                                                        <?php endif; ?>
+                                                        <div class="sywat-archer-cell-content">
+                                                            <strong><?php echo esc_html( $a['name'] ); ?></strong>
+                                                            <?php if ( $can_edit_scores && ! empty( $reg_id ) ): ?>
+                                                                <button type="button" 
+                                                                        class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit sywat-btn-sm" 
+                                                                        onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $a['name'] ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $gender_val ); ?>', '<?php echo esc_js( $a['style'] ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>)">
+                                                                    Edit
+                                                                </button>
+                                                            <?php endif; ?>
+                                                        </div>
                                                     </td>
                                                     <td class="sywat-col-right sywat-score-cell">
                                                         <strong><?php echo $s_val . ' / ' . $x_val . 'X'; ?></strong>
