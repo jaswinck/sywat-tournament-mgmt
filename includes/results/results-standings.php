@@ -54,14 +54,12 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         ?>
 
         <div class="sywat-public-card">
-            <div class="sywat-subtitle">
-                Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
-            </div>
+            <!-- TOP HEADER BAR: EXPLANATORY SUBTITLE (LEFT) + SEASON SELECTOR (RIGHT) -->
+            <div class="sywat-card-header-bar">
+                <div class="sywat-subtitle">
+                    Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
+                </div>
 
-            <!-- UNIFIED ALIGNED FILTER BAR -->
-            <div class="sywat-filter-bar">
-                
-                <!-- 1. Season Switcher Field -->
                 <form method="get" id="sywat_season_form" class="sywat-filter-form">
                     <input type="hidden" name="view" value="standings">
                     <div class="sywat-field-group">
@@ -75,8 +73,11 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                         </select>
                     </div>
                 </form>
+            </div>
 
-                <!-- 2. Division Filter -->
+            <!-- UNIFIED ALIGNED FILTER BAR (LIVE TABLE FILTERS ONLY) -->
+            <div class="sywat-filter-bar">
+                <!-- 1. Division Filter -->
                 <div class="sywat-field-group">
                     <label>Division</label>
                     <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()">
@@ -87,7 +88,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </select>
                 </div>
 
-                <!-- 3. Gender Filter -->
+                <!-- 2. Gender Filter -->
                 <div class="sywat-field-group">
                     <label>Gender</label>
                     <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()">
@@ -97,7 +98,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </select>
                 </div>
 
-                <!-- 4. Style Filter -->
+                <!-- 3. Style Filter -->
                 <div class="sywat-field-group">
                     <label>Style</label>
                     <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()">
@@ -108,7 +109,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </select>
                 </div>
 
-                <!-- 5. Search Archer Field & Reset Button -->
+                <!-- 4. Search Archer Field & Reset Button -->
                 <div class="sywat-field-group">
                     <label>Search Archer</label>
                     <div class="sywat-search-input-wrapper">
