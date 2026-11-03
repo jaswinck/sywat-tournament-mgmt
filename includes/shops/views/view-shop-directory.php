@@ -2,7 +2,8 @@
 /**
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
- * Version: 3.6.0
+ * Author: SYWAT Archery / TFAA
+ * Version: 4.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -10,6 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
 $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
 $is_admin           = current_user_can( 'administrator' );
+
+// Check for Active 2-Step Import Preview Transient
+$user_id        = get_current_user_id();
+$import_preview = get_transient( 'sywat_shop_import_preview_' . $user_id );
+$has_preview    = ! empty( $import_preview ) && ! empty( $import_preview['items'] );
 
 $filtered_shops = array();
 foreach ( $all_shops as $s_id => $shop ) {
@@ -172,45 +178,132 @@ foreach ( $all_shops as $s_id => $shop ) {
 
 <!-- IMPORT SHOPS MODAL -->
 <div id="importShopsModal" class="sywat-modal-backdrop" style="display:none;">
-    <div class="sywat-modal-content sywat-modal-md">
+    <div class="sywat-modal-content <?php echo $has_preview ? 'sywat-modal-md' : 'sywat-modal-md'; ?>" style="<?php echo $has_preview ? 'max-width:850px; width:95%;' : ''; ?>">
         <div class="sywat-modal-header no-print">
-            <h3>📥 Import Locations & Contacts</h3>
+            <h3>📥 <?php echo $has_preview ? 'Review Import Preview' : 'Import Locations & Contacts'; ?></h3>
             <button type="button" class="sywat-modal-close" onclick="closeImportShopsModal()">&times;</button>
         </div>
         <div class="sywat-modal-body">
-            <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" enctype="multipart/form-data">
-                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                <input type="hidden" name="sywat_shop_action" value="import_shops">
-
-                <div style="margin-bottom:15px;">
-                    <p style="font-size:13px; color:#475569; margin-top:0; line-height:1.5;">
-                        Upload an Excel (<code>.xlsx</code> / <code>.xls</code>) or <code>.csv</code> file containing your master shop directory and contact details.
-                    </p>
+            <?php if ( $has_preview ): ?>
+                <!-- STAGE 2: DRY-RUN PREVIEW TABLE & CONFIRMATION -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <strong style="font-size:13px; color:#1e293b;">File:</strong> <code><?php echo esc_html( $import_preview['file_name'] ); ?></code>
+                        <span style="font-size:12px; color:#64748b; margin-left:10px;">(Mode: <?php echo esc_html( $import_preview['mode'] === 'skip_existing' ? 'Add New Only' : 'Safe Merge & Update' ); ?>)</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <span class="sywat-badge" style="background:#dcfce7; color:#15803d; font-weight:bold; padding:4px 8px; font-size:11px;">
+                            🟢 <?php echo intval( $import_preview['summary']['new'] ); ?> New
+                        </span>
+                        <span class="sywat-badge" style="background:#fef3c7; color:#b45309; font-weight:bold; padding:4px 8px; font-size:11px;">
+                            🟡 <?php echo intval( $import_preview['summary']['update'] ); ?> Updates
+                        </span>
+                        <?php if ( $import_preview['summary']['skip'] > 0 ): ?>
+                            <span class="sywat-badge" style="background:#f1f5f9; color:#64748b; font-weight:bold; padding:4px 8px; font-size:11px;">
+                                ⚪ <?php echo intval( $import_preview['summary']['skip'] ); ?> Skipped
+                            </span>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select File (.xlsx, .xls, .csv) *</label>
-                    <input type="file" name="shop_import_file" accept=".xlsx,.xls,.csv" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; background:#fff;">
+                <div style="max-height:360px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
+                    <table class="sywat-table" style="font-size:12px;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:2;">
+                            <tr>
+                                <th style="width:14%;">Action</th>
+                                <th style="width:26%;">Location Name</th>
+                                <th style="width:10%;">Type</th>
+                                <th style="width:12%;">District</th>
+                                <th style="width:20%;">Address</th>
+                                <th style="width:18%;">Primary Contact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $import_preview['items'] as $p_item ): ?>
+                                <tr>
+                                    <td>
+                                        <?php if ( $p_item['status'] === 'new' ): ?>
+                                            <span class="sywat-badge" style="background:#dcfce7; color:#15803d; font-size:10px; padding:2px 6px;">🟢 Create New</span>
+                                        <?php elseif ( $p_item['status'] === 'update' ): ?>
+                                            <span class="sywat-badge" style="background:#fef3c7; color:#b45309; font-size:10px; padding:2px 6px;">🟡 Update</span>
+                                        <?php else: ?>
+                                            <span class="sywat-badge" style="background:#f1f5f9; color:#64748b; font-size:10px; padding:2px 6px;">⚪ Skipped</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><strong><?php echo esc_html( $p_item['name'] ); ?></strong></td>
+                                    <td>
+                                        <span class="sywat-badge" style="background:<?php echo ($p_item['location_type'] === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px;">
+                                            <?php echo ($p_item['location_type'] === 'club') ? '🌲 Club' : '🏪 Shop'; ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo esc_html( $p_item['district'] ? $p_item['district'] : 'Unassigned' ); ?></td>
+                                    <td>
+                                        <?php 
+                                            $full_addr = array_filter( array( $p_item['address_1'], $p_item['city'], $p_item['state'], $p_item['zip'] ) );
+                                            echo esc_html( ! empty( $full_addr ) ? implode( ', ', $full_addr ) : 'No address' );
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <strong><?php echo esc_html( $p_item['contact'] ? $p_item['contact'] : 'N/A' ); ?></strong>
+                                        <?php if ( ! empty( $p_item['phone'] ) ): ?>
+                                            <br><span style="color:#64748b; font-size:11px;"><?php echo esc_html( $p_item['phone'] ); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
 
-                <div style="margin-bottom:15px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Import Mode</label>
-                    <select name="import_mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                        <option value="upsert">Safe Merge & Update (Update Existing & Add New)</option>
-                        <option value="skip_existing">Add New Locations Only (Skip Existing)</option>
-                    </select>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:20px;">
+                    <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" style="margin:0;">
+                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                        <input type="hidden" name="sywat_shop_action" value="cancel_import_shops">
+                        <button type="submit" class="sywat-btn sywat-btn-secondary">Cancel & Start Over</button>
+                    </form>
+                    <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" style="margin:0;">
+                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                        <input type="hidden" name="sywat_shop_action" value="confirm_import_shops">
+                        <button type="submit" class="sywat-btn sywat-btn-primary">Confirm & Import <?php echo count($import_preview['items']); ?> Locations</button>
+                    </form>
                 </div>
 
-                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:12px; font-size:12px; color:#0369a1; line-height:1.4; margin-bottom:15px;">
-                    💡 <strong>Expected Column Headers:</strong><br>
-                    <code>Shop/Club</code>, <code>Type</code>, <code>District</code>, <code>Address Line 1</code>, <code>Address Line 2</code>, <code>City</code>, <code>State</code>, <code>Zip</code>, <code>Primary Contact</code>, <code>Primary Title</code>, <code>Primary Email</code>, <code>Primary Phone</code>, <code>Additional Contact</code>, <code>Additional Title</code>, <code>Additional Email</code>, <code>Additional Phone</code>
-                </div>
+            <?php else: ?>
+                <!-- STAGE 1: FILE UPLOAD FORM -->
+                <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" enctype="multipart/form-data">
+                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                    <input type="hidden" name="sywat_shop_action" value="preview_import_shops">
 
-                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeImportShopsModal()">Cancel</button>
-                    <button type="submit" class="sywat-btn sywat-btn-primary">Upload & Process Import</button>
-                </div>
-            </form>
+                    <div style="margin-bottom:15px;">
+                        <p style="font-size:13px; color:#475569; margin-top:0; line-height:1.5;">
+                            Upload an Excel (<code>.xlsx</code> / <code>.xls</code>) or <code>.csv</code> file containing your master shop directory and contact details.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select File (.xlsx, .xls, .csv) *</label>
+                        <input type="file" name="shop_import_file" accept=".xlsx,.xls,.csv" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; background:#fff;">
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Import Mode</label>
+                        <select name="import_mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                            <option value="upsert">Safe Merge & Update (Update Existing & Add New)</option>
+                            <option value="skip_existing">Add New Locations Only (Skip Existing)</option>
+                        </select>
+                    </div>
+
+                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:12px; font-size:12px; color:#0369a1; line-height:1.4; margin-bottom:15px;">
+                        💡 <strong>Expected Column Headers:</strong><br>
+                        <code>Shop/Club</code>, <code>Type</code>, <code>District</code>, <code>Address Line 1</code>, <code>Address Line 2</code>, <code>City</code>, <code>State</code>, <code>Zip</code>, <code>Primary Contact</code>, <code>Primary Title</code>, <code>Primary Email</code>, <code>Primary Phone</code>, <code>Additional Contact</code>, <code>Additional Title</code>, <code>Additional Email</code>, <code>Additional Phone</code>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeImportShopsModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary">Upload & Generate Preview</button>
+                    </div>
+                </form>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -334,4 +427,10 @@ function closeImportShopsModal() {
     var modal = document.getElementById('importShopsModal');
     if (modal) modal.style.display = 'none';
 }
+
+<?php if ( $has_preview ): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    openImportShopsModal();
+});
+<?php endif; ?>
 </script>
