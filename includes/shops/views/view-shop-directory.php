@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.5.0
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -34,29 +34,20 @@ uasort( $filtered_shops, function( $a, $b ) {
 ?>
 
 <div class="sywat-card no-print">
-    <!-- Clean Card Header: Title Left, Primary Actions Right -->
-    <div class="sywat-card-title" style="display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:15px; flex-wrap:wrap;">
-        <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
-            <?php 
+    <!-- UNIFIED TOP CARD HEADER BAR: TITLE (LEFT) & INLINE CONTROLS / ACTIONS (RIGHT) -->
+    <div class="sywat-card-header-bar">
+        <h2>
+            🎯 <?php 
                 if ($type_filter === 'pro_shop') echo 'Shops';
                 elseif ($type_filter === 'club') echo 'Clubs';
                 else echo 'Shops and Clubs';
             ?>
         </h2>
-        <?php if ( $can_manage_seasons || $is_admin ): ?>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <button type="button" class="sywat-btn sywat-btn-secondary" style="height:36px; line-height:1; display:inline-flex; align-items:center; gap:6px;" onclick="openImportShopsModal()">📥 Import Locations</button>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:36px; line-height:1; display:inline-flex; align-items:center; gap:6px;" onclick="openAddShopModal()">Add Location</button>
-            </div>
-        <?php endif; ?>
-    </div>
 
-    <!-- Dedicated Labeled Filter Toolbar -->
-    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
-        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; width:100%;">
-            <!-- Labeled District Select -->
+        <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <!-- Clean Inline District Filter -->
             <div style="display:flex; align-items:center; gap:8px;">
-                <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">District:</label>
+                <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">District:</label>
                 <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:180px;">
                     <option value="">All Districts</option>
                     <option value="unassigned">Unassigned Only</option>
@@ -66,14 +57,21 @@ uasort( $filtered_shops, function( $a, $b ) {
                 </select>
             </div>
 
-            <!-- Labeled Search & Clear -->
-            <div style="display:flex; align-items:center; gap:8px; flex-grow:1; max-width:400px;">
-                <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">Search Location:</label>
-                <div style="display:flex; gap:6px; width:100%;">
-                    <input type="text" id="sywat_shop_search_input" placeholder="Search by shop or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; width:100%; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+            <!-- Clean Inline Search & Clear -->
+            <div style="display:flex; align-items:center; gap:8px;">
+                <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">Search Location:</label>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="sywat_shop_search_input" placeholder="Search by shop or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; min-width:200px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:36px; padding:0 12px; white-space:nowrap;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
                 </div>
             </div>
+
+            <?php if ( $can_manage_seasons || $is_admin ): ?>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button" class="sywat-btn sywat-btn-secondary" style="height:36px; line-height:1; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;" onclick="openImportShopsModal()">📥 Import Locations</button>
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:36px; line-height:1; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;" onclick="openAddShopModal()">Add Location</button>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -84,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:25%;">Location Name & ID</th>
-                        <th style="width:12%;">District</th>
-                        <th style="width:20%;">Facilities</th>
-                        <th style="width:22%;">Contact Info</th>
-                        <th style="width:11%;">Phone</th>
-                        <th style="width:10%; text-align:right;">Actions</th>
+                        <th style="width:25%; text-align:left;">Location Name & ID</th>
+                        <th style="width:12%; text-align:left;">District</th>
+                        <th style="width:20%; text-align:left;">Facilities</th>
+                        <th style="width:22%; text-align:left;">Contact Info</th>
+                        <th style="width:11%; text-align:left;">Phone</th>
+                        <th class="sywat-col-right" style="width:10%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,7 +108,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                             $cnt_search_str = implode( ' ', $all_cnt_names );
                         ?>
                         <tr class="sywat-shop-row" data-name="<?php echo esc_attr(strtolower($shop['name'])); ?>" data-id="<?php echo esc_attr(strtolower($s_id)); ?>" data-contact="<?php echo esc_attr(strtolower($cnt_search_str)); ?>" data-district="<?php echo esc_attr(strtolower($s_dist)); ?>">
-                            <td>
+                            <td style="text-align:left;">
                                 <strong><?php echo esc_html( $shop['name'] ); ?></strong>
                                 <?php if ($type_filter === 'all'): ?>
                                     <span class="sywat-badge" style="background:<?php echo ($s_type === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px; padding:2px 6px; margin-left:4px;">
@@ -120,14 +118,14 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 <br>
                                 <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
                             </td>
-                            <td>
+                            <td style="text-align:left;">
                                 <?php if ( ! empty( $s_dist ) ): ?>
                                     <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $s_dist ); ?></span>
                                 <?php else: ?>
                                     <span style="font-size:12px; color:#94a3b8; font-style:italic;">Unassigned</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
+                            <td style="text-align:left;">
                                 <div style="display:flex; flex-wrap:wrap; gap:3px;">
                                     <?php if ( in_array( 'pro_shop', $s_fac ) ): ?>
                                         <span class="sywat-badge" style="background:#e0f2fe; color:#0369a1;">🏪 Pro Shop</span>
@@ -146,7 +144,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td>
+                            <td style="text-align:left;">
                                 <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong>
                                 <?php if ( ! empty($s_add_cnt) ): ?>
                                     <span class="sywat-badge" style="background:#f1f5f9; color:#475569; font-size:10px; cursor:help;" title="<?php foreach($s_add_cnt as $ac) { echo esc_attr(($ac['name'] ?? 'Contact') . ' (' . ($ac['title'] ?? 'Staff') . ') - ' . ($ac['email'] ?? 'No email') . "\n"); } ?>">
@@ -169,8 +167,8 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     }
                                 ?>
                             </td>
-                            <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                            <td style="text-align:right;">
+                            <td style="text-align:left;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
+                            <td class="sywat-col-right">
                                 <div style="display:inline-flex; gap:4px; align-items:center; justify-content:flex-end;">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
                                         <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:2px 6px; font-size:11px; height:28px;">Staff (<?php echo $linked_count; ?>)</a>
