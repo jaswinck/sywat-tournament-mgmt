@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
