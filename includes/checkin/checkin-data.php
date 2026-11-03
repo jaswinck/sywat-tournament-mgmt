@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: checkin-data.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -84,15 +84,28 @@ function sywat_desk_get_data() {
     $selected_line_idx   = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field($_REQUEST['selected_line_idx'])   : 'all';
     $search_query        = isset($_REQUEST['search_query'])        ? sanitize_text_field($_REQUEST['search_query'])        : '';
 
+    // Remember last selected tournament per user if not explicitly passed
+    if (empty($selected_tournament) && $user->ID) {
+        $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
+        if (!empty($saved_t) && isset($tournaments[$saved_t])) {
+            $selected_tournament = $saved_t;
+        }
+    }
+
     if (empty($selected_tournament) && !empty($tournaments)) {
         reset($tournaments);
         $selected_tournament = key($tournaments);
+    }
+
+    if ($user->ID && !empty($selected_tournament)) {
+        update_user_meta($user->ID, 'sywat_desk_selected_tournament', $selected_tournament);
     }
 
     $lines = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
     $active_t_slug = sanitize_title($selected_tournament);
 
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
+    wp_cache_delete($closed_lines_key, 'options');
     $raw_closed       = get_option($closed_lines_key, array());
     $closed_lines     = is_array($raw_closed) ? array_values(array_map('strval', $raw_closed)) : array();
 
