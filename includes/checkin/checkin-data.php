@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: checkin-data.php
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 5.0.0 (Clean Native WP API)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -84,7 +84,6 @@ function sywat_desk_get_data() {
     $selected_line_idx   = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field($_REQUEST['selected_line_idx'])   : 'all';
     $search_query        = isset($_REQUEST['search_query'])        ? sanitize_text_field($_REQUEST['search_query'])        : '';
 
-    // Global Active Tournament Sync across all staff
     if (empty($selected_tournament)) {
         $global_curr = get_option('sywat_current_tournament', '');
         if (!empty($global_curr) && isset($tournaments[$global_curr])) {
@@ -111,11 +110,12 @@ function sywat_desk_get_data() {
     $lines         = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
     $active_t_slug = sanitize_title($selected_tournament);
 
-    // Direct SQL Read — Bypass Object Cache completely
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    $raw_closed       = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
-    $closed_arr       = $raw_closed ? maybe_unserialize($raw_closed) : array();
-    $closed_lines     = is_array($closed_arr) ? array_values(array_unique(array_map('trim', array_map('strval', $closed_arr)))) : array();
+    
+    // Clear local object cache right before reading natively
+    wp_cache_delete($closed_lines_key, 'options');
+    $raw_closed   = get_option($closed_lines_key, array());
+    $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
 
     $registrations = array();
     $results = $wpdb->get_results($wpdb->prepare(
@@ -130,7 +130,6 @@ function sywat_desk_get_data() {
         }
     }
 
-    // Historical Profiles Lookup
     $all_db_results = $wpdb->get_results("SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'");
     $history_profiles = array();
 
@@ -167,7 +166,6 @@ function sywat_desk_get_data() {
         'updated_at' => isset($tfaa_cache_option['updated_at']) ? $tfaa_cache_option['updated_at'] : 'Never'
     );
 
-    // Build Line-Scoped & Smart-Named Family Groups
     $existing_families_by_line = array();
     $family_members_by_id      = array();
 
