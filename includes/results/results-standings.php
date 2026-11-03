@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.7.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -52,12 +52,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             return strcasecmp( $a, $b );
         });
         ?>
-
-        <!-- Master Navigation Tabs -->
-        <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'standings', get_permalink() ) ); ?>" class="sywat-tab-item active">🏆 Season Standings</a>
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'tournaments', get_permalink() ) ); ?>" class="sywat-tab-item">🎯 Tournament Results</a>
-        </div>
 
         <div class="sywat-public-card" style="border-top-left-radius: 0;">
             
