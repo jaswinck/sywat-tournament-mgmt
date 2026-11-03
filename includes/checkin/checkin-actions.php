@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 4.0.0 (Nuclear Cache Bypass)
+ * Version: 4.1.0 (Dual-Identifier Wipe & SQL Override)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -31,13 +31,11 @@ function sywat_desk_handle_actions(&$data) {
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
     $existing_families         = $data['existing_families'];
 
-    // ---------------------------------------------------------
-    // NUCLEAR DATABASE HELPERS: BYPASS ALL WP OBJECT CACHING
-    // ---------------------------------------------------------
+    // Direct Database Access Helpers
     $force_db_read = function($key) use ($wpdb) {
         $raw = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $key));
         $arr = $raw ? maybe_unserialize($raw) : array();
-        return is_array($arr) ? array_map('strval', $arr) : array();
+        return is_array($arr) ? array_map('trim', array_map('strval', $arr)) : array();
     };
 
     $force_db_update = function($key, $array) use ($wpdb) {
@@ -72,49 +70,54 @@ function sywat_desk_handle_actions(&$data) {
         return $style;
     };
 
-    // Close Line (Admin, Tournament Director & Shop Managers)
+    // Close Line
     if ($action === 'close_line' && $data['is_admin']) {
-        $target_line = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_idx  = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
         $live_closed = $force_db_read($closed_lines_key);
 
-        if (!in_array($target_line, $live_closed, true)) {
-            $live_closed[] = $target_line;
-            $live_closed   = array_values(array_unique($live_closed));
-            
-            $force_db_update($closed_lines_key, $live_closed);
-            $data['closed_lines'] = $live_closed; // Update in-memory array for current view render
+        if (!in_array($target_idx, $live_closed, true)) {
+            $live_closed[] = $target_idx;
+        }
+        if ($target_name !== '' && !in_array($target_name, $live_closed, true)) {
+            $live_closed[] = $target_name;
+        }
 
-            $update_count = 0;
-            foreach ($registrations as &$r) {
-                // Safely resolve the line index to handle legacy string names
-                $r_resolved_lidx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($r, $lines) : (isset($r['line_index']) ? (string)$r['line_index'] : '0');
-                if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r_resolved_lidx === $target_line) {
-                    if (empty($r['checked_in'])) {
-                        $r['division'] = 'No Show'; $r['gender'] = 'No Show'; $r['style'] = 'No Show';
-                        update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
-                        $update_count++;
-                    }
+        $live_closed = array_values(array_unique($live_closed));
+        $force_db_update($closed_lines_key, $live_closed);
+        $data['closed_lines'] = $live_closed;
+
+        $update_count = 0;
+        foreach ($registrations as &$r) {
+            $r_resolved_lidx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($r, $lines) : (isset($r['line_index']) ? (string)$r['line_index'] : '0');
+            if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r_resolved_lidx === $target_idx) {
+                if (empty($r['checked_in'])) {
+                    $r['division'] = 'No Show'; $r['gender'] = 'No Show'; $r['style'] = 'No Show';
+                    update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
+                    $update_count++;
                 }
             }
-            unset($r);
-            return '<div class="sywat-alert sywat-alert-success"><strong>Line closed successfully.</strong> ' . $update_count . ' absent archer(s) marked as No Show.</div>';
         }
+        unset($r);
+        return '<div class="sywat-alert sywat-alert-success"><strong>Line closed successfully.</strong> ' . $update_count . ' absent archer(s) marked as No Show.</div>';
     }
 
-    // Reopen Line (Admin, Tournament Director & Shop Managers)
+    // Reopen Line (Wipes both index and line name to ensure clean reopen)
     if ($action === 'reopen_line' && $data['is_admin']) {
-        $target_line = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_idx  = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
         $live_closed = $force_db_read($closed_lines_key);
-        
+
         $new_closed = array();
         foreach ($live_closed as $val) {
-            if (trim((string)$val) !== $target_line) {
-                $new_closed[] = (string)$val;
+            $v_clean = trim((string)$val);
+            if ($v_clean !== $target_idx && ($target_name === '' || $v_clean !== $target_name)) {
+                $new_closed[] = $v_clean;
             }
         }
 
         $force_db_update($closed_lines_key, $new_closed);
-        $data['closed_lines'] = $new_closed; // Update in-memory array for current view render
+        $data['closed_lines'] = $new_closed;
         
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
@@ -128,7 +131,6 @@ function sywat_desk_handle_actions(&$data) {
             return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
         }
 
-        // Duplicate check: prevent registering the same archer on the same line twice
         $is_duplicate = false;
         if (function_exists('sywat_is_archer_on_line')) {
             $is_duplicate = sywat_is_archer_on_line($selected_tournament, $line_idx, $name_val, $registrations);
@@ -167,7 +169,6 @@ function sywat_desk_handle_actions(&$data) {
                 $family_id   = $sel_fam_id;
                 $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
             } else {
-                // Generate Anchor Family ID
                 $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($name_val) . '_' . substr(md5(uniqid()), 0, 4);
                 $family_name = $name_val . ' (Family Cap)';
             }
@@ -201,7 +202,6 @@ function sywat_desk_handle_actions(&$data) {
         update_option('sywat_t_' . $active_t_slug . '_' . $new_id, $new_reg, false);
         $registrations[] = $new_reg;
 
-        // Synchronize into master tournament roster
         $t_slug      = sanitize_title($selected_tournament);
         $master_regs = get_option('sywat_registrations_' . $t_slug, array());
         if (!is_array($master_regs)) $master_regs = array();
@@ -237,7 +237,6 @@ function sywat_desk_handle_actions(&$data) {
                 $reg['checked_in']  = 1;
                 $reg['balance_due'] = 0;
                 
-                // Process Family Option changes on check-in
                 if ($reg['paid'] === 'Family') {
                     $sel_fam_id = isset($_POST['checkin_family_group_id']) ? sanitize_text_field($_POST['checkin_family_group_id']) : '';
                     $line_idx   = isset($reg['line_index']) ? $reg['line_index'] : '0';
@@ -247,7 +246,6 @@ function sywat_desk_handle_actions(&$data) {
                         $reg['family_id']   = $sel_fam_id;
                         $reg['family_name'] = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
                     } elseif (empty($reg['family_id'])) {
-                        // Generate Anchor Family ID if changing to family at check-in
                         $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($reg['name']) . '_' . substr(md5(uniqid()), 0, 4);
                         $reg['family_name'] = $reg['name'] . ' (Family Cap)';
                     }
@@ -257,7 +255,6 @@ function sywat_desk_handle_actions(&$data) {
                 
                 update_option($opt_key, $reg, false);
 
-                // Multi-Archer Family Balance Sync: Clear balance_due ONLY for archers on the SAME shooting line
                 $fam_id      = !empty($reg['family_id']) ? $reg['family_id'] : '';
                 $book_id     = !empty($reg['booking_id']) ? $reg['booking_id'] : '';
                 $target_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
@@ -315,7 +312,6 @@ function sywat_desk_handle_actions(&$data) {
             $orig_name = isset($reg['name']) ? trim($reg['name']) : '';
             $orig_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
 
-            // Duplicate check if archer name or line is edited to match an existing registrant on that line
             if ( (strcasecmp($orig_name, $edit_name) !== 0 || (string)$orig_line !== (string)$line_idx) ) {
                 $dupe_found = false;
                 foreach ($registrations as $other) {
@@ -360,7 +356,6 @@ function sywat_desk_handle_actions(&$data) {
                     $reg['family_id']   = $sel_fam_id;
                     $reg['family_name'] = isset($edit_families[$sel_fam_id]) ? $edit_families[$sel_fam_id] : 'Family Group';
                 } elseif (empty($reg['family_id']) || $orig_line !== $line_idx) {
-                    // Generate new Anchor Family ID if moved to a new line or previously unassigned
                     $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($edit_name) . '_' . substr(md5(uniqid()), 0, 4);
                     $reg['family_name'] = $edit_name . ' (Family Cap)';
                 }
