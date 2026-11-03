@@ -72,7 +72,7 @@ function sywat_desk_render_filter_bar($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
                     <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0; white-space:nowrap;">Tournament:</label>
+                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0; white-space:nowrap;">Active Tournament:</label>
                         <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0;">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                                 <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
