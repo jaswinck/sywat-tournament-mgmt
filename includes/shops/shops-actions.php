@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,7 +56,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
 
             if ( empty( $facilities ) ) {
-                $facilities = ( $loc_type === 'club' ) ? array( 'indoor_range' ) : array( 'pro_shop', 'indoor_range' );
+                $facilities = array( 'indoor_range' );
             }
 
             $shops[$shop_slug] = array(
@@ -304,14 +304,15 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     );
                 }
 
-                // Auto-detect Location Type & Facility Classification (Disassociated Pro Shop vs. Indoor Range)
+                // Auto-detect Location Type
                 if ( strtolower($raw_type) === 'club' || strpos( strtolower($shop_name), '4h' ) !== false || strpos( strtolower($shop_name), 'club' ) !== false ) {
-                    $loc_type   = 'club';
-                    $facilities = array( 'indoor_range' );
+                    $loc_type = 'club';
                 } else {
-                    $loc_type   = 'pro_shop';
-                    $facilities = array( 'pro_shop', 'indoor_range' );
+                    $loc_type = 'pro_shop';
                 }
+
+                // All uploaded/imported locations default to Indoor Range only (no Pro Shop tag by default)
+                $facilities = array( 'indoor_range' );
 
                 $shop_slug = 'shop_' . sanitize_title( $shop_name );
 
@@ -432,28 +433,23 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         $shops[$shop_slug]['additional_contacts'] = $item['additional_contacts'];
                     }
 
-                    // Enforce facility separation: Clubs get 'indoor_range' only; Shops get both.
+                    // Strip auto-assigned 'pro_shop' facility tag from all imported locations, ensure 'indoor_range' is set
                     $existing_fac = isset( $shops[$shop_slug]['facilities'] ) && is_array( $shops[$shop_slug]['facilities'] ) ? $shops[$shop_slug]['facilities'] : array();
-                    if ( $item['location_type'] === 'club' ) {
-                        $existing_fac = array_diff( $existing_fac, array( 'pro_shop' ) );
-                        if ( ! in_array( 'indoor_range', $existing_fac ) ) {
-                            $existing_fac[] = 'indoor_range';
-                        }
-                    } else {
-                        if ( ! in_array( 'pro_shop', $existing_fac ) )    $existing_fac[] = 'pro_shop';
-                        if ( ! in_array( 'indoor_range', $existing_fac ) ) $existing_fac[] = 'indoor_range';
+                    $existing_fac = array_diff( $existing_fac, array( 'pro_shop' ) );
+                    if ( ! in_array( 'indoor_range', $existing_fac ) ) {
+                        $existing_fac[] = 'indoor_range';
                     }
                     $shops[$shop_slug]['facilities'] = array_values( $existing_fac );
 
                     $updated_count++;
                 } else {
-                    // Create new location
+                    // Create new location (Only Indoor Target Range by default)
                     $shops[$shop_slug] = array(
                         'id'                  => $shop_slug,
                         'name'                => $item['name'],
                         'location_type'       => $item['location_type'],
                         'district'            => $item['district'],
-                        'facilities'          => isset( $item['facilities'] ) ? $item['facilities'] : ( $item['location_type'] === 'club' ? array( 'indoor_range' ) : array( 'pro_shop', 'indoor_range' ) ),
+                        'facilities'          => array( 'indoor_range' ),
                         'contact'             => $item['contact'],
                         'contact_title'       => $item['contact_title'],
                         'email'               => $item['email'],
