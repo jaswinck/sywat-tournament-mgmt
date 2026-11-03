@@ -1,9 +1,9 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Visual Views
- * File: checkin-views.php
+ * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -49,7 +49,7 @@ function sywat_desk_render_filter_bar($data) {
 
     $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
     ?>
-    <!-- Master Navigation Tabs -->
+    <!-- Master Navigation Tabs (Card-Docked) -->
     <div class="sywat-nav-tabs no-print">
         <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
         <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
