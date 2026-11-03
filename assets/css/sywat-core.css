@@ -179,7 +179,8 @@ body {
 
 /* Card Containers */
 .sywat-card,
-.sywat-shop-card {
+.sywat-shop-card,
+.sywat-public-card {
     background: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
@@ -251,7 +252,9 @@ body {
 
 /* Dock Card directly to Tab Track when placed immediately after tabs */
 .sywat-nav-tabs + .sywat-card,
-.sywat-nav-tabs + div > .sywat-card {
+.sywat-nav-tabs + .sywat-public-card,
+.sywat-nav-tabs + div > .sywat-card,
+.sywat-nav-tabs + div > .sywat-public-card {
     border-top-left-radius: 0;
 }
 
@@ -412,6 +415,7 @@ body {
 .sywat-btn-icon-clear::before       { content: "✕\00a0"; }
 .sywat-btn-icon-back::before        { content: "←\00a0"; }
 .sywat-btn-icon-global-push::before { content: "🚀\00a0"; }
+.sywat-btn-icon-results::before    { content: "🎯\00a0"; }
 
 /* Multi-Line Capacity Stack & Compact Slot Layout */
 .sywat-lines-grid {
