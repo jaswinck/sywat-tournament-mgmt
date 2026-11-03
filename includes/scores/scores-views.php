@@ -2,7 +2,8 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.9.0
+ * Author: SYWAT Archery
+ * Version: 4.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -153,18 +154,16 @@ function render_sywat_scores_app() {
 
         <!-- Integrated Control Panel Filter Toolbar -->
         <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-                <h3 class="sywat-filter-title" style="margin:0; font-size:18px; font-weight:700; color:#0f172a; white-space:nowrap;">
-                    Enter Scores
-                </h3>
+            <div class="sywat-card-header-bar">
+                <h2>🎯 Enter Scores</h2>
 
-                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
                     <form method="post" id="sywat_score_filter_form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                         
                         <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                            <label style="font-size:12px; font-weight:700; color:#475569; margin:0; white-space:nowrap;">Active Tournament:</label>
-                            <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0;">
+                            <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Active Tournament:</label>
+                            <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
                                 <?php foreach ($tournaments as $t_name => $t_lines): ?>
                                     <option value="<?php echo esc_attr($t_name); ?>" <?php selected($selected_tournament, $t_name); ?>>
                                         <?php echo esc_html($t_name); ?>
@@ -174,8 +173,8 @@ function render_sywat_scores_app() {
                         </div>
 
                         <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                            <label style="font-size:12px; font-weight:700; color:#475569; margin:0; white-space:nowrap;">Shooting Line:</label>
-                            <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0;">
+                            <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Shooting Line:</label>
+                            <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
                                 <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
                                 <?php foreach ($lines as $idx => $line): ?>
                                     <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?>>
@@ -195,8 +194,8 @@ function render_sywat_scores_app() {
 
         <!-- Line Score Tracker Card -->
         <div class="sywat-card no-print" style="margin-bottom:20px;">
-            <div class="sywat-card-title">
-                <span>Line Score Tracker</span>
+            <div class="sywat-card-header-bar">
+                <h2>🎯 Line Score Tracker</h2>
             </div>
             <?php if (!empty($lines)): ?>
                 <?php
@@ -307,38 +306,38 @@ function render_sywat_scores_app() {
                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
 
-                <div class="sywat-card-title">
+                <div class="sywat-card-header-bar">
                     <div>
-                        <span style="font-size:18px;">Archer Scores</span>
-                        <div style="font-size:13px; color:#64748b; font-weight:normal; margin-top:2px;">
+                        <h2>🎯 Archer Scores</h2>
+                        <div class="sywat-subtitle" style="margin-top:2px;">
                             Displaying <strong><?php echo count($tourn_registrations); ?></strong> checked-in archer(s) for <?php echo esc_html($selected_tournament); ?>
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <div class="sywat-header-inline-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <!-- Live Search Input -->
                         <div style="display:flex; gap:5px; align-items:center; margin-right:5px; flex-wrap:wrap;">
-                            <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                            <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search archer name..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:38px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
 
                         <!-- Export CSV Button (Admin & Shop Managers) -->
                         <?php if ($is_admin && !empty($locked_lines)): ?>
-                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" style="height:32px;" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
+                            <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" style="height:38px;" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
                         <?php endif; ?>
 
                         <?php if ($is_admin): ?>
                             <?php if ($selected_line_idx !== 'all'): ?>
                                 <?php if ($current_view_locked): ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" style="height:32px;" title="Unlock to edit scores">Unlock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" style="height:38px;" title="Unlock to edit scores">Unlock Line</button>
                                 <?php else: ?>
-                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock" style="height:32px;" title="Lock to prevent edits">Lock Line</button>
+                                    <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock" style="height:38px;" title="Lock to prevent edits">Lock Line</button>
                                 <?php endif; ?>
                             <?php endif; ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:38px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                         <?php endif; ?>
                         
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:32px;">Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:38px;">Save All Scores</button>
                     </div>
                 </div>
 
@@ -401,9 +400,9 @@ function render_sywat_scores_app() {
 
                     <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
                         <?php if ($is_admin): ?>
-                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:32px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
+                            <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" style="height:38px;" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                         <?php endif; ?>
-                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:32px;">Save All Scores</button>
+                        <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:38px;">Save All Scores</button>
                     </div>
                 <?php else: ?>
                     <p style="color:#64748b; font-style:italic; padding:20px 0;">No checked-in archers found for this tournament/line selection.</p>
