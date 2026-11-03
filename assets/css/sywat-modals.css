@@ -73,121 +73,14 @@
     overflow-y: auto; 
 }
 
-/* TFAA Autocomplete Dropdown */
-.sywat-tfaa-autocomplete-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    width: 100%;
-    min-width: 220px;
-    z-index: 99999;
-    background: #ffffff;
-    border: 1px solid #94a3b8;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    max-height: 180px;
-    overflow-y: auto;
-    margin-top: 2px;
+/* Form Grid & Input Row Spacing inside Modals */
+.sywat-modal-body .sywat-form-grid-2,
+.sywat-modal-body .sywat-form-grid-3,
+.sywat-modal-body form > div:not(:last-child) {
+    margin-bottom: 16px;
 }
 
-.sywat-tfaa-autocomplete-dropdown > div {
-    padding: 6px 10px;
-    cursor: pointer;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #1e293b;
-}
-
-.sywat-tfaa-autocomplete-dropdown > div:hover { 
-    background-color: #f1f5f9; 
-}
-
-#sywat_edit_archer_modal, 
-.sywat-modal-backdrop.sywat-nested-modal { 
-    z-index: 100050 !important; 
-}
-
-/* Mobile & Small Screen Adaptations */
-@media screen and (max-width: 600px) {
-    .sywat-modal-backdrop {
-        padding: 10p/* SYWAT Archery - Modals, Dialogs, and TFAA Autocomplete Dropdowns */
-
-.sywat-modal-backdrop {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 99999;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.sywat-modal-backdrop.active { 
-    display: flex; 
-}
-
-/* Base Fluid Modal Box */
-.sywat-modal-content {
-    background: #ffffff;
-    width: min(94vw, 560px);
-    border-radius: 6px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    margin: auto;
-    box-sizing: border-box;
-}
-
-/* Modal Sizing Modifiers for Responsive Layout Templates */
-.sywat-modal-sm { width: min(94vw, 480px); }  /* Standard Desk Check-In & Walk-In Modals */
-.sywat-modal-md { width: min(94vw, 620px); }  /* Manage Shooters Roster Edit Modal */
-.sywat-modal-lg { width: min(94vw, 920px); }  /* Phone Intake & Bulk Upload Roster Modals */
-
-.sywat-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid #dcdcde;
-    background: #f6f7f7;
-}
-
-.sywat-modal-header h3 { 
-    margin: 0; 
-    font-size: 1.1em; 
-    color: #1d2327; 
-    font-weight: 600; 
-}
-
-.sywat-modal-close {
-    background: none;
-    border: none;
-    font-size: 22px;
-    font-weight: bold;
-    color: #646970;
-    cursor: pointer;
-    line-height: 1;
-}
-
-.sywat-modal-close:hover { 
-    color: #d63638; 
-}
-
-.sywat-modal-body { 
-    padding: 20px; 
-    overflow-y: auto; 
-}
-
+/* Dedicated Modal Footer Container */
 .sywat-modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -196,6 +89,18 @@
     padding: 14px 20px;
     border-top: 1px solid #dcdcde;
     background: #f6f7f7;
+}
+
+/* Fallback: Inline Action Rows (Cancel / Save) Inside Modal Forms */
+.sywat-modal-body form > div:last-child {
+    margin-top: 20px !important;
+    margin-bottom: 0 !important;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
 }
 
 /* TFAA Autocomplete Dropdown */
