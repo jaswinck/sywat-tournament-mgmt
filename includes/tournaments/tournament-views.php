@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.5.1
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -131,6 +131,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <div class="sywat-nav-tabs no-print">
                 <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ($active_tab === 'manage') ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_access_desk ): ?>
+                    <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
                     <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <?php endif; ?>
                 <?php if ( $can_edit_scores ): ?>
@@ -174,6 +175,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 26px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff;">Sync</button>
                             </form>
 
+                            <?php if ( $can_manage_seasons ): ?>
+                                <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                    <input type="hidden" name="sywat_action" value="global_push_standings">
+                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
+                                </form>
+                            <?php endif; ?>
+
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
@@ -187,11 +196,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 22%; text-align: center;">Tournament, Season & Location</th>
+                                        <th style="width: 24%; text-align: center;">Tournament, Season & Location</th>
                                         <th style="width: 12%; text-align: center;">Volunteer Hub</th>
-                                        <th style="width: 35%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
+                                        <th style="width: 36%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
                                         <th style="width: 16%; text-align: center;">Shooter Management</th>
-                                        <th style="width: 15%; text-align: center;">Tournament Management</th>
+                                        <th style="width: 12%; text-align: center;">Tournament Management</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -213,11 +222,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $line_count    = is_array( $t_lines ) ? count( $t_lines ) : 0;
                                             $reg_count     = sywat_get_tournament_count( $t_name, $registrations );
                                             $is_active_hub = in_array( $t_name, $active_tournaments );
-                                            $is_scores_pub = ! empty( $t_data['scores_published'] );
-
-                                            $confirm_msg_raw = $is_scores_pub
-                                                ? sprintf( 'Are you sure you want to recall scores for "%s" and hide them from Season Standings?', $t_name )
-                                                : sprintf( 'Are you sure you want to push scores for "%s" to Season Standings?', $t_name );
                                         ?>
                                         <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
                                             <td>
@@ -274,31 +278,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <td>
                                                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="width: 100%;">Manage Shooters</a>
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=prereg" class="sywat-btn sywat-btn-primary sywat-btn-icon-add" style="width: 100%;">Register Shooters</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print" style="width: 100%;">Print Roster</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice" style="width: 100%;">Generate Invoice</a>
                                                 </div>
                                             </td>
                                             <td style="text-align: right;">
                                                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                                    <a href="/sywat-desk/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-full">Check In Archers</a>
-                                                    <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Enter Scores</a>
-
-                                                    <form method="post" class="sywat-table-action-form" onsubmit="return confirm('<?php echo esc_js( $confirm_msg_raw ); ?>');">
-                                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                        <input type="hidden" name="sywat_action" value="toggle_publish_standings">
-                                                        <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                        <?php if ( $is_scores_pub ): ?>
-                                                            <button type="submit" class="sywat-btn sywat-btn-live sywat-btn-full" title="Scores are live in Season Standings. Click to recall/hide.">
-                                                                🟢 Standings Live
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <button type="submit" class="sywat-btn sywat-btn-push sywat-btn-full" title="Push tournament scores to Season Standings">
-                                                                🚀 Push Standings
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </form>
-
                                                     <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Config</a>
                                                     
                                                     <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
