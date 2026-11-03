@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 5.0.0 (Clean Native WP API)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -105,19 +105,11 @@ function sywat_desk_render_filter_bar($data) {
 }
 
 function sywat_desk_render_capacity_tracker($data) {
-    global $wpdb;
     $lines               = $data['lines'];
     $registrations       = $data['registrations'];
     $selected_tournament = $data['selected_tournament'];
+    $closed_lines        = $data['closed_lines'];
     $is_admin            = $data['is_admin'];
-
-    // Direct Live Database Query to ensure zero stale renders
-    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
-    $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    
-    $raw_closed   = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
-    $closed_arr   = $raw_closed ? maybe_unserialize($raw_closed) : array();
-    $closed_lines = is_array($closed_arr) ? array_map('trim', array_map('strval', $closed_arr)) : array();
 
     ?>
     <div class="sywat-card no-print">
@@ -179,8 +171,8 @@ function sywat_desk_render_capacity_tracker($data) {
                         $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
                         $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
-                        // Strict Dual-Identifier Check
-                        $is_closed_line = in_array($idx, $closed_lines, true) || ($line_name !== '' && in_array($line_name, $closed_lines, true));
+                        // Using safe in_array comparison to avoid type mismatch bugs
+                        $is_closed_line = in_array($idx, $closed_lines) || ($line_name !== '' && in_array($line_name, $closed_lines));
                         $closed_badge   = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
                     <div class="sywat-tracker-card">
@@ -235,20 +227,12 @@ function sywat_desk_render_capacity_tracker($data) {
 }
 
 function sywat_desk_render_archers_table($data) {
-    global $wpdb;
     $tourn_registrations = $data['tourn_registrations'];
     $search_query        = $data['search_query'];
     $selected_tournament = $data['selected_tournament'];
     $selected_line_idx   = $data['selected_line_idx'];
+    $closed_lines        = $data['closed_lines'];
     $lines               = $data['lines'];
-
-    // Direct Live Database Query
-    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
-    $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    
-    $raw_closed   = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
-    $closed_arr   = $raw_closed ? maybe_unserialize($raw_closed) : array();
-    $closed_lines = is_array($closed_arr) ? array_map('trim', array_map('strval', $closed_arr)) : array();
 
     ?>
     <div class="sywat-card no-print">
@@ -293,7 +277,7 @@ function sywat_desk_render_archers_table($data) {
                                 $resolved_l_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
                                 $reg_line_name  = isset($lines[$resolved_l_idx]['name']) ? trim($lines[$resolved_l_idx]['name']) : (isset($reg['line_name']) ? trim($reg['line_name']) : '');
 
-                                $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines, true) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines, true));
+                                $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines));
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
