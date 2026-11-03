@@ -99,15 +99,15 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                 <?php endif; ?>
             </div>
 
-            <!-- Main Desk Card (Docked to Tabs with Balanced Header Controls) -->
+            <!-- Main Desk Card -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
                 <div class="sywat-card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                    <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Register Shooters Desk</span>
+                    <span style="font-weight: 700; font-size: 18px; color: #0f172a; white-space: nowrap;">Register Shooters</span>
 
-                    <!-- Tournament Switcher Control Bar (Right-Aligned) -->
-                    <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; gap:8px; align-items:center;">
-                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Active Tournament:</label>
-                        <select name="selected_tournament" onchange="this.form.submit()" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px;">
+                    <!-- Tournament Switcher Control Bar -->
+                    <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; gap:8px; align-items:center; white-space:nowrap;">
+                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0; white-space:nowrap;">Active Tournament:</label>
+                        <select name="selected_tournament" onchange="this.form.submit()" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; margin:0;">
                             <?php if ( empty( $scoped_tournaments ) ): ?>
                                 <option value="">No Tournaments Configured</option>
                             <?php else: ?>
@@ -126,7 +126,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                 <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] ) ): ?>
                     <?php sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations ); ?>
                 <?php else: ?>
-                    <p style="color:#646970; font-style:italic;">Please select or create a tournament to begin registering shooters.</p>
+                    <p style="color:#64748b; font-style:italic;">Please select or create a tournament to begin registering shooters.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -152,7 +152,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
         $can_show_csv_import = ($is_admin && $tourn_shop_id === 'shop_ccr');
 
-        // Persist previously selected line index across form submissions
         $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
             ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
             : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
@@ -196,7 +195,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                     <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                     <input type="hidden" name="modal_action" value="prereg">
 
-                    <!-- Group Header Information -->
                     <div class="sywat-form-grid-4" style="background:#f8fafc; padding:14px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:16px;">
                         <div>
                             <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Caller / Primary Archer Name</label>
@@ -225,7 +223,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         </div>
                     </div>
 
-                    <!-- Column Headings Bar -->
                     <div class="sywat-archer-header-row" style="display:flex; gap:10px; align-items:center; margin-bottom:6px; padding:0 4px; font-weight:700; font-size:12px; color:#475569;">
                         <div style="flex:2; min-width:180px;">Archer Full Name *</div>
                         <div style="flex:1; min-width:100px;">Target Distance *</div>
@@ -234,21 +231,17 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         <div style="width:38px;"></div>
                     </div>
 
-                    <!-- Archer Rows Container -->
                     <div id="sywat_archer_rows_container">
-                        <!-- Archer Row 1 -->
                         <div class="sywat-archer-input-row" style="display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
                             <div style="flex:2; min-width:180px; position:relative;">
                                 <input type="text" name="archers[0][name]" id="sywat_first_archer_name" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; height:38px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
                             </div>
 
-                            <!-- Target Distance Selection -->
                             <select name="archers[0][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; height:38px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
                                 <option value="20yd" selected>20yd</option>
                                 <option value="Cub">Cub (10yd)</option>
                             </select>
 
-                            <!-- Full 7 TFAA Age Division Selection (Age Order) -->
                             <select name="archers[0][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; height:38px; box-sizing:border-box;" onchange="handleDivisionChange(this);">
                                 <option value="" disabled selected hidden>Select Division</option>
                                 <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
@@ -260,7 +253,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                                 <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
                             </select>
 
-                            <!-- Line Override Selection -->
                             <select name="archers[0][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; height:38px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
                                 <?php foreach ( $available_lines as $idx => $line ): ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
@@ -273,7 +265,6 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                         </div>
                     </div>
 
-                    <!-- Add Row & Live Payment Total Display -->
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:1px dashed #cbd5e1; flex-wrap:wrap; gap:10px;">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" style="height:38px;" onclick="addArcherRow()">Add Another Archer</button>
 
@@ -292,7 +283,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 </form>
             </div>
 
-            <!-- FAREHARBOR CSV BULK UPLOAD (CCR ADMIN ONLY) -->
+            <!-- FAREHARBOR CSV BULK UPLOAD -->
             <?php if ( $can_show_csv_import ): ?>
                 <div style="background:#ffffff; padding:18px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
                     <div class="sywat-style-header" style="margin-top: -6px; margin-bottom: 16px;">
