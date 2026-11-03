@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.9.1
+ * Version: 4.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,8 +15,9 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) return '';
         if ( ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) return '';
 
-        $action = sanitize_text_field( $_POST['sywat_shop_action'] );
-        $shops  = sywat_get_shops();
+        $action  = sanitize_text_field( $_POST['sywat_shop_action'] );
+        $shops   = sywat_get_shops();
+        $user_id = get_current_user_id();
 
         if ( $action === 'create_shop' ) {
             $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
@@ -147,7 +148,8 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
         }
 
-        if ( $action === 'import_shops' ) {
+        // STEP 1: PARSE FILE & GENERATE DRY-RUN PREVIEW
+        if ( $action === 'import_shops' || $action === 'preview_import_shops' ) {
             if ( empty( $_FILES['shop_import_file']['tmp_name'] ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select an Excel or CSV file to import.</div>';
             }
@@ -175,7 +177,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unable to parse Excel file. Please ensure it is a valid .xlsx file or upload as CSV.</div>';
                 }
             } else {
-                // CSV / TSV Text Parser with Delimiter Auto-Detection & BOM Stripping
+                // CSV / TSV Text Parser with Delimiter Auto-Detection & UTF-8 BOM Stripping
                 $file_content = file_get_contents( $file_tmp );
                 if ( substr( $file_content, 0, 3 ) === "\xEF\xBB\xBF" ) {
                     $file_content = substr( $file_content, 3 );
@@ -208,10 +210,10 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
 
             if ( empty( $rows ) || count( $rows ) < 2 ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No data rows found in the uploaded file.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No valid data rows found in the uploaded file.</div>';
             }
 
-            // Extract Header Row & Clean UTF-8
+            // Extract Header Row
             $raw_headers = array_shift( $rows );
             $headers     = array();
             foreach ( $raw_headers as $idx => $h_val ) {
@@ -238,21 +240,10 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 return '';
             };
 
-            $created_count = 0;
-            $updated_count = 0;
-            $skipped_count = 0;
-
-            $default_indoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
-            );
-
-            $default_outdoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '9:00 AM', 'name' => 'Saturday 9:00 AM' ),
-                array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
-            );
+            $preview_items = array();
+            $new_count     = 0;
+            $update_count  = 0;
+            $skip_count    = 0;
 
             foreach ( $rows as $row ) {
                 $shop_name = $get_cell( $row, array( 'Shop/Club', 'Shop Name', 'Location Name', 'Shop', 'Club' ), 0 );
@@ -306,30 +297,115 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
 
                 $shop_slug = 'shop_' . sanitize_title( $shop_name );
 
-                if ( isset( $shops[$shop_slug] ) && $mode === 'skip_existing' ) {
+                // Determine Action Status for Preview
+                if ( isset( $shops[$shop_slug] ) ) {
+                    if ( $mode === 'skip_existing' ) {
+                        $status       = 'skip';
+                        $status_label = 'Skipped (Exists)';
+                        $skip_count++;
+                    } else {
+                        $status       = 'update';
+                        $status_label = 'Update Existing';
+                        $update_count++;
+                    }
+                } else {
+                    $status       = 'new';
+                    $status_label = 'Create New';
+                    $new_count++;
+                }
+
+                $preview_items[] = array(
+                    'slug'                => $shop_slug,
+                    'name'                => $shop_name,
+                    'location_type'       => $loc_type,
+                    'district'            => $district,
+                    'contact'             => $contact,
+                    'contact_title'       => $contact_title,
+                    'email'               => $email,
+                    'phone'               => $phone,
+                    'additional_contacts' => $additional_contacts,
+                    'address_1'           => $addr1,
+                    'address_2'           => $addr2,
+                    'city'                => $city,
+                    'state'               => $state,
+                    'zip'                 => $zip,
+                    'status'              => $status,
+                    'status_label'        => $status_label,
+                );
+            }
+
+            if ( empty( $preview_items ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No valid locations could be parsed from the file.</div>';
+            }
+
+            // Store Preview Transient (valid for 15 minutes)
+            $transient_payload = array(
+                'file_name' => $file_name,
+                'mode'      => $mode,
+                'summary'   => array(
+                    'total'  => count( $preview_items ),
+                    'new'    => $new_count,
+                    'update' => $update_count,
+                    'skip'   => $skip_count,
+                ),
+                'items'     => $preview_items,
+            );
+
+            set_transient( 'sywat_shop_import_preview_' . $user_id, $transient_payload, 900 );
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-info">📥 File <strong>' . esc_html($file_name) . '</strong> parsed successfully. Please review the <strong>' . count($preview_items) . ' location(s)</strong> below and click <strong>Confirm Import</strong> to save changes.</div>';
+        }
+
+        // STEP 2: COMMIT PREVIEW TO DATABASE
+        if ( $action === 'confirm_import_shops' ) {
+            $transient_data = get_transient( 'sywat_shop_import_preview_' . $user_id );
+
+            if ( empty( $transient_data ) || empty( $transient_data['items'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import preview session expired or invalid. Please re-upload your file to try again.</div>';
+            }
+
+            $items         = $transient_data['items'];
+            $created_count = 0;
+            $updated_count = 0;
+            $skipped_count = 0;
+
+            $default_indoor_lines = array(
+                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+            );
+
+            $default_outdoor_lines = array(
+                array( 'day' => 'Saturday', 'time' => '9:00 AM', 'name' => 'Saturday 9:00 AM' ),
+                array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
+            );
+
+            foreach ( $items as $item ) {
+                if ( $item['status'] === 'skip' ) {
                     $skipped_count++;
                     continue;
                 }
 
+                $shop_slug = $item['slug'];
+
                 if ( isset( $shops[$shop_slug] ) ) {
                     // Update existing location (Safe Merge)
-                    $shops[$shop_slug]['name']          = $shop_name;
-                    $shops[$shop_slug]['location_type'] = $loc_type;
-                    if ( ! empty( $district ) ) $shops[$shop_slug]['district'] = $district;
-                    if ( ! empty( $contact ) )  $shops[$shop_slug]['contact'] = $contact;
-                    if ( ! empty( $contact_title ) ) $shops[$shop_slug]['contact_title'] = $contact_title;
-                    if ( ! empty( $email ) )    $shops[$shop_slug]['email'] = $email;
-                    if ( ! empty( $phone ) )    $shops[$shop_slug]['phone'] = $phone;
-                    if ( ! empty( $addr1 ) )    $shops[$shop_slug]['address_1'] = $addr1;
-                    if ( ! empty( $addr2 ) || isset( $headers['addressline2'] ) ) {
-                        $shops[$shop_slug]['address_2'] = $addr2;
-                    }
-                    if ( ! empty( $city ) )     $shops[$shop_slug]['city'] = $city;
-                    if ( ! empty( $state ) )    $shops[$shop_slug]['state'] = $state;
-                    if ( ! empty( $zip ) )      $shops[$shop_slug]['zip'] = $zip;
+                    $shops[$shop_slug]['name']          = $item['name'];
+                    $shops[$shop_slug]['location_type'] = $item['location_type'];
+                    if ( ! empty( $item['district'] ) )      $shops[$shop_slug]['district']      = $item['district'];
+                    if ( ! empty( $item['contact'] ) )       $shops[$shop_slug]['contact']       = $item['contact'];
+                    if ( ! empty( $item['contact_title'] ) ) $shops[$shop_slug]['contact_title'] = $item['contact_title'];
+                    if ( ! empty( $item['email'] ) )         $shops[$shop_slug]['email']         = $item['email'];
+                    if ( ! empty( $item['phone'] ) )         $shops[$shop_slug]['phone']         = $item['phone'];
+                    if ( ! empty( $item['address_1'] ) )     $shops[$shop_slug]['address_1']     = $item['address_1'];
+                    if ( ! empty( $item['address_2'] ) )     $shops[$shop_slug]['address_2']     = $item['address_2'];
+                    if ( ! empty( $item['city'] ) )          $shops[$shop_slug]['city']          = $item['city'];
+                    if ( ! empty( $item['state'] ) )         $shops[$shop_slug]['state']         = $item['state'];
+                    if ( ! empty( $item['zip'] ) )           $shops[$shop_slug]['zip']           = $item['zip'];
 
-                    if ( ! empty( $additional_contacts ) ) {
-                        $shops[$shop_slug]['additional_contacts'] = $additional_contacts;
+                    if ( ! empty( $item['additional_contacts'] ) ) {
+                        $shops[$shop_slug]['additional_contacts'] = $item['additional_contacts'];
                     }
 
                     // Ensure 'indoor_range' facility is present so SYWAT Indoor Lines tab renders
@@ -344,20 +420,20 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     // Create new location
                     $shops[$shop_slug] = array(
                         'id'                  => $shop_slug,
-                        'name'                => $shop_name,
-                        'location_type'       => $loc_type,
-                        'district'            => $district,
+                        'name'                => $item['name'],
+                        'location_type'       => $item['location_type'],
+                        'district'            => $item['district'],
                         'facilities'          => array( 'pro_shop', 'indoor_range' ),
-                        'contact'             => $contact,
-                        'contact_title'       => $contact_title,
-                        'email'               => $email,
-                        'phone'               => $phone,
-                        'additional_contacts' => $additional_contacts,
-                        'address_1'           => $addr1,
-                        'address_2'           => $addr2,
-                        'city'                => $city,
-                        'state'               => $state,
-                        'zip'                 => $zip,
+                        'contact'             => $item['contact'],
+                        'contact_title'       => $item['contact_title'],
+                        'email'               => $item['email'],
+                        'phone'               => $item['phone'],
+                        'additional_contacts' => $item['additional_contacts'],
+                        'address_1'           => $item['address_1'],
+                        'address_2'           => $item['address_2'],
+                        'city'                => $item['city'],
+                        'state'               => $item['state'],
+                        'zip'                 => $item['zip'],
                         'default_lines'       => $default_indoor_lines,
                         'outdoor_lines'       => $default_outdoor_lines,
                         'created_at'          => current_time( 'mysql' ),
@@ -367,14 +443,21 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
 
             update_option( 'sywat_shops_list', $shops );
+            delete_transient( 'sywat_shop_import_preview_' . $user_id );
 
-            $msg = "Import complete! Created {$created_count} new location(s), updated {$updated_count} location(s)";
+            $msg = "Import complete! Successfully created {$created_count} new location(s), updated {$updated_count} location(s)";
             if ( $skipped_count > 0 ) {
                 $msg .= ", skipped {$skipped_count} existing location(s)";
             }
             $msg .= ".";
 
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">' . esc_html( $msg ) . '</div>';
+        }
+
+        // CANCEL IMPORT PREVIEW
+        if ( $action === 'cancel_import_shops' ) {
+            delete_transient( 'sywat_shop_import_preview_' . $user_id );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-info">Import preview cancelled. No database changes were made.</div>';
         }
 
         if ( $action === 'delete_shop' ) {
