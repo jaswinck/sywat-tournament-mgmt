@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.6.1
+ * Version: 3.6.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -148,42 +148,44 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
-                <div class="sywat-card no-print">
+                <div class="sywat-card no-print" style="border-top-left-radius:0;">
                     <div class="sywat-card-title">
                         <span>Configured Tournaments</span>
-                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             
-                            <div style="display: flex; gap: 5px; margin: 0; align-items: center; flex-wrap: wrap;">
+                            <!-- Search & Filter Controls Group -->
+                            <div style="display: flex; gap: 5px; margin: 0; align-items: center;">
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; height: 32px; box-sizing: border-box; width: 140px;">
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px;">
                                         <option value="all">All Shops</option>
                                         <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                             <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 <?php endif; ?>
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; width: 130px; height: 32px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px; padding: 4px 8px;" onclick="sywatResetTournamentFilters()">Clear</button>
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 4px 10px;" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
 
-                            <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 10px; gap: 6px;">
+                            <!-- TFAA Sync Pill -->
+                            <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 10px; gap: 6px; height: 38px; box-sizing: border-box;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
                                 <span style="font-size: 12px; color: #475569; font-weight: 600; white-space: nowrap;">
                                     👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
                                 </span>
-                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 26px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff;">Sync</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 28px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff;">Sync</button>
                             </form>
 
                             <?php if ( $can_manage_seasons ): ?>
                                 <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="global_push_standings">
-                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="height: 38px;">Push Weekend Standings</button>
                                 </form>
                             <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height: 38px;" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
 
