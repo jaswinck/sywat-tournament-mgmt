@@ -1,6 +1,8 @@
 <?php
 /**
  * Sub-Module: Scores Engine Action Handlers
+ * File: includes/scores/scores-actions.php
+ * Version: 3.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -27,6 +29,7 @@ function sywat_scores_handle_ajax_autosave() {
         $opt_key       = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
         $reg           = get_option($opt_key);
 
+        wp_cache_delete('sywat_locks_' . $active_t_slug, 'options');
         $locked_lines = get_option('sywat_locks_' . $active_t_slug, array());
 
         if ($reg) {
@@ -76,7 +79,13 @@ function sywat_scores_handle_batch_actions($selected_tournament, $selected_line_
                     $locked_lines[$selected_line_idx] = 1;
                     $notice = '<div class="sywat-alert sywat-alert-success">Line locked. Scores on this line are frozen and cannot be edited until unlocked.</div>';
                 }
-                update_option('sywat_locks_' . $active_t_slug, $locked_lines);
+
+                // Force cache deletion and store with autoload = 'no'
+                delete_option('sywat_locks_' . $active_t_slug);
+                add_option('sywat_locks_' . $active_t_slug, $locked_lines, '', 'no');
+                
+                // Synchronize global current tournament
+                update_option('sywat_current_tournament', $selected_tournament, false);
                 $current_view_locked = !empty($locked_lines[$selected_line_idx]);
             }
         }
