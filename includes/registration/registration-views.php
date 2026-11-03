@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.9.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -101,10 +101,11 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
             <!-- Main Desk Card -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                <!-- UNIFIED TOP CARD HEADER BAR -->
-                <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
+                <!-- UNIFIED TOP CARD HEADER BAR WITH ICON & SUBTITLE -->
+                <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:15px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
                     <div>
-                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">Register Shooters</h2>
+                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">📝 Register Shooters</h2>
+                        <div class="sywat-subtitle" style="margin-top:2px;">Select an active tournament to register incoming archers.</div>
                     </div>
 
                     <!-- Tournament Switcher Control Bar (Stacked Label) -->
@@ -163,7 +164,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         $skipped_duplicates = ! empty( $GLOBALS['sywat_skipped_duplicates'] ) ? $GLOBALS['sywat_skipped_duplicates'] : array();
         $skipped_full       = ! empty( $GLOBALS['sywat_skipped_full'] ) ? $GLOBALS['sywat_skipped_full'] : array();
         ?>
-        <div class="no-print" style="display:flex; flex-direction:column; gap:24px;">
+        <div class="no-print" style="display:flex; flex-direction:column; gap:16px;">
             
             <?php if ( ! empty( $modal_notice ) ): ?>
                 <div><?php echo $modal_notice; ?></div>
@@ -186,8 +187,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             <?php endif; ?>
 
             <!-- PHONE & GROUP INTAKE FORM -->
-            <div style="background:#ffffff; padding:18px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                <div class="sywat-card-header-bar" style="margin-bottom:16px;">
+            <div style="background:#ffffff; padding:16px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                <div class="sywat-card-header-bar" style="margin-bottom:12px;">
                     <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Phone & Group Registration Intake</h2>
                 </div>
                 
@@ -288,8 +289,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
             <!-- FAREHARBOR CSV BULK UPLOAD -->
             <?php if ( $can_show_csv_import ): ?>
-                <div style="background:#ffffff; padding:18px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                    <div class="sywat-card-header-bar" style="margin-bottom:16px;">
+                <div style="background:#ffffff; padding:16px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                    <div class="sywat-card-header-bar" style="margin-bottom:12px;">
                         <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Bulk Upload Roster File (FareHarbor CSV)</h2>
                     </div>
                     <form method="post" enctype="multipart/form-data" id="sywat_import_form">
@@ -330,7 +331,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             <?php endif; ?>
 
             <!-- LINE SLOT USAGE TABLE -->
-            <div style="margin-top: 6px;">
+            <div style="margin-top: 2px;">
                 <div class="sywat-card-header-bar" style="margin-bottom:12px;">
                     <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Current Line Slot Usage</h2>
                 </div>
