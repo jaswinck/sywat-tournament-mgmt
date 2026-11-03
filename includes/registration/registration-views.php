@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -101,18 +101,17 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
             <!-- Main Desk Card -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                <!-- UNIFIED TOP CARD HEADER BAR -->
-                <div class="sywat-card-header-bar">
+                <!-- UNIFIED TOP CARD HEADER BAR: MATCHING ICON, NO SUBTITLE, STACKED DROPDOWN -->
+                <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
                     <div>
-                        <h2>🎯 Register Shooters</h2>
-                        <div class="sywat-subtitle" style="margin-top:2px;">Phone intake, group pre-registrations, and FareHarbor roster file imports.</div>
+                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">📝 Register Shooters</h2>
                     </div>
 
-                    <!-- Tournament Switcher Control Bar -->
+                    <!-- Tournament Switcher Control Bar (Stacked Label) -->
                     <div class="sywat-header-inline-controls">
-                        <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; gap:8px; align-items:center; white-space:nowrap;">
-                            <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Active Tournament:</label>
-                            <select name="selected_tournament" onchange="this.form.submit()" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; margin:0; background:#fff;">
+                        <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                            <label for="sywat_selected_tournament" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Active Tournament:</label>
+                            <select id="sywat_selected_tournament" name="selected_tournament" onchange="this.form.submit()" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; margin:0; background:#fff; min-width:220px;">
                                 <?php if ( empty( $scoped_tournaments ) ): ?>
                                     <option value="">No Tournaments Configured</option>
                                 <?php else: ?>
