@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.6.4
+ * Version: 3.6.5
  */
 
 if (!defined('ABSPATH')) exit;
@@ -127,8 +127,8 @@ function render_sywat_scores_app() {
         <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Direct Controls Right) -->
         <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-                <h3 class="sywat-filter-title" style="margin:0; font-size:18px;">
-                    🎯 Active Roster Filter
+                <h3 class="sywat-filter-title" style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
+                    Enter Scores Desk
                 </h3>
 
                 <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
