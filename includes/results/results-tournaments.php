@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -449,9 +449,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         <!-- In-Page Quick Edit Archer Modal Overlay -->
         <?php if ( $can_edit_scores ): ?>
-            <div id="sywat_results_edit_modal" class="sywat-modal">
-                <div class="sywat-modal-backdrop" onclick="closeResultsEditModal()"></div>
-                <div class="sywat-modal-dialog">
+            <div id="sywat_results_edit_modal" class="sywat-modal-backdrop">
+                <div class="sywat-modal-content sywat-modal-sm">
                     <div class="sywat-modal-header">
                         <h3>✏️ Quick Edit Archer Record</h3>
                         <button type="button" class="sywat-modal-close" onclick="closeResultsEditModal()">&times;</button>
@@ -523,14 +522,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 document.getElementById('edit_modal_x_count').value  = xCount;
 
                 const modal = document.getElementById('sywat_results_edit_modal');
-                modal.classList.add('is-open');
-                modal.style.display = 'block';
+                if (modal) {
+                    modal.classList.add('active');
+                }
             }
 
             function closeResultsEditModal() {
                 const modal = document.getElementById('sywat_results_edit_modal');
-                modal.classList.remove('is-open');
-                modal.style.display = 'none';
+                if (modal) {
+                    modal.classList.remove('active');
+                }
             }
             </script>
         <?php endif; ?>
@@ -595,15 +596,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 const isFiltered = (divFilter !== 'all' || genFilter !== 'all' || styleFilter !== 'all' || searchFilter !== '');
 
                 if (!isFiltered || visibleCount === totalCount) {
-                    counterEl.style.background  = '#eff6ff';
-                    counterEl.style.borderColor = '#bfdbfe';
-                    counterEl.style.color       = '#1e40af';
-                    counterEl.innerHTML         = '🎯 Total Tournament Shooters: <strong>' + totalCount + '</strong>';
+                    counterEl.classList.remove('is-filtered');
+                    counterEl.innerHTML = '🎯 Total Tournament Shooters: <strong>' + totalCount + '</strong>';
                 } else {
-                    counterEl.style.background  = '#dcfce7';
-                    counterEl.style.borderColor = '#86efac';
-                    counterEl.style.color       = '#166534';
-                    counterEl.innerHTML         = '🎯 Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Archers';
+                    counterEl.classList.add('is-filtered');
+                    counterEl.innerHTML = '🎯 Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Archers';
                 }
             }
         }
