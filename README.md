@@ -29,7 +29,7 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 
 #### 2. TFAA Desk Authentication Sub-System (`includes/auth/`)
 - **`sywat-auth-actions.php`** — Backend authentication action handler managing user sign-in via `wp_signon()`, dynamic post-login role redirection via `sywat_get_post_login_redirect_url()`, secure sign-out via `wp_logout()`, lost password email requests via `retrieve_password()`, and new password updates via `reset_password()` with nonce security and inline error tracking.
-- **`sywat-auth-views.php`** — Front-end UI renderer providing the dark Operator Header Bar (`sywat_render_auth_header`) with dynamic role titles across all TFAA Board, Shop, and Member roles, the standalone `[sywat_login]` shortcode for dedicated portal login pages, and the 3-state TFAA Login Card (`sywat_render_login_screen`) with `redirect_to` target preservation:
+- **`sywat-auth-views.php`** — Front-end UI renderer providing the dark Operator Header Bar (`sywat_render_auth_header`) with dynamic role titles across all TFAA Board, Shop, and Member roles, streamlined `Tournaments ▼` navigation dropdown pointing directly to the Tournament Portal, standalone `[sywat_login]` shortcode for dedicated portal login pages, and 3-state TFAA Login Card (`sywat_render_login_screen`) with `redirect_to` target preservation:
   - **State 1 (Sign In)**: Username/Email, Password, Remember Me, and Sign In button with "Forgot Password?" link.
   - **State 2 (Request Password Reset)**: Front-end password recovery input triggering reset emails.
   - **State 3 (Set New Password)**: Front-end password update form for operators arriving via email reset tokens.
@@ -57,8 +57,8 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 #### 5. Public Results & Standings Sub-System (`includes/results/`)
 - **`class-sywat-results.php`** — Sub-module loader shell and shortcode binding (`[sywat_results]`). Features conditional `✏️ Enter Scores` desk shortcuts in the tournament directory table for authorized staff (`sywat_can_edit_scores()`).
 - **`results-helpers.php`** — Division/gender sort weights (Pro Male -> Male -> Pro Female -> Female -> Senior), 11-tier style sort weight priority (Freestyle through Guest), complete roster score retrieval with automatic mapping of un-submitted/blank DB scores to `0` (`sywat_get_tournament_scores`), and season standings aggregation explicitly excluding Guests and zero-score cards (`sywat_aggregate_season_standings`).
-- **`results-standings.php`** — Public Season Standings UI (`?view=standings`) with multi-variable filters (Division, Gender, Style, Archer Search), unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banner (`.sywat-counter-banner`) calculating total standings leaderboard entries supporting multi-style archers.
-- **`results-tournaments.php`** — Public Tournament Results UI (`?view=tournaments` / `?view=tourn_results`) with automatic Guest style assignment for unturned cards (`0` scores) and multi-line re-entries, dynamic participation stat banner (`.sywat-counter-banner`), live result filters, and inline `✏️ Edit` shortcut buttons next to archer names for logged-in staff (`sywat_can_edit_scores()`).
+- **`results-standings.php`** — Public Season Standings UI (`?view=standings`) with multi-variable filters (Division, Gender, Style, Archer Search), inline search reset button, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banner (`.sywat-counter-banner`) calculating total standings leaderboard entries supporting multi-style archers.
+- **`results-tournaments.php`** — Public Tournament Results UI (`?view=tournaments` / `?view=tourn_results`) with automatic Guest style assignment for unturned cards (`0` scores) and multi-line re-entries, dynamic participation stat banner (`.sywat-counter-banner`), live result filters with inline search clear action buttons, and inline `✏️ Edit` shortcut buttons next to archer names for logged-in staff (`sywat_can_edit_scores()`).
 
 #### 6. Archer Registration Sub-System (`includes/registration/`)
 - **`class-sywat-registration.php`** — Sub-module loader shell.
@@ -78,15 +78,15 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`class-sywat-scores.php`** — Sub-module loader shell and shortcode binding (`[sywat_scores]`). Enforces access using `sywat_can_edit_scores()`.
 - **`scores-actions.php`** — Action handlers for AJAX single score auto-save and batch save/lock/reset logic.
 - **`scores-export.php`** — Early CSV score report export generation (`template_redirect`).
-- **`scores-scripts.php`** — Client-side JavaScript engine (offline local draft storage, background AJAX auto-save, and input range validation).
-- **`scores-views.php`** — Score entry filter bar with dynamic return navigation bar and batch scoring table UI.
+- **`scores-scripts.php`** — Client-side JavaScript engine (offline local draft storage, background AJAX auto-save, input range validation, and 4-second notice/alert banner auto-dismissal).
+- **`scores-views.php`** — Score entry filter toolbar with standardized `Active Tournament:` selection, visual Line Score Tracker grid card (displaying completion progress badges, line lock statuses, and 1-click line entry buttons), dynamic return navigation bar, and clean Archer Scores table UI.
 
 #### 9. Members & Board Roster Sub-System (`includes/members/`)
 - **`class-sywat-members.php`** — Sub-module loader shell and master shortcode binding (`[sywat_members]`). Binds `sywat_render_members_portal` to handle public board roster views, member directory search, and administrative role updates.
 - **`members-helpers.php`** — Resolves user board designations (`tfaa_president`, `tfaa_field_governor`, etc.), maps district assignments (`sywat_tfaa_district`), checks active status, and formats contact info.
 - **`members-actions.php`** — Action handlers for updating member profiles, assigning custom TFAA roles, toggling active/inactive status, and updating TFAA membership numbers.
 - **`members-modals.php`** — Modal overlay interfaces for member profile editing and role assignments.
-- **`members-views.php`** — Public Board of Directors roster with district contact buttons, searchable Member Directory cards, and the administrative Member Management panel (`tab=members`).
+- **`members-views.php`** — Public Board of Directors roster with district contact buttons, searchable Member Directory cards, and administrative Member Management panel (`tab=members`).
 
 #### 10. Standalone Supporting Modules
 - **`class-sywat-roster.php`** — Archer roster management, division/style restriction enforcement, family group assignments, line purges, and high z-index nested edit archer modal overlay (`#sywat_edit_archer_modal`).
