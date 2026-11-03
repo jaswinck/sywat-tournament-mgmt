@@ -1,8 +1,8 @@
 <?php
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
- * File: score-entry-views.php
- * Version: 3.6.2
+ * File: includes/scores/scores-views.php
+ * Version: 3.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -116,6 +116,7 @@ function render_sywat_scores_app() {
         <!-- Master Navigation Tabs -->
         <div class="sywat-nav-tabs no-print">
             <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+            <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
             <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
             <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
             <?php if ( $can_manage_seasons ): ?>
