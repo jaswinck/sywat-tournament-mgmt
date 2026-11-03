@@ -39,7 +39,7 @@ uasort( $filtered_shops, function( $a, $b ) {
         <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
             <?php 
                 if ($type_filter === 'pro_shop') echo 'Shops';
-                elseif ($type_filter === 'club') echo 'Archery Clubs';
+                elseif ($type_filter === 'club') echo 'Clubs';
                 else echo 'Shops and Clubs';
             ?>
         </h2>
