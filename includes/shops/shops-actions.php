@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.6.1
+ * Version: 3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -195,8 +195,16 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 }
             } elseif ( $ext === 'csv' ) {
                 if ( ( $handle = fopen( $file_tmp, 'r' ) ) !== false ) {
-                    while ( ( $data = fgetcsv( $handle, 2000, ',' ) ) !== false ) {
+                    while ( ( $data = fgetcsv( $handle, 2000, "\t" ) ) !== false ) {
                         $rows[] = $data;
+                    }
+                    if ( count( $rows ) <= 1 ) {
+                        // Fallback to comma delimiter if tab delimiter yielded no rows
+                        rewind( $handle );
+                        $rows = array();
+                        while ( ( $data = fgetcsv( $handle, 2000, ',' ) ) !== false ) {
+                            $rows[] = $data;
+                        }
                     }
                     fclose( $handle );
                 }
@@ -213,10 +221,11 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $headers     = array();
             foreach ( $raw_headers as $idx => $h_val ) {
                 $clean_h = strtolower( preg_replace( '/[^a-z0-9]/', '', (string) $h_val ) );
-                $headers[$clean_h] = $idx;
+                if ( ! empty( $clean_h ) ) {
+                    $headers[$clean_h] = $idx;
+                }
             }
 
-            // Helper to get cell by array of possible header variations
             $get_cell = function( $row, $patterns ) use ( $headers ) {
                 if ( ! is_array( $patterns ) ) $patterns = array( $patterns );
                 foreach ( $patterns as $p ) {
@@ -245,32 +254,10 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             );
 
             foreach ( $rows as $row ) {
-                // Determine Shop Name (fallback column 0 if header fails)
                 $shop_name = $get_cell( $row, array( 'Shop/Club', 'Shop Name', 'Location Name', 'Shop', 'Club' ) );
-                if ( empty( $shop_name ) && isset( $row[0] ) ) {
-                    $shop_name = trim( (string) $row[0] );
-                }
                 if ( empty( $shop_name ) ) continue;
 
-                $shop_slug = 'shop_' . sanitize_title( $shop_name );
-
-                if ( isset( $shops[$shop_slug] ) && $mode === 'skip_existing' ) {
-                    $skipped_count++;
-                    continue;
-                }
-
                 $raw_type = $get_cell( $row, array( 'Type', 'Location Type' ) );
-                if ( empty( $raw_type ) && isset( $row[1] ) && in_array( strtolower($row[1]), array('shop', 'club', 'pro_shop') ) ) {
-                    $raw_type = $row[1];
-                }
-                
-                // Auto-detect Type if blank
-                if ( strtolower($raw_type) === 'club' || strpos( strtolower($shop_name), '4h' ) !== false || strpos( strtolower($shop_name), 'club' ) !== false ) {
-                    $loc_type = 'club';
-                } else {
-                    $loc_type = 'pro_shop';
-                }
-
                 $raw_dist = $get_cell( $row, array( 'District', 'TFAA District' ) );
                 $district = function_exists('sywat_normalize_district') ? sywat_normalize_district( $raw_dist ) : sanitize_text_field( $raw_dist );
 
@@ -280,6 +267,9 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 $state = $get_cell( $row, array( 'State' ) );
                 $state = function_exists('sywat_normalize_state_code') ? sywat_normalize_state_code( $state ) : 'TX - Texas';
                 $zip   = $get_cell( $row, array( 'Zip', 'Zip Code', 'Postal Code' ) );
+                if ( ! empty( $zip ) ) {
+                    $zip = preg_replace( '/\.0$/', '', (string) $zip );
+                }
 
                 $contact       = $get_cell( $row, array( 'Primary Contact', 'Contact Name', 'Contact' ) );
                 $contact_title = $get_cell( $row, array( 'Primary Title', 'Contact Title', 'Title' ) );
@@ -304,8 +294,22 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     );
                 }
 
+                // Auto-detect Location Type (Shop vs. Club)
+                if ( strtolower($raw_type) === 'club' || strpos( strtolower($shop_name), '4h' ) !== false || strpos( strtolower($shop_name), 'club' ) !== false ) {
+                    $loc_type = 'club';
+                } else {
+                    $loc_type = 'pro_shop';
+                }
+
+                $shop_slug = 'shop_' . sanitize_title( $shop_name );
+
+                if ( isset( $shops[$shop_slug] ) && $mode === 'skip_existing' ) {
+                    $skipped_count++;
+                    continue;
+                }
+
                 if ( isset( $shops[$shop_slug] ) ) {
-                    // Update existing (safe merge)
+                    // Update existing location (Safe Merge)
                     $shops[$shop_slug]['name']          = $shop_name;
                     $shops[$shop_slug]['location_type'] = $loc_type;
                     if ( ! empty( $district ) ) $shops[$shop_slug]['district'] = $district;
@@ -314,7 +318,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     if ( ! empty( $email ) )    $shops[$shop_slug]['email'] = $email;
                     if ( ! empty( $phone ) )    $shops[$shop_slug]['phone'] = $phone;
                     if ( ! empty( $addr1 ) )    $shops[$shop_slug]['address_1'] = $addr1;
-                    if ( ! empty( $addr2 ) || isset( $headers[strtolower(preg_replace('/[^a-z0-9]/','','Address Line 2'))] ) ) {
+                    if ( ! empty( $addr2 ) || isset( $headers['addressline2'] ) ) {
                         $shops[$shop_slug]['address_2'] = $addr2;
                     }
                     if ( ! empty( $city ) )     $shops[$shop_slug]['city'] = $city;
@@ -325,7 +329,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         $shops[$shop_slug]['additional_contacts'] = $additional_contacts;
                     }
 
-                    // Ensure 'indoor_range' facility is present so the SYWAT Indoor Lines tab renders
+                    // Ensure 'indoor_range' facility is present so SYWAT Indoor Lines tab renders
                     if ( empty( $shops[$shop_slug]['facilities'] ) || ! is_array( $shops[$shop_slug]['facilities'] ) ) {
                         $shops[$shop_slug]['facilities'] = array( 'indoor_range' );
                     } elseif ( ! in_array( 'indoor_range', $shops[$shop_slug]['facilities'] ) ) {
@@ -356,6 +360,14 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         'created_at'          => current_time( 'mysql' ),
                     );
                     $created_count++;
+                }
+            }
+
+            // Cleanup lingering month placeholder keys if created previously
+            $month_placeholders = array( 'shop_oct', 'shop_nov', 'shop_dec', 'shop_jan', 'shop_feb', 'shop_mar', 'shop_apr', 'shop_may', 'shop_jun', 'shop_jul', 'shop_aug', 'shop_sep' );
+            foreach ( $month_placeholders as $p_id ) {
+                if ( isset( $shops[$p_id] ) ) {
+                    unset( $shops[$p_id] );
                 }
             }
 
