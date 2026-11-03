@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 3.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -101,10 +101,10 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
             <!-- Main Desk Card -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                <!-- UNIFIED TOP CARD HEADER BAR: MATCHING ICON, NO SUBTITLE, STACKED DROPDOWN -->
+                <!-- UNIFIED TOP CARD HEADER BAR -->
                 <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
                     <div>
-                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">📝 Register Shooters</h2>
+                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">Register Shooters</h2>
                     </div>
 
                     <!-- Tournament Switcher Control Bar (Stacked Label) -->
@@ -187,8 +187,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
             <!-- PHONE & GROUP INTAKE FORM -->
             <div style="background:#ffffff; padding:18px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                <div class="sywat-style-header" style="margin-top: -6px; margin-bottom: 16px;">
-                    1. Phone & Group Registration Intake
+                <div class="sywat-card-header-bar" style="margin-bottom:16px;">
+                    <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Phone & Group Registration Intake</h2>
                 </div>
                 
                 <form method="post" id="sywat_phone_intake_form">
@@ -289,8 +289,8 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
             <!-- FAREHARBOR CSV BULK UPLOAD -->
             <?php if ( $can_show_csv_import ): ?>
                 <div style="background:#ffffff; padding:18px; border:1px solid #cbd5e1; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                    <div class="sywat-style-header" style="margin-top: -6px; margin-bottom: 16px;">
-                        2. Bulk Upload Roster File (FareHarbor CSV)
+                    <div class="sywat-card-header-bar" style="margin-bottom:16px;">
+                        <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Bulk Upload Roster File (FareHarbor CSV)</h2>
                     </div>
                     <form method="post" enctype="multipart/form-data" id="sywat_import_form">
                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -331,7 +331,9 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
             <!-- LINE SLOT USAGE TABLE -->
             <div style="margin-top: 6px;">
-                <h4 style="margin:0 0 12px 0; font-size:15px; font-weight:700; color:#0f172a;">Current Line Slot Usage</h4>
+                <div class="sywat-card-header-bar" style="margin-bottom:12px;">
+                    <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Current Line Slot Usage</h2>
+                </div>
                 <div class="sywat-table-responsive">
                     <table class="sywat-table">
                         <thead>
