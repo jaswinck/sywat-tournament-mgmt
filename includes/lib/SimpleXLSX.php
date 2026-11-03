@@ -2,7 +2,7 @@
 /**
  * Lightweight Standalone Excel (.xlsx) Parser for WordPress / PHP
  * Path: includes/lib/SimpleXLSX.php
- * Version: 1.2.0
+ * Version: 1.3.0
  * 
  * Dependencies: PHP ZipArchive & SimpleXML (Standard in PHP 7.4+ & WP Core)
  */
@@ -55,7 +55,7 @@ class SimpleXLSX {
             return false;
         }
 
-        // 1. Read Shared Strings
+        // 1. Read Shared Strings Table
         if ( ( $index = $zip->locateName( 'xl/sharedStrings.xml' ) ) !== false ) {
             $data = $zip->getFromIndex( $index );
             $xml = @simplexml_load_string( $data );
@@ -76,20 +76,54 @@ class SimpleXLSX {
             }
         }
 
-        // 2. Locate Worksheets
-        $sheetFiles = array();
-        for ( $i = 0; $i < $zip->numFiles; $i++ ) {
-            $name = $zip->getNameIndex( $i );
-            if ( preg_match( '/xl\/worksheets\/sheet\d+\.xml/i', $name ) ) {
-                $sheetFiles[] = $name;
+        // 2. Read Relationships (rId -> file path)
+        $rels = array();
+        if ( ( $index = $zip->locateName( 'xl/_rels/workbook.xml.rels' ) ) !== false ) {
+            $xml = @simplexml_load_string( $zip->getFromIndex( $index ) );
+            if ( $xml && isset( $xml->Relationship ) ) {
+                foreach ( $xml->Relationship as $rel ) {
+                    $rId    = (string) $rel['Id'];
+                    $target = (string) $rel['Target'];
+                    if ( strpos( $target, 'worksheets/' ) !== false ) {
+                        $rels[$rId] = 'xl/' . ltrim( preg_replace( '/^\/?xl\//', '', $target ), '/' );
+                    }
+                }
             }
         }
 
-        usort( $sheetFiles, function( $a, $b ) {
-            preg_match( '/sheet(\d+)\.xml/i', $a, $m1 );
-            preg_match( '/sheet(\d+)\.xml/i', $b, $m2 );
-            return intval( isset($m1[1]) ? $m1[1] : 0 ) - intval( isset($m2[1]) ? $m2[1] : 0 );
-        });
+        // 3. Read Workbook Sheets (Filter out hidden/veryHidden sheets)
+        $sheetFiles = array();
+        if ( ( $index = $zip->locateName( 'xl/workbook.xml' ) ) !== false ) {
+            $xml = @simplexml_load_string( $zip->getFromIndex( $index ) );
+            if ( $xml && isset( $xml->sheets->sheet ) ) {
+                foreach ( $xml->sheets->sheet as $sheet ) {
+                    $state = strtolower( (string) $sheet['state'] );
+                    if ( in_array( $state, array( 'hidden', 'veryhidden' ) ) ) {
+                        continue; // Skip hidden tabs!
+                    }
+                    $rel_attr = $sheet->attributes( 'http://schemas.openxmlformats.org/officeDocument/2006/relationships' );
+                    $rId = isset( $rel_attr['id'] ) ? (string) $rel_attr['id'] : '';
+                    if ( ! empty( $rId ) && isset( $rels[$rId] ) ) {
+                        $sheetFiles[] = $rels[$rId];
+                    }
+                }
+            }
+        }
+
+        // Fallback if workbook.xml parsing fails: scan zip directory directly
+        if ( empty( $sheetFiles ) ) {
+            for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+                $name = $zip->getNameIndex( $i );
+                if ( preg_match( '/xl\/worksheets\/sheet\d+\.xml/i', $name ) ) {
+                    $sheetFiles[] = $name;
+                }
+            }
+            usort( $sheetFiles, function( $a, $b ) {
+                preg_match( '/sheet(\d+)\.xml/i', $a, $m1 );
+                preg_match( '/sheet(\d+)\.xml/i', $b, $m2 );
+                return intval( isset($m1[1]) ? $m1[1] : 0 ) - intval( isset($m2[1]) ? $m2[1] : 0 );
+            });
+        }
 
         if ( empty( $sheetFiles ) ) {
             $zip->close();
@@ -97,7 +131,7 @@ class SimpleXLSX {
             return false;
         }
 
-        // 3. Extract Rows & Cells
+        // 4. Extract Rows & Cell Values from Visible Worksheets
         foreach ( $sheetFiles as $sIndex => $sheetFile ) {
             $sheetData = $zip->getFromName( $sheetFile );
             if ( empty( $sheetData ) ) continue;
