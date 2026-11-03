@@ -3,7 +3,7 @@
  * Sub-Module: Shop Helpers & WP User Profile Integration
  * Path: includes/shops/shops-helpers.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -122,14 +122,14 @@ if ( ! function_exists( 'sywat_get_shops' ) ) {
 
 /**
  * Fetch Current User's Assigned Shop ID
- * Allows Administrators, Management, and TFAA Admin roles to switch shop views
+ * Allows Administrators, Executive Board, and Tournament Directors to switch shop views freely
  */
 if ( ! function_exists( 'sywat_get_current_user_shop_id' ) ) {
     function sywat_get_current_user_shop_id() {
         $user = wp_get_current_user();
         if ( ! $user || ! $user->ID ) return 'shop_ccr';
 
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor' );
         if ( array_intersect( $admin_roles, (array) $user->roles ) ) {
             if ( isset( $_REQUEST['sywat_shop_filter'] ) ) {
                 return sanitize_text_field( $_REQUEST['sywat_shop_filter'] );
@@ -150,10 +150,11 @@ add_action( 'edit_user_profile', 'sywat_render_user_profile_shop_field' );
 if ( ! function_exists( 'sywat_render_user_profile_shop_field' ) ) {
     function sywat_render_user_profile_shop_field( $user ) {
         $curr_user = wp_get_current_user();
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director' );
         if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
 
-        if ( ! array_intersect( array( 'sywat_shop_manager', 'sywat_shop_user' ), (array) $user->roles ) ) {
+        $target_roles = array( 'sywat_shop_manager', 'sywat_shop_user', 'tfaa_tournament_director' );
+        if ( ! array_intersect( $target_roles, (array) $user->roles ) ) {
             return;
         }
         $current_shop = get_user_meta( $user->ID, 'sywat_shop_id', true );
@@ -186,7 +187,7 @@ add_action( 'edit_user_profile_update', 'sywat_save_user_profile_shop_field' );
 if ( ! function_exists( 'sywat_save_user_profile_shop_field' ) ) {
     function sywat_save_user_profile_shop_field( $user_id ) {
         $curr_user = wp_get_current_user();
-        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin' );
+        $admin_roles = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director' );
         if ( ! array_intersect( $admin_roles, (array) $curr_user->roles ) ) return;
 
         if ( isset( $_POST['sywat_shop_id'] ) ) {
