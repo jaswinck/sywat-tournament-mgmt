@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.6.4
+ * Version: 3.6.5
  */
 
 if (!defined('ABSPATH')) exit;
@@ -63,8 +63,8 @@ function sywat_desk_render_filter_bar($data) {
     <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Direct Controls Right) -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-            <h3 class="sywat-filter-title" style="margin:0; font-size:18px;">
-                🎯 Active Roster Filter
+            <h3 class="sywat-filter-title" style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
+                Check In Archers Desk
             </h3>
 
             <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
