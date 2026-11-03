@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 4.1.0 (Glitch-Free Live Tracker Render)
+ * Version: 4.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -111,7 +111,7 @@ function sywat_desk_render_capacity_tracker($data) {
     $selected_tournament = $data['selected_tournament'];
     $is_admin            = $data['is_admin'];
 
-    // Direct Live Database Fetch to Prevent Stale Post-Render State
+    // Direct Live Database Query to ensure zero stale renders
     $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
     
@@ -179,7 +179,7 @@ function sywat_desk_render_capacity_tracker($data) {
                         $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
                         $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
-                        // Glitch-Free Dual Identifier Matching
+                        // Strict Dual-Identifier Check
                         $is_closed_line = in_array($idx, $closed_lines, true) || ($line_name !== '' && in_array($line_name, $closed_lines, true));
                         $closed_badge   = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
@@ -242,7 +242,7 @@ function sywat_desk_render_archers_table($data) {
     $selected_line_idx   = $data['selected_line_idx'];
     $lines               = $data['lines'];
 
-    // Direct Live Database Fetch
+    // Direct Live Database Query
     $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
     
