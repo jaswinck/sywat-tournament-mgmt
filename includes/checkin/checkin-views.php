@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -145,14 +145,14 @@ function sywat_desk_render_capacity_tracker($data) {
             <div class="sywat-tracker-grid">
                 <?php foreach ($ordered_lines as $item): ?>
                     <?php
-                        $idx  = $item['idx'];
+                        $idx  = (string) $item['idx'];
                         $line = $item['line'];
                         
                         $booked_20yd = 0; $booked_cub = 0; $total_reg_line = 0; $checked_in_line = 0;
 
                         foreach ($registrations as $reg) {
                             if (isset($reg['tournament']) && $reg['tournament'] === $selected_tournament) {
-                                $match_index = isset($reg['line_index']) && (string)$reg['line_index'] === (string)$idx;
+                                $match_index = isset($reg['line_index']) && (string)$reg['line_index'] === $idx;
                                 $match_name  = isset($reg['line_name']) && isset($line['name']) && trim($reg['line_name']) === trim($line['name']);
 
                                 if ($match_index || $match_name) {
@@ -170,7 +170,7 @@ function sywat_desk_render_capacity_tracker($data) {
                         $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
                         $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
-                        $is_closed_line = in_array((string)$idx, $closed_lines);
+                        $is_closed_line = in_array($idx, $closed_lines, true);
                         $closed_badge = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
                     <div class="sywat-tracker-card">
@@ -230,6 +230,7 @@ function sywat_desk_render_archers_table($data) {
     $selected_tournament = $data['selected_tournament'];
     $selected_line_idx   = $data['selected_line_idx'];
     $closed_lines        = $data['closed_lines'];
+    $lines               = $data['lines'];
 
     ?>
     <div class="sywat-card no-print">
@@ -263,14 +264,14 @@ function sywat_desk_render_archers_table($data) {
                     <tbody>
                         <?php foreach ($tourn_registrations as $reg): ?>
                             <?php 
-                                $reg_type   = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
-                                $badge_class= ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-                                $balance_due= isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                                $paid_disp  = !empty($reg['paid']) ? $reg['paid'] : '—';
-                                $div_disp   = !empty($reg['division']) ? $reg['division'] : '—';
-                                $style_disp = !empty($reg['style']) ? $reg['style'] : '—';
-                                
-                                $is_family_due = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
+                                $reg_type       = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
+                                $badge_class    = ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                $balance_due    = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
+                                $paid_disp      = !empty($reg['paid']) ? $reg['paid'] : '—';
+                                $div_disp       = !empty($reg['division']) ? $reg['division'] : '—';
+                                $style_disp     = !empty($reg['style']) ? $reg['style'] : '—';
+                                $is_family_due  = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
+                                $resolved_l_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
@@ -323,7 +324,7 @@ function sywat_desk_render_archers_table($data) {
                                                 <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                             </form>
                                         <?php else: ?>
-                                            <?php if (in_array((string)$reg['line_index'], $closed_lines)): ?>
+                                            <?php if (in_array($resolved_l_idx, $closed_lines, true)): ?>
                                                 <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                             <?php else: ?>
                                                 <form method="post" style="margin:0;">
