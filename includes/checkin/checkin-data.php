@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: checkin-data.php
  * Author: SYWAT Archery
- * Version: 5.0.0 (Clean Native WP API)
+ * Version: 5.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -84,6 +84,7 @@ function sywat_desk_get_data() {
     $selected_line_idx   = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field($_REQUEST['selected_line_idx'])   : 'all';
     $search_query        = isset($_REQUEST['search_query'])        ? sanitize_text_field($_REQUEST['search_query'])        : '';
 
+    // ALWAYS prefer the globally active tournament first so TD and Admin stay in sync
     if (empty($selected_tournament)) {
         $global_curr = get_option('sywat_current_tournament', '');
         if (!empty($global_curr) && isset($tournaments[$global_curr])) {
@@ -91,6 +92,7 @@ function sywat_desk_get_data() {
         }
     }
 
+    // Fallback to local user meta if global fails
     if (empty($selected_tournament) && $user->ID) {
         $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
         if (!empty($saved_t) && isset($tournaments[$saved_t])) {
@@ -112,8 +114,6 @@ function sywat_desk_get_data() {
 
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
     
-    // Clear local object cache right before reading natively
-    wp_cache_delete($closed_lines_key, 'options');
     $raw_closed   = get_option($closed_lines_key, array());
     $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
 
