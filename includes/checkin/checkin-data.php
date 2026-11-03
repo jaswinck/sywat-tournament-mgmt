@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: checkin-data.php
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 4.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -61,7 +61,7 @@ function sywat_desk_get_data() {
 
     $user = wp_get_current_user();
     
-    // Administrative & Desk Control roles (Includes sywat_shop_manager for Line Close/Reopen)
+    // Administrative & Desk Control roles
     $admin_roles = array('administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor', 'sywat_shop_manager');
     $is_admin    = (bool) array_intersect($admin_roles, (array) $user->roles);
     $user_shop_id = function_exists('sywat_get_current_user_shop_id') ? sywat_get_current_user_shop_id() : 'shop_ccr';
@@ -84,7 +84,14 @@ function sywat_desk_get_data() {
     $selected_line_idx   = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field($_REQUEST['selected_line_idx'])   : 'all';
     $search_query        = isset($_REQUEST['search_query'])        ? sanitize_text_field($_REQUEST['search_query'])        : '';
 
-    // Remember last selected tournament per user if not explicitly passed
+    // Global Active Tournament Sync across all staff
+    if (empty($selected_tournament)) {
+        $global_curr = get_option('sywat_current_tournament', '');
+        if (!empty($global_curr) && isset($tournaments[$global_curr])) {
+            $selected_tournament = $global_curr;
+        }
+    }
+
     if (empty($selected_tournament) && $user->ID) {
         $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
         if (!empty($saved_t) && isset($tournaments[$saved_t])) {
@@ -101,13 +108,14 @@ function sywat_desk_get_data() {
         update_user_meta($user->ID, 'sywat_desk_selected_tournament', $selected_tournament);
     }
 
-    $lines = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
+    $lines         = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
     $active_t_slug = sanitize_title($selected_tournament);
 
+    // Direct SQL Read — Bypass Object Cache completely
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    wp_cache_delete($closed_lines_key, 'options');
-    $raw_closed       = get_option($closed_lines_key, array());
-    $closed_lines     = is_array($raw_closed) ? array_values(array_map('strval', $raw_closed)) : array();
+    $raw_closed       = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
+    $closed_arr       = $raw_closed ? maybe_unserialize($raw_closed) : array();
+    $closed_lines     = is_array($closed_arr) ? array_values(array_unique(array_map('trim', array_map('strval', $closed_arr)))) : array();
 
     $registrations = array();
     $results = $wpdb->get_results($wpdb->prepare(
@@ -159,7 +167,7 @@ function sywat_desk_get_data() {
         'updated_at' => isset($tfaa_cache_option['updated_at']) ? $tfaa_cache_option['updated_at'] : 'Never'
     );
 
-    // Build Line-Scoped & Smart-Named Family Groups (STRICT FILTER)
+    // Build Line-Scoped & Smart-Named Family Groups
     $existing_families_by_line = array();
     $family_members_by_id      = array();
 
@@ -167,7 +175,6 @@ function sywat_desk_get_data() {
         $fid = !empty($r['family_id']) ? trim($r['family_id']) : '';
         if (empty($fid)) continue;
 
-        // Strict Check: Only include if explicitly paid/registered as Family Rate
         $is_fam = (isset($r['paid']) && strcasecmp($r['paid'], 'Family') === 0)
                || (!empty($r['rate_type']) && stripos($r['rate_type'], 'family') !== false);
 
