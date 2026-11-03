@@ -181,9 +181,9 @@ body {
 .sywat-card,
 .sywat-shop-card {
     background: #ffffff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     padding: 20px;
     margin-bottom: 20px;
 }
@@ -209,26 +209,29 @@ body {
     margin-bottom: 15px;
 }
 
-/* Navigation Tabs - Modern Segmented Control Track */
+/* Navigation Tabs - Card-Docked Segmented Control Track */
 .sywat-nav-tabs {
     display: inline-flex;
     align-items: center;
     background-color: #e2e8f0;
-    padding: 4px;
-    border-radius: 8px;
-    margin-bottom: 20px;
+    padding: 4px 4px 0 4px;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: -1px;
     gap: 4px;
+    border: 1px solid #cbd5e1;
     border-bottom: none;
+    position: relative;
+    z-index: 2;
 }
 
 .sywat-tab-item {
-    padding: 7px 16px;
+    padding: 8px 16px;
     font-weight: 600;
     text-decoration: none !important;
     color: #475569;
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: 6px 6px 0 0;
     font-size: 13px;
     line-height: 1.2;
     transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
@@ -242,8 +245,14 @@ body {
 .sywat-tab-item.active {
     background: #ffffff;
     color: #0f172a;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
+}
+
+/* Dock Card directly to Tab Track when placed immediately after tabs */
+.sywat-nav-tabs + .sywat-card,
+.sywat-nav-tabs + div > .sywat-card {
+    border-top-left-radius: 0;
 }
 
 /* Button Standard Base */
