@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
