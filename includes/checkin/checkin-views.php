@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 4.1.0 (Glitch-Free Live Tracker Render)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -60,7 +60,7 @@ function sywat_desk_render_filter_bar($data) {
         <?php endif; ?>
     </div>
 
-    <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Direct Controls Right) -->
+    <!-- Integrated Control Panel Filter Toolbar -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
             <h3 class="sywat-filter-title" style="margin:0; font-size:18px; font-weight:700; color:#0f172a; white-space:nowrap;">
@@ -105,11 +105,19 @@ function sywat_desk_render_filter_bar($data) {
 }
 
 function sywat_desk_render_capacity_tracker($data) {
-    $lines = $data['lines'];
-    $registrations = $data['registrations'];
+    global $wpdb;
+    $lines               = $data['lines'];
+    $registrations       = $data['registrations'];
     $selected_tournament = $data['selected_tournament'];
-    $closed_lines = $data['closed_lines'];
-    $is_admin = $data['is_admin'];
+    $is_admin            = $data['is_admin'];
+
+    // Direct Live Database Fetch to Prevent Stale Post-Render State
+    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
+    $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
+    
+    $raw_closed   = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
+    $closed_arr   = $raw_closed ? maybe_unserialize($raw_closed) : array();
+    $closed_lines = is_array($closed_arr) ? array_map('trim', array_map('strval', $closed_arr)) : array();
 
     ?>
     <div class="sywat-card no-print">
@@ -133,7 +141,7 @@ function sywat_desk_render_capacity_tracker($data) {
                         else $weight = 45;
                     }
 
-                    $ordered_lines[] = array('idx' => $idx, 'line' => $line, 'weight' => $weight);
+                    $ordered_lines[] = array('idx' => (string)$idx, 'line' => $line, 'weight' => $weight);
                 }
 
                 usort($ordered_lines, function($a, $b) {
@@ -145,15 +153,16 @@ function sywat_desk_render_capacity_tracker($data) {
             <div class="sywat-tracker-grid">
                 <?php foreach ($ordered_lines as $item): ?>
                     <?php
-                        $idx  = (string) $item['idx'];
-                        $line = $item['line'];
+                        $idx       = $item['idx'];
+                        $line      = $item['line'];
+                        $line_name = isset($line['name']) ? trim($line['name']) : '';
                         
                         $booked_20yd = 0; $booked_cub = 0; $total_reg_line = 0; $checked_in_line = 0;
 
                         foreach ($registrations as $reg) {
                             if (isset($reg['tournament']) && $reg['tournament'] === $selected_tournament) {
                                 $match_index = isset($reg['line_index']) && (string)$reg['line_index'] === $idx;
-                                $match_name  = isset($reg['line_name']) && isset($line['name']) && trim($reg['line_name']) === trim($line['name']);
+                                $match_name  = isset($reg['line_name']) && $line_name !== '' && trim($reg['line_name']) === $line_name;
 
                                 if ($match_index || $match_name) {
                                     $total_reg_line++;
@@ -170,8 +179,9 @@ function sywat_desk_render_capacity_tracker($data) {
                         $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
                         $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
-                        $is_closed_line = in_array($idx, $closed_lines, true);
-                        $closed_badge = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
+                        // Glitch-Free Dual Identifier Matching
+                        $is_closed_line = in_array($idx, $closed_lines, true) || ($line_name !== '' && in_array($line_name, $closed_lines, true));
+                        $closed_badge   = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
                     <div class="sywat-tracker-card">
                         <div>
@@ -225,12 +235,20 @@ function sywat_desk_render_capacity_tracker($data) {
 }
 
 function sywat_desk_render_archers_table($data) {
+    global $wpdb;
     $tourn_registrations = $data['tourn_registrations'];
     $search_query        = $data['search_query'];
     $selected_tournament = $data['selected_tournament'];
     $selected_line_idx   = $data['selected_line_idx'];
-    $closed_lines        = $data['closed_lines'];
     $lines               = $data['lines'];
+
+    // Direct Live Database Fetch
+    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
+    $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
+    
+    $raw_closed   = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $closed_lines_key));
+    $closed_arr   = $raw_closed ? maybe_unserialize($raw_closed) : array();
+    $closed_lines = is_array($closed_arr) ? array_map('trim', array_map('strval', $closed_arr)) : array();
 
     ?>
     <div class="sywat-card no-print">
@@ -271,7 +289,11 @@ function sywat_desk_render_archers_table($data) {
                                 $div_disp       = !empty($reg['division']) ? $reg['division'] : '—';
                                 $style_disp     = !empty($reg['style']) ? $reg['style'] : '—';
                                 $is_family_due  = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
+                                
                                 $resolved_l_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
+                                $reg_line_name  = isset($lines[$resolved_l_idx]['name']) ? trim($lines[$resolved_l_idx]['name']) : (isset($reg['line_name']) ? trim($reg['line_name']) : '');
+
+                                $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines, true) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines, true));
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
@@ -324,7 +346,7 @@ function sywat_desk_render_archers_table($data) {
                                                 <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                             </form>
                                         <?php else: ?>
-                                            <?php if (in_array($resolved_l_idx, $closed_lines, true)): ?>
+                                            <?php if ($is_line_closed): ?>
                                                 <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                             <?php else: ?>
                                                 <form method="post" style="margin:0;">
