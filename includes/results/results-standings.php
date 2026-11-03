@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -54,17 +54,20 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         ?>
 
         <div class="sywat-public-card">
-            <!-- TOP HEADER BAR: EXPLANATORY SUBTITLE (LEFT) + SEASON SELECTOR (RIGHT) -->
+            <!-- TOP CARD HEADER BAR: TITLE + SUBTITLE (LEFT) & INLINE SEASON SELECTOR (RIGHT) -->
             <div class="sywat-card-header-bar">
-                <div class="sywat-subtitle">
-                    Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
+                <div>
+                    <h2>🎯 Season Standings</h2>
+                    <div class="sywat-subtitle">
+                        Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
+                    </div>
                 </div>
 
                 <form method="get" id="sywat_season_form" class="sywat-filter-form">
                     <input type="hidden" name="view" value="standings">
-                    <div class="sywat-field-group">
-                        <label>Season</label>
-                        <select name="season" onchange="this.form.submit()">
+                    <div class="sywat-search-input-wrapper">
+                        <label for="sywat_season_select"><strong>Season:</strong></label>
+                        <select name="season" id="sywat_season_select" onchange="this.form.submit()">
                             <?php foreach ( $seasons as $slug => $s ): ?>
                                 <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
                                     <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
@@ -150,7 +153,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                                     <table class="sywat-table">
                                         <thead>
                                             <tr>
-                                                <th class="sywat-col-center">Rank</th>
+                                                <th class="sywat-col-center">Place</th>
                                                 <th>Archer Name</th>
                                                 <th class="sywat-col-center">Score 1</th>
                                                 <th class="sywat-col-center">Score 2</th>
@@ -176,15 +179,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                                                 }
                                                 $prev_tot_score = $tot_s;
                                                 $prev_tot_x     = $tot_x;
-
-                                                $rank_badge = '';
-                                                if ( $current_rank === 1 ) $rank_badge = '🥇';
-                                                elseif ( $current_rank === 2 ) $rank_badge = '🥈';
-                                                elseif ( $current_rank === 3 ) $rank_badge = '🥉';
                                             ?>
                                                 <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
-                                                    <td class="sywat-col-center sywat-rank-cell">
-                                                        <?php echo $rank_badge ? $rank_badge : $current_rank; ?>
+                                                    <td class="sywat-col-center">
+                                                        <strong><?php echo $current_rank; ?></strong>
                                                     </td>
                                                     <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
                                                     <td class="sywat-col-center"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
@@ -262,7 +260,6 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 card.style.display = cardHasVisibleBlock ? '' : 'none';
             });
 
-            // Update Counter Banner via CSS classes
             const counterEl = document.getElementById('sywat_standings_counter');
             if (counterEl) {
                 const isFiltered = (divFilter !== 'all' || genFilter !== 'all' || styleFilter !== 'all' || searchFilter !== '');
