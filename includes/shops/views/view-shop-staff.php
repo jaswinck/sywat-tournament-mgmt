@@ -2,6 +2,8 @@
 /**
  * View Template: Admin Manage Shop Staff
  * Path: includes/shops/views/view-shop-staff.php
+ * Author: SYWAT Archery
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,24 +21,30 @@ foreach ( $eligible_users as $u ) {
 ?>
 
 <div class="sywat-card no-print">
-    <div class="sywat-card-title">
-        <span>Linked Staff for Location: <strong><?php echo esc_html( $managing_shop['name'] ); ?></strong></span>
-        <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to List</a>
+    <!-- UNIFIED TOP CARD HEADER BAR: TITLE (LEFT) & BACK BUTTON (RIGHT) -->
+    <div class="sywat-card-header-bar">
+        <div>
+            <h2>🎯 Linked Staff: <?php echo esc_html( $managing_shop['name'] ); ?></h2>
+        </div>
+        <div>
+            <a href="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to List</a>
+        </div>
     </div>
 
-    <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:4px;">
-        <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:bold;">Link Additional Staff User to This Location</h4>
+    <!-- LINK ADDITIONAL STAFF USER TOOLBAR -->
+    <div style="margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px;">
+        <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:700; color:#1e293b;">Link Additional Staff User to This Location</h4>
         <?php if ( empty( $unlinked_staff ) ): ?>
             <p style="color:#646970; font-style:italic; margin:0; font-size:13px;">All registered Shop Managers and Shop Users are currently linked to a location.</p>
         <?php else: ?>
-            <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+            <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                 <input type="hidden" name="sywat_shop_action" value="assign_staff_to_shop">
                 <input type="hidden" name="target_shop_id" value="<?php echo esc_attr( $managing_shop['id'] ); ?>">
                 
                 <div style="flex:1; min-width:250px;">
-                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select Available Staff User</label>
-                    <select name="staff_user_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Select Available Staff User</label>
+                    <select name="staff_user_id" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; background:#fff;" required>
                         <?php foreach ( $unlinked_staff as $un_user ): ?>
                             <?php 
                                 $curr_s_id = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
@@ -48,12 +56,13 @@ foreach ( $eligible_users as $u ) {
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-add">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
+                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
             </form>
         <?php endif; ?>
     </div>
 
-    <h4 style="margin:15px 0 10px 0; font-size:14px; font-weight:bold;">Currently Linked Staff Accounts (<?php echo count($linked_staff); ?>)</h4>
+    <!-- CURRENTLY LINKED ACCOUNTS TABLE -->
+    <h4 style="margin:20px 0 10px 0; font-size:14px; font-weight:700; color:#1e293b;">Currently Linked Staff Accounts (<?php echo count($linked_staff); ?>)</h4>
     <?php if ( empty( $linked_staff ) ): ?>
         <p style="color:#646970; font-style:italic; margin-bottom:15px;">No Shop Manager or Shop User accounts are currently linked to this location.</p>
     <?php else: ?>
@@ -61,24 +70,24 @@ foreach ( $eligible_users as $u ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th style="text-align:right;">Action</th>
+                        <th style="text-align:left;">Name</th>
+                        <th style="text-align:left;">Username</th>
+                        <th style="text-align:left;">Email</th>
+                        <th class="sywat-col-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ( $linked_staff as $ls_user ): ?>
                         <tr>
-                            <td style="font-weight:bold;"><?php echo esc_html( $ls_user->display_name ); ?></td>
-                            <td><?php echo esc_html( $ls_user->user_login ); ?></td>
-                            <td><?php echo esc_html( $ls_user->user_email ); ?></td>
-                            <td style="text-align:right;">
-                                <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="margin:0;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this location?');">
+                            <td style="font-weight:700; color:#0f172a; text-align:left;"><?php echo esc_html( $ls_user->display_name ); ?></td>
+                            <td style="text-align:left;"><?php echo esc_html( $ls_user->user_login ); ?></td>
+                            <td style="text-align:left;"><?php echo esc_html( $ls_user->user_email ); ?></td>
+                            <td class="sywat-col-right">
+                                <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="margin:0; display:inline-block;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this location?');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                     <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
-                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding:4px 8px; font-size:12px; height:auto;">Unlink Staff</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Unlink Staff</button>
                                 </form>
                             </td>
                         </tr>
