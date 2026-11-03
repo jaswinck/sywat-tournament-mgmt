@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -54,7 +54,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         ?>
 
         <div class="sywat-public-card">
-            <!-- TOP CARD HEADER BAR: TITLE + SUBTITLE (LEFT) & INLINE SEASON SELECTOR (RIGHT) -->
+            <!-- TOP CARD HEADER BAR: TITLE + SUBTITLE (LEFT) & CLEAN INLINE SEASON SELECTOR (RIGHT) -->
             <div class="sywat-card-header-bar">
                 <div>
                     <h2>🎯 Season Standings</h2>
@@ -63,18 +63,16 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </div>
                 </div>
 
-                <form method="get" id="sywat_season_form" class="sywat-filter-form">
+                <form method="get" id="sywat_season_form" class="sywat-header-inline-select">
                     <input type="hidden" name="view" value="standings">
-                    <div class="sywat-search-input-wrapper">
-                        <label for="sywat_season_select"><strong>Season:</strong></label>
-                        <select name="season" id="sywat_season_select" onchange="this.form.submit()">
-                            <?php foreach ( $seasons as $slug => $s ): ?>
-                                <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
-                                    <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <label for="sywat_season_select"><strong>Season:</strong></label>
+                    <select name="season" id="sywat_season_select" onchange="this.form.submit()">
+                        <?php foreach ( $seasons as $slug => $s ): ?>
+                            <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
+                                <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </form>
             </div>
 
