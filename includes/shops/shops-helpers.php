@@ -3,7 +3,7 @@
  * Sub-Module: Shop Helpers & WP User Profile Integration
  * Path: includes/shops/shops-helpers.php
  * Author: SYWAT Archery / TFAA
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -104,11 +104,18 @@ if ( ! function_exists( 'sywat_ensure_default_shop_exists' ) ) {
 }
 
 /**
- * Fetch All Configured Archery Shops & Clubs
+ * Fetch All Configured Archery Shops & Clubs (Sorted Alphabetically by Name)
  */
 if ( ! function_exists( 'sywat_get_shops' ) ) {
     function sywat_get_shops() {
         $shops = get_option( 'sywat_shops_list', array() );
+        if ( is_array( $shops ) && ! empty( $shops ) ) {
+            uasort( $shops, function( $a, $b ) {
+                $name_a = isset( $a['name'] ) ? $a['name'] : '';
+                $name_b = isset( $b['name'] ) ? $b['name'] : '';
+                return strcasecmp( $name_a, $name_b );
+            });
+        }
         return is_array( $shops ) ? $shops : array();
     }
 }
