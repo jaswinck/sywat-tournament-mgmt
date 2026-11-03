@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -22,7 +22,7 @@ function sywat_desk_handle_actions(&$data) {
 
     $active_t_slug       = $data['active_t_slug'];
     $selected_tournament = $data['selected_tournament'];
-    $closed_lines        = $data['closed_lines'];
+    $closed_lines        = isset($data['closed_lines']) && is_array($data['closed_lines']) ? array_map('strval', $data['closed_lines']) : array();
     $closed_lines_key    = $data['closed_lines_key'];
     $registrations       = &$data['registrations'];
     $lines               = $data['lines'];
@@ -52,16 +52,16 @@ function sywat_desk_handle_actions(&$data) {
         return $style;
     };
 
-    // Close Line
+    // Close Line (Admin, Tournament Director & Shop Managers)
     if ($action === 'close_line' && $data['is_admin']) {
-        $target_line = sanitize_text_field($_POST['target_line_idx']);
-        if (!in_array($target_line, $closed_lines)) {
+        $target_line = (string) sanitize_text_field($_POST['target_line_idx']);
+        if (!in_array($target_line, $closed_lines, true)) {
             $closed_lines[] = $target_line;
-            update_option($closed_lines_key, $closed_lines);
+            update_option($closed_lines_key, array_values(array_unique($closed_lines)));
 
             $update_count = 0;
             foreach ($registrations as &$r) {
-                if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r['line_index'] === (string)$target_line) {
+                if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r['line_index'] === $target_line) {
                     if (empty($r['checked_in'])) {
                         $r['division'] = 'No Show'; $r['gender'] = 'No Show'; $r['style'] = 'No Show';
                         update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
@@ -74,11 +74,13 @@ function sywat_desk_handle_actions(&$data) {
         }
     }
 
-    // Reopen Line
+    // Reopen Line (Admin, Tournament Director & Shop Managers)
     if ($action === 'reopen_line' && $data['is_admin']) {
-        $target_line = sanitize_text_field($_POST['target_line_idx']);
-        $closed_lines = array_diff($closed_lines, array($target_line));
-        update_option($closed_lines_key, array_values($closed_lines));
+        $target_line  = (string) sanitize_text_field($_POST['target_line_idx']);
+        $closed_lines = array_values(array_filter($closed_lines, function($val) use ($target_line) {
+            return (string)$val !== $target_line;
+        }));
+        update_option($closed_lines_key, $closed_lines);
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
 
