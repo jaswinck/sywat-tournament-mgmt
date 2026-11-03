@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 5.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -62,16 +62,17 @@ function sywat_desk_render_filter_bar($data) {
 
     <!-- Integrated Control Panel Filter Toolbar -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div class="sywat-card-header-bar">
-            <h2>🎯 Check In Archers</h2>
+        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px;">
+            <h2 style="margin:0;">📋 Check In Archers</h2>
 
-            <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div class="sywat-header-inline-controls" style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+                <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
-                    <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                        <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Active Tournament:</label>
-                        <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
+                    <!-- Stacked Active Tournament Select -->
+                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                        <label for="sywat_selected_tournament" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Active Tournament:</label>
+                        <select id="sywat_selected_tournament" name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:200px;">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                                 <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
                                     <?php echo esc_html($t_name); ?>
@@ -80,9 +81,10 @@ function sywat_desk_render_filter_bar($data) {
                         </select>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                        <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Shooting Line:</label>
-                        <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
+                    <!-- Stacked Shooting Line Select -->
+                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                        <label for="sywat_selected_line_idx" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Shooting Line:</label>
+                        <select id="sywat_selected_line_idx" name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:160px;">
                             <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
                             <?php foreach ($data['lines'] as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
@@ -118,7 +120,7 @@ function sywat_desk_render_capacity_tracker($data) {
     ?>
     <div class="sywat-card no-print">
         <div class="sywat-card-header-bar">
-            <h2>🎯 Line Capacity Tracker</h2>
+            <h2 style="font-size:16px;">Line Capacity Tracker</h2>
         </div>
         <?php if (!empty($lines)): ?>
             <?php
@@ -246,7 +248,7 @@ function sywat_desk_render_archers_table($data) {
     ?>
     <div class="sywat-card no-print">
         <div class="sywat-card-header-bar">
-            <h2>🎯 Registered Archers</h2>
+            <h2 style="font-size:16px;">Registered Archers</h2>
             <div class="sywat-header-inline-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex; gap:6px; margin:0; align-items:center;">
                     <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
