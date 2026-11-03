@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.6.5
+ * Version: 3.6.6
  */
 
 if (!defined('ABSPATH')) exit;
@@ -273,7 +273,7 @@ function render_sywat_scores_app() {
             <?php endif; ?>
         </div>
 
-        <!-- Main Scoring Table Card -->
+        <!-- Main Archer Scores Table Card -->
         <div class="sywat-card no-print">
             <form method="post" id="sywat_batch_score_form">
                 <?php wp_nonce_field('sywat_scores_action', 'sywat_nonce'); ?>
@@ -282,7 +282,7 @@ function render_sywat_scores_app() {
 
                 <div class="sywat-card-title">
                     <div>
-                        <span style="font-size:18px;">Batch Score Entry</span>
+                        <span style="font-size:18px;">Archer Scores</span>
                         <div style="font-size:13px; color:#64748b; font-weight:normal; margin-top:2px;">
                             Displaying <strong><?php echo count($tourn_registrations); ?></strong> checked-in archer(s) for <?php echo esc_html($selected_tournament); ?>
                         </div>
