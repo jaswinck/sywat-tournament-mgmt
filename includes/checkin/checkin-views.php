@@ -369,6 +369,11 @@ function sywat_desk_render_archers_table($data) {
 ?>
 
 <script>
+// Stop the browser from resubmitting the form when you press Refresh (F5)
+if ( window.history.replaceState ) {
+    window.history.replaceState( null, null, window.location.href );
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     // Auto-dismiss Check-In Desk alert banners after 4 seconds
     setTimeout(function() {
