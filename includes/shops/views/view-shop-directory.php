@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -39,8 +39,8 @@ uasort( $filtered_shops, function( $a, $b ) {
         <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
             <?php 
                 if ($type_filter === 'pro_shop') echo 'Shops Directory';
-                elseif ($type_filter === 'club') echo 'Clubs Directory';
-                else echo 'All Shops & Clubs Directory';
+                elseif ($type_filter === 'club') echo 'Archery Clubs Directory';
+                else echo 'Shops and Clubs Directory';
             ?>
         </h2>
         <?php if ( $can_manage_seasons || $is_admin ): ?>
@@ -56,7 +56,7 @@ uasort( $filtered_shops, function( $a, $b ) {
         <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; width:100%;">
             <!-- Labeled District Select -->
             <div style="display:flex; align-items:center; gap:8px;">
-                <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">TFAA District:</label>
+                <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">District:</label>
                 <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:180px;">
                     <option value="">All Districts</option>
                     <option value="unassigned">Unassigned Only</option>
@@ -353,7 +353,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                         </select>
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">TFAA District</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">District</label>
                         <select name="shop_district" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                             <option value="">-- Unassigned --</option>
                             <?php foreach ( $districts as $key => $label ): ?>
