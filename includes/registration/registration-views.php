@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.6.2
+ * Version: 3.6.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -99,38 +99,26 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                 <?php endif; ?>
             </div>
 
-            <!-- Integrated Control Panel Filter Toolbar -->
-            <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-                <div class="sywat-filter-toolbar">
-                    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-                        <h3 class="sywat-filter-title">
-                            🎯 Active Roster Filter
-                        </h3>
-
-                        <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" id="sywat_register_filter_form" class="sywat-filter-form">
-                            <div class="sywat-filter-field">
-                                <label>Tournament</label>
-                                <select name="selected_tournament" onchange="this.form.submit()">
-                                    <?php if ( empty( $scoped_tournaments ) ): ?>
-                                        <option value="">No Tournaments Configured</option>
-                                    <?php else: ?>
-                                        <?php foreach ( $scoped_tournaments as $t_name => $t_data ): ?>
-                                            <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
-                                                <?php echo esc_html( $t_name ); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Desk Card -->
-            <div class="sywat-card no-print">
+            <!-- Main Desk Card (Docked to Tabs with Balanced Header Controls) -->
+            <div class="sywat-card no-print" style="border-top-left-radius:0;">
                 <div class="sywat-card-title">
                     <span>Register Shooters Desk</span>
+
+                    <!-- Tournament Switcher Control Bar (Right-Aligned) -->
+                    <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; gap:8px; align-items:center;">
+                        <label style="font-size:12px; font-weight:700; color:#475569;">Active Tournament:</label>
+                        <select name="selected_tournament" onchange="this.form.submit()" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px;">
+                            <?php if ( empty( $scoped_tournaments ) ): ?>
+                                <option value="">No Tournaments Configured</option>
+                            <?php else: ?>
+                                <?php foreach ( $scoped_tournaments as $t_name => $t_data ): ?>
+                                    <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
+                                        <?php echo esc_html( $t_name ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                    </form>
                 </div>
 
                 <div class="sywat-subtitle">Phone intake, group pre-registrations, and FareHarbor roster file imports.</div>
