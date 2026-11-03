@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.6.5
+ * Version: 3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -149,23 +149,25 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                    <div class="sywat-card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <span style="font-weight: 700; font-size: 18px; color: #0f172a; white-space: nowrap;">Configured Tournaments</span>
-                        
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; white-space: nowrap;">
-                            
+                    <div class="sywat-card-header-bar">
+                        <div>
+                            <h2>🎯 Configured Tournaments</h2>
+                            <div class="sywat-subtitle" style="margin-top:2px;">Overview of configured tournaments, shooting lines, and archer administration.</div>
+                        </div>
+
+                        <div class="sywat-header-inline-controls" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             <!-- Search & Filter Controls Group -->
                             <div style="display: flex; gap: 5px; margin: 0; align-items: center; white-space: nowrap;">
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px; margin: 0;">
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px; margin: 0; background:#fff;">
                                         <option value="all">All Shops</option>
                                         <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                             <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 <?php endif; ?>
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box; margin: 0;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 4px 10px; margin: 0;" onclick="sywatResetTournamentFilters()">Clear</button>
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box; margin: 0; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 0 10px; margin: 0;" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
 
                             <!-- TFAA Sync Pill -->
@@ -189,8 +191,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height: 38px; margin: 0;" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
-
-                    <div class="sywat-subtitle">Overview of configured tournaments, shooting lines, and archer administration.</div>
 
                     <?php if ( empty( $scoped_tournaments ) ): ?>
                         <p style="color:#646970; font-style:italic;">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
