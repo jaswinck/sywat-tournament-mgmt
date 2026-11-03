@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -113,7 +113,7 @@ function render_sywat_scores_app() {
     <div class="sywat-wrap">
         <div class="no-print"><?php echo $notice; ?></div>
 
-        <!-- Master Navigation Tabs -->
+        <!-- Master Navigation Tabs (Card-Docked) -->
         <div class="sywat-nav-tabs no-print">
             <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
             <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
