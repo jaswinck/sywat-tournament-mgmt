@@ -2,7 +2,7 @@
 /**
  * Lightweight Standalone Excel (.xlsx) Parser for WordPress / PHP
  * Path: includes/lib/SimpleXLSX.php
- * Version: 1.0.0
+ * Version: 1.2.0
  * 
  * Dependencies: PHP ZipArchive & SimpleXML (Standard in PHP 7.4+ & WP Core)
  */
@@ -28,16 +28,14 @@ class SimpleXLSX {
         return false;
     }
 
-    /**
-     * Get error message if parse fails
-     */
     public function getError() {
         return $this->error;
     }
 
-    /**
-     * Get rows array for specified worksheet index (default 0 = first sheet)
-     */
+    public function sheetsCount() {
+        return count( $this->sheets );
+    }
+
     public function rows( $sheetIndex = 0 ) {
         if ( isset( $this->sheets[$sheetIndex] ) ) {
             return $this->sheets[$sheetIndex];
@@ -45,9 +43,6 @@ class SimpleXLSX {
         return array();
     }
 
-    /**
-     * Internal XLSX Unpack & XML Parsing
-     */
     private function _parse( $filename ) {
         if ( ! class_exists( 'ZipArchive' ) ) {
             $this->error = 'PHP ZipArchive extension is required on your web server.';
@@ -60,7 +55,7 @@ class SimpleXLSX {
             return false;
         }
 
-        // 1. Read Shared Strings (Text content table)
+        // 1. Read Shared Strings
         if ( ( $index = $zip->locateName( 'xl/sharedStrings.xml' ) ) !== false ) {
             $data = $zip->getFromIndex( $index );
             $xml = @simplexml_load_string( $data );
@@ -81,7 +76,7 @@ class SimpleXLSX {
             }
         }
 
-        // 2. Locate Worksheet XML files
+        // 2. Locate Worksheets
         $sheetFiles = array();
         for ( $i = 0; $i < $zip->numFiles; $i++ ) {
             $name = $zip->getNameIndex( $i );
@@ -90,7 +85,6 @@ class SimpleXLSX {
             }
         }
 
-        // Sort sheets in original order (sheet1.xml, sheet2.xml, etc.)
         usort( $sheetFiles, function( $a, $b ) {
             preg_match( '/sheet(\d+)\.xml/i', $a, $m1 );
             preg_match( '/sheet(\d+)\.xml/i', $b, $m2 );
@@ -103,7 +97,7 @@ class SimpleXLSX {
             return false;
         }
 
-        // 3. Extract Rows & Cell Values from Worksheets
+        // 3. Extract Rows & Cells
         foreach ( $sheetFiles as $sIndex => $sheetFile ) {
             $sheetData = $zip->getFromName( $sheetFile );
             if ( empty( $sheetData ) ) continue;
@@ -120,22 +114,26 @@ class SimpleXLSX {
 
                 if ( isset( $row->c ) ) {
                     foreach ( $row->c as $c ) {
-                        $r   = (string) $c['r']; // e.g. "A1", "B2"
-                        $t   = (string) $c['t']; // e.g. "s" for shared string
+                        $r   = (string) $c['r'];
+                        $t   = (string) $c['t'];
                         $val = '';
 
                         if ( isset( $c->v ) ) {
                             $val = (string) $c->v;
                         } elseif ( isset( $c->is->t ) ) {
                             $val = (string) $c->is->t;
+                        } elseif ( isset( $c->is->r ) ) {
+                            $str = '';
+                            foreach ( $c->is->r as $r_node ) {
+                                $str .= (string) $r_node->t;
+                            }
+                            $val = $str;
                         }
 
-                        // Map shared string lookup
                         if ( $t === 's' && isset( $this->sharedStrings[intval($val)] ) ) {
                             $val = $this->sharedStrings[intval($val)];
                         }
 
-                        // Convert column letters (A, B, AA) to 0-based column index
                         $colAlpha = preg_replace( '/[0-9]/', '', $r );
                         $colIdx   = $this->columnLetterToIndex( $colAlpha );
 
@@ -143,7 +141,6 @@ class SimpleXLSX {
                     }
                 }
 
-                // Fill missing cells to maintain contiguous arrays ($row[0], $row[1], etc.)
                 if ( ! empty( $rowCells ) ) {
                     $maxCol = max( array_keys( $rowCells ) );
                     $contiguousRow = array();
@@ -161,9 +158,6 @@ class SimpleXLSX {
         return true;
     }
 
-    /**
-     * Convert Excel column reference to 0-based index (e.g. A -> 0, B -> 1, AA -> 26)
-     */
     private function columnLetterToIndex( $col ) {
         $col = strtoupper( $col );
         $len = strlen( $col );
