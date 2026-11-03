@@ -62,7 +62,7 @@ function render_sywat_scores_app() {
         $notice = sywat_scores_handle_batch_actions($selected_tournament, $selected_line_idx, $is_admin, $locked_lines, $current_view_locked);
     }
 
-    // Retrieve Archers for Active View Table
+    // Retrieve Archers for Active View Table & Line Metrics
     $registrations = array();
     $results = $wpdb->get_results( $wpdb->prepare(
         "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
@@ -164,6 +164,113 @@ function render_sywat_scores_app() {
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
+
+        <!-- Line Score Tracker Card -->
+        <div class="sywat-card no-print" style="margin-bottom:20px;">
+            <div class="sywat-card-title">
+                <span>Line Score Tracker</span>
+            </div>
+            <?php if (!empty($lines)): ?>
+                <?php
+                    $ordered_lines = array();
+                    foreach ($lines as $idx => $line) {
+                        $line_title = isset($line['name']) ? $line['name'] : 'Line ' . ($idx + 1);
+                        $weight = 50;
+
+                        if (stripos($line_title, 'Sat') !== false) {
+                            if (stripos($line_title, '10') !== false) $weight = 10;
+                            elseif (stripos($line_title, '2') !== false) $weight = 20;
+                            else $weight = 25;
+                        } elseif (stripos($line_title, 'Sun') !== false) {
+                            if (stripos($line_title, '10') !== false) $weight = 30;
+                            elseif (stripos($line_title, '2') !== false) $weight = 40;
+                            else $weight = 45;
+                        }
+
+                        $ordered_lines[] = array('idx' => $idx, 'line' => $line, 'weight' => $weight);
+                    }
+
+                    usort($ordered_lines, function($a, $b) {
+                        if ($a['weight'] !== $b['weight']) return $a['weight'] <=> $b['weight'];
+                        return $a['idx'] <=> $b['idx'];
+                    });
+                ?>
+
+                <div class="sywat-tracker-grid">
+                    <?php foreach ($ordered_lines as $item): ?>
+                        <?php
+                            $idx  = $item['idx'];
+                            $line = $item['line'];
+                            
+                            $total_line_shooters = 0;
+                            $scores_entered_line = 0;
+
+                            foreach ($registrations as $reg) {
+                                if (isset($reg['tournament']) && $reg['tournament'] === $selected_tournament) {
+                                    $match_index = isset($reg['line_index']) && (string)$reg['line_index'] === (string)$idx;
+                                    $match_name  = isset($reg['line_name']) && isset($line['name']) && trim($reg['line_name']) === trim($line['name']);
+
+                                    if (($match_index || $match_name) && !empty($reg['checked_in'])) {
+                                        $total_line_shooters++;
+                                        $has_score = (isset($reg['score']) && $reg['score'] !== '' && (int)$reg['score'] > 0) || (isset($reg['x_count']) && (int)$reg['x_count'] > 0);
+                                        if ($has_score) {
+                                            $scores_entered_line++;
+                                        }
+                                    }
+                                }
+                            }
+
+                            $is_line_locked = !empty($locked_lines[$idx]);
+                            $is_complete    = ($total_line_shooters > 0 && $scores_entered_line === $total_line_shooters);
+
+                            if ($is_line_locked) {
+                                $status_badge = '<span class="sywat-badge sywat-badge-full">🔒 Locked</span>';
+                            } elseif ($is_complete) {
+                                $status_badge = '<span class="sywat-badge sywat-badge-open">✅ Complete</span>';
+                            } else {
+                                $pending = max(0, $total_line_shooters - $scores_entered_line);
+                                $status_badge = '<span class="sywat-badge sywat-badge-prereg">' . $pending . ' Pending</span>';
+                            }
+                        ?>
+                        <div class="sywat-tracker-card">
+                            <div>
+                                <div class="sywat-tracker-card-header">
+                                    <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']); ?></strong>
+                                    <?php echo $status_badge; ?>
+                                </div>
+                                <div class="sywat-tracker-card-stats">
+                                    <span><strong>Scores Saved:</strong> <?php echo $scores_entered_line . ' / ' . $total_line_shooters; ?></span>
+                                </div>
+                            </div>
+                            
+                            <div class="sywat-tracker-card-actions">
+                                <form method="post" style="margin:0;">
+                                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
+                                    <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-edit">Enter Scores</button>
+                                </form>
+
+                                <?php if ($is_admin): ?>
+                                    <form method="post" style="margin:0;">
+                                        <?php wp_nonce_field('sywat_scores_action', 'sywat_nonce'); ?>
+                                        <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                        <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
+                                        <input type="hidden" name="sywat_action" value="toggle_lock">
+                                        <?php if ($is_line_locked): ?>
+                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Unlock</button>
+                                        <?php else: ?>
+                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock">Lock</button>
+                                        <?php endif; ?>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p style="color:#64748b; font-style:italic;">No shooting lines configured.</p>
+            <?php endif; ?>
         </div>
 
         <!-- Main Scoring Table Card -->
