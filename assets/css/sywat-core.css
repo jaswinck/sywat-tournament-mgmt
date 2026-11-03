@@ -88,8 +88,6 @@ body {
     padding: 6px 0;
     z-index: 99999;
     margin-top: 6px;
-    
-    /* Smooth fade & grace window on mouseout */
     opacity: 0;
     visibility: hidden;
     transform: translateY(4px);
@@ -515,6 +513,112 @@ body {
     flex-wrap: wrap;
     gap: 12px;
     align-items: flex-end;
+}
+
+.sywat-filter-form {
+    margin: 0;
+    flex: 1 1 180px;
+    min-width: 160px;
+}
+
+.sywat-filter-field-sm  { flex: 1 1 120px; min-width: 110px; margin: 0; }
+.sywat-filter-field-md  { flex: 1 1 140px; min-width: 130px; margin: 0; }
+.sywat-filter-field-lg  { flex: 1 1 160px; min-width: 150px; margin: 0; }
+.sywat-filter-field-xl  { flex: 2 1 240px; min-width: 200px; margin: 0; }
+.sywat-filter-field-dir { flex: 2 1 260px; min-width: 220px; margin: 0; }
+
+.sywat-search-input-wrapper {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.sywat-search-input-wrapper input[type="text"] {
+    flex: 1;
+    height: 38px;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.sywat-search-input-wrapper .sywat-btn {
+    height: 38px;
+    font-size: 13px;
+    padding: 4px 12px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Card Headers & Sub-Elements */
+.sywat-card-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.sywat-card-header-bar h2 {
+    margin: 0;
+    font-size: 22px;
+    color: #1e3a8a;
+}
+
+.sywat-shop-location {
+    font-size: 12px;
+    color: #0284c7;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.sywat-empty-notice {
+    color: #646970;
+    font-style: italic;
+    padding: 20px 0;
+}
+
+/* Directory & Results Table Column Utilities */
+.sywat-col-center { text-align: center !important; }
+.sywat-col-right  { text-align: right !important; }
+
+.sywat-col-date       { width: 22%; }
+.sywat-col-tourn      { width: 38%; }
+.sywat-col-shooters   { width: 15%; text-align: center; }
+.sywat-col-action     { width: 25%; text-align: right; }
+
+.sywat-col-rank        { width: 50px; text-align: center; font-weight: bold; }
+.sywat-col-score       { width: 110px; text-align: center; }
+.sywat-col-total       { width: 130px; text-align: right; }
+.sywat-col-tourn-score { width: 140px; text-align: right; }
+
+.sywat-table-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.sywat-badge-pending {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.sywat-score-null { color: #94a3b8; }
+
+.sywat-score-cell {
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.sywat-btn-sm {
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    margin-left: 8px !important;
+    height: 24px !important;
 }
 
 /* Dynamic Participation Stat Banner */
