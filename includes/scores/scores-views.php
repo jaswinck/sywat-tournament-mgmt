@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.6.3
+ * Version: 3.6.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -124,18 +124,18 @@ function render_sywat_scores_app() {
             <?php endif; ?>
         </div>
 
-        <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Controls Right) -->
+        <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Direct Controls Right) -->
         <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-            <div class="sywat-filter-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-                <h3 class="sywat-filter-title" style="margin:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                <h3 class="sywat-filter-title" style="margin:0; font-size:18px;">
                     🎯 Active Roster Filter
                 </h3>
 
                 <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                    <form method="post" id="sywat_score_filter_form" class="sywat-filter-form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <form method="post" id="sywat_score_filter_form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                         
-                        <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
                             <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Tournament:</label>
                             <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                                 <?php foreach ($tournaments as $t_name => $t_lines): ?>
@@ -146,7 +146,7 @@ function render_sywat_scores_app() {
                             </select>
                         </div>
 
-                        <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
                             <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Shooting Line:</label>
                             <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                                 <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
