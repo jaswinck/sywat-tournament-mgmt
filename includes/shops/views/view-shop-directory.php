@@ -1,7 +1,8 @@
 <?php
 /**
- * View Template: Admin Shop Directory & Creation Modal
+ * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -45,6 +46,7 @@ foreach ( $all_shops as $s_id => $shop ) {
             </div>
 
             <?php if ( $can_manage_seasons || $is_admin ): ?>
+                <button type="button" class="sywat-btn sywat-btn-secondary" style="height:32px;" onclick="openImportShopsModal()">📥 Import Locations</button>
                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:32px;" onclick="openAddShopModal()">Add Location</button>
             <?php endif; ?>
         </div>
@@ -168,6 +170,51 @@ foreach ( $all_shops as $s_id => $shop ) {
     <?php endif; ?>
 </div>
 
+<!-- IMPORT SHOPS MODAL -->
+<div id="importShopsModal" class="sywat-modal-backdrop" style="display:none;">
+    <div class="sywat-modal-content sywat-modal-md">
+        <div class="sywat-modal-header no-print">
+            <h3>📥 Import Locations & Contacts</h3>
+            <button type="button" class="sywat-modal-close" onclick="closeImportShopsModal()">&times;</button>
+        </div>
+        <div class="sywat-modal-body">
+            <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" enctype="multipart/form-data">
+                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                <input type="hidden" name="sywat_shop_action" value="import_shops">
+
+                <div style="margin-bottom:15px;">
+                    <p style="font-size:13px; color:#475569; margin-top:0; line-height:1.5;">
+                        Upload an Excel (<code>.xlsx</code> / <code>.xls</code>) or <code>.csv</code> file containing your master shop directory and contact details.
+                    </p>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Select File (.xlsx, .xls, .csv) *</label>
+                    <input type="file" name="shop_import_file" accept=".xlsx,.xls,.csv" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; background:#fff;">
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Import Mode</label>
+                    <select name="import_mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="upsert">Safe Merge & Update (Update Existing & Add New)</option>
+                        <option value="skip_existing">Add New Locations Only (Skip Existing)</option>
+                    </select>
+                </div>
+
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:12px; font-size:12px; color:#0369a1; line-height:1.4; margin-bottom:15px;">
+                    💡 <strong>Expected Column Headers:</strong><br>
+                    <code>Shop/Club</code>, <code>Type</code>, <code>District</code>, <code>Address Line 1</code>, <code>Address Line 2</code>, <code>City</code>, <code>State</code>, <code>Zip</code>, <code>Primary Contact</code>, <code>Primary Title</code>, <code>Primary Email</code>, <code>Primary Phone</code>, <code>Additional Contact</code>, <code>Additional Title</code>, <code>Additional Email</code>, <code>Additional Phone</code>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="closeImportShopsModal()">Cancel</button>
+                    <button type="submit" class="sywat-btn sywat-btn-primary">Upload & Process Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- CREATE SHOP MODAL -->
 <div id="addShopModal" class="sywat-modal-backdrop">
     <div class="sywat-modal-content sywat-modal-md">
@@ -277,3 +324,14 @@ foreach ( $all_shops as $s_id => $shop ) {
         </div>
     </div>
 </div>
+
+<script>
+function openImportShopsModal() {
+    var modal = document.getElementById('importShopsModal');
+    if (modal) modal.style.display = 'flex';
+}
+function closeImportShopsModal() {
+    var modal = document.getElementById('importShopsModal');
+    if (modal) modal.style.display = 'none';
+}
+</script>
