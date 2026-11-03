@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -127,7 +127,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <!-- Operational Navigation Tabs -->
+            <!-- Operational Navigation Tabs (Card-Docked) -->
             <div class="sywat-nav-tabs no-print">
                 <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ($active_tab === 'manage') ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_access_desk ): ?>
@@ -196,10 +196,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 25%; text-align: center;">Tournament, Season & Location</th>
-                                        <th style="width: 12%; text-align: center;">Volunteer Hub</th>
-                                        <th style="width: 38%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
-                                        <th style="width: 25%; text-align: center;">Tournament Actions</th>
+                                        <th style="width: 28%; text-align: left;">Tournament, Season & Location</th>
+                                        <th style="width: 48%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
+                                        <th style="width: 24%; text-align: center;">Tournament Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -223,29 +222,33 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $is_active_hub = in_array( $t_name, $active_tournaments );
                                         ?>
                                         <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
+                                            <!-- Column 1: Metadata & Volunteer Hub Toggle -->
                                             <td>
-                                                <strong><?php echo esc_html( $t_name ); ?></strong>
-                                                <div style="font-size: 11px; color: #1e3a8a; font-weight: 700; margin-top: 2px;">🏆 <?php echo esc_html( $t_season_name ); ?></div>
-                                                <div style="font-size: 12px; color: #2271b1; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
-                                                <div style="font-size: 11px; color: #646970; margin-top: 2px;">📅 <?php echo esc_html( $disp_dates ); ?></div>
-                                                <div style="font-size: 11px; color: #646970; margin-top: 1px;"><?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?></div>
+                                                <strong style="font-size: 15px; color: #0f172a;"><?php echo esc_html( $t_name ); ?></strong>
+                                                <div style="font-size: 12px; color: #1e3a8a; font-weight: 700; margin-top: 3px;">🏆 <?php echo esc_html( $t_season_name ); ?></div>
+                                                <div style="font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                                <div style="font-size: 11px; color: #64748b; margin-top: 2px;">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
+                                                
+                                                <!-- Volunteer Hub Toggle Chip -->
+                                                <div style="margin-top: 8px;">
+                                                    <?php if ( $t_shop_id === 'shop_ccr' ): ?>
+                                                        <form method="post" style="margin: 0;">
+                                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                            <input type="hidden" name="sywat_action" value="toggle_active_tournament">
+                                                            <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                            <?php if ( $is_active_hub ): ?>
+                                                                <button type="submit" class="sywat-btn sywat-btn-success" style="padding: 2px 8px; font-size: 11px; height: 26px;" title="Visible in Volunteer Hub">🟢 Hub Active</button>
+                                                            <?php else: ?>
+                                                                <button type="submit" class="sywat-btn sywat-btn-secondary" style="padding: 2px 8px; font-size: 11px; height: 26px;" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
+                                                            <?php endif; ?>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">Hub: N/A</span>
+                                                    <?php endif; ?>
+                                                </div>
                                             </td>
-                                            <td style="text-align: center;">
-                                                <?php if ( $t_shop_id === 'shop_ccr' ): ?>
-                                                    <form method="post" style="margin: 0;">
-                                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                        <input type="hidden" name="sywat_action" value="toggle_active_tournament">
-                                                        <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                        <?php if ( $is_active_hub ): ?>
-                                                            <button type="submit" class="sywat-btn sywat-btn-success" style="padding: 4px 8px; font-size: 11px; height: auto;">🟢 Active (Hide)</button>
-                                                        <?php else: ?>
-                                                            <button type="submit" class="sywat-btn sywat-btn-secondary" style="padding: 4px 8px; font-size: 11px; height: auto;">⚪ Hidden (Activate)</button>
-                                                        <?php endif; ?>
-                                                    </form>
-                                                <?php else: ?>
-                                                    <span style="color: #8c8f94; font-size: 12px; font-weight: 600;">N/A</span>
-                                                <?php endif; ?>
-                                            </td>
+
+                                            <!-- Column 2: 2-Column Line Slot Capacity Grid -->
                                             <td>
                                                 <?php if ( ! empty( $t_lines ) && is_array( $t_lines ) ): ?>
                                                     <div class="sywat-lines-grid">
@@ -270,12 +273,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                         <?php endforeach; ?>
                                                     </div>
                                                 <?php endif; ?>
-                                                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #c3c4c7; font-size: 12px; color: #1d2327; text-align: center;">
+                                                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #1e293b; text-align: center;">
                                                     <strong>Total Registered:</strong> <?php echo $reg_count; ?> <?php echo ( $reg_count === 1 ? 'archer' : 'archers' ); ?>
                                                 </div>
                                             </td>
+
+                                            <!-- Column 3: Stacked Tournament Action Buttons -->
                                             <td style="text-align: center;">
-                                                <div style="display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center;">
+                                                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center;">
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
