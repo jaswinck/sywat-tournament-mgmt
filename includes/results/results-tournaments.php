@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 3.6.2
+ * Version: 3.6.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -46,11 +46,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
             </div>
 
             <!-- Directory Filter Bar -->
-            <div class="sywat-filter-bar" style="margin-bottom: 20px;">
+            <div class="sywat-filter-bar" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
                 <?php if ( count( $filter_shops ) > 1 ): ?>
-                    <div class="sywat-field-group" style="flex: 1 1 180px; min-width: 160px;">
-                        <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Host Location / Shop</label>
-                        <select id="sywat_dir_shop_filter" onchange="sywatApplyDirectoryFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
+                    <div class="sywat-field-group" style="flex: 1 1 180px; min-width: 160px; margin: 0;">
+                        <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Host Location / Shop</label>
+                        <select id="sywat_dir_shop_filter" onchange="sywatApplyDirectoryFilters()" style="width: 100%; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin: 0;">
                             <option value="all">All Locations</option>
                             <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                 <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
@@ -59,14 +59,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                     </div>
                 <?php endif; ?>
 
-                <div class="sywat-field-group" style="flex: 2 1 240px; min-width: 200px;">
-                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Search Tournament</label>
-                    <input type="text" id="sywat_dir_search_input" oninput="sywatApplyDirectoryFilters()" placeholder="Type tournament name or range..." style="width: 100%; height: 38px; padding: 6px 10px; box-sizing: border-box;">
-                </div>
-
-                <div class="sywat-field-group" style="flex: 0 0 auto;">
-                    <label style="font-weight: 700; font-size: 12px; color: transparent; user-select: none;">Reset</label>
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetDirectoryFilters()" style="height: 38px; font-size: 13px;">Clear</button>
+                <div class="sywat-field-group" style="flex: 2 1 260px; min-width: 220px; margin: 0;">
+                    <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Search Tournament</label>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="text" id="sywat_dir_search_input" oninput="sywatApplyDirectoryFilters()" placeholder="Type tournament name or range..." style="flex: 1; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; margin: 0;">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetDirectoryFilters()" style="height: 38px; font-size: 13px; padding: 4px 12px; margin: 0; white-space: nowrap;">Clear</button>
+                    </div>
                 </div>
             </div>
 
@@ -294,10 +292,10 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 <h2 style="margin: 0; font-size: 22px; color: #1e3a8a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
             </div>
 
-            <div class="sywat-filter-bar" style="margin-bottom: 20px;">
-                <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px;">
-                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Division</label>
-                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
+            <div class="sywat-filter-bar" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px; margin: 0;">
+                    <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Division</label>
+                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin: 0;">
                         <option value="all">All Divisions</option>
                         <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
@@ -305,18 +303,18 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     </select>
                 </div>
 
-                <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px;">
-                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Gender</label>
-                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
+                <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px; margin: 0;">
+                    <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Gender</label>
+                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin: 0;">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                     </select>
                 </div>
 
-                <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px;">
-                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Style</label>
-                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
+                <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px; margin: 0;">
+                    <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Style</label>
+                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin: 0;">
                         <option value="all">All Styles</option>
                         <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
@@ -324,14 +322,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     </select>
                 </div>
 
-                <div class="sywat-field-group" style="flex: 2 1 200px; min-width: 180px;">
-                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Search Archer</label>
-                    <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="width: 100%; height: 38px; padding: 6px 10px; box-sizing: border-box;">
-                </div>
-
-                <div class="sywat-field-group" style="flex: 0 0 auto;">
-                    <label style="font-weight: 700; font-size: 12px; color: transparent; user-select: none;">Reset</label>
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournFilters()" style="height: 38px; font-size: 13px;">Reset Filters</button>
+                <div class="sywat-field-group" style="flex: 2 1 240px; min-width: 200px; margin: 0;">
+                    <label style="display: block; font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 4px;">Search Archer</label>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="flex: 1; height: 38px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; margin: 0;">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournFilters()" style="height: 38px; font-size: 13px; padding: 4px 12px; margin: 0; white-space: nowrap;">Reset Filters</button>
+                    </div>
                 </div>
             </div>
 
