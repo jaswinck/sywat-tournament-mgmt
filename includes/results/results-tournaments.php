@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 3.6.5
+ * Version: 3.6.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -287,9 +287,10 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         ?>
 
         <div class="sywat-public-card" style="border-top-left-radius:0;">
-            <div style="margin-bottom: 20px;">
-                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="margin-bottom: 12px; height: 32px;">Back to Directory</a>
+            <!-- Clean Header: Results Title Left, Back Button Right -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:20px; flex-wrap:wrap;">
                 <h2 style="margin: 0; font-size: 22px; color: #1e3a8a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
+                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="height: 36px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; line-height: 1; font-weight: 600; text-decoration: none;">Back to Directory</a>
             </div>
 
             <div class="sywat-filter-bar" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
