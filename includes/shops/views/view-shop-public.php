@@ -1,9 +1,9 @@
 <?php
 /**
- * View Template: Public Archery Shops & Clubs Directory
+ * View Template: Public Archery Shops & Clubs
  * Path: includes/shops/views/view-shop-public.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.4.0
+ * Version: 4.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -57,9 +57,9 @@ uasort( $filtered_shops, function( $a, $b ) {
         <div class="sywat-card-title" style="margin-bottom:15px;">
             <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
                 <?php 
-                    if ($type_filter === 'pro_shop') echo 'Shops Directory';
-                    elseif ($type_filter === 'club') echo 'Archery Clubs Directory';
-                    else echo 'Shops and Clubs Directory';
+                    if ($type_filter === 'pro_shop') echo 'Shops';
+                    elseif ($type_filter === 'club') echo 'Archery Clubs';
+                    else echo 'Shops and Clubs';
                 ?>
             </h2>
         </div>
