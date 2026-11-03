@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,6 +24,13 @@ foreach ( $all_shops as $s_id => $shop ) {
         $filtered_shops[$s_id] = $shop;
     }
 }
+
+// Enforce Alphabetical Sorting by Location Name
+uasort( $filtered_shops, function( $a, $b ) {
+    $name_a = isset( $a['name'] ) ? $a['name'] : '';
+    $name_b = isset( $b['name'] ) ? $b['name'] : '';
+    return strcasecmp( $name_a, $name_b );
+});
 ?>
 
 <div class="sywat-card no-print">
