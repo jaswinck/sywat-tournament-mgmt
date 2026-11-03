@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.6.4
+ * Version: 3.6.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -149,8 +149,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                    <div class="sywat-card-title">
-                        <span>Configured Tournaments</span>
+                    <div class="sywat-card-title" style="display: flex; justify- continental; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Configured Tournaments</span>
+                        
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             
                             <!-- Search & Filter Controls Group -->
