@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -16,7 +16,8 @@ function render_sywat_scores_app() {
         return '<p style="color:red; padding:20px;">Access denied. Staff access required.</p>';
     }
 
-    $admin_roles        = array('administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor');
+    // Administrative & Score Control roles (Includes sywat_shop_manager for Line Lock/Unlock)
+    $admin_roles        = array('administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor', 'sywat_shop_manager');
     $is_admin           = is_user_logged_in() && (bool) array_intersect($admin_roles, (array) $user->roles);
     $can_manage_seasons = function_exists('sywat_can_manage_seasons') && sywat_can_manage_seasons();
     $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
@@ -299,7 +300,7 @@ function render_sywat_scores_app() {
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                         </div>
 
-                        <!-- Export CSV Button (Admin Only & Shown Whenever Locked Lines Exist) -->
+                        <!-- Export CSV Button (Admin & Shop Managers) -->
                         <?php if ($is_admin && !empty($locked_lines)): ?>
                             <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" style="height:32px;" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
                         <?php endif; ?>
@@ -365,7 +366,7 @@ function render_sywat_scores_app() {
                                         </td>
                                         <td style="text-align: center;">
                                             <?php if ($is_locked): ?>
-                                                <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins Only">🔒 Locked</span>
+                                                <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins & Shop Managers Only">🔒 Locked</span>
                                             <?php else: ?>
                                                 <span class="sywat-save-status sywat-status-saved" id="status_<?php echo esc_attr($reg_id); ?>">✓ Saved</span>
                                             <?php endif; ?>
