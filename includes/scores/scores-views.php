@@ -3,7 +3,7 @@
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
  * Author: SYWAT Archery
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -154,16 +154,17 @@ function render_sywat_scores_app() {
 
         <!-- Integrated Control Panel Filter Toolbar -->
         <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-            <div class="sywat-card-header-bar">
-                <h2>🎯 Enter Scores</h2>
+            <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px;">
+                <h2 style="margin:0;">✏️ Enter Scores</h2>
 
-                <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                    <form method="post" id="sywat_score_filter_form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div class="sywat-header-inline-controls" style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+                    <form method="post" id="sywat_score_filter_form" style="margin:0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                         
-                        <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                            <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Active Tournament:</label>
-                            <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
+                        <!-- Stacked Active Tournament Dropdown -->
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                            <label for="selected_tournament_val" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Active Tournament:</label>
+                            <select name="selected_tournament" id="selected_tournament_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:200px;">
                                 <?php foreach ($tournaments as $t_name => $t_lines): ?>
                                     <option value="<?php echo esc_attr($t_name); ?>" <?php selected($selected_tournament, $t_name); ?>>
                                         <?php echo esc_html($t_name); ?>
@@ -172,9 +173,10 @@ function render_sywat_scores_app() {
                             </select>
                         </div>
 
-                        <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                            <label style="font-weight:600; font-size:13px; color:#1e293b; margin:0; white-space:nowrap;">Shooting Line:</label>
-                            <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff;">
+                        <!-- Stacked Shooting Line Dropdown -->
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                            <label for="selected_line_val" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Shooting Line:</label>
+                            <select name="selected_line_idx" id="selected_line_val" onchange="document.getElementById('sywat_score_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:200px;">
                                 <option value="all" <?php selected($selected_line_idx, 'all'); ?>>All Lines (Entire Weekend)</option>
                                 <?php foreach ($lines as $idx => $line): ?>
                                     <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?>>
@@ -195,7 +197,7 @@ function render_sywat_scores_app() {
         <!-- Line Score Tracker Card -->
         <div class="sywat-card no-print" style="margin-bottom:20px;">
             <div class="sywat-card-header-bar">
-                <h2>🎯 Line Score Tracker</h2>
+                <h2 style="font-size:16px;">Line Score Tracker</h2>
             </div>
             <?php if (!empty($lines)): ?>
                 <?php
@@ -308,7 +310,7 @@ function render_sywat_scores_app() {
 
                 <div class="sywat-card-header-bar">
                     <div>
-                        <h2>🎯 Archer Scores</h2>
+                        <h2 style="font-size:16px;">Archer Scores</h2>
                         <div class="sywat-subtitle" style="margin-top:2px;">
                             Displaying <strong><?php echo count($tourn_registrations); ?></strong> checked-in archer(s) for <?php echo esc_html($selected_tournament); ?>
                         </div>
