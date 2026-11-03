@@ -3,7 +3,7 @@
  * View Template: Public Archery Shops & Clubs
  * Path: includes/shops/views/view-shop-public.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.5.0
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -53,24 +53,21 @@ uasort( $filtered_shops, function( $a, $b ) {
     </div>
 
     <div class="sywat-card">
-        <!-- Clean Title Header -->
-        <div class="sywat-card-title" style="margin-bottom:15px;">
-            <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
-                <?php 
+        <!-- UNIFIED TOP CARD HEADER BAR: TITLE (LEFT) & INLINE FILTERS (RIGHT) -->
+        <div class="sywat-card-header-bar">
+            <h2>
+                🎯 <?php 
                     if ($type_filter === 'pro_shop') echo 'Shops';
                     elseif ($type_filter === 'club') echo 'Clubs';
                     else echo 'Shops and Clubs';
                 ?>
             </h2>
-        </div>
 
-        <!-- Dedicated Labeled Filter Toolbar -->
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; width:100%;">
-                <!-- Clean District Label -->
+            <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                <!-- Clean Inline District Filter -->
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">District:</label>
-                    <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:220px;">
+                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">District:</label>
+                    <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:180px;">
                         <option value="">All Districts</option>
                         <option value="unassigned">Unassigned Only</option>
                         <?php foreach ( $districts as $key => $label ): ?>
@@ -79,11 +76,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                     </select>
                 </div>
 
-                <!-- Labeled Search & Clear -->
-                <div style="display:flex; align-items:center; gap:8px; flex-grow:1; max-width:400px;">
-                    <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">Search Location:</label>
-                    <div style="display:flex; gap:6px; width:100%;">
-                        <input type="text" id="sywat_shop_search_input" placeholder="Search by name or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; width:100%; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                <!-- Clean Inline Search & Clear -->
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">Search Location:</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="sywat_shop_search_input" placeholder="Search by name or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; min-width:200px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:36px; padding:0 12px; white-space:nowrap;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
                     </div>
                 </div>
