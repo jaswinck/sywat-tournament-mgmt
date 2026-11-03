@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.6.0
+ * Version: 3.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -179,9 +179,15 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $rows = array();
 
             if ( in_array( $ext, array( 'xlsx', 'xls' ) ) ) {
-                if ( file_exists( __DIR__ . '/SimpleXLSX.php' ) ) {
-                    require_once __DIR__ . '/SimpleXLSX.php';
+                $lib_path  = dirname( __DIR__ ) . '/lib/SimpleXLSX.php';
+                $shop_path = __DIR__ . '/SimpleXLSX.php';
+
+                if ( file_exists( $lib_path ) ) {
+                    require_once $lib_path;
+                } elseif ( file_exists( $shop_path ) ) {
+                    require_once $shop_path;
                 }
+
                 if ( class_exists( 'SimpleXLSX' ) && $xlsx = SimpleXLSX::parse( $file_tmp ) ) {
                     $rows = $xlsx->rows();
                 } else {
