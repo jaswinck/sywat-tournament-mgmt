@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -52,6 +52,7 @@ function sywat_desk_render_filter_bar($data) {
     <!-- Master Navigation Tabs -->
     <div class="sywat-nav-tabs no-print">
         <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+        <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
         <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
         <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
         <?php if ( $can_manage_seasons ): ?>
