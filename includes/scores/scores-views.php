@@ -2,18 +2,22 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
- * Version: 3.6.6
+ * Version: 3.7.0
  */
 
 if (!defined('ABSPATH')) exit;
 
 function render_sywat_scores_app() {
     $user = wp_get_current_user();
-    if ( ! is_user_logged_in() || ! array_intersect(array('administrator', 'management', 'non-shooting-member', 'staff_shooter', 'sywat_shop_manager', 'sywat_shop_user'), (array) $user->roles) ) {
+    
+    // Centralized capability check (includes tfaa_tournament_director & Executive Board)
+    $can_edit = function_exists('sywat_can_edit_scores') ? sywat_can_edit_scores() : ( is_user_logged_in() && (bool) array_intersect(array('administrator', 'management', 'non-shooting-member', 'staff_shooter', 'sywat_shop_manager', 'sywat_shop_user', 'tfaa_tournament_director', 'tfaa_president', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_field_governor'), (array) $user->roles) );
+    if ( ! $can_edit ) {
         return '<p style="color:red; padding:20px;">Access denied. Staff access required.</p>';
     }
 
-    $is_admin           = is_user_logged_in() && in_array('administrator', (array) $user->roles);
+    $admin_roles        = array('administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor');
+    $is_admin           = is_user_logged_in() && (bool) array_intersect($admin_roles, (array) $user->roles);
     $can_manage_seasons = function_exists('sywat_can_manage_seasons') && sywat_can_manage_seasons();
     $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
