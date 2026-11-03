@@ -3,11 +3,173 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 2.7.4
+ * Version: 3.6.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Render Public Tournament Directory Listing with Shop Search & Turnout Stats
+ */
+if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
+    function sywat_render_public_tournament_directory() {
+        $tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( ! is_array( $tournaments ) ) $tournaments = array();
+
+        $all_shops = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        $filter_shops = array();
+
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+            if ( isset( $all_shops[$t_shop]['name'] ) ) {
+                $filter_shops[$t_shop] = $all_shops[$t_shop]['name'];
+            }
+        }
+        asort( $filter_shops );
+
+        // Sort tournaments chronologically by start_date ASC (Oldest to Newest)
+        uasort( $tournaments, function( $a, $b ) {
+            $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
+            $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
+            if ( $a_date === $b_date ) return 0;
+            return ( $a_date < $b_date ) ? -1 : 1;
+        });
+
+        $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
+        ?>
+        <div class="sywat-public-card" style="border-top-left-radius:0;">
+            <div style="margin-bottom: 16px;">
+                <h2 style="margin: 0; font-size: 20px; color: #0f172a;">🎯 Individual Tournament Directory</h2>
+                <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+                    Select a completed tournament below to view official scores and category leaderboards.
+                </div>
+            </div>
+
+            <!-- Directory Filter Bar -->
+            <div class="sywat-filter-bar" style="margin-bottom: 20px;">
+                <?php if ( count( $filter_shops ) > 1 ): ?>
+                    <div class="sywat-field-group" style="flex: 1 1 180px; min-width: 160px;">
+                        <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Host Location / Shop</label>
+                        <select id="sywat_dir_shop_filter" onchange="sywatApplyDirectoryFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
+                            <option value="all">All Locations</option>
+                            <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+
+                <div class="sywat-field-group" style="flex: 2 1 240px; min-width: 200px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Search Tournament</label>
+                    <input type="text" id="sywat_dir_search_input" oninput="sywatApplyDirectoryFilters()" placeholder="Type tournament name or range..." style="width: 100%; height: 38px; padding: 6px 10px; box-sizing: border-box;">
+                </div>
+
+                <div class="sywat-field-group" style="flex: 0 0 auto;">
+                    <label style="font-weight: 700; font-size: 12px; color: transparent; user-select: none;">Reset</label>
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetDirectoryFilters()" style="height: 38px; font-size: 13px;">Clear</button>
+                </div>
+            </div>
+
+            <?php if ( empty( $tournaments ) ): ?>
+                <p style="color: #646970; font-style: italic; padding: 20px 0;">No tournaments configured yet.</p>
+            <?php else: ?>
+                <div class="sywat-table-responsive" style="margin-top: 10px;">
+                    <table class="sywat-table" style="margin-top: 0;">
+                        <thead>
+                            <tr>
+                                <th style="width: 22%;">Tournament Date</th>
+                                <th style="width: 38%;">Tournament Name & Location</th>
+                                <th style="width: 15%; text-align: center;">Shooters</th>
+                                <th style="width: 25%; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $tournaments as $t_name => $t_data ): ?>
+                                <?php 
+                                    $s_date        = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                                    $e_date        = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                                    $disp_dates    = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
+                                    if ( empty( $disp_dates ) ) {
+                                        $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
+                                    }
+
+                                    $t_shop_id     = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+                                    $t_shop_name   = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
+
+                                    // Calculate recorded shooter count for conditional View Results button
+                                    $raw_scores    = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
+                                    $scores_count  = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
+                                ?>
+                                <tr class="sywat-dir-row" data-name="<?php echo esc_attr( strtolower( $t_name ) ); ?>" data-shop="<?php echo esc_attr( strtolower( $t_shop_name ) ); ?>">
+                                    <td>
+                                        <strong style="font-size: 14px; color: #0f172a; font-weight: 700;">📅 <?php echo esc_html( $disp_dates ); ?></strong>
+                                    </td>
+                                    <td>
+                                        <strong style="font-size: 15px; color: #0f172a; font-weight: 700;"><?php echo esc_html( $t_name ); ?></strong>
+                                        <div style="font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span class="sywat-badge <?php echo ($scores_count > 0) ? 'sywat-badge-open' : 'sywat-badge-prereg'; ?>" style="font-size: 12px; padding: 4px 10px;">
+                                            👥 <strong><?php echo $scores_count; ?></strong> <?php echo ($scores_count === 1 ? 'Archer' : 'Archers'); ?>
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                                            <?php if ( $can_edit_scores ): ?>
+                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit" style="font-size: 12px; height: 32px;" title="Jump to Score Entry Desk">Enter Scores</a>
+                                            <?php endif; ?>
+
+                                            <?php if ( $scores_count > 0 ): ?>
+                                                <a href="?view=tournaments&tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-results" style="font-size: 12px; height: 32px;">View Results</a>
+                                            <?php else: ?>
+                                                <span class="sywat-badge" style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 6px 12px; font-size: 12px;" title="No scores entered yet">Pending</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <script>
+        function sywatApplyDirectoryFilters() {
+            const shopSelect   = document.getElementById('sywat_dir_shop_filter');
+            const searchInput  = document.getElementById('sywat_dir_search_input');
+
+            const shopFilter   = shopSelect ? shopSelect.value.toLowerCase().trim() : 'all';
+            const searchFilter = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            const rows = document.querySelectorAll('.sywat-dir-row');
+
+            rows.forEach(row => {
+                const name = (row.getAttribute('data-name') || '').toLowerCase();
+                const shop = (row.getAttribute('data-shop') || '').toLowerCase();
+
+                const shopMatch   = (shopFilter === 'all' || shop === shopFilter);
+                const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter));
+
+                row.style.display = (shopMatch && searchMatch) ? '' : 'none';
+            });
+        }
+
+        function sywatResetDirectoryFilters() {
+            const shopSelect  = document.getElementById('sywat_dir_shop_filter');
+            const searchInput = document.getElementById('sywat_dir_search_input');
+            if (shopSelect) shopSelect.value = 'all';
+            if (searchInput) searchInput.value = '';
+            sywatApplyDirectoryFilters();
+        }
+        </script>
+        <?php
+    }
+}
+
+/**
+ * Render Single Tournament Results Breakdown
+ */
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
         $raw_scores = sywat_get_tournament_scores( $tournament_name );
@@ -126,16 +288,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
 
-        <div class="sywat-public-card">
+        <div class="sywat-public-card" style="border-top-left-radius:0;">
             <div style="margin-bottom: 20px;">
-                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary" style="margin-bottom: 12px; display: inline-flex; align-items: center; gap: 5px;">← Back to Tournament Directory</a>
+                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="margin-bottom: 12px; height: 32px;">Back to Directory</a>
                 <h2 style="margin: 0; font-size: 22px; color: #1e3a8a;">🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
             </div>
 
-            <div class="sywat-filter-bar">
+            <div class="sywat-filter-bar" style="margin-bottom: 20px;">
                 <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px;">
-                    <label>Division</label>
-                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Division</label>
+                    <select id="sywat_tourn_filter_div" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Divisions</option>
                         <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
@@ -144,8 +306,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 </div>
 
                 <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px;">
-                    <label>Gender</label>
-                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Gender</label>
+                    <select id="sywat_tourn_filter_gen" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
@@ -153,8 +315,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 </div>
 
                 <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px;">
-                    <label>Style</label>
-                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Style</label>
+                    <select id="sywat_tourn_filter_style" onchange="sywatApplyTournFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Styles</option>
                         <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
@@ -163,12 +325,13 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 </div>
 
                 <div class="sywat-field-group" style="flex: 2 1 200px; min-width: 180px;">
-                    <label>Search Archer</label>
-                    <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="width: 100%; height: 36px; box-sizing: border-box;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Search Archer</label>
+                    <input type="text" id="sywat_tourn_search" oninput="sywatApplyTournFilters()" placeholder="Type archer name..." style="width: 100%; height: 38px; padding: 6px 10px; box-sizing: border-box;">
                 </div>
 
-                <div style="flex: 0 0 auto;">
-                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetTournFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
+                <div class="sywat-field-group" style="flex: 0 0 auto;">
+                    <label style="font-weight: 700; font-size: 12px; color: transparent; user-select: none;">Reset</label>
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournFilters()" style="height: 38px; font-size: 13px;">Reset Filters</button>
                 </div>
             </div>
 
