@@ -3,7 +3,7 @@
  * View Template: Public Archery Shops & Clubs Directory
  * Path: includes/shops/views/view-shop-public.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -57,9 +57,9 @@ uasort( $filtered_shops, function( $a, $b ) {
         <div class="sywat-card-title" style="margin-bottom:15px;">
             <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
                 <?php 
-                    if ($type_filter === 'pro_shop') echo 'TFAA Pro Shops Directory';
-                    elseif ($type_filter === 'club') echo 'TFAA Archery Clubs Directory';
-                    else echo 'TFAA Shops & Archery Clubs Directory';
+                    if ($type_filter === 'pro_shop') echo 'Shops Directory';
+                    elseif ($type_filter === 'club') echo 'Archery Clubs Directory';
+                    else echo 'Shops and Clubs Directory';
                 ?>
             </h2>
         </div>
@@ -67,9 +67,9 @@ uasort( $filtered_shops, function( $a, $b ) {
         <!-- Dedicated Labeled Filter Toolbar -->
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; width:100%;">
-                <!-- Labeled District Select -->
+                <!-- Clean District Label -->
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">TFAA District:</label>
+                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">District:</label>
                     <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:220px;">
                         <option value="">All Districts</option>
                         <option value="unassigned">Unassigned Only</option>
