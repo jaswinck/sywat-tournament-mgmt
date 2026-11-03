@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.6.5
+ * Version: 3.7.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -348,3 +348,20 @@ function sywat_desk_render_archers_table($data) {
     </div>
     <?php
 }
+?>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Auto-dismiss Check-In Desk alert banners after 4 seconds
+    setTimeout(function() {
+        const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
+        notices.forEach(function(notice) {
+            notice.style.transition = 'opacity 0.5s ease, margin-bottom 0.5s ease';
+            notice.style.opacity = '0';
+            setTimeout(function() {
+                notice.style.display = 'none';
+            }, 500);
+        });
+    }, 4000);
+});
+</script>
