@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 2.7.4
+ * Version: 3.6.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -53,31 +53,34 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         });
         ?>
 
-        <div class="sywat-public-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
-                <div>
-                    <h2 style="margin: 0; font-size: 22px; color: #1e3a8a;">🏆 SYWAT Season Standings</h2>
-                    <div style="font-size: 13px; color: #646970; margin-top: 4px;">
-                        Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
-                    </div>
-                </div>
-
-                <form method="get" style="margin: 0;">
-                    <input type="hidden" name="view" value="standings">
-                    <select name="season" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; font-size: 13px; height: 38px;">
-                        <?php foreach ( $seasons as $slug => $s ): ?>
-                            <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
-                                <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
+        <div class="sywat-public-card" style="border-top-left-radius: 0;">
+            
+            <div class="sywat-subtitle" style="margin-bottom: 16px; margin-top: 0;">
+                Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
             </div>
 
-            <div class="sywat-filter-bar">
+            <!-- UNIFIED ALIGNED FILTER BAR -->
+            <div class="sywat-filter-bar" style="margin-bottom: 20px;">
+                
+                <!-- 1. Season Switcher Field -->
+                <form method="get" id="sywat_season_form" style="margin: 0; flex: 1 1 180px; min-width: 160px;">
+                    <input type="hidden" name="view" value="standings">
+                    <div class="sywat-field-group">
+                        <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Season</label>
+                        <select name="season" onchange="this.form.submit()" style="width: 100%; height: 38px; padding: 6px 10px;">
+                            <?php foreach ( $seasons as $slug => $s ): ?>
+                                <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
+                                    <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </form>
+
+                <!-- 2. Division Filter -->
                 <div class="sywat-field-group" style="flex: 1 1 140px; min-width: 130px;">
-                    <label>Division</label>
-                    <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Division</label>
+                    <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Divisions</option>
                         <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
@@ -85,18 +88,20 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </select>
                 </div>
 
+                <!-- 3. Gender Filter -->
                 <div class="sywat-field-group" style="flex: 1 1 120px; min-width: 110px;">
-                    <label>Gender</label>
-                    <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Gender</label>
+                    <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                     </select>
                 </div>
 
+                <!-- 4. Style Filter -->
                 <div class="sywat-field-group" style="flex: 1 1 160px; min-width: 150px;">
-                    <label>Style</label>
-                    <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 36px;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Style</label>
+                    <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()" style="width: 100%; height: 38px; padding: 6px 10px;">
                         <option value="all">All Styles</option>
                         <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
@@ -104,13 +109,16 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     </select>
                 </div>
 
+                <!-- 5. Search Archer Field -->
                 <div class="sywat-field-group" style="flex: 2 1 200px; min-width: 180px;">
-                    <label>Search Archer</label>
-                    <input type="text" id="sywat_standings_search" oninput="sywatApplyStandingsFilters()" placeholder="Type archer name..." style="width: 100%; height: 36px; box-sizing: border-box;">
+                    <label style="font-weight: 700; font-size: 12px; color: #1e293b;">Search Archer</label>
+                    <input type="text" id="sywat_standings_search" oninput="sywatApplyStandingsFilters()" placeholder="Type archer name..." style="width: 100%; height: 38px; padding: 6px 10px; box-sizing: border-box;">
                 </div>
 
-                <div style="flex: 0 0 auto;">
-                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetStandingsFilters()" style="height: 36px; font-size: 12px;">Reset Filters</button>
+                <!-- 6. Reset Filters Button -->
+                <div class="sywat-field-group" style="flex: 0 0 auto;">
+                    <label style="font-weight: 700; font-size: 12px; color: transparent; user-select: none;">Reset</label>
+                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatResetStandingsFilters()" style="height: 38px; font-size: 13px;">Reset Filters</button>
                 </div>
             </div>
 
