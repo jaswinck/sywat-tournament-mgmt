@@ -2,7 +2,8 @@
 /**
  * View Template: Public Archery Shops & Clubs Directory
  * Path: includes/shops/views/view-shop-public.php
- * Version: 2.6.0
+ * Author: SYWAT Archery / TFAA
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,11 +29,18 @@ foreach ( $all_shops as $s_id => $shop ) {
         $filtered_shops[$s_id] = $shop;
     }
 }
+
+// Enforce Alphabetical Sorting by Location Name
+uasort( $filtered_shops, function( $a, $b ) {
+    $name_a = isset( $a['name'] ) ? $a['name'] : '';
+    $name_b = isset( $b['name'] ) ? $b['name'] : '';
+    return strcasecmp( $name_a, $name_b );
+});
 ?>
 
 <div class="sywat-wrap">
     <!-- Sub-Tab Navigation Bar -->
-    <div class="sywat-nav-tabs no-print">
+    <div class="sywat-nav-tabs no-print" style="margin-bottom:15px;">
         <a href="<?php echo esc_url( add_query_arg( 'type', 'all', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'all') ? 'active' : ''; ?>">
             🌐 All Locations
         </a>
@@ -45,28 +53,39 @@ foreach ( $all_shops as $s_id => $shop ) {
     </div>
 
     <div class="sywat-card">
-        <div class="sywat-card-title">
-            <span>
+        <!-- Clean Title Header -->
+        <div class="sywat-card-title" style="margin-bottom:15px;">
+            <h2 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">
                 <?php 
                     if ($type_filter === 'pro_shop') echo 'TFAA Pro Shops Directory';
                     elseif ($type_filter === 'club') echo 'TFAA Archery Clubs Directory';
                     else echo 'TFAA Shops & Archery Clubs Directory';
                 ?>
-            </span>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <!-- District Filter Dropdown -->
-                <select id="sywat_district_filter_select" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; height:32px;">
-                    <option value="">All Districts</option>
-                    <option value="unassigned">Unassigned Only</option>
-                    <?php foreach ( $districts as $key => $label ): ?>
-                        <option value="<?php echo esc_attr( strtolower($key) ); ?>"><?php echo esc_html( $key ); ?></option>
-                    <?php endforeach; ?>
-                </select>
+            </h2>
+        </div>
 
-                <!-- Live Search Input -->
-                <div style="display:flex; gap:5px; margin:0; align-items:center; flex-wrap:wrap;">
-                    <input type="text" id="sywat_shop_search_input" placeholder="Search name..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:32px;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
+        <!-- Dedicated Labeled Filter Toolbar -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; gap:15px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; width:100%;">
+                <!-- Labeled District Select -->
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">TFAA District:</label>
+                    <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:220px;">
+                        <option value="">All Districts</option>
+                        <option value="unassigned">Unassigned Only</option>
+                        <?php foreach ( $districts as $key => $label ): ?>
+                            <option value="<?php echo esc_attr( strtolower($key) ); ?>"><?php echo esc_html( $label ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Labeled Search & Clear -->
+                <div style="display:flex; align-items:center; gap:8px; flex-grow:1; max-width:400px;">
+                    <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#475569; white-space:nowrap;">Search Location:</label>
+                    <div style="display:flex; gap:6px; width:100%;">
+                        <input type="text" id="sywat_shop_search_input" placeholder="Search by name or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; width:100%; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:36px; padding:0 12px; white-space:nowrap;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -108,7 +127,7 @@ foreach ( $all_shops as $s_id => $shop ) {
                                     }
                                 }
 
-                                // Build search string from all contact data so live search still works
+                                // Search string for live JS search
                                 $search_terms = array();
                                 foreach ($all_contacts as $c) {
                                     $search_terms[] = isset($c['name']) ? $c['name'] : '';
