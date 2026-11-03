@@ -2,15 +2,19 @@
 /**
  * Sub-Module: Scores Engine Client Scripts
  * File: includes/scores/scores-scripts.php
- * Version: 3.7.0
+ * Version: 3.9.0
  */
 
 if (!defined('ABSPATH')) exit;
 
 function sywat_scores_render_client_scripts() {
     ?>
-    <!-- Hybrid Local Draft + Background Auto-Save Script -->
+    <!-- Prevent form resubmission on page refresh (F5) -->
     <script>
+    if ( window.history.replaceState ) {
+        window.history.replaceState( null, null, window.location.href );
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         const currentTourn = document.getElementById('selected_tournament_val') ? document.getElementById('selected_tournament_val').value : '';
         const nonceVal     = document.getElementById('sywat_nonce') ? document.getElementById('sywat_nonce').value : '';
@@ -263,20 +267,6 @@ function sywat_scores_render_client_scripts() {
                 }
             });
         }
-
-        // 6. Auto-Dismiss Disabled (Notices remain visible permanently)
-        /*
-        setTimeout(function() {
-            const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
-            notices.forEach(function(notice) {
-                notice.style.transition = 'opacity 0.5s ease, margin-bottom 0.5s ease';
-                notice.style.opacity = '0';
-                setTimeout(function() {
-                    notice.style.display = 'none';
-                }, 500);
-            });
-        }, 4000);
-        */
     });
     </script>
     <?php
