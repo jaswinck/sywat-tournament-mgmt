@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -101,10 +101,10 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
             <!-- Main Desk Card -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                <!-- UNIFIED TOP CARD HEADER BAR WITH ICON & SUBTITLE -->
+                <!-- UNIFIED TOP CARD HEADER BAR WITH MATCHING DARK BLUE TITLE -->
                 <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:15px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
                     <div>
-                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">📝 Register Shooters</h2>
+                        <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">📝 Register Shooters</h2>
                         <div class="sywat-subtitle" style="margin-top:2px;">Select an active tournament to register incoming archers.</div>
                     </div>
 
