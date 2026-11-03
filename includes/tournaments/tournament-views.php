@@ -149,23 +149,23 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print" style="border-top-left-radius:0;">
-                    <div class="sywat-card-title" style="display: flex; justify- continental; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Configured Tournaments</span>
+                    <div class="sywat-card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <span style="font-weight: 700; font-size: 18px; color: #0f172a; white-space: nowrap;">Configured Tournaments</span>
                         
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; white-space: nowrap;">
                             
                             <!-- Search & Filter Controls Group -->
-                            <div style="display: flex; gap: 5px; margin: 0; align-items: center;">
+                            <div style="display: flex; gap: 5px; margin: 0; align-items: center; white-space: nowrap;">
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px;">
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px; margin: 0;">
                                         <option value="all">All Shops</option>
                                         <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                             <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 <?php endif; ?>
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 4px 10px;" onclick="sywatResetTournamentFilters()">Clear</button>
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box; margin: 0;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 4px 10px; margin: 0;" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
 
                             <!-- TFAA Sync Pill -->
@@ -175,18 +175,18 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <span style="font-size: 12px; color: #475569; font-weight: 600; white-space: nowrap;">
                                     👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
                                 </span>
-                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 28px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff;">Sync</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 28px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff; margin: 0;">Sync</button>
                             </form>
 
                             <?php if ( $can_manage_seasons ): ?>
                                 <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="global_push_standings">
-                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="height: 38px;">Push Weekend Standings</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="height: 38px; margin: 0;">Push Weekend Standings</button>
                                 </form>
                             <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height: 38px;" onclick="openAddTournamentModal()">Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height: 38px; margin: 0;" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
 
