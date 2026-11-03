@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 3.6.1
+ * Version: 3.6.3
  */
 
 if (!defined('ABSPATH')) exit;
@@ -60,21 +60,20 @@ function sywat_desk_render_filter_bar($data) {
         <?php endif; ?>
     </div>
 
-    <!-- Integrated Control Panel Filter Toolbar -->
+    <!-- Integrated Control Panel Filter Toolbar (Balanced Title Left / Controls Right) -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div class="sywat-filter-toolbar">
-            
-            <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-                <h3 class="sywat-filter-title">
-                    🎯 Active Roster Filter
-                </h3>
+        <div class="sywat-filter-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <h3 class="sywat-filter-title" style="margin:0;">
+                🎯 Active Roster Filter
+            </h3>
 
-                <form method="post" id="sywat_filter_form" class="sywat-filter-form">
+            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                <form method="post" id="sywat_filter_form" class="sywat-filter-form" style="margin:0; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
-                    <div class="sywat-filter-field">
-                        <label>Tournament</label>
-                        <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Tournament:</label>
+                        <select name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                                 <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
                                     <?php echo esc_html($t_name); ?>
@@ -83,9 +82,9 @@ function sywat_desk_render_filter_bar($data) {
                         </select>
                     </div>
 
-                    <div class="sywat-filter-field">
-                        <label>Shooting Line</label>
-                        <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();">
+                    <div class="sywat-filter-field" style="display:flex; align-items:center; gap:6px;">
+                        <label style="font-size:12px; font-weight:700; color:#475569; margin:0;">Shooting Line:</label>
+                        <select name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:4px 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
                             <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
                             <?php foreach ($data['lines'] as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
@@ -95,12 +94,11 @@ function sywat_desk_render_filter_bar($data) {
                         </select>
                     </div>
                 </form>
+
+                <?php if ($is_hub_enabled): ?>
+                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="height:38px;">Back to Hub</a>
+                <?php endif; ?>
             </div>
-
-            <?php if ($is_hub_enabled): ?>
-                <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
-            <?php endif; ?>
-
         </div>
     </div>
     <?php
