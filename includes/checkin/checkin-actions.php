@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 5.0.0 (Clean Native WP API)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -20,7 +20,6 @@ function sywat_desk_handle_actions(&$data) {
 
     if (!$is_valid_nonce) return '';
 
-    global $wpdb;
     $active_t_slug       = $data['active_t_slug'];
     $selected_tournament = $data['selected_tournament'];
     $closed_lines_key    = $data['closed_lines_key'];
@@ -29,33 +28,6 @@ function sywat_desk_handle_actions(&$data) {
     
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
     $existing_families         = $data['existing_families'];
-
-    // Direct Database Read Helper
-    $force_db_read = function($key) use ($wpdb) {
-        $raw = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $key));
-        $arr = $raw ? maybe_unserialize($raw) : array();
-        return is_array($arr) ? array_map('trim', array_map('strval', $arr)) : array();
-    };
-
-    // Direct Database Write Helper (Enforces autoload = 'no' and flushes cache)
-    $force_db_update = function($key, $array) use ($wpdb) {
-        $serialized = maybe_serialize(array_values(array_unique($array)));
-        $exists = $wpdb->get_var($wpdb->prepare("SELECT option_name FROM {$wpdb->options} WHERE option_name = %s", $key));
-        if ($exists) {
-            $wpdb->update(
-                $wpdb->options, 
-                array('option_value' => $serialized, 'autoload' => 'no'), 
-                array('option_name' => $key)
-            );
-        } else {
-            $wpdb->insert(
-                $wpdb->options, 
-                array('option_name' => $key, 'option_value' => $serialized, 'autoload' => 'no')
-            );
-        }
-        wp_cache_delete($key, 'options');
-        wp_cache_delete('alloptions', 'options');
-    };
 
     $calculate_paid_status = function($pay_option, $division) {
         if ($pay_option === 'Family') return 'Family';
@@ -80,20 +52,26 @@ function sywat_desk_handle_actions(&$data) {
 
     // Close Line
     if ($action === 'close_line' && $data['is_admin']) {
-        $target_idx  = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_idx  = trim(sanitize_text_field($_POST['target_line_idx']));
         $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
-        $live_closed = $force_db_read($closed_lines_key);
+        
+        $live_closed = get_option($closed_lines_key, array());
+        if (!is_array($live_closed)) $live_closed = array();
 
-        if (!in_array($target_idx, $live_closed, true)) {
+        if (!in_array($target_idx, $live_closed)) {
             $live_closed[] = $target_idx;
         }
-        if ($target_name !== '' && !in_array($target_name, $live_closed, true)) {
+        if ($target_name !== '' && !in_array($target_name, $live_closed)) {
             $live_closed[] = $target_name;
         }
+        
+        $live_closed = array_values(array_unique($live_closed));
 
-        $force_db_update($closed_lines_key, $live_closed);
-        $data['closed_lines'] = $live_closed;
-        update_option('sywat_current_tournament', $selected_tournament, false);
+        // Delete and Add natively forces WP to clear object caches globally
+        delete_option($closed_lines_key);
+        add_option($closed_lines_key, $live_closed, '', 'no');
+        
+        $data['closed_lines'] = $live_closed; // Update memory for active user
 
         $update_count = 0;
         foreach ($registrations as &$r) {
@@ -110,25 +88,26 @@ function sywat_desk_handle_actions(&$data) {
         return '<div class="sywat-alert sywat-alert-success"><strong>Line closed successfully.</strong> ' . $update_count . ' absent archer(s) marked as No Show.</div>';
     }
 
-    // Reopen Line (Wipes both numeric index AND line name string)
+    // Reopen Line
     if ($action === 'reopen_line' && $data['is_admin']) {
-        $target_idx  = trim((string) sanitize_text_field($_POST['target_line_idx']));
+        $target_idx  = trim(sanitize_text_field($_POST['target_line_idx']));
         $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
-        $live_closed = $force_db_read($closed_lines_key);
+        
+        $live_closed = get_option($closed_lines_key, array());
+        if (!is_array($live_closed)) $live_closed = array();
 
         $new_closed = array();
         foreach ($live_closed as $val) {
             $v_clean = trim((string)$val);
-            $is_match_idx  = ($v_clean === $target_idx);
-            $is_match_name = ($target_name !== '' && strcasecmp($v_clean, $target_name) === 0);
-            if (!$is_match_idx && !$is_match_name) {
+            if ($v_clean !== $target_idx && ($target_name === '' || $v_clean !== $target_name)) {
                 $new_closed[] = $v_clean;
             }
         }
 
-        $force_db_update($closed_lines_key, $new_closed);
+        delete_option($closed_lines_key);
+        add_option($closed_lines_key, $new_closed, '', 'no');
+        
         $data['closed_lines'] = $new_closed;
-        update_option('sywat_current_tournament', $selected_tournament, false);
         
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
