@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -57,7 +57,11 @@ function sywat_desk_handle_actions(&$data) {
         $target_line = (string) sanitize_text_field($_POST['target_line_idx']);
         if (!in_array($target_line, $closed_lines, true)) {
             $closed_lines[] = $target_line;
-            update_option($closed_lines_key, array_values(array_unique($closed_lines)));
+            $closed_lines   = array_values(array_unique(array_map('strval', $closed_lines)));
+            
+            update_option($closed_lines_key, $closed_lines);
+            wp_cache_delete($closed_lines_key, 'options');
+            $data['closed_lines'] = $closed_lines; // Update in-memory array for current view render
 
             $update_count = 0;
             foreach ($registrations as &$r) {
@@ -80,7 +84,12 @@ function sywat_desk_handle_actions(&$data) {
         $closed_lines = array_values(array_filter($closed_lines, function($val) use ($target_line) {
             return (string)$val !== $target_line;
         }));
+        $closed_lines = array_map('strval', $closed_lines);
+
         update_option($closed_lines_key, $closed_lines);
+        wp_cache_delete($closed_lines_key, 'options');
+        $data['closed_lines'] = $closed_lines; // Update in-memory array for current view render
+        
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
 
