@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 5.0.0 (Clean Native WP API)
+ * Version: 5.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -67,11 +67,11 @@ function sywat_desk_handle_actions(&$data) {
         
         $live_closed = array_values(array_unique($live_closed));
 
-        // Delete and Add natively forces WP to clear object caches globally
-        delete_option($closed_lines_key);
-        add_option($closed_lines_key, $live_closed, '', 'no');
+        update_option($closed_lines_key, $live_closed, false);
+        // Force sync active tournament for all staff
+        update_option('sywat_current_tournament', $selected_tournament, false); 
         
-        $data['closed_lines'] = $live_closed; // Update memory for active user
+        $data['closed_lines'] = $live_closed; 
 
         $update_count = 0;
         foreach ($registrations as &$r) {
@@ -104,8 +104,9 @@ function sywat_desk_handle_actions(&$data) {
             }
         }
 
-        delete_option($closed_lines_key);
-        add_option($closed_lines_key, $new_closed, '', 'no');
+        update_option($closed_lines_key, $new_closed, false);
+        // Force sync active tournament for all staff
+        update_option('sywat_current_tournament', $selected_tournament, false);
         
         $data['closed_lines'] = $new_closed;
         
