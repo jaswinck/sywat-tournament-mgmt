@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 3.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -30,6 +30,7 @@ function sywat_handle_results_quick_edit() {
         if ( $reg && is_array( $reg ) ) {
             if ( isset( $_POST['archer_name'] ) ) $reg['name']     = sanitize_text_field( $_POST['archer_name'] );
             if ( isset( $_POST['division'] ) )    $reg['division'] = sanitize_text_field( $_POST['division'] );
+            if ( isset( $_POST['gender'] ) )      $reg['gender']   = sanitize_text_field( $_POST['gender'] );
             if ( isset( $_POST['style'] ) )       $reg['style']    = sanitize_text_field( $_POST['style'] );
             if ( isset( $_POST['score'] ) )       $reg['score']    = intval( $_POST['score'] );
             if ( isset( $_POST['x_count'] ) )     $reg['x_count']  = intval( $_POST['x_count'] );
@@ -42,7 +43,7 @@ function sywat_handle_results_quick_edit() {
 add_action( 'init', 'sywat_handle_results_quick_edit' );
 
 /**
- * Render Public Tournament Directory Listing
+ * Render Public Tournament Directory Listing with Shop Search & Turnout Stats
  */
 if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
     function sywat_render_public_tournament_directory() {
@@ -60,6 +61,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
         }
         asort( $filter_shops );
 
+        // Sort tournaments chronologically by start_date ASC (Oldest to Newest)
         uasort( $tournaments, function( $a, $b ) {
             $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
             $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
@@ -77,6 +79,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                 </div>
             </div>
 
+            <!-- Directory Filter Bar -->
             <div class="sywat-filter-bar">
                 <?php if ( count( $filter_shops ) > 1 ): ?>
                     <div class="sywat-field-group">
@@ -115,18 +118,18 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                         <tbody>
                             <?php foreach ( $tournaments as $t_name => $t_data ): ?>
                                 <?php 
-                                    $s_date      = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
-                                    $e_date      = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
-                                    $disp_dates  = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
+                                    $s_date        = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
+                                    $e_date        = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
+                                    $disp_dates    = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $s_date, $e_date ) : '';
                                     if ( empty( $disp_dates ) ) {
                                         $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
                                     }
 
-                                    $t_shop_id   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
-                                    $t_shop_name = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
+                                    $t_shop_id     = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+                                    $t_shop_name   = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
 
-                                    $raw_scores   = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
-                                    $scores_count = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
+                                    $raw_scores    = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
+                                    $scores_count  = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
                                 ?>
                                 <tr class="sywat-dir-row" data-name="<?php echo esc_attr( strtolower( $t_name ) ); ?>" data-shop="<?php echo esc_attr( strtolower( $t_shop_name ) ); ?>">
                                     <td>
@@ -406,14 +409,15 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                 $x_val = intval( $a['x_count'] );
 
                                                 if ( $prev_score !== null && $s_val === $prev_score && $x_val === $prev_x ) {
-                                                    // Tied with previous archer
+                                                    // Tied with previous archer - keep current rank
                                                 } else {
                                                     $current_rank = $idx + 1;
                                                 }
                                                 $prev_score = $s_val;
                                                 $prev_x     = $x_val;
 
-                                                $reg_id = ! empty( $a['id'] ) ? $a['id'] : '';
+                                                $reg_id     = ! empty( $a['id'] ) ? $a['id'] : '';
+                                                $gender_val = ! empty( $a['gender'] ) ? $a['gender'] : ( ! empty( $group_data['gender'] ) ? $group_data['gender'] : 'Male' );
                                             ?>
                                                 <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
                                                     <td><?php echo $current_rank; ?></td>
@@ -422,7 +426,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                         <?php if ( $can_edit_scores && ! empty( $reg_id ) ): ?>
                                                             <button type="button" 
                                                                     class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit" 
-                                                                    onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $a['name'] ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $a['style'] ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>)">
+                                                                    onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $a['name'] ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $gender_val ); ?>', '<?php echo esc_js( $a['style'] ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>)">
                                                                 ✏️ Edit
                                                             </button>
                                                         <?php endif; ?>
@@ -443,9 +447,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             <?php endif; ?>
         </div>
 
-        <!-- In-Page Quick Edit Archer Modal Overlay -->
+        <!-- In-Page Quick Edit Archer Modal Overlay (Pure CSS via sywat-modals.css & sywat-core.css) -->
         <?php if ( $can_edit_scores ): ?>
-            <div id="sywat_results_edit_modal" class="sywat-modal" style="display:none;">
+            <div id="sywat_results_edit_modal" class="sywat-modal">
                 <div class="sywat-modal-backdrop" onclick="closeResultsEditModal()"></div>
                 <div class="sywat-modal-dialog">
                     <div class="sywat-modal-header">
@@ -470,9 +474,17 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                     <input type="text" name="division" id="edit_modal_division" required>
                                 </div>
                                 <div class="sywat-field-group">
-                                    <label>Style</label>
-                                    <input type="text" name="style" id="edit_modal_style" required>
+                                    <label>Gender</label>
+                                    <select name="gender" id="edit_modal_gender" required>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
                                 </div>
+                            </div>
+
+                            <div class="sywat-field-group">
+                                <label>Style</label>
+                                <input type="text" name="style" id="edit_modal_style" required>
                             </div>
 
                             <div class="sywat-form-grid-2">
@@ -496,19 +508,28 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             </div>
 
             <script>
-            function openResultsEditModal(regId, name, division, style, score, xCount) {
+            function openResultsEditModal(regId, name, division, gender, style, score, xCount) {
                 document.getElementById('edit_modal_reg_id').value   = regId;
                 document.getElementById('edit_modal_name').value     = name;
                 document.getElementById('edit_modal_division').value = division;
+                
+                const genderSelect = document.getElementById('edit_modal_gender');
+                if (genderSelect) {
+                    genderSelect.value = (gender && gender.toLowerCase().includes('female')) ? 'Female' : 'Male';
+                }
+
                 document.getElementById('edit_modal_style').value    = style;
                 document.getElementById('edit_modal_score').value    = score;
                 document.getElementById('edit_modal_x_count').value  = xCount;
 
+                document.getElementById('sywat_results_edit_modal').classList.add('is-open');
                 document.getElementById('sywat_results_edit_modal').style.display = 'block';
             }
 
             function closeResultsEditModal() {
-                document.getElementById('sywat_results_edit_modal').style.display = 'none';
+                const modal = document.getElementById('sywat_results_edit_modal');
+                modal.classList.remove('is-open');
+                modal.style.display = 'none';
             }
             </script>
         <?php endif; ?>
