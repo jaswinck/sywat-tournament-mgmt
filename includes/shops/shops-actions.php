@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -18,6 +18,17 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         $action  = sanitize_text_field( $_POST['sywat_shop_action'] );
         $shops   = sywat_get_shops();
         $user_id = get_current_user_id();
+
+        // Helper: Sort shops array alphabetically by location name
+        $sort_shops = function( &$shops_arr ) {
+            if ( is_array( $shops_arr ) && ! empty( $shops_arr ) ) {
+                uasort( $shops_arr, function( $a, $b ) {
+                    $name_a = isset( $a['name'] ) ? $a['name'] : '';
+                    $name_b = isset( $b['name'] ) ? $b['name'] : '';
+                    return strcasecmp( $name_a, $name_b );
+                });
+            }
+        };
 
         if ( $action === 'create_shop' ) {
             $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
@@ -44,6 +55,10 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
             $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
 
+            if ( empty( $facilities ) ) {
+                $facilities = ( $loc_type === 'club' ) ? array( 'indoor_range' ) : array( 'pro_shop', 'indoor_range' );
+            }
+
             $shops[$shop_slug] = array(
                 'id'                  => $shop_slug,
                 'name'                => $shop_name,
@@ -65,6 +80,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 'created_at'          => current_time( 'mysql' ),
             );
 
+            $sort_shops( $shops );
             update_option( 'sywat_shops_list', $shops );
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created location <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
         }
@@ -143,6 +159,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     $shops[$shop_id]['outdoor_lines'] = $outdoor_lines;
                 }
 
+                $sort_shops( $shops );
                 update_option( 'sywat_shops_list', $shops );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated details for <strong>' . esc_html( $shops[$shop_id]['name'] ) . '</strong>.</div>';
             }
@@ -223,7 +240,6 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 }
             }
 
-            // Cell Getter with Named Header Matching & Column Index Fallbacks
             $get_cell = function( $row, $patterns, $fallback_col = null ) use ( $headers ) {
                 if ( ! is_array( $patterns ) ) $patterns = array( $patterns );
                 foreach ( $patterns as $p ) {
@@ -288,16 +304,18 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     );
                 }
 
-                // Auto-detect Location Type (Shop vs. Club)
+                // Auto-detect Location Type & Facility Classification (Disassociated Pro Shop vs. Indoor Range)
                 if ( strtolower($raw_type) === 'club' || strpos( strtolower($shop_name), '4h' ) !== false || strpos( strtolower($shop_name), 'club' ) !== false ) {
-                    $loc_type = 'club';
+                    $loc_type   = 'club';
+                    $facilities = array( 'indoor_range' );
                 } else {
-                    $loc_type = 'pro_shop';
+                    $loc_type   = 'pro_shop';
+                    $facilities = array( 'pro_shop', 'indoor_range' );
                 }
 
                 $shop_slug = 'shop_' . sanitize_title( $shop_name );
 
-                // Determine Action Status for Preview
+                // Determine Status
                 if ( isset( $shops[$shop_slug] ) ) {
                     if ( $mode === 'skip_existing' ) {
                         $status       = 'skip';
@@ -318,6 +336,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     'slug'                => $shop_slug,
                     'name'                => $shop_name,
                     'location_type'       => $loc_type,
+                    'facilities'          => $facilities,
                     'district'            => $district,
                     'contact'             => $contact,
                     'contact_title'       => $contact_title,
@@ -337,6 +356,11 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             if ( empty( $preview_items ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No valid locations could be parsed from the file.</div>';
             }
+
+            // Alphabetical sort preview items by name
+            usort( $preview_items, function( $a, $b ) {
+                return strcasecmp( $a['name'], $b['name'] );
+            });
 
             // Store Preview Transient (valid for 15 minutes)
             $transient_payload = array(
@@ -408,12 +432,18 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         $shops[$shop_slug]['additional_contacts'] = $item['additional_contacts'];
                     }
 
-                    // Ensure 'indoor_range' facility is present so SYWAT Indoor Lines tab renders
-                    if ( empty( $shops[$shop_slug]['facilities'] ) || ! is_array( $shops[$shop_slug]['facilities'] ) ) {
-                        $shops[$shop_slug]['facilities'] = array( 'indoor_range' );
-                    } elseif ( ! in_array( 'indoor_range', $shops[$shop_slug]['facilities'] ) ) {
-                        $shops[$shop_slug]['facilities'][] = 'indoor_range';
+                    // Enforce facility separation: Clubs get 'indoor_range' only; Shops get both.
+                    $existing_fac = isset( $shops[$shop_slug]['facilities'] ) && is_array( $shops[$shop_slug]['facilities'] ) ? $shops[$shop_slug]['facilities'] : array();
+                    if ( $item['location_type'] === 'club' ) {
+                        $existing_fac = array_diff( $existing_fac, array( 'pro_shop' ) );
+                        if ( ! in_array( 'indoor_range', $existing_fac ) ) {
+                            $existing_fac[] = 'indoor_range';
+                        }
+                    } else {
+                        if ( ! in_array( 'pro_shop', $existing_fac ) )    $existing_fac[] = 'pro_shop';
+                        if ( ! in_array( 'indoor_range', $existing_fac ) ) $existing_fac[] = 'indoor_range';
                     }
+                    $shops[$shop_slug]['facilities'] = array_values( $existing_fac );
 
                     $updated_count++;
                 } else {
@@ -423,7 +453,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         'name'                => $item['name'],
                         'location_type'       => $item['location_type'],
                         'district'            => $item['district'],
-                        'facilities'          => array( 'pro_shop', 'indoor_range' ),
+                        'facilities'          => isset( $item['facilities'] ) ? $item['facilities'] : ( $item['location_type'] === 'club' ? array( 'indoor_range' ) : array( 'pro_shop', 'indoor_range' ) ),
                         'contact'             => $item['contact'],
                         'contact_title'       => $item['contact_title'],
                         'email'               => $item['email'],
@@ -442,6 +472,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 }
             }
 
+            $sort_shops( $shops );
             update_option( 'sywat_shops_list', $shops );
             delete_transient( 'sywat_shop_import_preview_' . $user_id );
 
@@ -465,6 +496,8 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             if ( isset( $shops[$shop_id] ) ) {
                 $deleted_name = $shops[$shop_id]['name'];
                 unset( $shops[$shop_id] );
+                
+                $sort_shops( $shops );
                 update_option( 'sywat_shops_list', $shops );
 
                 $assigned_users = get_users( array( 'meta_key' => 'sywat_shop_id', 'meta_value' => $shop_id ) );
