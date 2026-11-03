@@ -3,7 +3,7 @@
  * Sub-Module: Public Archery Shops & Clubs Directory Controller
  * Path: includes/shops/shops-public-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
