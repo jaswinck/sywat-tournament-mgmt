@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.3.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -47,7 +47,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 'id'                  => $shop_slug,
                 'name'                => $shop_name,
                 'location_type'       => $loc_type,
-                'district'            => isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '',
+                'district'            => isset( $_POST['shop_district'] ) ? sywat_normalize_district( $_POST['shop_district'] ) : '',
                 'facilities'          => $facilities,
                 'contact'             => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
                 'contact_title'       => isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( $_POST['shop_contact_title'] ) : '',
@@ -57,7 +57,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 'address_1'           => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( $_POST['shop_address_1'] ) : '',
                 'address_2'           => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( $_POST['shop_address_2'] ) : '',
                 'city'                => isset( $_POST['shop_city'] ) ? sanitize_text_field( $_POST['shop_city'] ) : '',
-                'state'               => isset( $_POST['shop_state'] ) ? sanitize_text_field( $_POST['shop_state'] ) : '',
+                'state'               => isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( $_POST['shop_state'] ) : 'TX - Texas',
                 'zip'                 => isset( $_POST['shop_zip'] ) ? sanitize_text_field( $_POST['shop_zip'] ) : '',
                 'default_lines'       => $default_indoor_lines,
                 'outdoor_lines'       => $default_outdoor_lines,
@@ -75,7 +75,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
 
                 $shops[$shop_id]['name']          = sanitize_text_field( $_POST['shop_name'] );
                 $shops[$shop_id]['location_type'] = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
-                $shops[$shop_id]['district']      = isset( $_POST['shop_district'] ) ? sanitize_text_field( $_POST['shop_district'] ) : '';
+                $shops[$shop_id]['district']      = isset( $_POST['shop_district'] ) ? sywat_normalize_district( $_POST['shop_district'] ) : '';
                 $shops[$shop_id]['facilities']    = $facilities;
                 $shops[$shop_id]['contact']       = sanitize_text_field( $_POST['shop_contact'] );
                 $shops[$shop_id]['contact_title'] = isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( $_POST['shop_contact_title'] ) : '';
@@ -84,7 +84,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 $shops[$shop_id]['address_1']     = sanitize_text_field( $_POST['shop_address_1'] );
                 $shops[$shop_id]['address_2']     = sanitize_text_field( $_POST['shop_address_2'] );
                 $shops[$shop_id]['city']          = sanitize_text_field( $_POST['shop_city'] );
-                $shops[$shop_id]['state']         = sanitize_text_field( $_POST['shop_state'] );
+                $shops[$shop_id]['state']         = sywat_normalize_state_code( $_POST['shop_state'] );
                 $shops[$shop_id]['zip']           = sanitize_text_field( $_POST['shop_zip'] );
 
                 // Process Additional Contacts Repeater
@@ -164,6 +164,197 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 update_option( 'sywat_shops_list', $shops );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated details for <strong>' . esc_html( $shops[$shop_id]['name'] ) . '</strong>.</div>';
             }
+        }
+
+        if ( $action === 'import_shops' ) {
+            if ( empty( $_FILES['shop_import_file']['tmp_name'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select an Excel or CSV file to import.</div>';
+            }
+
+            $file_tmp  = $_FILES['shop_import_file']['tmp_name'];
+            $file_name = $_FILES['shop_import_file']['name'];
+            $ext       = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+            $mode      = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'upsert';
+
+            $rows = array();
+
+            if ( in_array( $ext, array( 'xlsx', 'xls' ) ) ) {
+                if ( file_exists( __DIR__ . '/SimpleXLSX.php' ) ) {
+                    require_once __DIR__ . '/SimpleXLSX.php';
+                }
+                if ( class_exists( 'SimpleXLSX' ) && $xlsx = SimpleXLSX::parse( $file_tmp ) ) {
+                    $rows = $xlsx->rows();
+                } else {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unable to parse Excel file. Please ensure it is a valid .xlsx file or upload as CSV.</div>';
+                }
+            } elseif ( $ext === 'csv' ) {
+                if ( ( $handle = fopen( $file_tmp, 'r' ) ) !== false ) {
+                    while ( ( $data = fgetcsv( $handle, 2000, ',' ) ) !== false ) {
+                        $rows[] = $data;
+                    }
+                    fclose( $handle );
+                }
+            } else {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Invalid file format. Please upload a .xlsx, .xls, or .csv file.</div>';
+            }
+
+            if ( empty( $rows ) || count( $rows ) < 2 ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No data rows found in the uploaded file.</div>';
+            }
+
+            // Extract Header Row
+            $raw_headers = array_shift( $rows );
+            $headers     = array();
+            foreach ( $raw_headers as $idx => $h_val ) {
+                $clean_h = strtolower( preg_replace( '/[^a-z0-9]/', '', (string) $h_val ) );
+                $headers[$clean_h] = $idx;
+            }
+
+            // Helper to get cell by array of possible header variations
+            $get_cell = function( $row, $patterns ) use ( $headers ) {
+                if ( ! is_array( $patterns ) ) $patterns = array( $patterns );
+                foreach ( $patterns as $p ) {
+                    $clean_p = strtolower( preg_replace( '/[^a-z0-9]/', '', $p ) );
+                    if ( isset( $headers[$clean_p] ) && isset( $row[$headers[$clean_p]] ) ) {
+                        return trim( (string) $row[$headers[$clean_p]] );
+                    }
+                }
+                return '';
+            };
+
+            $created_count = 0;
+            $updated_count = 0;
+            $skipped_count = 0;
+
+            $default_indoor_lines = array(
+                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+            );
+
+            $default_outdoor_lines = array(
+                array( 'day' => 'Saturday', 'time' => '9:00 AM', 'name' => 'Saturday 9:00 AM' ),
+                array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
+            );
+
+            foreach ( $rows as $row ) {
+                // Determine Shop Name (fallback column 0 if header fails)
+                $shop_name = $get_cell( $row, array( 'Shop/Club', 'Shop Name', 'Location Name', 'Shop', 'Club' ) );
+                if ( empty( $shop_name ) && isset( $row[0] ) ) {
+                    $shop_name = trim( (string) $row[0] );
+                }
+                if ( empty( $shop_name ) ) continue;
+
+                $shop_slug = 'shop_' . sanitize_title( $shop_name );
+
+                if ( isset( $shops[$shop_slug] ) && $mode === 'skip_existing' ) {
+                    $skipped_count++;
+                    continue;
+                }
+
+                $raw_type = $get_cell( $row, array( 'Type', 'Location Type' ) );
+                if ( empty( $raw_type ) && isset( $row[1] ) && in_array( strtolower($row[1]), array('shop', 'club', 'pro_shop') ) ) {
+                    $raw_type = $row[1];
+                }
+                
+                // Auto-detect Type if blank
+                if ( strtolower($raw_type) === 'club' || strpos( strtolower($shop_name), '4h' ) !== false || strpos( strtolower($shop_name), 'club' ) !== false ) {
+                    $loc_type = 'club';
+                } else {
+                    $loc_type = 'pro_shop';
+                }
+
+                $raw_dist = $get_cell( $row, array( 'District', 'TFAA District' ) );
+                $district = function_exists('sywat_normalize_district') ? sywat_normalize_district( $raw_dist ) : sanitize_text_field( $raw_dist );
+
+                $addr1 = $get_cell( $row, array( 'Address Line 1', 'Address 1', 'Address' ) );
+                $addr2 = $get_cell( $row, array( 'Address Line 2', 'Address 2', 'Suite' ) );
+                $city  = $get_cell( $row, array( 'City' ) );
+                $state = $get_cell( $row, array( 'State' ) );
+                $state = function_exists('sywat_normalize_state_code') ? sywat_normalize_state_code( $state ) : 'TX - Texas';
+                $zip   = $get_cell( $row, array( 'Zip', 'Zip Code', 'Postal Code' ) );
+
+                $contact       = $get_cell( $row, array( 'Primary Contact', 'Contact Name', 'Contact' ) );
+                $contact_title = $get_cell( $row, array( 'Primary Title', 'Contact Title', 'Title' ) );
+                $email         = $get_cell( $row, array( 'Primary Email', 'Contact Email', 'Email' ) );
+                $phone         = $get_cell( $row, array( 'Primary Phone', 'Contact Phone', 'Phone' ) );
+                if ( ! empty( $phone ) ) {
+                    $phone = sywat_format_phone_number( $phone );
+                }
+
+                $add_name  = $get_cell( $row, array( 'Additional Contact', 'Secondary Contact', 'Contact 2' ) );
+                $add_title = $get_cell( $row, array( 'Additional Title', 'Secondary Title', 'Title 2' ) );
+                $add_email = $get_cell( $row, array( 'Additional Email', 'Secondary Email', 'Email 2' ) );
+                $add_phone = $get_cell( $row, array( 'Additional Phone', 'Secondary Phone', 'Phone 2' ) );
+
+                $additional_contacts = array();
+                if ( ! empty( $add_name ) || ! empty( $add_email ) || ! empty( $add_phone ) ) {
+                    $additional_contacts[] = array(
+                        'name'  => $add_name,
+                        'title' => $add_title,
+                        'email' => $add_email,
+                        'phone' => ! empty( $add_phone ) ? sywat_format_phone_number( $add_phone ) : '',
+                    );
+                }
+
+                if ( isset( $shops[$shop_slug] ) ) {
+                    // Update existing (safe merge)
+                    $shops[$shop_slug]['name']          = $shop_name;
+                    $shops[$shop_slug]['location_type'] = $loc_type;
+                    if ( ! empty( $district ) ) $shops[$shop_slug]['district'] = $district;
+                    if ( ! empty( $contact ) )  $shops[$shop_slug]['contact'] = $contact;
+                    if ( ! empty( $contact_title ) ) $shops[$shop_slug]['contact_title'] = $contact_title;
+                    if ( ! empty( $email ) )    $shops[$shop_slug]['email'] = $email;
+                    if ( ! empty( $phone ) )    $shops[$shop_slug]['phone'] = $phone;
+                    if ( ! empty( $addr1 ) )    $shops[$shop_slug]['address_1'] = $addr1;
+                    if ( ! empty( $addr2 ) || isset( $headers[strtolower(preg_replace('/[^a-z0-9]/','','Address Line 2'))] ) ) {
+                        $shops[$shop_slug]['address_2'] = $addr2;
+                    }
+                    if ( ! empty( $city ) )     $shops[$shop_slug]['city'] = $city;
+                    if ( ! empty( $state ) )    $shops[$shop_slug]['state'] = $state;
+                    if ( ! empty( $zip ) )      $shops[$shop_slug]['zip'] = $zip;
+
+                    if ( ! empty( $additional_contacts ) ) {
+                        $shops[$shop_slug]['additional_contacts'] = $additional_contacts;
+                    }
+
+                    $updated_count++;
+                } else {
+                    // Create new location
+                    $shops[$shop_slug] = array(
+                        'id'                  => $shop_slug,
+                        'name'                => $shop_name,
+                        'location_type'       => $loc_type,
+                        'district'            => $district,
+                        'facilities'          => array( 'pro_shop', 'indoor_range' ),
+                        'contact'             => $contact,
+                        'contact_title'       => $contact_title,
+                        'email'               => $email,
+                        'phone'               => $phone,
+                        'additional_contacts' => $additional_contacts,
+                        'address_1'           => $addr1,
+                        'address_2'           => $addr2,
+                        'city'                => $city,
+                        'state'               => $state,
+                        'zip'                 => $zip,
+                        'default_lines'       => $default_indoor_lines,
+                        'outdoor_lines'       => $default_outdoor_lines,
+                        'created_at'          => current_time( 'mysql' ),
+                    );
+                    $created_count++;
+                }
+            }
+
+            update_option( 'sywat_shops_list', $shops );
+
+            $msg = "Import complete! Created {$created_count} new location(s), updated {$updated_count} location(s)";
+            if ( $skipped_count > 0 ) {
+                $msg .= ", skipped {$skipped_count} existing location(s)";
+            }
+            $msg .= ".";
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">' . esc_html( $msg ) . '</div>';
         }
 
         if ( $action === 'delete_shop' ) {
