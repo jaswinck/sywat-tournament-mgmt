@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.7.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -37,12 +37,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
 
         $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
-        <!-- Master Navigation Tabs -->
-        <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'standings', get_permalink() ) ); ?>" class="sywat-tab-item">🏆 Season Standings</a>
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'tournaments', get_permalink() ) ); ?>" class="sywat-tab-item active">🎯 Tournament Results</a>
-        </div>
-
         <div class="sywat-public-card" style="border-top-left-radius:0;">
             <div style="margin-bottom: 16px;">
                 <h2 style="margin: 0; font-size: 20px; color: #0f172a;">🎯 Individual Tournament Directory</h2>
@@ -196,7 +190,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     return $q['score'] - $p['score'];
                 });
 
-                // If top score is 0, archer turned in a card but didn't record a score -> convert all entries to Guest
                 if ( intval( $entries[0]['score'] ) === 0 ) {
                     foreach ( $entries as $zero_entry ) {
                         $guest_entry = $zero_entry;
@@ -291,12 +284,6 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
         $can_edit_scores = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         ?>
-
-        <!-- Master Navigation Tabs -->
-        <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'standings', get_permalink() ) ); ?>" class="sywat-tab-item">🏆 Season Standings</a>
-            <a href="<?php echo esc_url( add_query_arg( 'view', 'tournaments', get_permalink() ) ); ?>" class="sywat-tab-item active">🎯 Tournament Results</a>
-        </div>
 
         <div class="sywat-public-card" style="border-top-left-radius:0;">
             <!-- Clean Header: Results Title Left, Back Button Right -->
