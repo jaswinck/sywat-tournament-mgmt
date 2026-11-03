@@ -2,6 +2,7 @@
 /**
  * View Template: Admin Edit Location (Tabbed Layout)
  * Path: includes/shops/views/view-shop-edit.php
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -54,7 +55,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                     </select>
                 </div>
                 <div>
-                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">TFAA District</label>
+                    <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">District</label>
                     <select name="shop_district" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                         <option value="" <?php selected( empty($curr_dist), true ); ?>>-- Unassigned --</option>
                         <?php foreach ( $districts as $key => $label ): ?>
