@@ -246,7 +246,8 @@ body {
 .sywat-btn-gray,
 .sywat-btn-checkedin,
 .sywat-btn-push,
-.sywat-btn-live {
+.sywat-btn-live,
+.sywat-btn-global-push {
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
@@ -320,6 +321,17 @@ body {
     color: #ffffff !important;
 }
 
+.sywat-btn-global-push {
+    background-color: #0f172a;
+    border: 1px solid #0f172a;
+    color: #ffffff !important;
+}
+.sywat-btn-global-push:hover {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #38bdf8 !important;
+}
+
 .sywat-btn-live {
     background-color: #ffffff;
     border: 1px solid #008a20;
@@ -355,6 +367,7 @@ body {
 
 /* Button Icons */
 .sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-register::before   { content: "📝\00a0"; }
 .sywat-tab-icon-checkin::before    { content: "📋\00a0"; }
 .sywat-tab-icon-edit::before       { content: "✏️\00a0"; }
 .sywat-tab-icon-member::before     { content: "👤\00a0"; }
@@ -364,22 +377,23 @@ body {
 .sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
 .sywat-tab-icon-results::before    { content: "🎯\00a0"; }
 
-.sywat-btn-icon-save::before       { content: "💾\00a0"; }
-.sywat-btn-icon-edit::before       { content: "✏️\00a0"; }
-.sywat-btn-icon-manage::before     { content: "👥\00a0"; }
-.sywat-btn-icon-add::before        { content: "➕\00a0"; }
-.sywat-btn-icon-delete::before     { content: "🗑️\00a0"; }
-.sywat-btn-icon-checkin::before    { content: "📋\00a0"; }
-.sywat-btn-icon-checkedin::before  { content: "✓\00a0"; }
-.sywat-btn-icon-export::before     { content: "📥\00a0"; }
-.sywat-btn-icon-invoice::before    { content: "📄\00a0"; }
-.sywat-btn-icon-print::before      { content: "🖨️\00a0"; }
-.sywat-btn-icon-lock::before       { content: "🔒\00a0"; }
-.sywat-btn-icon-unlock::before     { content: "🔓\00a0"; }
-.sywat-btn-icon-sync::before       { content: "🔄\00a0"; }
-.sywat-btn-icon-reset::before      { content: "↺\00a0"; }
-.sywat-btn-icon-clear::before      { content: "✕\00a0"; }
-.sywat-btn-icon-back::before       { content: "←\00a0"; }
+.sywat-btn-icon-save::before        { content: "💾\00a0"; }
+.sywat-btn-icon-edit::before        { content: "✏️\00a0"; }
+.sywat-btn-icon-manage::before      { content: "👥\00a0"; }
+.sywat-btn-icon-add::before         { content: "➕\00a0"; }
+.sywat-btn-icon-delete::before      { content: "🗑️\00a0"; }
+.sywat-btn-icon-checkin::before     { content: "📋\00a0"; }
+.sywat-btn-icon-checkedin::before   { content: "✓\00a0"; }
+.sywat-btn-icon-export::before      { content: "📥\00a0"; }
+.sywat-btn-icon-invoice::before     { content: "📄\00a0"; }
+.sywat-btn-icon-print::before       { content: "🖨️\00a0"; }
+.sywat-btn-icon-lock::before        { content: "🔒\00a0"; }
+.sywat-btn-icon-unlock::before      { content: "🔓\00a0"; }
+.sywat-btn-icon-sync::before        { content: "🔄\00a0"; }
+.sywat-btn-icon-reset::before       { content: "↺\00a0"; }
+.sywat-btn-icon-clear::before       { content: "✕\00a0"; }
+.sywat-btn-icon-back::before        { content: "←\00a0"; }
+.sywat-btn-icon-global-push::before { content: "🚀\00a0"; }
 
 /* Badges & Alerts */
 .sywat-badge {
