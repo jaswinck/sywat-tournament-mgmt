@@ -319,6 +319,13 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         $shops[$shop_slug]['additional_contacts'] = $additional_contacts;
                     }
 
+                    // Ensure 'indoor_range' facility is present so the SYWAT Indoor Lines tab renders
+                    if ( empty( $shops[$shop_slug]['facilities'] ) || ! is_array( $shops[$shop_slug]['facilities'] ) ) {
+                        $shops[$shop_slug]['facilities'] = array( 'indoor_range' );
+                    } elseif ( ! in_array( 'indoor_range', $shops[$shop_slug]['facilities'] ) ) {
+                        $shops[$shop_slug]['facilities'][] = 'indoor_range';
+                    }
+
                     $updated_count++;
                 } else {
                     // Create new location
