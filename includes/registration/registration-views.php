@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 3.6.4
+ * Version: 3.6.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -102,7 +102,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             <!-- Main Desk Card (Docked to Tabs with Balanced Header Controls) -->
             <div class="sywat-card no-print" style="border-top-left-radius:0;">
                 <div class="sywat-card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                    <span>Register Shooters Desk</span>
+                    <span style="font-weight: 700; font-size: 18px; color: #0f172a;">Register Shooters Desk</span>
 
                     <!-- Tournament Switcher Control Bar (Right-Aligned) -->
                     <form method="get" action="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" style="margin:0; display:flex; gap:8px; align-items:center;">
