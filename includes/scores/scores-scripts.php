@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Client Scripts
  * File: includes/scores/scores-scripts.php
- * Version: 3.6.5
+ * Version: 3.7.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -264,7 +264,8 @@ function sywat_scores_render_client_scripts() {
             });
         }
 
-        // 6. Auto-Dismiss Alert & Notice Banners after 4 seconds
+        // 6. Auto-Dismiss Disabled (Notices remain visible permanently)
+        /*
         setTimeout(function() {
             const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
             notices.forEach(function(notice) {
@@ -275,6 +276,7 @@ function sywat_scores_render_client_scripts() {
                 }, 500);
             });
         }, 4000);
+        */
     });
     </script>
     <?php
