@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -118,7 +118,32 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Updated Volunteer Hub status for <strong>' . esc_html( $target_t ) . '</strong>.</div>';
         }
 
-        // Action: Toggle Push / Publish Scores to Season Standings
+        // Action: Global Push All Weekend Scores to Season Standings
+        if ( $action === 'global_push_standings' ) {
+            if ( ! $can_manage_seasons ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators and TFAA webmasters can push global standings.</div>';
+            }
+
+            $pushed_count = 0;
+            $now_time     = current_time( 'mysql' );
+
+            foreach ( $tournaments as $t_name => &$t_data ) {
+                $t_data['scores_published'] = true;
+                $t_data['published_at']     = $now_time;
+                $pushed_count++;
+            }
+            unset( $t_data );
+
+            update_option( 'sywat_tournaments_list', $tournaments );
+
+            if ( function_exists( 'sywat_recalculate_season_standings' ) ) {
+                sywat_recalculate_season_standings();
+            }
+
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Weekend Standings Pushed!</strong> Successfully published scores across ' . $pushed_count . ' tournament(s) to Season Standings.</div>';
+        }
+
+        // Action: Toggle Push / Publish Scores to Season Standings (Single Event Fallback)
         if ( $action === 'toggle_publish_standings' ) {
             $t_name = sanitize_text_field( $_POST['tournament_name'] );
             if ( isset( $tournaments[$t_name] ) ) {
