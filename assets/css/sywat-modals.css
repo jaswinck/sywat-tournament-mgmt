@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SYWAT Archery - Modals, Dialogs, and TFAA Autocomplete Dropdowns
+   SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
    ========================================================================== */
 
@@ -33,10 +33,10 @@
     width: min(94vw, 560px);
     border-radius: 6px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    max-height: 88vh; /* Tightened slightly to ensure footer fits on screen */
+    max-height: 88vh;
     display: flex;
-    flex-direction: column; /* Establishes vertical stacking */
-    overflow: hidden; /* Contains scrollable body */
+    flex-direction: column;
+    overflow: hidden;
     margin: auto;
     box-sizing: border-box;
 }
@@ -54,7 +54,7 @@
     padding: 16px 20px;
     border-bottom: 1px solid #dcdcde;
     background: #f6f7f7;
-    flex-shrink: 0; /* Keeps header pinned at top */
+    flex-shrink: 0;
 }
 
 .sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
@@ -79,13 +79,13 @@
     padding: 14px 20px;
     border-top: 1px solid #dcdcde;
     background: #f6f7f7;
-    flex-shrink: 0; /* Keeps footer pinned at bottom */
+    flex-shrink: 0;
 }
 
 /* 3. Scrollable Body & Field Grid Utilities */
 .sywat-modal-body { 
     padding: 20px; 
-    overflow-y: auto; /* Internal scrolling for body only */
+    overflow-y: auto;
     flex: 1 1 auto; 
 }
 
@@ -95,7 +95,7 @@
     margin-bottom: 16px;
 }
 
-/* Compact Modal Field Spacing overrides */
+/* Compact Modal Field Spacing Overrides */
 .sywat-modal-body .sywat-field-group { margin-bottom: 0 !important; }
 .sywat-modal-body .sywat-field-group label { font-size: 11px !important; margin-bottom: 4px !important; }
 .sywat-modal-body .sywat-field-group input[type="text"],
@@ -126,7 +126,102 @@
 }
 
 /* ==========================================================================
-   TFAA Autocomplete Dropdown
+   4. Registration Intake & Dynamic Archer Row Grids
+   ========================================================================== */
+.sywat-intake-card {
+    background: #ffffff;
+    padding: 16px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.sywat-intake-group-wrapper {
+    background: #f8fafc;
+    padding: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.sywat-form-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+/* Archer Row Grid Columns */
+.sywat-archer-header-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 0 4px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #475569;
+}
+
+.sywat-archer-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.sywat-col-archer-name   { flex: 2; min-width: 180px; position: relative; }
+.sywat-col-archer-dist   { flex: 1; min-width: 100px; }
+.sywat-col-archer-div    { flex: 1.5; min-width: 160px; }
+.sywat-col-archer-line   { flex: 1.2; min-width: 130px; }
+.sywat-col-archer-action { width: 38px; display: flex; justify-content: center; }
+
+/* Intake Footer & Totals Summary */
+.sywat-intake-footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #cbd5e1;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.sywat-intake-summary { text-align: right; }
+.sywat-intake-total-text { font-size: 14px; font-weight: 700; color: #0f172a; }
+.sywat-intake-total-val { color: #0284c7; }
+
+.sywat-family-badge {
+    display: none;
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-left: 6px;
+}
+
+.sywat-intake-due-text { font-size: 12px; color: #64748b; margin-top: 2px; }
+.sywat-intake-due-val { color: #dc2626; font-weight: 700; }
+
+/* FareHarbor Bulk Upload Layouts */
+.sywat-import-file-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.sywat-import-details { margin-top: 10px; }
+.sywat-import-summary { font-size: 12px; font-weight: 600; color: #2271b1; cursor: pointer; }
+.sywat-import-textarea-wrap { margin-top: 8px; }
+.sywat-import-textarea { font-family: monospace; font-size: 12px; width: 100%; box-sizing: border-box; }
+
+/* ==========================================================================
+   5. TFAA Autocomplete Dropdown
    ========================================================================== */
 .sywat-tfaa-autocomplete-dropdown {
     position: absolute;
@@ -144,7 +239,8 @@
     margin-top: 2px;
 }
 
-.sywat-tfaa-autocomplete-dropdown > div {
+.sywat-tfaa-autocomplete-dropdown > div,
+.sywat-tfaa-item {
     padding: 6px 10px;
     cursor: pointer;
     border-bottom: 1px solid #f1f5f9;
@@ -155,7 +251,18 @@
     color: #1e293b;
 }
 
-.sywat-tfaa-autocomplete-dropdown > div:hover { background-color: #f1f5f9; }
+.sywat-tfaa-autocomplete-dropdown > div:hover,
+.sywat-tfaa-item:hover { 
+    background-color: #f1f5f9; 
+}
+
+.sywat-tfaa-item-badge {
+    font-size: 11px;
+    color: #0284c7;
+    background: #e0f2fe;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
 
 #sywat_edit_archer_modal, 
 #sywat_results_edit_modal,
@@ -167,11 +274,25 @@
     .sywat-modal-backdrop { padding: 10px; }
     .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 94vh !important; }
     .sywat-modal-body { padding: 14px; }
-    .sywat-form-grid-2 { grid-template-columns: 1fr !important; gap: 8px !important; }
+    .sywat-form-grid-2, .sywat-form-grid-4 { grid-template-columns: 1fr !important; gap: 8px !important; }
+
+    /* Responsive Archer Input Row Stacking */
+    .sywat-archer-header-row { display: none; }
+    .sywat-archer-input-row { 
+        flex-direction: column; 
+        align-items: stretch; 
+        background: #f8fafc; 
+        padding: 10px; 
+        border: 1px solid #e2e8f0; 
+        border-radius: 6px; 
+    }
+    .sywat-col-archer-name, .sywat-col-archer-dist, .sywat-col-archer-div, .sywat-col-archer-line { width: 100%; min-width: 0; }
+    .sywat-col-archer-action { width: 100%; margin-top: 4px; }
+    .sywat-col-archer-action .sywat-btn { width: 100%; }
 }
 
 /* ==========================================================================
-   Print Engine Reset
+   6. Print Engine Reset
    ========================================================================== */
 @media print {
     html, body {
