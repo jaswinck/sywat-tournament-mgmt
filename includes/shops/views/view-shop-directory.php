@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.1.5
+ * Version: 5.1.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -82,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:20%;">Location Name & ID</th>
+                        <th style="width:28%;">Location Name & ID</th>
                         <th style="width:9%; white-space:nowrap;">District</th>
-                        <th style="width:10%;">Facilities</th>
-                        <th style="width:18%;">Contact Info</th>
+                        <th style="width:11%;">Facilities</th>
+                        <th style="width:21%;">Contact Info</th>
                         <th style="width:11%; white-space:nowrap;">Phone</th>
-                        <th class="sywat-col-right" style="width:32%; white-space:nowrap;">Actions</th>
+                        <th class="sywat-col-right" style="width:20%; white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
