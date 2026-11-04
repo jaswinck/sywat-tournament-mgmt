@@ -1,0 +1,172 @@
+/* ==========================================================================
+   SYWAT Archery - Unified Button System Spec
+   Path: assets/css/sywat-buttons.css
+   ========================================================================== */
+
+/* Universal Button Base (38px Standard Height) */
+.sywat-btn,
+.sywat-btn-primary,
+.sywat-btn-secondary,
+.sywat-btn-success,
+.sywat-btn-danger,
+.sywat-btn-gray,
+.sywat-btn-checkedin,
+.sywat-btn-push,
+.sywat-btn-live,
+.sywat-btn-global-push {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none !important;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Color Tier Variants */
+.sywat-btn-primary,
+.sywat-btn-secondary {
+    background-color: #ffffff;
+    border: 1px solid #2271b1;
+    color: #2271b1 !important;
+}
+.sywat-btn-primary:hover,
+.sywat-btn-secondary:hover {
+    background-color: #2271b1;
+    border-color: #2271b1;
+    color: #ffffff !important;
+}
+
+.sywat-btn-success {
+    background-color: #ffffff;
+    border: 1px solid #008a20;
+    color: #008a20 !important;
+}
+.sywat-btn-success:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+    color: #ffffff !important;
+}
+
+.sywat-btn-danger {
+    background-color: #ffffff;
+    border: 1px solid #dc3545;
+    color: #dc3545 !important;
+}
+.sywat-btn-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #ffffff !important;
+}
+
+.sywat-btn-checkedin {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724 !important;
+}
+.sywat-btn-checkedin:hover {
+    background-color: #c3e6cb;
+    border-color: #b1dfbb;
+    color: #155724 !important;
+}
+
+.sywat-btn-push {
+    background-color: #ffffff;
+    border: 1px solid #475569;
+    color: #475569 !important;
+}
+.sywat-btn-push:hover {
+    background-color: #475569;
+    border-color: #475569;
+    color: #ffffff !important;
+}
+
+.sywat-btn-global-push {
+    background-color: #ffffff;
+    border: 1px solid #0f172a;
+    color: #0f172a !important;
+}
+.sywat-btn-global-push:hover {
+    background-color: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff !important;
+}
+
+.sywat-btn-live {
+    background-color: #ffffff;
+    border: 1px solid #008a20;
+    color: #008a20 !important;
+}
+.sywat-btn-live:hover {
+    background-color: #008a20;
+    border-color: #008a20;
+    color: #ffffff !important;
+}
+
+.sywat-btn-gray {
+    background-color: #6c757d;
+    border: 1px solid #6c757d;
+    color: #ffffff !important;
+}
+.sywat-btn-gray:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+    color: #ffffff !important;
+}
+
+/* Sizing Helpers */
+.sywat-btn-full {
+    width: 100%;
+    max-width: 140px;
+}
+
+.sywat-btn-sm {
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    margin-left: 8px !important;
+    height: 24px !important;
+}
+
+.sywat-table-action-form {
+    margin: 0;
+    width: 100%;
+    max-width: 140px;
+}
+
+/* Automated Icon Pseudo-Elements */
+.sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
+.sywat-tab-icon-register::before   { content: "📝\00a0"; }
+.sywat-tab-icon-checkin::before    { content: "📋\00a0"; }
+.sywat-tab-icon-edit::before       { content: "✏️\00a0"; }
+.sywat-tab-icon-member::before     { content: "👤\00a0"; }
+.sywat-tab-icon-board::before      { content: "🏛️\00a0"; }
+.sywat-tab-icon-season::before     { content: "🏆\00a0"; }
+.sywat-tab-icon-shop::before       { content: "🏪\00a0"; }
+.sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
+.sywat-tab-icon-results::before    { content: "🎯\00a0"; }
+
+.sywat-btn-icon-save::before        { content: "💾\00a0"; }
+.sywat-btn-icon-edit::before        { content: "✏️\00a0"; }
+.sywat-btn-icon-manage::before      { content: "👥\00a0"; }
+.sywat-btn-icon-add::before         { content: "➕\00a0"; }
+.sywat-btn-icon-delete::before      { content: "🗑️\00a0"; }
+.sywat-btn-icon-checkin::before     { content: "📋\00a0"; }
+.sywat-btn-icon-checkedin::before   { content: "✓\00a0"; }
+.sywat-btn-icon-export::before      { content: "📥\00a0"; }
+.sywat-btn-icon-invoice::before     { content: "📄\00a0"; }
+.sywat-btn-icon-print::before       { content: "🖨️\00a0"; }
+.sywat-btn-icon-lock::before        { content: "🔒\00a0"; }
+.sywat-btn-icon-unlock::before      { content: "🔓\00a0"; }
+.sywat-btn-icon-sync::before        { content: "🔄\00a0"; }
+.sywat-btn-icon-reset::before       { content: "↺\00a0"; }
+.sywat-btn-icon-clear::before       { content: "✕\00a0"; }
+.sywat-btn-icon-back::before        { content: "←\00a0"; }
+.sywat-btn-icon-global-push::before { content: "🚀\00a0"; }
+.sywat-btn-icon-results::before    { content: "🎯\00a0"; }
