@@ -111,6 +111,13 @@
 .sywat-col-cap-cub     { width: 25%; text-align: center; }
 .sywat-col-line-action { width: 20%; text-align: center; }
 
+/* Archer Roster Table Specific Columns */
+.sywat-col-roster-name   { width: 30%; }
+.sywat-col-roster-type   { width: 18%; text-align: center; }
+.sywat-col-roster-line   { width: 22%; }
+.sywat-col-roster-dist   { width: 12%; text-align: center; }
+.sywat-col-roster-action { width: 18%; text-align: right; }
+
 /* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
     display: flex;
@@ -166,6 +173,39 @@
     background-color: #fee2e2;
     color: #991b1b;
     border: 1px solid #fca5a5;
+}
+
+.sywat-badge-prereg {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.sywat-badge-walkin {
+    background-color: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.sywat-badge-family-cap {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0284c7;
+    background: #e0f2fe;
+    padding: 2px 4px;
+    border-radius: 3px;
+    display: inline-block;
+    margin-top: 2px;
+}
+
+.sywat-chip-family {
+    font-size: 11px;
+    color: #155724;
+    background: #d4edda;
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
 }
 
 /* Tournament Row Metadata Typography & Chips */
