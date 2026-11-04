@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Administration Management Views Controller
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -64,10 +64,10 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
                     🌐 All Locations
                 </a>
                 <a href="<?php echo esc_url( add_query_arg( 'type', 'pro_shop', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'pro_shop') ? 'active' : ''; ?>">
-                    🏪 Shops
+                    🎯 Shops
                 </a>
                 <a href="<?php echo esc_url( add_query_arg( 'type', 'club', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'club') ? 'active' : ''; ?>">
-                    🌲 Clubs
+                    🏹 Clubs
                 </a>
             </div>
         <?php endif; ?>
