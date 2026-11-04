@@ -4,7 +4,7 @@
  * Description: Synchronizes archer membership records, caches state standings data, 
  *              and verifies TFAA shooter eligibility across active tournament rosters.
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -54,7 +54,7 @@ function render_sywat_tfaa_sync_btn() {
         <span style="font-size: 12px; color: #646970;">
             TFAA Cache: <strong><?php echo $tfaa_count; ?></strong> Shooters (Updated: <?php echo esc_html($tfaa_updated); ?>)
         </span>
-        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 32px;">Sync TFAA Standings Now</button>
+        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync">Sync TFAA Standings Now</button>
     </form>
     <?php
     return ob_get_clean();
