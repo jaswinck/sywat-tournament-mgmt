@@ -48,21 +48,26 @@
 /* Action Cell Alignment & Vertical Stacking Support */
 .sywat-table-actions {
     display: flex !important;
-    gap: 4px !important;
+    gap: 6px !important;
     align-items: center !important;
-    justify-content: flex-end !important;
-    flex-wrap: wrap !important;
+    justify-content: center !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
 }
 
+.sywat-table-actions-vertical,
 .sywat-manage-row td:last-child > div {
     display: flex !important;
     flex-direction: column !important;
-    align-items: flex-end !important;
-    gap: 4px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
 }
 
 .sywat-table-actions .sywat-btn,
 .sywat-table-actions form,
+.sywat-table-actions-vertical .sywat-btn,
+.sywat-table-actions-vertical form,
 .sywat-manage-row td:last-child > div .sywat-btn,
 .sywat-manage-row td:last-child > div form {
     margin: 0 !important;
