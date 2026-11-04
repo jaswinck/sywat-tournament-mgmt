@@ -3,7 +3,7 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Author: SYWAT / TFAA Archery
- * Version: 3.6.5
+ * Version: 3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -119,11 +119,11 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                             👤 <?php echo esc_html( $current_user->display_name ); ?>
                         </span>
 
-                        <a href="<?php echo esc_url( wp_logout_url( site_url( '/login/' ) ) ); ?>" class="sywat-btn sywat-btn-danger" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
+                        <a href="<?php echo esc_url( wp_logout_url( site_url( '/login/' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
                             🚪 Log Out
                         </a>
                     <?php else: ?>
-                        <a href="<?php echo esc_url( site_url( '/login/' ) ); ?>" class="sywat-btn sywat-btn-primary" style="font-size:12px; padding:4px 12px; height:32px; white-space:nowrap;">
+                        <a href="<?php echo esc_url( site_url( '/login/' ) ); ?>" class="sywat-btn sywat-btn-primary">
                             🔑 Login
                         </a>
                     <?php endif; ?>
@@ -193,8 +193,8 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="lost_password">
 
-                        <div style="margin-bottom:18px;">
-                            <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
+                        <div class="sywat-field-group" style="margin-bottom:18px;">
+                            <label>Username or Email Address</label>
                             <input type="text" name="sywat_user_login" required style="width:100%;">
                         </div>
 
@@ -221,13 +221,13 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="rp_key" value="<?php echo esc_attr( $rp_key ); ?>">
                         <input type="hidden" name="rp_login" value="<?php echo esc_attr( $rp_login ); ?>">
 
-                        <div style="margin-bottom:14px;">
-                            <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">New Password</label>
+                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                            <label>New Password</label>
                             <input type="password" name="pass1" required autocomplete="new-password" style="width:100%;">
                         </div>
 
-                        <div style="margin-bottom:18px;">
-                            <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Confirm New Password</label>
+                        <div class="sywat-field-group" style="margin-bottom:18px;">
+                            <label>Confirm New Password</label>
                             <input type="password" name="pass2" required autocomplete="new-password" style="width:100%;">
                         </div>
 
@@ -249,13 +249,13 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="sywat_auth_action" value="login">
                         <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
 
-                        <div style="margin-bottom:14px;">
-                            <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Username or Email Address</label>
+                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                            <label>Username or Email Address</label>
                             <input type="text" name="sywat_user_login" required autocomplete="username" style="width:100%;">
                         </div>
 
-                        <div style="margin-bottom:14px;">
-                            <label style="display:block; font-weight:600; font-size:12px; color:#334155; margin-bottom:4px;">Password</label>
+                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                            <label>Password</label>
                             <input type="password" name="sywat_user_pass" required autocomplete="current-password" style="width:100%;">
                         </div>
 
