@@ -3,7 +3,7 @@
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
