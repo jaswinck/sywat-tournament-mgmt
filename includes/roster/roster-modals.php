@@ -45,7 +45,10 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
         <div class="sywat-modal-backdrop sywat-nested-modal <?php echo $open_edit_modal ? 'active' : ''; ?>" id="sywat_edit_archer_modal">
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header">
-                    <h3>Edit Archer Registration</h3>
+                    <div>
+                        <h3>✏️ Edit Archer Registration</h3>
+                        <div class="sywat-subtitle">Update division, shooting line, or payment category details.</div>
+                    </div>
                     <button type="button" class="sywat-modal-close" onclick="closeEditArcherModal()">&times;</button>
                 </div>
                 <?php if ( $target_archer ): ?>
@@ -99,7 +102,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                     <label for="edit_gender">Gender</label>
                                     <select name="edit_gender" id="edit_gender" required>
                                         <?php foreach ( $genders as $g ): ?>
-                                            <option value="<?php echo esc_attr( $g ); ?>" <?php selected( $curr_gen, $g );塑造?>>
+                                            <option value="<?php echo esc_attr( $g ); ?>" <?php selected( $curr_gen, $g ); ?>>
                                                 <?php echo esc_html( $g ); ?>
                                             </option>
                                         <?php endforeach; ?>
