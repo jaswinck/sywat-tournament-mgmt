@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 5.0.2
+ * Version: 5.0.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -148,7 +148,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             <?php else: ?>
                 <!-- TAB 1: TOURNAMENTS TABLE -->
-                <div class="sywat-card no-print" style="border-top-left-radius:0;">
+                <div class="sywat-card no-print">
                     <!-- UNIFIED TOP CARD HEADER BAR -->
                     <div class="sywat-card-header-bar">
                         <div>
@@ -166,10 +166,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     <div class="sywat-table-header-bar">
                         <h2>Configured Events</h2>
 
-                        <div class="sywat-table-header-controls" style="margin-left: auto;">
+                        <div class="sywat-table-header-controls">
                             <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                <div class="sywat-field-group" style="width:auto;">
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="width: 140px;">
+                                <div class="sywat-field-group">
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
                                         <option value="all">All Shops</option>
                                         <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                             <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
@@ -178,24 +178,24 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </div>
                             <?php endif; ?>
 
-                            <div class="sywat-field-group" style="width:auto;">
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="width: 150px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                            <div class="sywat-field-group">
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                             </div>
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
 
                             <!-- TFAA Sync Pill -->
-                            <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 10px; gap: 6px; height: 38px; box-sizing: border-box;">
+                            <form method="post" class="sywat-sync-pill">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                 <input type="hidden" name="sywat_action" value="sync_tfaa_now">
-                                <span style="font-size: 12px; color: #475569; font-weight: 600; white-space: nowrap;">
+                                <span class="sywat-sync-pill-count">
                                     👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
                                 </span>
-                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" style="height: 28px; padding: 2px 8px; font-size: 11px; border-radius: 14px; background: #ffffff; margin: 0;">Sync</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync sywat-btn-pill-sync">Sync</button>
                             </form>
 
                             <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="global_push_standings">
                                     <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
@@ -205,15 +205,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     </div>
 
                     <?php if ( empty( $scoped_tournaments ) ): ?>
-                        <p style="color:#646970; font-style:italic;">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
+                        <p class="sywat-score-null">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
                     <?php else: ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 32%;">Tournament, Season & Location</th>
-                                        <th class="sywat-col-center" style="width: 52%;">Line Slot Availability (20yd / Cub)</th>
-                                        <th class="sywat-col-center" style="width: 16%; white-space: nowrap;">Tournament Actions</th>
+                                        <th class="sywat-col-tourn">Tournament, Season & Location</th>
+                                        <th class="sywat-col-center">Line Slot Availability (20yd / Cub)</th>
+                                        <th class="sywat-col-center sywat-col-action">Tournament Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -239,26 +239,26 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                         <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
                                             <!-- Column 1: Metadata & Volunteer Hub Toggle -->
                                             <td>
-                                                <strong style="font-size: 15px; color: #0f172a;"><?php echo esc_html( $t_name ); ?></strong>
-                                                <div style="font-size: 12px; color: #1e3a8a; font-weight: 700; margin-top: 3px;">🏆 <?php echo esc_html( $t_season_name ); ?></div>
-                                                <div style="font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px;">📍 <?php echo esc_html( $t_shop_name ); ?></div>
-                                                <div style="font-size: 11px; color: #64748b; margin-top: 2px;">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
+                                                <strong class="sywat-tourn-title"><?php echo esc_html( $t_name ); ?></strong>
+                                                <div class="sywat-tourn-season">🏆 <?php echo esc_html( $t_season_name ); ?></div>
+                                                <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                                <div class="sywat-tourn-dates">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
                                                 
                                                 <!-- Volunteer Hub Toggle Chip -->
-                                                <div style="margin-top: 8px;">
+                                                <div class="sywat-table-action-form">
                                                     <?php if ( $t_shop_id === 'shop_ccr' ): ?>
-                                                        <form method="post" style="margin: 0;">
+                                                        <form method="post" class="sywat-table-action-form">
                                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                             <input type="hidden" name="sywat_action" value="toggle_active_tournament">
                                                             <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
                                                             <?php if ( $is_active_hub ): ?>
-                                                                <button type="submit" class="sywat-btn sywat-btn-success" style="padding: 2px 8px; font-size: 11px; height: 26px;" title="Visible in Volunteer Hub">🟢 Hub Active</button>
+                                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-sm" title="Visible in Volunteer Hub">🟢 Hub Active</button>
                                                             <?php else: ?>
-                                                                <button type="submit" class="sywat-btn sywat-btn-secondary" style="padding: 2px 8px; font-size: 11px; height: 26px;" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
+                                                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
                                                             <?php endif; ?>
                                                         </form>
                                                     <?php else: ?>
-                                                        <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">Hub: N/A</span>
+                                                        <span class="sywat-hub-chip-na">Hub: N/A</span>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
@@ -280,15 +280,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                             <div class="sywat-line-slot-compact">
                                                                 <span class="sywat-line-slot-title"><?php echo esc_html( $line_title ); ?></span>
                                                                 <div class="sywat-line-slot-caps">
-                                                                    <span>20yd: <strong><?php echo $c_20; ?>/<?php echo $m_20; ?></strong> <span style="color: <?php echo ($rem_20 > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_20; ?> open)</span></span>
+                                                                    <span>20yd: <strong><?php echo $c_20; ?>/<?php echo $m_20; ?></strong> <span class="<?php echo ($rem_20 > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_20; ?> open)</span></span>
                                                                     <span>•</span>
-                                                                    <span>Cub: <strong><?php echo $c_cub; ?>/<?php echo $m_cub; ?></strong> <span style="color: <?php echo ($rem_cub > 0) ? '#008a20' : '#d63638'; ?>; font-weight: 600;">(<?php echo $rem_cub; ?> open)</span></span>
+                                                                    <span>Cub: <strong><?php echo $c_cub; ?>/<?php echo $m_cub; ?></strong> <span class="<?php echo ($rem_cub > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_cub; ?> open)</span></span>
                                                                 </div>
                                                             </div>
                                                         <?php endforeach; ?>
                                                     </div>
                                                 <?php endif; ?>
-                                                <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #1e293b; text-align: center;">
+                                                <div class="sywat-lines-total">
                                                     <strong>Total Registered:</strong> <?php echo $reg_count; ?> <?php echo ( $reg_count === 1 ? 'archer' : 'archers' ); ?>
                                                 </div>
                                             </td>
@@ -348,7 +348,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </div>
                             </div>
 
-                            <div class="sywat-field-group" style="margin-top: 12px;">
+                            <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
                                 <?php if ( $can_manage_seasons ): ?>
                                     <select name="shop_id" required>
@@ -361,11 +361,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </select>
                                 <?php else: ?>
                                     <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
-                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="background:#f0f0f1; font-weight:bold;">
+                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly>
                                 <?php endif; ?>
                             </div>
 
-                            <div class="sywat-form-grid-2" style="margin-top: 12px;">
+                            <div class="sywat-form-grid-2">
                                 <div class="sywat-field-group">
                                     <label>Start Date *</label>
                                     <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
@@ -377,19 +377,19 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             </div>
 
                             <!-- Dynamic Shooting Lines Repeater Table -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0 10px 0;">
-                                <h4 style="font-size: 14px; font-weight: 600; margin: 0;">Shooting Lines & Capacity Templates</h4>
+                            <div class="sywat-table-header-bar">
+                                <h4>Shooting Lines & Capacity Templates</h4>
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
                             </div>
-                            <div class="sywat-table-responsive" style="margin-bottom: 20px;">
-                                <table class="sywat-table" id="sywat_tourn_lines_table" style="margin-bottom: 0;">
+                            <div class="sywat-table-responsive">
+                                <table class="sywat-table" id="sywat_tourn_lines_table">
                                     <thead>
                                         <tr>
                                             <th>Shooting Day</th>
                                             <th>Start Time</th>
-                                            <th style="width: 140px;">20yd Capacity</th>
-                                            <th style="width: 140px;">Cub Capacity</th>
-                                            <th class="sywat-col-center" style="width: 110px;">Action</th>
+                                            <th class="sywat-col-score">20yd Capacity</th>
+                                            <th class="sywat-col-score">Cub Capacity</th>
+                                            <th class="sywat-col-center">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
