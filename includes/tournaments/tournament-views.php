@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 3.9.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -12,7 +12,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
     function render_sywat_master_portal() {
         // Enforce Central Permission Check
         if ( ! sywat_can_manage_tournaments() ) {
-            return '<p style="color:red; padding:20px; font-weight:bold;">Access denied. Management access required.</p>';
+            return '<div class="sywat-alert sywat-alert-danger">Access denied. Management access required.</div>';
         }
 
         ob_start();
@@ -150,14 +150,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 <!-- TAB 1: TOURNAMENTS TABLE -->
                 <div class="sywat-card no-print" style="border-top-left-radius:0;">
                     <!-- UNIFIED TOP CARD HEADER BAR -->
-                    <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
+                    <div class="sywat-card-header-bar">
                         <div>
-                            <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">🎯 Manage Tournaments</h2>
-                            <div class="sywat-subtitle" style="margin-top:2px;">Set up upcoming events, configure shooting lines, and print desk rosters.</div>
+                            <h2>🎯 Manage Tournaments</h2>
+                            <div class="sywat-subtitle">Set up upcoming events, configure shooting lines, and print desk rosters.</div>
                         </div>
 
                         <!-- TOP PAGE ACTION CONTROLS -->
-                        <div class="sywat-header-inline-controls" style="display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; margin-left:auto;">
+                        <div class="sywat-header-inline-controls">
                             <!-- TFAA Sync Pill -->
                             <form method="post" style="margin: 0; display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 20px; padding: 2px 4px 2px 10px; gap: 6px; height: 38px; box-sizing: border-box;">
                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -172,29 +172,33 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <form method="post" style="margin: 0;" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="global_push_standings">
-                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="height: 38px; margin: 0;">Push Weekend Standings</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
                                 </form>
                             <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height: 38px; margin: 0;" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
 
                     <!-- TABLE SUB-HEADER ROW (Title Left, Search/Filter Right) -->
-                    <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-                        <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Configured Events</h2>
+                    <div class="sywat-table-header-bar">
+                        <h2>Configured Events</h2>
 
-                        <div style="display: flex; gap: 5px; margin: 0; align-items: center; white-space: nowrap; flex-wrap:wrap;">
+                        <div class="sywat-table-header-controls" style="margin-left: auto;">
                             <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; height: 38px; box-sizing: border-box; width: 140px; margin: 0; background:#fff;">
-                                    <option value="all">All Shops</option>
-                                    <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <div class="sywat-field-group" style="width:auto;">
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="width: 140px;">
+                                        <option value="all">All Shops</option>
+                                        <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                            <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             <?php endif; ?>
-                            <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; width: 150px; height: 38px; box-sizing: border-box; margin: 0; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 38px; padding: 0 10px; margin: 0;" onclick="sywatResetTournamentFilters()">Clear</button>
+                            <div class="sywat-field-group" style="width:auto;">
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" style="width: 150px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                            </div>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                         </div>
                     </div>
 
@@ -205,9 +209,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 28%; text-align: left;">Tournament, Season & Location</th>
-                                        <th style="width: 48%; text-align: center;">Line Slot Availability (20yd / Cub)</th>
-                                        <th style="width: 24%; text-align: center;">Tournament Actions</th>
+                                        <th style="width: 28%;">Tournament, Season & Location</th>
+                                        <th class="sywat-col-center" style="width: 48%;">Line Slot Availability (20yd / Cub)</th>
+                                        <th class="sywat-col-center" style="width: 24%;">Tournament Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -258,7 +262,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             </td>
 
                                             <!-- Column 2: 2-Column Line Slot Capacity Grid -->
-                                            <td>
+                                            <td class="sywat-col-center">
                                                 <?php if ( ! empty( $t_lines ) && is_array( $t_lines ) ): ?>
                                                     <div class="sywat-lines-grid">
                                                         <?php foreach ( $t_lines as $idx => $line ): ?>
@@ -288,7 +292,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             </td>
 
                                             <!-- Column 3: Stacked Tournament Action Buttons -->
-                                            <td style="text-align: center;">
+                                            <td class="sywat-col-center">
                                                 <div style="display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center;">
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
@@ -319,20 +323,20 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <h3><?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
                         <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
                     </div>
-                    <div class="sywat-modal-body">
-                        <form method="post" action="?tab=manage" onsubmit="return validateTournamentLines();">
+                    <form method="post" action="?tab=manage" onsubmit="return validateTournamentLines();">
+                        <div class="sywat-modal-body">
                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                             <input type="hidden" name="sywat_action" value="save_tournament">
                             <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
 
-                            <div class="sywat-form-grid-2" style="margin-bottom: 15px;">
-                                <div>
-                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Tournament Name *</label>
-                                    <input type="text" name="tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="e.g. CCR October 2026" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            <div class="sywat-form-grid-2">
+                                <div class="sywat-field-group">
+                                    <label>Tournament Name *</label>
+                                    <input type="text" name="tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="e.g. CCR October 2026" required>
                                 </div>
-                                <div>
-                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Competition Season *</label>
-                                    <select name="season_slug" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                <div class="sywat-field-group">
+                                    <label>Competition Season *</label>
+                                    <select name="season_slug" required>
                                         <?php foreach ( $seasons as $s_slug => $s_item ): ?>
                                             <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $edit_t_season, $s_slug ); ?>>
                                                 <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( ucfirst($s_item['status']) ); ?>)
@@ -342,10 +346,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </div>
                             </div>
 
-                            <div style="margin-bottom: 15px;">
-                                <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Host Archery Shop *</label>
+                            <div class="sywat-field-group" style="margin-top: 12px;">
+                                <label>Host Archery Shop *</label>
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <select name="shop_id" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; height:37px;" required>
+                                    <select name="shop_id" required>
                                         <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
                                         <?php foreach ( $all_shops as $s_id => $s_name ): ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
@@ -355,18 +359,18 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </select>
                                 <?php else: ?>
                                     <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
-                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px; background:#f0f0f1; font-weight:bold;">
+                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly style="background:#f0f0f1; font-weight:bold;">
                                 <?php endif; ?>
                             </div>
 
-                            <div class="sywat-form-grid-2" style="margin-bottom: 20px;">
-                                <div>
-                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">Start Date *</label>
-                                    <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;" required>
+                            <div class="sywat-form-grid-2" style="margin-top: 12px;">
+                                <div class="sywat-field-group">
+                                    <label>Start Date *</label>
+                                    <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
                                 </div>
-                                <div>
-                                    <label style="display:block; font-weight:600; margin-bottom:5px; font-size:13px;">End Date (Optional for multi-day)</label>
-                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>" style="width:100%; padding:8px; border:1px solid #8c8f94; border-radius:4px;">
+                                <div class="sywat-field-group">
+                                    <label>End Date (Optional for multi-day)</label>
+                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
                                 </div>
                             </div>
 
@@ -383,7 +387,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <th>Start Time</th>
                                             <th style="width: 140px;">20yd Capacity</th>
                                             <th style="width: 140px;">Cub Capacity</th>
-                                            <th style="width: 110px; text-align: center;">Action</th>
+                                            <th class="sywat-col-center" style="width: 110px;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -401,32 +405,46 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 $cap_cub   = isset($l['cap_cub']) ? $l['cap_cub'] : 5;
                                             ?>
                                             <tr>
-                                                <td style="padding:6px; vertical-align:middle;">
-                                                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkTournamentLineDuplicate(this);">
-                                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
-                                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
-                                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
-                                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
-                                                    </select>
+                                                <td>
+                                                    <div class="sywat-field-group">
+                                                        <select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">
+                                                            <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
+                                                            <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                                            <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                                            <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                                        </select>
+                                                    </div>
                                                 </td>
-                                                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required onchange="checkTournamentLineDuplicate(this);"></td>
-                                                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
-                                                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
-                                                <td style="padding:6px; text-align:center; vertical-align:middle;">
-                                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeTournamentLineRow(this)">Remove</button>
+                                                <td>
+                                                    <div class="sywat-field-group">
+                                                        <input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required onchange="checkTournamentLineDuplicate(this);">
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="sywat-field-group">
+                                                        <input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" required>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="sywat-field-group">
+                                                        <input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" required>
+                                                    </div>
+                                                </td>
+                                                <td class="sywat-col-center">
+                                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeTournamentLineRow(this)">Remove</button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
 
-                            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeAddTournamentModal()">Cancel</button>
-                                <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:38px; padding:8px 16px;">Save Tournament Configuration</button>
-                            </div>
-                        </form>
-                    </div>
+                        <div class="sywat-modal-footer">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeAddTournamentModal()">Cancel</button>
+                            <button type="submit" name="sywat_action" value="save_tournament" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Tournament Configuration</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -532,19 +550,33 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="padding:6px; vertical-align:middle;">
-                    <select name="line_days[]" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" onchange="checkTournamentLineDuplicate(this);">
-                        <option value="" disabled selected>-- Select Day --</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                        <option value="Sunday">Sunday</option>
-                    </select>
+                <td>
+                    <div class="sywat-field-group">
+                        <select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">
+                            <option value="" disabled selected>-- Select Day --</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
                 </td>
-                <td style="padding:6px; vertical-align:middle;"><input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required onchange="checkTournamentLineDuplicate(this);"></td>
-                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_20yd[]" value="20" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
-                <td style="padding:6px; vertical-align:middle;"><input type="number" name="cap_cub[]" value="5" min="0" style="width:100%; padding:6px; border:1px solid #8c8f94; border-radius:4px; height:38px; box-sizing:border-box;" required></td>
-                <td style="padding:6px; text-align:center; vertical-align:middle;">
-                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeTournamentLineRow(this)">Remove</button>
+                <td>
+                    <div class="sywat-field-group">
+                        <input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required onchange="checkTournamentLineDuplicate(this);">
+                    </div>
+                </td>
+                <td>
+                    <div class="sywat-field-group">
+                        <input type="number" name="cap_20yd[]" value="20" min="0" required>
+                    </div>
+                </td>
+                <td>
+                    <div class="sywat-field-group">
+                        <input type="number" name="cap_cub[]" value="5" min="0" required>
+                    </div>
+                </td>
+                <td class="sywat-col-center">
+                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeTournamentLineRow(this)">Remove</button>
                 </td>
             `;
             tableBody.appendChild(tr);
