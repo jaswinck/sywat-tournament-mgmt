@@ -173,6 +173,27 @@
     box-sizing: border-box !important;
 }
 
+/* Table Header Controls Baseline & Field Auto-Sizing */
+.sywat-table-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.sywat-table-header-controls .sywat-field-group {
+    width: auto;
+}
+
+.sywat-table-header-controls input[type="text"] {
+    width: 150px;
+}
+
+.sywat-table-header-controls select {
+    width: 140px;
+}
+
 /* Line Capacity Tracker Grid */
 .sywat-tracker-grid {
     display: grid;
