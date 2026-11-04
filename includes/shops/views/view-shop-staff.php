@@ -3,7 +3,7 @@
  * View Template: Admin Manage Shop Staff
  * Path: includes/shops/views/view-shop-staff.php
  * Author: SYWAT Archery
- * Version: 4.6.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -42,9 +42,9 @@ foreach ( $eligible_users as $u ) {
                 <input type="hidden" name="sywat_shop_action" value="assign_staff_to_shop">
                 <input type="hidden" name="target_shop_id" value="<?php echo esc_attr( $managing_shop['id'] ); ?>">
                 
-                <div style="flex:1; min-width:250px;">
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Select Available Staff User</label>
-                    <select name="staff_user_id" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; background:#fff;" required>
+                <div class="sywat-field-group" style="flex:1; min-width:250px;">
+                    <label>Select Available Staff User</label>
+                    <select name="staff_user_id" required>
                         <?php foreach ( $unlinked_staff as $un_user ): ?>
                             <?php 
                                 $curr_s_id = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
@@ -56,7 +56,7 @@ foreach ( $eligible_users as $u ) {
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
+                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-add">Link User to <?php echo esc_html( $managing_shop['name'] ); ?></button>
             </form>
         <?php endif; ?>
     </div>
@@ -70,20 +70,20 @@ foreach ( $eligible_users as $u ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="text-align:left;">Name</th>
-                        <th style="text-align:left;">Username</th>
-                        <th style="text-align:left;">Email</th>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Email</th>
                         <th class="sywat-col-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ( $linked_staff as $ls_user ): ?>
                         <tr>
-                            <td style="font-weight:700; color:#0f172a; text-align:left;"><?php echo esc_html( $ls_user->display_name ); ?></td>
-                            <td style="text-align:left;"><?php echo esc_html( $ls_user->user_login ); ?></td>
-                            <td style="text-align:left;"><?php echo esc_html( $ls_user->user_email ); ?></td>
+                            <td><strong style="color:#0f172a;"><?php echo esc_html( $ls_user->display_name ); ?></strong></td>
+                            <td><?php echo esc_html( $ls_user->user_login ); ?></td>
+                            <td><?php echo esc_html( $ls_user->user_email ); ?></td>
                             <td class="sywat-col-right">
-                                <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" style="margin:0; display:inline-block;" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this location?');">
+                                <form method="post" action="<?php echo esc_url( add_query_arg( array('manage_staff' => $managing_shop['id'], 'type' => $type_filter), $page_url ) ); ?>" class="sywat-table-action-form" onsubmit="return confirm('Remove <?php echo esc_js( $ls_user->display_name ); ?> from this location?');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_shop_action" value="remove_staff_from_shop">
                                     <input type="hidden" name="staff_user_id" value="<?php echo esc_attr( $ls_user->ID ); ?>">
