@@ -1,17 +1,17 @@
 # SYWAT Archery Tournament Management Plugin
 
-Custom WordPress plugin consolidating multi-tenant shop scoping, tournament administration, check-in operations, score entry, season tracking, public standings, role-based access control, member directories, board management, branded desk authentication, and TFAA data syncing into a unified portal architecture.
+Custom WordPress plugin consolidating multi-tenant shop scoping, tournament administration, check-in operations, score entry, season tracking, public standings, role-based access control, member directories, board management, branded desk authentication, financial invoicing, and TFAA data syncing into a unified portal architecture.
 
 ## Included Structure & Assets
 
-- **`sywat-archery-manager.php`** — Main plugin header (v2.6.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
-- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing uniform button palettes, card containers, centered division headers, left-aligned table data, form element theme resets with descender padding fixes (`min-height: 38px`, `line-height: 1.5`), operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
-- **`assets/css/sywat-modals.css`** — High-contrast modal overlay styling, dialog containers, backdrop filters, and popup animation rules.
-- **`assets/css/sywat-tables.css`** — Responsive data table structures, cell padding alignments, hover states, and ranking column layouts.
-- **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms, select input specificity overrides, and line capacity tracker responsive grid cards.
+- **`sywat-archery-manager.php`** — Main plugin header, master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
+- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing uniform button palettes (`.sywat-btn`), card containers (`.sywat-card`), form input wrappers (`.sywat-field-group`), card header bars (`.sywat-card-header-bar`), table toolbars (`.sywat-table-header-bar`), centered division headers, left-aligned table data, descender padding resets (`min-height: 38px`, `line-height: 1.5`), operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
+- **`assets/css/sywat-modals.css`** — High-contrast modal overlay styling (`.sywat-modal-backdrop`), dialog containers (`.sywat-modal-content`), backdrop filters, and popup animation rules.
+- **`assets/css/sywat-tables.css`** — Responsive data table structures (`.sywat-table-responsive`), cell padding alignments, hover states, alignment helper classes (`.sywat-col-center`, `.sywat-col-right`), and ranking column layouts.
+- **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms, select input specificity overrides, and line capacity tracker responsive grid cards (`.sywat-tracker-grid`).
 - **`assets/js/sywat-shops.js`** — Extracted client-side JavaScript engine managing tabbed location editing, dynamic contact repeaters, shooting line schedule repeaters, phone number formatting, and live directory/district filtering.
 - **`assets/images/logo.png`** — TFAA brand asset image.
-- **`assets/images/zelle-qr-code.png`** — Accounting payment QR code graphic asset.
+- **`assets/images/zelle-qr-code.png`** — Accounting payment Zelle QR code graphic asset.
 
 ---
 
@@ -36,21 +36,21 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 
 #### 3. Tournaments Sub-System (`includes/tournaments/`)
 - **`class-sywat-tournament-config.php`** — Sub-module loader shell and shortcode bindings (`[sywat_manage]`, `[sywat_admin]`, `[sywat_manage_tournaments]`, `[sywat_volunteer_hub]`).
-- **`tournament-helpers.php`** — Line capacity calculations, date range formatting, and season getters.
+- **`tournament-helpers.php`** — Line capacity calculations, date range formatting, line matchers, TFAA shooter search queries, and season getters.
 - **`tournament-seasons.php`** — Season Management CRUD UI (`tab=seasons`), live season search bar, pop-up modal overlay (`#sywat_add_season_modal`), auto-generated season names/year labels (e.g., *"2026–2027 Indoor"*), and newest-to-oldest sorting logic.
-- **`tournament-actions.php`** — POST request action handlers for dynamic shooting line templates array processing without hardcoded limits, tournament configuration, and role-restricted season management.
+- **`tournament-actions.php`** — POST request action handlers for dynamic shooting line templates array processing without hardcoded limits, tournament configuration, TFAA standings cache syncing, and role-restricted season management.
 - **`tournament-views.php`** — Master Admin Portal UI protected by `sywat_can_manage_tournaments()` with standardized navigation tabs (*Tournament Management*, *Season Management*), chronological tournament sorting (soonest to farthest out), side-by-side shop filter dropdown and search input, side-by-side Start/End Date grid fields in the edit modal, dynamic shooting lines repeater (`➕ Add New Line` / `🗑️ Remove`), standardized action buttons, and compact TFAA stat chip.
-- **`volunteer-hub.php`** — Staff Volunteer Hub portal view (`[sywat_volunteer_hub]`) featuring line check-in/scoring shortcuts and real-time roster stats.
+- **`volunteer-hub.php`** — Staff Volunteer Hub portal view (`[sywat_volunteer_hub]`) featuring `.sywat-tracker-grid` line cards, check-in/scoring shortcuts, and real-time roster stats.
 
 #### 4. Archery Shops Sub-System (`includes/shops/`)
 - **`class-sywat-shops.php`** — Sub-module loader shell for multi-tenant shop scoping and management.
 - **`shops-helpers.php`** — Phone number auto-formatting, seed shop initialization, shop getters, current shop context resolution, and WP Admin user profile integration (`Users > Edit User`).
-- **`shops-actions.php`** — Shop CRUD action processing (creation, updates, deletions, primary and additional contacts array parsing, dynamic default shooting lines, and staff account linking/unlinking).
+- **`shops-actions.php`** — Shop CRUD action processing (creation, updates, deletions, primary and additional contacts array parsing, dynamic default shooting lines, 2-step dry-run import preview transient processor with Excel `.xlsx`/`.xls` and CSV parsing, delimiter auto-detection, UTF-8 BOM stripping, safe merge/upsert and skip modes, and staff account linking/unlinking).
 - **`shops-views.php`** — Admin shortcode controller (`[sywat_manage_shops]`) enqueuing `sywat-shops.js` and routing to modular view partials.
 - **`shops-public-views.php`** — Public shortcode controller (`[sywat_public_shops]`) enqueuing `sywat-shops.js` and loading the public directory view partial.
 - **`views/`** — Modular sub-folder containing focused UI template partials:
-  - **`view-shop-directory.php`** — Admin directory list table with district filtering, search, and pop-up location creation modal overlay.
-  - **`view-shop-edit.php`** — Tabbed Location Editor UI (*📍 Profile & Address*, *👥 Contacts*, *🎯 Shooting Lines*) featuring primary contact fields, dynamic additional contact repeaters (`➕ Add Additional Contact`), facilities checkboxes, address details, and dynamic default shooting line template repeaters (`➕ Add New Line`).
+  - **`view-shop-directory.php`** — Admin directory list table with district filtering, search, location creation modal, and 2-step dry-run import preview modal (`📥 Import Locations`).
+  - **`view-shop-edit.php`** — Tabbed Location Editor UI (*📍 Profile & Address*, *👥 Contacts*, *🎯 SYWAT Indoor Lines*, *🌲 SYWAT Outdoor Lines*) featuring primary contact fields, dynamic additional contact repeaters (`➕ Add Additional Contact`), facilities checkboxes, address details, and dynamic default shooting line template repeaters (`➕ Add New Line`).
   - **`view-shop-staff.php`** — Staff account assignment and unlinking management panel for shops and clubs.
   - **`view-shop-public.php`** — Public-facing shop and club directory listing with primary/additional contact search integration and range amenity badges.
 
@@ -89,6 +89,6 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`members-views.php`** — Public Board of Directors roster with district contact buttons, searchable Member Directory cards, and administrative Member Management panel (`tab=members`).
 
 #### 10. Standalone Supporting Modules
-- **`class-sywat-roster.php`** — Archer roster management, division/style restriction enforcement, family group assignments, line purges, and high z-index nested edit archer modal overlay (`#sywat_edit_archer_modal`).
-- **`class-sywat-accounting.php`** — Financial accounting engine, 50/50 host/TFAA fee split math, family cap calculations, Zelle Base64 QR code rendering, and printable invoice/roster renderers with dynamic shop metadata.
+- **`class-sywat-roster.php`** — Archer roster management, division/style restriction enforcement, line-scoped family group assignments, line purges, and high z-index nested edit archer modal overlay (`#sywat_edit_archer_modal`).
+- **`class-sywat-accounting.php`** — Financial accounting engine, 50/50 host/TFAA fee split math, family cap calculations, embedded Base64 Zelle QR code rendering for print/PDF reliability, and printable invoice/roster renderers with dynamic shop metadata.
 - **`class-sywat-tfaa-sync.php`** — TFAA membership verification, web scraping standings cache engine, standalone sync button (`[sywat_tfaa_sync_btn]`), and daily WP-Cron background sync.
