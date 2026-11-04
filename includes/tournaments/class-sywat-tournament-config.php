@@ -4,7 +4,7 @@
  * Path: includes/tournaments/class-sywat-tournament-config.php
  * Description: Main loader binding helpers, season CRUD, action handlers, portal views, and volunteer hub.
  * Author: SYWAT Archery
- * Version: 2.5.0
+ * Version: 2.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -31,5 +31,6 @@ add_action( 'wp_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
 require_once plugin_dir_path( __FILE__ ) . 'tournament-helpers.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-seasons.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-actions.php';
+require_once plugin_dir_path( __FILE__ ) . 'tournament-modals.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-views.php';
 require_once plugin_dir_path( __FILE__ ) . 'volunteer-hub.php';
