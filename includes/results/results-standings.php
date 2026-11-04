@@ -3,7 +3,7 @@
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
