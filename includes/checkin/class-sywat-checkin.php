@@ -1,10 +1,11 @@
 <?php
 /**
  * Module: Check-In Desk Portal Controller
+ * Path: includes/checkin/class-sywat-checkin.php
  * Description: Main entry point and shortcode definition for the Check-In Desk portal.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 2.4.0
+ * Version: 3.8.0
  */
 
 if (!defined('ABSPATH')) exit;
