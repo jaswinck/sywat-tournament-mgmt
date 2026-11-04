@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.1.0
+ * Version: 5.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -82,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:22%;">Location Name & ID</th>
-                        <th style="width:11%;">District</th>
-                        <th style="width:18%;">Facilities</th>
-                        <th style="width:21%;">Contact Info</th>
-                        <th style="width:10%;">Phone</th>
-                        <th class="sywat-col-right" style="width:18%;">Actions</th>
+                        <th style="width:20%;">Location Name & ID</th>
+                        <th style="width:10%;">District</th>
+                        <th style="width:14%;">Facilities</th>
+                        <th style="width:20%;">Contact Info</th>
+                        <th style="width:11%;">Phone</th>
+                        <th class="sywat-col-right" style="width:25%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -169,7 +169,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                             </td>
                             <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                             <td class="sywat-col-right">
-                                <div class="sywat-table-actions">
+                                <div class="sywat-table-actions" style="white-space:nowrap; display:inline-flex; gap:6px; justify-content:flex-end;">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
                                         <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">Staff (<?php echo $linked_count; ?>)</a>
                                         <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
