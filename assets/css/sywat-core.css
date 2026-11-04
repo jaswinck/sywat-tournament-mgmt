@@ -112,11 +112,14 @@ body {
     color: #1e3a8a;
 }
 
+/* High-Contrast Subtitles */
 .sywat-subtitle {
-    font-size: 13px;
-    color: #646970;
-    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+    margin-top: 4px;
     margin-bottom: 0;
+    line-height: 1.4;
 }
 
 .sywat-header-inline-controls {
