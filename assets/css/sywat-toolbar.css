@@ -498,8 +498,17 @@
     margin: 0 !important;
     box-sizing: border-box !important;
     width: 100% !important;
-    min-width: 0 !important; /* CRITICAL: Overrides filter select min-width */
+    min-width: 0 !important; /* Overrides filter select min-width */
     max-width: 100% !important;
+}
+
+.sywat-modal-repeater-table .sywat-btn-sm {
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
 }
 
 .sywat-modal-repeater-table .sywat-col-num-input {
@@ -507,11 +516,11 @@
     text-align: center !important;
 }
 
-/* Proportional Modal Column Percentage Widths */
-.sywat-modal-repeater-table th.sywat-col-day { width: 28% !important; }
-.sywat-modal-repeater-table th.sywat-col-time { width: 24% !important; }
-.sywat-modal-repeater-table th.sywat-col-cap { width: 16% !important; }
-.sywat-modal-repeater-table th.sywat-col-action-sm { width: 16% !important; }
+/* Optimized Proportional Column Widths (22% + 18% + 15% + 15% + 30% = 100%) */
+.sywat-modal-repeater-table th.sywat-col-day       { width: 22% !important; }
+.sywat-modal-repeater-table th.sywat-col-time      { width: 18% !important; }
+.sywat-modal-repeater-table th.sywat-col-cap       { width: 15% !important; }
+.sywat-modal-repeater-table th.sywat-col-action-sm { width: 30% !important; }
 
 /* Mobile & Tablet Responsiveness */
 @media (max-width: 768px) {
