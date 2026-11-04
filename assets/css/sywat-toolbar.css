@@ -1,5 +1,121 @@
-/* SYWAT Archery - Filter Toolbar & Capacity Tracker Widgets */
+/* ==========================================================================
+   SYWAT Archery - Auth Navigation Bar, Dropdowns & Filter Toolbars
+   Path: assets/css/sywat-toolbar.css
+   ========================================================================== */
 
+/* Top Full-Width Authentication Header */
+.sywat-auth-bar {
+    width: 100%;
+    background: #0f172a;
+    color: #ffffff;
+    margin: 0 0 24px 0;
+    padding: 14px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
+}
+
+.sywat-auth-bar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.sywat-auth-nav-link {
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    white-space: nowrap !important;
+    display: inline-flex;
+    align-items: center;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sywat-auth-nav-link:hover {
+    background-color: #1e293b;
+    color: #38bdf8;
+}
+
+/* Hover Dropdown Menu System */
+.sywat-auth-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.sywat-dropdown-caret {
+    display: inline-block;
+    font-size: 10px;
+    margin-left: 5px;
+    color: #38bdf8;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.sywat-auth-dropdown:hover .sywat-dropdown-caret {
+    transform: rotate(180deg);
+    color: #7dd3fc;
+}
+
+.sywat-auth-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #0f172a;
+    min-width: 210px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 0;
+    z-index: 99999;
+    margin-top: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    transition-delay: 0.15s;
+}
+
+.sywat-auth-dropdown-menu::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: 0;
+    width: 100%;
+    height: 12px;
+    background: transparent;
+}
+
+.sywat-auth-dropdown-menu a {
+    color: #e2e8f0;
+    padding: 10px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap !important;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sywat-auth-dropdown-menu a:hover {
+    background-color: #1e293b;
+    color: #38bdf8;
+}
+
+.sywat-auth-dropdown:hover .sywat-auth-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition-delay: 0s;
+}
+
+/* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar {
     display: flex;
     justify-content: space-between;
@@ -43,7 +159,6 @@
     line-height: 1;
 }
 
-/* Enforce Specificity Over Global Theme Inputs */
 .sywat-wrap .sywat-filter-field select,
 .sywat-app .sywat-filter-field select,
 .sywat-filter-field select {
@@ -58,7 +173,7 @@
     box-sizing: border-box !important;
 }
 
-/* Line Capacity Tracker Grid & Responsive Cards */
+/* Line Capacity Tracker Grid */
 .sywat-tracker-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -88,18 +203,8 @@
     padding-bottom: 6px;
 }
 
-.sywat-tracker-card-title {
-    color: #0f172a;
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.sywat-tracker-card-stats {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: #475569;
-}
+.sywat-tracker-card-title { color: #0f172a; font-size: 14px; font-weight: 700; }
+.sywat-tracker-card-stats { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
 
 .sywat-tracker-card-actions {
     margin-top: 4px;
@@ -112,13 +217,10 @@
     flex-wrap: wrap;
 }
 
-.sywat-tracker-card-actions form {
-    margin: 0;
-    flex: 1;
-    min-width: 110px;
-}
+.sywat-tracker-card-actions form { margin: 0; flex: 1; min-width: 110px; }
+.sywat-tracker-card-actions .sywat-btn { width: 100%; justify-content: center; }
 
-.sywat-tracker-card-actions .sywat-btn {
-    width: 100%;
-    justify-content: center;
+@media (max-width: 768px) {
+    .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
+    .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
 }
