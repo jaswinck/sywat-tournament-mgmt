@@ -1,9 +1,10 @@
 <?php
 /**
  * Module: Financial Accounting & Invoice Engine
+ * Path: includes/class-sywat-accounting.php
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 2.6.2
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -273,9 +274,9 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                 <input type="hidden" name="tab" value="manage">
                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="modal_action" value="print">
-                <div style="min-width: 220px;">
-                    <label for="filter_line_idx_print" style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Filter Roster by Line</label>
-                    <select name="filter_line_idx" id="filter_line_idx_print" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px;" onchange="this.form.submit()">
+                <div class="sywat-field-group" style="min-width: 220px; width: auto;">
+                    <label for="filter_line_idx_print">Filter Roster by Line</label>
+                    <select name="filter_line_idx" id="filter_line_idx_print" onchange="this.form.submit()">
                         <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>Entire Weekend (All Lines)</option>
                         <?php foreach ( $available_lines as $idx => $line ): ?>
                             <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>><?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?></option>
