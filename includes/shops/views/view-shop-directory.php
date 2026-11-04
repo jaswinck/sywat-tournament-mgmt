@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -37,10 +37,10 @@ uasort( $filtered_shops, function( $a, $b ) {
     <!-- UNIFIED TOP CARD HEADER BAR: TITLE (LEFT) & INLINE CONTROLS / ACTIONS (RIGHT) -->
     <div class="sywat-card-header-bar">
         <h2>
-            🎯 <?php 
-                if ($type_filter === 'pro_shop') echo 'Shops';
-                elseif ($type_filter === 'club') echo 'Clubs';
-                else echo 'Shops and Clubs';
+            <?php 
+                if ($type_filter === 'pro_shop') echo '🎯 Shops';
+                elseif ($type_filter === 'club') echo '🏹 Clubs';
+                else echo '🌐 All Locations';
             ?>
         </h2>
 
@@ -112,7 +112,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 <strong><?php echo esc_html( $shop['name'] ); ?></strong>
                                 <?php if ($type_filter === 'all'): ?>
                                     <span class="sywat-badge" style="background:<?php echo ($s_type === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px; padding:2px 6px; margin-left:4px;">
-                                        <?php echo ($s_type === 'club') ? '🌲 Club' : '🏪 Shop'; ?>
+                                        <?php echo ($s_type === 'club') ? '🏹 Club' : '🎯 Shop'; ?>
                                     </span>
                                 <?php endif; ?>
                                 <br>
@@ -250,7 +250,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     <td><strong><?php echo esc_html( $p_item['name'] ); ?></strong></td>
                                     <td>
                                         <span class="sywat-badge" style="background:<?php echo ($p_item['location_type'] === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px;">
-                                            <?php echo ($p_item['location_type'] === 'club') ? '🌲 Club' : '🏪 Shop'; ?>
+                                            <?php echo ($p_item['location_type'] === 'club') ? '🏹 Club' : '🎯 Shop'; ?>
                                         </span>
                                     </td>
                                     <td><?php echo esc_html( $p_item['district'] ? $p_item['district'] : 'Unassigned' ); ?></td>
@@ -346,8 +346,8 @@ uasort( $filtered_shops, function( $a, $b ) {
                     <div class="sywat-field-group">
                         <label>Location Type *</label>
                         <select name="location_type" required>
-                            <option value="pro_shop" <?php selected( $type_filter, 'pro_shop' ); ?>>🏪 Shop</option>
-                            <option value="club" <?php selected( $type_filter, 'club' ); ?>>🌲 Club</option>
+                            <option value="pro_shop" <?php selected( $type_filter, 'pro_shop' ); ?>>🎯 Shop</option>
+                            <option value="club" <?php selected( $type_filter, 'club' ); ?>>🏹 Club</option>
                         </select>
                     </div>
                     <div class="sywat-field-group">
