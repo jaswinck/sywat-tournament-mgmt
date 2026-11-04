@@ -164,8 +164,8 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    flex-wrap: wrap;
-    flex: 1 1 auto;
+    flex-wrap: wrap; /* Triggers the drop to the next line */
+    flex: 1 1 0%; /* CRITICAL: Forces base width to 0 so it absolutely MUST obey the border */
     min-width: 0;
     max-width: 100%;
     margin-left: auto;
