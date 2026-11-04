@@ -3,7 +3,7 @@
  * Sub-Module: Season Management & Taxonomies
  * Path: includes/tournaments/tournament-seasons.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -90,8 +90,10 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
                 </div>
             </div>
 
-            <!-- Table Controls Row (Search & Clear Aligned Right) -->
-            <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:12px;">
+            <!-- Table Sub-Header Row (Title Left, Search Right) -->
+            <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">All Seasons</h2>
+
                 <div style="display:flex; gap:6px; margin:0; align-items:center; flex-wrap:wrap;">
                     <input type="text" id="sywat_season_search_input" placeholder="Search seasons..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:38px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_season_search_input').value=''; document.getElementById('sywat_season_search_input').dispatchEvent(new Event('input'));">Clear</button>
