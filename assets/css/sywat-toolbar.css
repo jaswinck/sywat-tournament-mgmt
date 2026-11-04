@@ -474,9 +474,9 @@
     font-weight: 700 !important;
 }
 
-/* Dynamic Shrink-Wrap Table Engine */
+/* Strict 100% Modal Repeater Table Grid */
 .sywat-modal-repeater-table {
-    table-layout: auto !important;
+    table-layout: fixed !important;
     width: 100% !important;
     margin: 0 !important;
     border-collapse: collapse !important;
@@ -491,8 +491,8 @@
 
 .sywat-modal-repeater-table select,
 .sywat-modal-repeater-table input[type="text"] {
-    height: 28px !important;
-    min-height: 28px !important;
+    height: 30px !important;
+    min-height: 30px !important;
     font-size: 12px !important;
     padding: 2px 6px !important;
     margin: 0 !important;
@@ -504,32 +504,32 @@
 
 .sywat-modal-repeater-table input[type="number"].sywat-col-num-input {
     width: 55px !important;
-    height: 28px !important;
+    height: 30px !important;
     font-size: 12px !important;
     text-align: center !important;
     padding: 2px 4px !important;
     margin: 0 auto !important;
     box-sizing: border-box !important;
+    display: block !important;
 }
 
 .sywat-modal-repeater-table .sywat-btn-sm {
-    padding: 3px 10px !important;
+    padding: 4px 10px !important;
     font-size: 11px !important;
-    height: 26px !important;
-    min-height: 26px !important;
+    height: 28px !important;
+    min-height: 28px !important;
     line-height: 1 !important;
     white-space: nowrap !important;
     display: inline-flex !important;
     align-items: center !important;
+    justify-content: center !important;
 }
 
-/* Dynamic Column Shrink-Wrap & Stretch Rules:
-   Setting 'width: 1%' forces the browser to shrink-wrap Capacities and Remove buttons down to their exact content dimensions.
-   Shooting Day and Start Time expand to take up all remaining flex space. */
-.sywat-modal-repeater-table th.sywat-col-day       { width: 55% !important; }
-.sywat-modal-repeater-table th.sywat-col-time      { width: 35% !important; }
-.sywat-modal-repeater-table th.sywat-col-cap       { width: 1% !important; white-space: nowrap !important; }
-.sywat-modal-repeater-table th.sywat-col-action-sm { width: 1% !important; white-space: nowrap !important; }
+/* Balanced 100% Table Column Width Distribution (30% + 26% + 14% + 14% + 16% = 100%) */
+.sywat-modal-repeater-table th.sywat-col-day       { width: 30% !important; }
+.sywat-modal-repeater-table th.sywat-col-time      { width: 26% !important; }
+.sywat-modal-repeater-table th.sywat-col-cap       { width: 14% !important; text-align: center !important; }
+.sywat-modal-repeater-table th.sywat-col-action-sm { width: 16% !important; text-align: center !important; }
 
 /* Mobile & Tablet Responsiveness */
 @media (max-width: 768px) {
