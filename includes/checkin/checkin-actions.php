@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.2.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -139,7 +139,7 @@ function sywat_desk_handle_actions(&$data) {
 
         if ($is_duplicate) {
             $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js($name_val) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
-            return '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ Walk-In Blocked! <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
+            return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
                    '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
         }
 
@@ -318,7 +318,7 @@ function sywat_desk_handle_actions(&$data) {
 
                 if ($dupe_found) {
                     $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js($edit_name) . ' is already registered on this shooting line.';
-                    return '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ Edit Blocked! <strong>' . esc_html($edit_name) . '</strong> is already registered on this shooting line.</div>' .
+                    return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html($edit_name) . '</strong> is already registered on this shooting line.</div>' .
                            '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
                 }
             }
