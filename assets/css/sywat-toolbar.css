@@ -164,8 +164,8 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-    flex-wrap: wrap; /* Triggers the drop to the next line */
-    flex: 1 1 0%; /* CRITICAL: Forces base width to 0 so it absolutely MUST obey the border */
+    flex-wrap: wrap;
+    flex: 1 1 0%;
     min-width: 0;
     max-width: 100%;
     margin-left: auto;
@@ -367,9 +367,9 @@
     height: 100vh;
     background: rgba(15, 23, 42, 0.65);
     backdrop-filter: blur(4px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
     z-index: 99999;
     opacity: 0;
     visibility: hidden;
@@ -388,11 +388,11 @@
     border-radius: 12px;
     width: 100%;
     max-width: 850px;
-    max-height: 90vh; /* Locks modal inside browser window */
-    display: flex;
-    flex-direction: column; /* Stacks Header, Body, Footer vertically */
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-    overflow: hidden; /* Prevents outer blowout */
+    overflow: hidden !important;
 }
 
 .sywat-modal-header {
@@ -401,7 +401,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-shrink: 0; /* Keeps header pinned at top */
+    flex-shrink: 0;
     background: #ffffff;
 }
 
@@ -414,8 +414,9 @@
 
 .sywat-modal-body {
     padding: 20px 24px;
-    overflow-y: auto; /* Internal scrollbar for body content only */
-    flex: 1 1 auto;
+    overflow-y: auto !important;
+    max-height: calc(85vh - 120px) !important;
+    flex: 1 1 auto !important;
 }
 
 .sywat-modal-footer {
@@ -425,8 +426,57 @@
     justify-content: flex-end;
     gap: 10px;
     background: #f8fafc;
-    flex-shrink: 0; /* Keeps footer pinned at bottom */
+    flex-shrink: 0;
 }
+
+/* Modal Field Grid Spacing & Typography Utilities */
+.sywat-modal-row-spacing {
+    margin-top: 10px;
+}
+
+.sywat-grid-compact {
+    gap: 10px;
+}
+
+.sywat-label-subtext {
+    font-weight: normal;
+    color: #64748b;
+}
+
+.sywat-modal-section-header {
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+/* Compact Repeater Table Formatting */
+.sywat-modal-repeater-table th,
+.sywat-modal-repeater-table td {
+    padding: 4px 6px !important;
+    vertical-align: middle !important;
+}
+
+.sywat-modal-repeater-table input,
+.sywat-modal-repeater-table select {
+    height: 30px !important;
+    min-height: 30px !important;
+    font-size: 12px !important;
+    padding: 2px 6px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+.sywat-modal-repeater-table .sywat-col-num-input {
+    width: 65px !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+}
+
+/* Modal Table Column Sizing Classes */
+.sywat-modal-repeater-table th.sywat-col-day { width: 140px; }
+.sywat-modal-repeater-table th.sywat-col-time { width: 120px; }
+.sywat-modal-repeater-table th.sywat-col-cap { width: 90px; }
+.sywat-modal-repeater-table th.sywat-col-action-sm { width: 80px; }
 
 @media (max-width: 768px) {
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
