@@ -37,9 +37,11 @@ function sywat_archery_enqueue_assets() {
 
     // Enqueue Modular Admin & Operations Stylesheets
     wp_enqueue_style( 'sywat-core',    $base_css_url . 'sywat-core.css',    array(), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-toolbar', $base_css_url . 'sywat-toolbar.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-buttons', $base_css_url . 'sywat-buttons.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
     wp_enqueue_style( 'sywat-tables',  $base_css_url . 'sywat-tables.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-toolbar', $base_css_url . 'sywat-toolbar.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
     wp_enqueue_style( 'sywat-modals',  $base_css_url . 'sywat-modals.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
+    wp_enqueue_style( 'sywat-public',  $base_css_url . 'sywat-public.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
 }
 
 // Load TFAA Authentication Engine Sub-Modules
