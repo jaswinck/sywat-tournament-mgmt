@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -61,7 +61,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <input type="hidden" name="sywat_action" value="save_tournament">
                         <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
 
-                        <!-- SHOP FIRST LAYOUT GRID -->
+                        <!-- ROW 1: SHOP (LEFT) | SEASON (RIGHT) -->
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
@@ -85,13 +85,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
 
                             <div class="sywat-field-group">
-                                <label>Tournament Name * <small style="font-weight: normal; color: #64748b;">(Auto-generated, editable)</small></label>
-                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" required>
-                            </div>
-                        </div>
-
-                        <div class="sywat-form-grid-2">
-                            <div class="sywat-field-group">
                                 <label>Competition Season *</label>
                                 <select name="season_slug" required>
                                     <?php foreach ( $seasons as $s_slug => $s_item ): ?>
@@ -101,8 +94,16 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                        </div>
 
-                            <div class="sywat-form-grid-2">
+                        <!-- ROW 2: NAME (LEFT) | DATES (RIGHT) -->
+                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
+                            <div class="sywat-field-group">
+                                <label>Tournament Name * <span class="sywat-label-subtext">(Auto-generated, editable)</span></label>
+                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" required>
+                            </div>
+
+                            <div class="sywat-form-grid-2 sywat-grid-compact">
                                 <div class="sywat-field-group">
                                     <label>Start Date *</label>
                                     <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
@@ -114,21 +115,22 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         </div>
 
-                        <!-- STANDARDIZED SECTION SUB-HEADER BAR -->
-                        <div class="sywat-table-header-bar" style="margin-top: 20px;">
+                        <!-- STANDARDIZED SUB-HEADER -->
+                        <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>📋 Shooting Lines & Capacity Templates</h2>
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">+ Add New Line</button>
                         </div>
 
+                        <!-- COMPACT REPEATER TABLE -->
                         <div class="sywat-table-responsive">
-                            <table class="sywat-table" id="sywat_tourn_lines_table">
+                            <table class="sywat-table sywat-modal-repeater-table" id="sywat_tourn_lines_table">
                                 <thead>
                                     <tr>
-                                        <th>Shooting Day</th>
-                                        <th>Start Time</th>
-                                        <th class="sywat-col-score">20yd Capacity</th>
-                                        <th class="sywat-col-score">Cub Capacity</th>
-                                        <th class="sywat-col-center">Action</th>
+                                        <th class="sywat-col-day">Shooting Day</th>
+                                        <th class="sywat-col-time">Start Time</th>
+                                        <th class="sywat-col-center sywat-col-cap">20yd Cap</th>
+                                        <th class="sywat-col-center sywat-col-cap">Cub Cap</th>
+                                        <th class="sywat-col-center sywat-col-action-sm">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -147,32 +149,24 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                         ?>
                                         <tr>
                                             <td>
-                                                <div class="sywat-field-group">
-                                                    <select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">
-                                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
-                                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
-                                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
-                                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
-                                                    </select>
-                                                </div>
+                                                <select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">
+                                                    <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select --</option>
+                                                    <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                                    <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                                    <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                                </select>
                                             </td>
                                             <td>
-                                                <div class="sywat-field-group">
-                                                    <input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required onchange="checkTournamentLineDuplicate(this);">
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="sywat-field-group">
-                                                    <input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" required>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="sywat-field-group">
-                                                    <input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" required>
-                                                </div>
+                                                <input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="10:00 AM" required onchange="checkTournamentLineDuplicate(this);">
                                             </td>
                                             <td class="sywat-col-center">
-                                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeTournamentLineRow(this)">Remove</button>
+                                                <input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" class="sywat-col-num-input" required>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <input type="number" name="cap_cub[]" value="<?php echo esc_attr( $cap_cub ); ?>" min="0" class="sywat-col-num-input" required>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-sm" onclick="removeTournamentLineRow(this)">Remove</button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
