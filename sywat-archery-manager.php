@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and TFAA sync.
- * Version:     3.1.0
+ * Version:     5.0.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '3.1.0' );
+define( 'SYWAT_PLUGIN_VERSION', '5.0.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -52,7 +52,7 @@ require_once SYWAT_PLUGIN_DIR . 'includes/auth/sywat-auth-views.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-config.php'; // Tournament Config, Seasons & Volunteer Hub
 require_once SYWAT_PLUGIN_DIR . 'includes/members/class-sywat-members.php';               // Member Management Sub-System ([sywat_members])
 require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';      // Intake & Phone Registration Engine
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-roster.php';                         // Roster Administration & Line Purging
+require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';                  // Roster Administration & Line Purging Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';                     // Financial Split Calculations & Invoicing
 require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';                     // Multi-Tenant Shop Management Engine
 
