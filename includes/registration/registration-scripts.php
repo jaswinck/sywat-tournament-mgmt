@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Client Scripts
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -286,31 +286,37 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             }
 
             rowDiv.innerHTML = `
-                <div style="flex:2; min-width:180px; position:relative;">
-                    <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
+                <div style="flex:2; min-width:180px; position:relative;" class="sywat-field-group">
+                    <input type="text" name="archers[${archerRowCount}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
                 </div>
                 
-                <select name="archers[${archerRowCount}][distance]" class="sywat-distance-select" style="flex:1; min-width:100px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDistanceChange(this)">
-                    <option value="20yd" selected>20yd</option>
-                    <option value="Cub">Cub (10yd)</option>
-                </select>
+                <div style="flex:1; min-width:100px;" class="sywat-field-group">
+                    <select name="archers[${archerRowCount}][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
+                        <option value="20yd" selected>20yd</option>
+                        <option value="Cub">Cub (10yd)</option>
+                    </select>
+                </div>
 
-                <select name="archers[${archerRowCount}][division]" class="sywat-division-select" style="flex:1.5; min-width:160px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="handleDivisionChange(this);">
-                    <option value="" disabled selected hidden>Select Division</option>
-                    <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
-                    <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
-                    <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
-                    <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
-                    <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
-                    <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
-                </select>
+                <div style="flex:1.5; min-width:160px;" class="sywat-field-group">
+                    <select name="archers[${archerRowCount}][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
+                        <option value="" disabled selected hidden>Select Division</option>
+                        <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
+                        <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
+                        <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
+                        <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
+                        <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
+                        <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
+                        <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
+                    </select>
+                </div>
 
-                <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" style="flex:1.2; min-width:130px; padding:6px; border:1px solid #ccc; border-radius:4px; height:32px; box-sizing:border-box;" onchange="recalculateGroupTotal()">
-                    ${lineOptionsHtml}
-                </select>
+                <div style="flex:1.2; min-width:130px;" class="sywat-field-group">
+                    <select name="archers[${archerRowCount}][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
+                        ${lineOptionsHtml}
+                    </select>
+                </div>
 
-                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="height:32px; width:32px; padding:2px 8px; font-size:12px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" style="padding:0 10px;" onclick="removeArcherRow(this)" title="Remove Archer"></button>
             `;
 
             container.appendChild(rowDiv);
