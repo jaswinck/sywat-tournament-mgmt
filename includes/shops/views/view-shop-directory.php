@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.1.1
+ * Version: 5.1.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -83,11 +83,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                 <thead>
                     <tr>
                         <th style="width:20%;">Location Name & ID</th>
-                        <th style="width:10%;">District</th>
-                        <th style="width:14%;">Facilities</th>
-                        <th style="width:20%;">Contact Info</th>
-                        <th style="width:11%;">Phone</th>
-                        <th class="sywat-col-right" style="width:25%;">Actions</th>
+                        <th style="width:8%; white-space:nowrap;">District</th>
+                        <th style="width:10%;">Facilities</th>
+                        <th style="width:19%;">Contact Info</th>
+                        <th style="width:13%; white-space:nowrap;">Phone</th>
+                        <th class="sywat-col-right" style="width:30%; white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -118,7 +118,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 <br>
                                 <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
                             </td>
-                            <td>
+                            <td style="white-space:nowrap;">
                                 <?php if ( ! empty( $s_dist ) ): ?>
                                     <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $s_dist ); ?></span>
                                 <?php else: ?>
@@ -126,7 +126,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <div style="display:flex; flex-wrap:wrap; gap:3px;">
+                                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:3px;">
                                     <?php if ( in_array( 'pro_shop', $s_fac ) ): ?>
                                         <span class="sywat-badge" style="background:#e0f2fe; color:#0369a1;">🏪 Pro Shop</span>
                                     <?php endif; ?>
@@ -167,8 +167,8 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     }
                                 ?>
                             </td>
-                            <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                            <td class="sywat-col-right">
+                            <td style="white-space:nowrap;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
+                            <td class="sywat-col-right" style="white-space:nowrap;">
                                 <div class="sywat-table-actions" style="white-space:nowrap; display:inline-flex; gap:6px; justify-content:flex-end;">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
                                         <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">Staff (<?php echo $linked_count; ?>)</a>
