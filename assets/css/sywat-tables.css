@@ -53,6 +53,7 @@
     justify-content: center !important;
     flex-wrap: nowrap !important;
     white-space: nowrap !important;
+    margin: 0 auto !important;
 }
 
 .sywat-table-actions-vertical,
@@ -81,9 +82,16 @@
     box-sizing: border-box !important;
 }
 
-/* Column Utilities */
-.sywat-table th.text-center, .sywat-table td.text-center, .sywat-col-center { text-align: center !important; }
-.sywat-table th.text-right, .sywat-table td.text-right, .sywat-table td:last-child, .sywat-table th:last-child, .sywat-col-right { text-align: right !important; }
+/* Default Last Column Behavior */
+.sywat-table th:last-child, 
+.sywat-table td:last-child { 
+    text-align: right; 
+}
+
+/* Explicit Alignment Utilities (Overrides Defaults) */
+.sywat-table th.text-center, .sywat-table td.text-center, .sywat-table th.sywat-col-center, .sywat-table td.sywat-col-center, .sywat-col-center { text-align: center !important; }
+.sywat-table th.text-right, .sywat-table td.text-right, .sywat-table th.sywat-col-right, .sywat-table td.sywat-col-right, .sywat-col-right { text-align: right !important; }
+.sywat-table th.text-left, .sywat-table td.text-left, .sywat-table th.sywat-col-left, .sywat-table td.sywat-col-left, .sywat-col-left { text-align: left !important; }
 
 .sywat-col-date       { width: 22%; }
 .sywat-col-tourn      { width: 38%; }
