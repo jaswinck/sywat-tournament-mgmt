@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -62,8 +62,11 @@ function sywat_desk_render_filter_bar($data) {
 
     <!-- Integrated Control Panel Filter Toolbar -->
     <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div class="sywat-card-header-bar" style="display:flex; justify-space-between; align-items:flex-end; gap:16px;">
-            <h2 style="margin:0; font-size:20px; font-weight:700; color:#0f172a;">Check In Archers</h2>
+        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+                <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">📋 Check In Archers</h2>
+                <div class="sywat-subtitle" style="margin-top:2px;">Select an active tournament and line to begin checking in archers.</div>
+            </div>
 
             <div class="sywat-header-inline-controls" style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
                 <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
