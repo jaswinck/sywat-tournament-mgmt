@@ -3,7 +3,7 @@
  * View Template: Public Archery Shops & Clubs
  * Path: includes/shops/views/view-shop-public.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.6.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -63,11 +63,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                 ?>
             </h2>
 
-            <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div class="sywat-header-inline-controls">
                 <!-- Clean Inline District Filter -->
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <label for="sywat_district_filter_select" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">District:</label>
-                    <select id="sywat_district_filter_select" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; background:#fff; min-width:180px;">
+                <div class="sywat-field-group" style="width:auto;">
+                    <label for="sywat_district_filter_select">District:</label>
+                    <select id="sywat_district_filter_select" style="min-width:180px;">
                         <option value="">All Districts</option>
                         <option value="unassigned">Unassigned Only</option>
                         <?php foreach ( $districts as $key => $label ): ?>
@@ -77,11 +77,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                 </div>
 
                 <!-- Clean Inline Search & Clear -->
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <label for="sywat_shop_search_input" style="font-weight:600; font-size:13px; color:#1e293b; white-space:nowrap;">Search Location:</label>
+                <div class="sywat-field-group" style="width:auto;">
+                    <label for="sywat_shop_search_input">Search Location:</label>
                     <div style="display:flex; gap:6px;">
-                        <input type="text" id="sywat_shop_search_input" placeholder="Search by name or contact..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:36px; min-width:200px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:36px; padding:0 12px; white-space:nowrap;" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
+                        <input type="text" id="sywat_shop_search_input" placeholder="Search by name or contact..." autocomplete="off" style="min-width:200px;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_shop_search_input').value=''; document.getElementById('sywat_district_filter_select').value=''; sywatFilterShops();">Clear</button>
                     </div>
                 </div>
             </div>
@@ -94,10 +94,10 @@ uasort( $filtered_shops, function( $a, $b ) {
                 <table class="sywat-table">
                     <thead>
                         <tr>
-                            <th style="width:28%; text-align:left;">Location & Address</th>
-                            <th style="width:12%; text-align:left;">District</th>
-                            <th style="width:22%; text-align:left;">Range Amenities</th>
-                            <th style="width:38%; text-align:left;">Contacts</th>
+                            <th style="width:28%;">Location & Address</th>
+                            <th style="width:12%;">District</th>
+                            <th style="width:22%;">Range Amenities</th>
+                            <th style="width:38%;">Contacts</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -149,7 +149,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 $full_address = implode('<br>', array_map('esc_html', $addr_parts));
                             ?>
                             <tr class="sywat-shop-row" data-name="<?php echo esc_attr(strtolower($shop['name'])); ?>" data-id="<?php echo esc_attr(strtolower($s_id)); ?>" data-contact="<?php echo esc_attr(strtolower($cnt_search_str)); ?>" data-district="<?php echo esc_attr(strtolower($s_dist)); ?>">
-                                <td style="text-align:left;">
+                                <td>
                                     <strong style="font-size:15px; color:#0f172a;"><?php echo esc_html( $shop['name'] ); ?></strong>
                                     <?php if ($type_filter === 'all'): ?>
                                         <span class="sywat-badge" style="background:<?php echo ($s_type === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px; padding:2px 6px; margin-left:4px;">
@@ -163,14 +163,14 @@ uasort( $filtered_shops, function( $a, $b ) {
                                         </div>
                                     <?php endif; ?>
                                 </td>
-                                <td style="text-align:left;">
+                                <td>
                                     <?php if ( ! empty( $s_dist ) ): ?>
                                         <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $s_dist ); ?></span>
                                     <?php else: ?>
                                         <span style="font-size:12px; color:#94a3b8; font-style:italic;">Unassigned</span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="text-align:left;">
+                                <td>
                                     <div style="display:flex; flex-wrap:wrap; gap:3px;">
                                         <?php if ( in_array( 'pro_shop', $s_fac ) ): ?>
                                             <span class="sywat-badge" style="background:#e0f2fe; color:#0369a1;">🏪 Pro Shop</span>
@@ -189,7 +189,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                         <?php endif; ?>
                                     </div>
                                 </td>
-                                <td style="text-align:left;">
+                                <td>
                                     <?php if ( empty( $all_contacts ) ): ?>
                                         <span style="font-size:12px; color:#94a3b8; font-style:italic;">No contact info available</span>
                                     <?php else: ?>
