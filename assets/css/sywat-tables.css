@@ -1,4 +1,7 @@
-/* SYWAT Archery - Data Tables & Responsive Scrolling */
+/* ==========================================================================
+   SYWAT Archery - Data Tables & Responsive Scrolling
+   Path: assets/css/sywat-tables.css
+   ========================================================================== */
 
 .sywat-table-responsive {
     width: 100%;
@@ -6,23 +9,10 @@
     -webkit-overflow-scrolling: touch;
 }
 
-.sywat-table-responsive::-webkit-scrollbar { 
-    height: 6px; 
-}
-
-.sywat-table-responsive::-webkit-scrollbar-track { 
-    background: #f1f5f9; 
-    border-radius: 4px; 
-}
-
-.sywat-table-responsive::-webkit-scrollbar-thumb { 
-    background: #cbd5e1; 
-    border-radius: 4px; 
-}
-
-.sywat-table-responsive::-webkit-scrollbar-thumb:hover { 
-    background: #94a3b8; 
-}
+.sywat-table-responsive::-webkit-scrollbar { height: 6px; }
+.sywat-table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+.sywat-table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.sywat-table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 .sywat-table {
     width: 100%;
@@ -55,7 +45,7 @@
     font-size: 12px;
 }
 
-/* Action Buttons Flex Container with Vertical Stacking Support */
+/* Action Cell Alignment & Vertical Stacking Support */
 .sywat-table-actions {
     display: flex !important;
     gap: 4px !important;
@@ -64,7 +54,6 @@
     flex-wrap: wrap !important;
 }
 
-/* Target ONLY Manage Shooters Roster Action Cell */
 .sywat-manage-row td:last-child > div {
     display: flex !important;
     flex-direction: column !important;
@@ -80,23 +69,65 @@
     flex: 0 0 auto !important;
 }
 
-.sywat-table th.text-center, 
-.sywat-table td.text-center { 
-    text-align: center; 
+/* Column Utilities */
+.sywat-table th.text-center, .sywat-table td.text-center, .sywat-col-center { text-align: center !important; }
+.sywat-table th.text-right, .sywat-table td.text-right, .sywat-table td:last-child, .sywat-table th:last-child, .sywat-col-right { text-align: right !important; }
+
+.sywat-col-date       { width: 22%; }
+.sywat-col-tourn      { width: 38%; }
+.sywat-col-shooters   { width: 15%; text-align: center; }
+.sywat-col-action     { width: 25%; text-align: right; }
+
+.sywat-col-rank        { width: 50px; text-align: center; font-weight: bold; }
+.sywat-col-score       { width: 110px; text-align: center; }
+.sywat-col-total       { width: 130px; text-align: right; }
+.sywat-col-tourn-score { width: 140px; text-align: right; }
+
+/* Line Slot Capacity Stack */
+.sywat-lines-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.sywat-table th.text-right, 
-.sywat-table td.text-right, 
-.sywat-table td:last-child, 
-.sywat-table th:last-child { 
-    text-align: right; 
+.sywat-line-slot-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #f8fafc;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    font-size: 12px;
 }
 
-/* ==========================================================================
-   Print Engine Rules for Data Tables & Invoices
-   ========================================================================== */
+.sywat-line-slot-title { font-weight: 700; color: #1e293b; white-space: nowrap; }
+.sywat-line-slot-caps  { display: flex; gap: 8px; color: #475569; align-items: center; font-size: 11px; white-space: nowrap; }
 
-/* TFAA Invoice Table Base Layout */
+/* Cell Content Formatting */
+.sywat-archer-cell-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sywat-score-null { color: #94a3b8; }
+.sywat-score-cell { font-size: 13px; font-weight: 700; color: #0f172a; }
+
+@media (max-width: 600px) {
+    .sywat-archer-cell-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    .sywat-archer-cell-content .sywat-btn-sm {
+        margin-left: 0 !important;
+    }
+}
+
+/* Print Engine & Invoice Layout */
 .invoice-box { font-family: Arial, sans-serif; color: #000; width: 100%; max-width: 800px; margin: 0 auto; padding: 10px; box-sizing: border-box; }
 .invoice-title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 2px; }
 .invoice-subtitle { text-align: center; font-size: 11px; margin-bottom: 15px; font-style: italic; }
@@ -112,34 +143,9 @@
 .invoice-footer-bold { font-weight: bold; color: #1e3a8a; }
 
 @media print {
-    .sywat-table-responsive {
-        overflow: visible !important;
-    }
-
-    .sywat-table {
-        width: 100% !important;
-        min-width: 0 !important;
-        border-collapse: collapse !important;
-        page-break-inside: auto !important;
-    }
-
-    /* Prevent rows from splitting horizontally across page breaks */
-    .sywat-table tr {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        page-break-after: auto !important;
-    }
-
-    /* Repeat column header row on every new printed page */
-    .sywat-table thead {
-        display: table-header-group !important;
-    }
-
-    /* Preserve shaded background colors in PDF exports */
-    .invoice-header-val,
-    .invoice-fee-table th,
-    .blue-shade {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
+    .sywat-table-responsive { overflow: visible !important; }
+    .sywat-table { width: 100% !important; min-width: 0 !important; border-collapse: collapse !important; page-break-inside: auto !important; }
+    .sywat-table tr { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: auto !important; }
+    .sywat-table thead { display: table-header-group !important; }
+    .invoice-header-val, .invoice-fee-table th, .blue-shade { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
