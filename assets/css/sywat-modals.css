@@ -270,6 +270,65 @@
     z-index: 100050 !important; 
 }
 
+/* ==========================================================================
+   6. Roster Management & Edit Archer Callouts
+   ========================================================================== */
+.sywat-roster-filter-bar {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.sywat-roster-filter-form {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    align-items: flex-end;
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.sywat-search-input-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.sywat-full-width {
+    grid-column: 1 / -1;
+}
+
+.sywat-calculated-status-box {
+    background: #e5f5fa;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #bfe7f3;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sywat-calculated-status-label {
+    font-size: 13px;
+    color: #0073aa;
+    font-weight: 600;
+}
+
+.sywat-calculated-status-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1d2327;
+}
+
+.sywat-input-disabled-calc {
+    background: #f9f9f9 !important;
+    font-weight: 700 !important;
+}
+
 @media screen and (max-width: 768px) {
     .sywat-modal-backdrop { padding: 10px; }
     .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 94vh !important; }
@@ -292,7 +351,7 @@
 }
 
 /* ==========================================================================
-   6. Print Engine Reset
+   7. Print Engine Reset
    ========================================================================== */
 @media print {
     html, body {
