@@ -3,7 +3,7 @@
  * Sub-Module: Season Management & Taxonomies
  * Path: includes/tournaments/tournament-seasons.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -76,20 +76,30 @@ if ( ! function_exists( 'sywat_render_seasons_tab' ) ) {
         $open_season_modal = ! empty( $edit_season ) || isset( $_REQUEST['open_add_season'] );
         ?>
 
-        <div class="sywat-card no-print">
-            <div class="sywat-card-title">
-                <span>Season Management</span>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <div style="display:flex; gap:5px; margin:0; align-items:center; flex-wrap:wrap;">
-                        <input type="text" id="sywat_season_search_input" placeholder="Search seasons..." autocomplete="off" style="padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; width:180px; height:32px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_season_search_input').value=''; document.getElementById('sywat_season_search_input').dispatchEvent(new Event('input'));">Clear</button>
-                    </div>
-                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddSeasonModal()">Add New Season</button>
+        <!-- Master Single Unified Desk Card -->
+        <div class="sywat-card no-print" style="border-top-left-radius:0;">
+            <!-- Integrated Top Header Bar -->
+            <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
+                <div>
+                    <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">🏆 Manage Seasons</h2>
+                    <div class="sywat-subtitle" style="margin-top:2px;">Configure SYWAT competition seasons and set active aggregate score rules.</div>
+                </div>
+
+                <div class="sywat-header-inline-controls" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;" onclick="openAddSeasonModal()">Add New Season</button>
                 </div>
             </div>
-            <div class="sywat-subtitle">Configure SYWAT competition seasons and set active aggregate score rules.</div>
 
-            <div class="sywat-table-responsive" style="margin-bottom: 30px;">
+            <!-- Table Controls Row (Search & Clear Aligned Right) -->
+            <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:12px;">
+                <div style="display:flex; gap:6px; margin:0; align-items:center; flex-wrap:wrap;">
+                    <input type="text" id="sywat_season_search_input" placeholder="Search seasons..." autocomplete="off" style="padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; width:180px; height:38px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_season_search_input').value=''; document.getElementById('sywat_season_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                </div>
+            </div>
+
+            <!-- Seasons Data Table -->
+            <div class="sywat-table-responsive" style="margin-bottom: 10px;">
                 <table class="sywat-table" style="margin-bottom: 0;">
                     <thead>
                         <tr>
