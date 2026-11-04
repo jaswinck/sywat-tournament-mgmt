@@ -474,62 +474,75 @@
     font-weight: 700 !important;
 }
 
-/* Strict 100% Modal Repeater Table Grid */
+/* ==========================================================================
+   BRUTE-FORCE MODAL TABLE LOCK (Zero Horizontal Scrolling)
+   ========================================================================== */
+
+/* 1. Prevent the wrapper itself from spawning a side scrollbar */
+.sywat-modal-body .sywat-table-responsive {
+    overflow-x: hidden !important; 
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* 2. Force the table to perfectly fit the wrapper */
 .sywat-modal-repeater-table {
     table-layout: fixed !important;
     width: 100% !important;
+    max-width: 100% !important;
     margin: 0 !important;
     border-collapse: collapse !important;
 }
 
+/* 3. Strip padding down to the bare minimum to save space */
 .sywat-modal-repeater-table th,
 .sywat-modal-repeater-table td {
-    padding: 4px 6px !important;
+    padding: 4px !important;
     vertical-align: middle !important;
     box-sizing: border-box !important;
+    overflow: hidden !important; /* Prevents text/inputs from bleeding out */
 }
 
+/* 4. Force all inputs and selects to shrink and NEVER exceed cell width */
 .sywat-modal-repeater-table select,
-.sywat-modal-repeater-table input[type="text"] {
+.sywat-modal-repeater-table input[type="text"],
+.sywat-modal-repeater-table input[type="number"] {
     height: 30px !important;
     min-height: 30px !important;
     font-size: 12px !important;
-    padding: 2px 6px !important;
+    padding: 2px 4px !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
+    min-width: 0 !important; /* Kills any global min-widths */
+    max-width: 100% !important; /* Hard stop */
 }
 
 .sywat-modal-repeater-table input[type="number"].sywat-col-num-input {
-    width: 55px !important;
-    height: 30px !important;
-    font-size: 12px !important;
     text-align: center !important;
-    padding: 2px 4px !important;
-    margin: 0 auto !important;
-    box-sizing: border-box !important;
-    display: block !important;
 }
 
+/* 5. Force the button to stay contained */
 .sywat-modal-repeater-table .sywat-btn-sm {
-    padding: 4px 10px !important;
+    width: 100% !important;
+    padding: 4px 0 !important;
     font-size: 11px !important;
-    height: 28px !important;
-    min-height: 28px !important;
+    height: 30px !important;
     line-height: 1 !important;
     white-space: nowrap !important;
-    display: inline-flex !important;
+    display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
 }
 
-/* Balanced 100% Table Column Width Distribution (30% + 26% + 14% + 14% + 16% = 100%) */
-.sywat-modal-repeater-table th.sywat-col-day       { width: 30% !important; }
-.sywat-modal-repeater-table th.sywat-col-time      { width: 26% !important; }
-.sywat-modal-repeater-table th.sywat-col-cap       { width: 14% !important; text-align: center !important; }
-.sywat-modal-repeater-table th.sywat-col-action-sm { width: 16% !important; text-align: center !important; }
+/* 6. Strict Mathematical Column Constraints (Exactly 100%) */
+.sywat-modal-repeater-table th:nth-child(1), .sywat-modal-repeater-table td:nth-child(1) { width: 30% !important; } /* Day */
+.sywat-modal-repeater-table th:nth-child(2), .sywat-modal-repeater-table td:nth-child(2) { width: 26% !important; } /* Time */
+.sywat-modal-repeater-table th:nth-child(3), .sywat-modal-repeater-table td:nth-child(3) { width: 14% !important; text-align: center !important; } /* 20yd */
+.sywat-modal-repeater-table th:nth-child(4), .sywat-modal-repeater-table td:nth-child(4) { width: 14% !important; text-align: center !important; } /* Cub */
+.sywat-modal-repeater-table th:nth-child(5), .sywat-modal-repeater-table td:nth-child(5) { width: 16% !important; text-align: center !important; } /* Action */
 
 /* Mobile & Tablet Responsiveness */
 @media (max-width: 768px) {
@@ -542,30 +555,16 @@
         margin-left: 0;
     }
 
-    .sywat-modal-backdrop {
-        padding: 8px !important;
-    }
-
+    .sywat-modal-backdrop { padding: 8px !important; }
     .sywat-modal-content {
         max-height: 94vh !important;
         max-width: 100% !important;
         border-radius: 8px !important;
     }
-
-    .sywat-modal-body {
-        padding: 12px 14px !important;
-    }
-
-    .sywat-form-grid-2 {
-        grid-template-columns: 1fr !important;
-        gap: 8px !important;
-    }
-
-    .sywat-modal-repeater-table {
-        table-layout: auto !important;
-    }
-
-    .sywat-table-responsive {
-        overflow-x: auto !important;
-    }
+    .sywat-modal-body { padding: 12px 8px !important; }
+    .sywat-form-grid-2 { grid-template-columns: 1fr !important; gap: 8px !important; }
+    
+    /* Keep table totally locked even on mobile */
+    .sywat-modal-body .sywat-table-responsive { overflow-x: hidden !important; }
+    .sywat-modal-repeater-table { table-layout: fixed !important; }
 }
