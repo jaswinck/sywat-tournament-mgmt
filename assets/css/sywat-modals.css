@@ -3,32 +3,40 @@
    Path: assets/css/sywat-modals.css
    ========================================================================== */
 
+/* 1. Modal Container & Backdrop Engine */
 .sywat-modal-backdrop {
-    display: none;
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
     background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
     z-index: 99999;
+    display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
     box-sizing: border-box;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-.sywat-modal-backdrop.active { display: flex; }
+.sywat-modal-backdrop.active { 
+    opacity: 1; 
+    visibility: visible; 
+}
 
 .sywat-modal-content {
     background: #ffffff;
     width: min(94vw, 560px);
     border-radius: 6px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    max-height: 90vh;
+    max-height: 88vh; /* Tightened slightly to ensure footer fits on screen */
     display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    flex-direction: column; /* Establishes vertical stacking */
+    overflow: hidden; /* Contains scrollable body */
     margin: auto;
     box-sizing: border-box;
 }
@@ -36,8 +44,9 @@
 /* Modal Sizing Modifiers */
 .sywat-modal-sm { width: min(94vw, 480px); }
 .sywat-modal-md { width: min(94vw, 620px); }
-.sywat-modal-lg { width: min(94vw, 920px); }
+.sywat-modal-lg { width: min(94vw, 920px); max-width: 780px; }
 
+/* 2. Pinned Header & Footer Structure */
 .sywat-modal-header {
     display: flex;
     justify-content: space-between;
@@ -45,6 +54,7 @@
     padding: 16px 20px;
     border-bottom: 1px solid #dcdcde;
     background: #f6f7f7;
+    flex-shrink: 0; /* Keeps header pinned at top */
 }
 
 .sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
@@ -61,14 +71,6 @@
 
 .sywat-modal-close:hover { color: #d63638; }
 
-.sywat-modal-body { padding: 20px; overflow-y: auto; }
-
-.sywat-modal-body .sywat-form-grid-2,
-.sywat-modal-body .sywat-form-grid-3,
-.sywat-modal-body form > div:not(:last-child) {
-    margin-bottom: 16px;
-}
-
 .sywat-modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -77,7 +79,40 @@
     padding: 14px 20px;
     border-top: 1px solid #dcdcde;
     background: #f6f7f7;
+    flex-shrink: 0; /* Keeps footer pinned at bottom */
 }
+
+/* 3. Scrollable Body & Field Grid Utilities */
+.sywat-modal-body { 
+    padding: 20px; 
+    overflow-y: auto; /* Internal scrolling for body only */
+    flex: 1 1 auto; 
+}
+
+.sywat-modal-body .sywat-form-grid-2,
+.sywat-modal-body .sywat-form-grid-3,
+.sywat-modal-body form > div:not(:last-child) {
+    margin-bottom: 16px;
+}
+
+/* Compact Modal Field Spacing overrides */
+.sywat-modal-body .sywat-field-group { margin-bottom: 0 !important; }
+.sywat-modal-body .sywat-field-group label { font-size: 11px !important; margin-bottom: 4px !important; }
+.sywat-modal-body .sywat-field-group input[type="text"],
+.sywat-modal-body .sywat-field-group input[type="date"],
+.sywat-modal-body .sywat-field-group select {
+    height: 32px !important;
+    min-height: 32px !important;
+    font-size: 12px !important;
+    padding: 3px 8px !important;
+    box-sizing: border-box !important;
+}
+
+.sywat-modal-row-spacing { margin-top: 8px !important; }
+.sywat-grid-compact { gap: 8px !important; }
+.sywat-label-subtext { font-weight: normal; color: #64748b; }
+.sywat-modal-section-header { margin-top: 10px !important; margin-bottom: 6px !important; }
+.sywat-modal-section-header h2 { font-size: 14px !important; font-weight: 700 !important; margin: 0; }
 
 .sywat-modal-body form > div:last-child {
     margin-top: 20px !important;
@@ -90,7 +125,9 @@
     gap: 10px;
 }
 
-/* TFAA Autocomplete Dropdown */
+/* ==========================================================================
+   TFAA Autocomplete Dropdown
+   ========================================================================== */
 .sywat-tfaa-autocomplete-dropdown {
     position: absolute;
     top: 100%;
@@ -126,13 +163,16 @@
     z-index: 100050 !important; 
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 768px) {
     .sywat-modal-backdrop { padding: 10px; }
-    .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 95vh; }
+    .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 94vh !important; }
     .sywat-modal-body { padding: 14px; }
+    .sywat-form-grid-2 { grid-template-columns: 1fr !important; gap: 8px !important; }
 }
 
-/* Print Engine Reset */
+/* ==========================================================================
+   Print Engine Reset
+   ========================================================================== */
 @media print {
     html, body {
         background: #ffffff !important;
