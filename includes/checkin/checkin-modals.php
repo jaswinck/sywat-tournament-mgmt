@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals & Client Scripts
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -67,15 +67,15 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_archer['id']); ?>">
 
-                    <div style="margin-bottom:12px; position:relative;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Name:</label>
-                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-weight:bold;">
+                    <div class="sywat-field-group" style="position:relative;">
+                        <label>Name:</label>
+                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" style="font-weight:bold;">
                         <div id="checkin_tfaa_badge"></div>
                         <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
 
                     <?php if ($modal_due > 0): ?>
-                        <div id="sywat_unpaid_warning_banner" style="background:#f8d7da; color:#721c24; padding:12px; border-radius:6px; border:1px solid #f5c6cb; margin-bottom:15px; text-align:center;">
+                        <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger" style="text-align:center; margin-top:12px;">
                             <div style="font-size:16px; font-weight:bold;">
                                 ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
                             </div>
@@ -88,17 +88,17 @@ function sywat_desk_render_modals($data) {
                             </div>
                         </div>
 
-                        <div style="margin-bottom:15px;">
-                            <label style="color:#721c24; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:8px;">
+                        <div class="sywat-field-group">
+                            <label style="color:#721c24; cursor:pointer; display:flex; align-items:center; gap:8px;">
                                 <input type="checkbox" name="checkin_payment_verified" id="sywat_payment_verified_check" value="1" required style="width:auto;" onchange="toggleUnpaidBanner(this.checked)">
                                 Payment / Resolution Verified with Event Staff
                             </label>
                         </div>
                     <?php endif; ?>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Division:</label>
-                        <select name="checkin_division" id="checkin_division" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="handleStyleRestrictions('checkin'); evaluateTfaaStatus('checkin');">
+                    <div class="sywat-field-group">
+                        <label>Division:</label>
+                        <select name="checkin_division" id="checkin_division" required onchange="handleStyleRestrictions('checkin'); evaluateTfaaStatus('checkin');">
                             <?php
                             $curr_div = isset($modal_archer['division']) ? $modal_archer['division'] : '';
                             if (isset($legacy_div_map[$curr_div])) $curr_div = $legacy_div_map[$curr_div];
@@ -112,9 +112,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Gender:</label>
-                        <select name="checkin_gender" id="checkin_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="evaluateTfaaStatus('checkin')">
+                    <div class="sywat-field-group">
+                        <label>Gender:</label>
+                        <select name="checkin_gender" id="checkin_gender" required onchange="evaluateTfaaStatus('checkin')">
                             <?php
                             $curr_gen = isset($modal_archer['gender']) && in_array($modal_archer['gender'], $genders) ? $modal_archer['gender'] : '';
                             echo '<option value="" disabled ' . (empty($curr_gen) ? 'selected' : '') . ' hidden>Select Gender</option>';
@@ -126,9 +126,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Style:</label>
-                        <select name="checkin_style" id="checkin_style" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="evaluateTfaaStatus('checkin')">
+                    <div class="sywat-field-group">
+                        <label>Style:</label>
+                        <select name="checkin_style" id="checkin_style" required onchange="evaluateTfaaStatus('checkin')">
                             <?php
                             $curr_sty = isset($modal_archer['style']) && in_array($modal_archer['style'], $sywat_styles) ? $modal_archer['style'] : '';
                             echo '<option value="" disabled ' . (empty($curr_sty) ? 'selected' : '') . ' hidden>Select Style</option>';
@@ -140,9 +140,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Paid Option:</label>
-                        <select name="checkin_pay_option" id="checkin_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="toggleFamilyBox('checkin')">
+                    <div class="sywat-field-group">
+                        <label>Paid Option:</label>
+                        <select name="checkin_pay_option" id="checkin_pay_option" required onchange="toggleFamilyBox('checkin')">
                             <?php
                             $curr_paid = isset($modal_archer['paid']) ? $modal_archer['paid'] : '';
                             $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
@@ -153,9 +153,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="checkin_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
-                        <select name="checkin_family_group_id" id="checkin_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="sywat-field-group" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="checkin_family_box">
+                        <label>Line Family Group:</label>
+                        <select name="checkin_family_group_id" id="checkin_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_archer['family_id']) ? $modal_archer['family_id'] : '';
@@ -200,14 +200,14 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_edit_archer['id']); ?>">
 
-                    <div style="margin-bottom:12px; position:relative;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name:</label>
-                        <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                    <div class="sywat-field-group" style="position:relative;">
+                        <label>Full Name:</label>
+                        <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" autocomplete="off" required>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
-                        <select name="edit_line_index" id="edit_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="updateEditFamilyOptions(this.value)">
+                    <div class="sywat-field-group">
+                        <label>Shooting Line:</label>
+                        <select name="edit_line_index" id="edit_line_index" required onchange="updateEditFamilyOptions(this.value)">
                             <?php $curr_line = isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : ''; ?>
                             <?php foreach ($lines as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>>
@@ -217,9 +217,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Division:</label>
-                        <select name="edit_division" id="edit_division" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="handleStyleRestrictions('edit');">
+                    <div class="sywat-field-group">
+                        <label>Division:</label>
+                        <select name="edit_division" id="edit_division" required onchange="handleStyleRestrictions('edit');">
                             <?php
                             $raw_div = isset($modal_edit_archer['division']) ? $modal_edit_archer['division'] : '';
                             if (isset($legacy_div_map[$raw_div])) $raw_div = $legacy_div_map[$raw_div];
@@ -235,9 +235,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Gender:</label>
-                        <select name="edit_gender" id="edit_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                    <div class="sywat-field-group">
+                        <label>Gender:</label>
+                        <select name="edit_gender" id="edit_gender" required>
                             <?php
                             $curr_gen = isset($modal_edit_archer['gender']) && in_array($modal_edit_archer['gender'], $genders) ? $modal_edit_archer['gender'] : '';
                             echo '<option value="" disabled ' . (empty($curr_gen) ? 'selected' : '') . ' hidden>Select Gender</option>';
@@ -249,9 +249,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Style:</label>
-                        <select name="edit_style" id="edit_style" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required>
+                    <div class="sywat-field-group">
+                        <label>Style:</label>
+                        <select name="edit_style" id="edit_style" required>
                             <?php
                             $curr_sty = isset($modal_edit_archer['style']) && in_array($modal_edit_archer['style'], $sywat_styles) ? $modal_edit_archer['style'] : '';
                             echo '<option value="" disabled ' . (empty($curr_sty) ? 'selected' : '') . ' hidden>Select Style</option>';
@@ -263,9 +263,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Paid Option:</label>
-                        <select name="edit_pay_option" id="edit_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="toggleFamilyBox('edit')">
+                    <div class="sywat-field-group">
+                        <label>Paid Option:</label>
+                        <select name="edit_pay_option" id="edit_pay_option" required onchange="toggleFamilyBox('edit')">
                             <?php
                             $curr_paid = isset($modal_edit_archer['paid']) ? $modal_edit_archer['paid'] : '';
                             $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
@@ -276,9 +276,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px; <?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="edit_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
-                        <select name="edit_family_group_id" id="edit_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="sywat-field-group" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="edit_family_box">
+                        <label>Line Family Group:</label>
+                        <select name="edit_family_group_id" id="edit_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php
                             $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
@@ -289,9 +289,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Balance Due ($):</label>
-                        <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="sywat-field-group">
+                        <label>Balance Due ($):</label>
+                        <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>">
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
@@ -322,16 +322,16 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
 
-                    <div style="margin-bottom:12px; position:relative;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Full Name:</label>
-                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="sywat-field-group" style="position:relative;">
+                        <label>Full Name:</label>
+                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off">
                         <div id="walkin_tfaa_badge"></div>
                         <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Shooting Line:</label>
-                        <select name="walkin_line_index" id="walkin_line_index" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="updateWalkinFamilyOptions(this.value)">
+                    <div class="sywat-field-group">
+                        <label>Shooting Line:</label>
+                        <select name="walkin_line_index" id="walkin_line_index" required onchange="updateWalkinFamilyOptions(this.value)">
                             <?php foreach ($lines as $idx => $line): ?>
                                 <?php $is_c = in_array((string)$idx, $closed_lines); ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
@@ -341,9 +341,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Division:</label>
-                        <select name="walkin_division" id="walkin_division" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="handleStyleRestrictions('walkin'); evaluateTfaaStatus('walkin');">
+                    <div class="sywat-field-group">
+                        <label>Division:</label>
+                        <select name="walkin_division" id="walkin_division" required onchange="handleStyleRestrictions('walkin'); evaluateTfaaStatus('walkin');">
                             <option value="" disabled selected hidden>Select Division</option>
                             <?php foreach ($divs as $d): ?>
                                 <?php if ($d === 'No Show') continue; ?>
@@ -352,9 +352,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Gender:</label>
-                        <select name="walkin_gender" id="walkin_gender" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="evaluateTfaaStatus('walkin')">
+                    <div class="sywat-field-group">
+                        <label>Gender:</label>
+                        <select name="walkin_gender" id="walkin_gender" required onchange="evaluateTfaaStatus('walkin')">
                             <option value="" disabled selected hidden>Select Gender</option>
                             <?php foreach ($genders as $g): ?>
                                 <?php if ($g === 'No Show') continue; ?>
@@ -363,9 +363,9 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Style:</label>
-                        <select name="walkin_style" id="walkin_style" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="evaluateTfaaStatus('walkin')">
+                    <div class="sywat-field-group">
+                        <label>Style:</label>
+                        <select name="walkin_style" id="walkin_style" required onchange="evaluateTfaaStatus('walkin')">
                             <option value="" disabled selected hidden>Select Style</option>
                             <?php foreach ($sywat_styles as $s): ?>
                                 <?php if ($s === 'No Show') continue; ?>
@@ -374,18 +374,18 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Paid Option:</label>
-                        <select name="walkin_pay_option" id="walkin_pay_option" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" required onchange="toggleFamilyBox('walkin')">
+                    <div class="sywat-field-group">
+                        <label>Paid Option:</label>
+                        <select name="walkin_pay_option" id="walkin_pay_option" required onchange="toggleFamilyBox('walkin')">
                             <option value="Individual">Individual</option>
                             <option value="Family">Family</option>
                             <option value="Field Governor">Field Governor</option>
                         </select>
                     </div>
 
-                    <div style="margin-bottom:12px; display:none;" id="walkin_family_box">
-                        <label style="display:block; font-weight:bold; margin-bottom:4px; font-size:13px;">Line Family Group:</label>
-                        <select name="walkin_family_group_id" id="walkin_family_group_id" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="sywat-field-group" style="display:none;" id="walkin_family_box">
+                        <label>Line Family Group:</label>
+                        <select name="walkin_family_group_id" id="walkin_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
                             <?php foreach ($existing_families as $fid => $flabel): ?>
                                 <option value="<?php echo esc_attr($fid); ?>"><?php echo esc_html($flabel); ?></option>
@@ -543,7 +543,6 @@ function sywat_desk_render_client_scripts($data) {
         return null;
     }
 
-    // UPDATED: Strict prefix matching that prevents FS from overriding FS Pro
     function matchDeskTfaaSelect(value, selectEl) {
         if (!value || !selectEl) return;
         const clean = value.trim().toLowerCase();
@@ -557,7 +556,6 @@ function sywat_desk_render_client_scripts($data) {
                 return;
             }
             
-            // Cleanly split at the dash or parenthesis (e.g. "fs pro" vs "fs")
             const cleanPrefix = clean.split(' –')[0].split(' (')[0].trim();
             const optPrefix   = optLower.split(' –')[0].split(' (')[0].trim();
             
@@ -719,7 +717,6 @@ function sywat_desk_render_client_scripts($data) {
             const uGen = currGen.toLowerCase();
             const uSty = currStyle.toLowerCase();
 
-            // UPDATED: Strict prefix separation to prevent "Senior" matching "Silver Senior" and "FS" matching "FS Pro"
             const divMatch   = (cDiv === uDiv) || (cDiv && uDiv && cDiv.split(' (')[0].trim() === uDiv.split(' (')[0].trim());
             const genMatch   = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
             const styleMatch = (cSty === uSty) || (cSty && uSty && cSty.split(' –')[0].trim() === uSty.split(' –')[0].trim());
@@ -804,7 +801,7 @@ function sywat_desk_render_client_scripts($data) {
 
                 if (divEl && shopMatch.division) matchDeskTfaaSelect(shopMatch.division, divEl);
                 if (genEl && shopMatch.gender) matchDeskTfaaSelect(shopMatch.gender, genEl);
-                if (styleEl && shopMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
+                if (styleEl && shopMatch.style) matchDeskTfaaSelect(shopMatch.style, styleEl);
                 if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
 
                 handleStyleRestrictions(prefix);
