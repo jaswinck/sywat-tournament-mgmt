@@ -355,6 +355,79 @@
     margin: 0 !important;
 }
 
+/* ==========================================================================
+   BLUEPRINT: Fixed Modal Structure & Internal Scrolling Engine
+   ========================================================================== */
+
+.sywat-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.sywat-modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sywat-modal-content {
+    background: #ffffff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 850px;
+    max-height: 90vh; /* Locks modal inside browser window */
+    display: flex;
+    flex-direction: column; /* Stacks Header, Body, Footer vertically */
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    overflow: hidden; /* Prevents outer blowout */
+}
+
+.sywat-modal-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Keeps header pinned at top */
+    background: #ffffff;
+}
+
+.sywat-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.sywat-modal-body {
+    padding: 20px 24px;
+    overflow-y: auto; /* Internal scrollbar for body content only */
+    flex: 1 1 auto;
+}
+
+.sywat-modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #f8fafc;
+    flex-shrink: 0; /* Keeps footer pinned at bottom */
+}
+
 @media (max-width: 768px) {
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
     .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
