@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 5.0.7
+ * Version: 5.0.8
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,19 +168,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                         <div class="sywat-table-header-controls">
                             <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                <div class="sywat-field-group">
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
-                                        <option value="all">All Shops</option>
-                                        <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                            <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
+                                <!-- NO field-group wrapper here -->
+                                <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
+                                    <option value="all">All Shops</option>
+                                    <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             <?php endif; ?>
 
-                            <div class="sywat-field-group">
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                            </div>
+                            <!-- NO field-group wrapper here -->
+                            <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
 
