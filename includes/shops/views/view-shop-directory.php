@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.1.3
+ * Version: 5.1.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -82,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:20%;">Location Name & ID</th>
-                        <th style="width:8%; white-space:nowrap;">District</th>
+                        <th style="width:22%;">Location Name & ID</th>
+                        <th style="width:9%; white-space:nowrap;">District</th>
                         <th style="width:10%;">Facilities</th>
-                        <th style="width:19%;">Contact Info</th>
-                        <th style="width:13%; white-space:nowrap;">Phone</th>
-                        <th class="sywat-col-right" style="width:30%; white-space:nowrap;">Actions</th>
+                        <th style="width:20%;">Contact Info</th>
+                        <th style="width:12%; white-space:nowrap;">Phone</th>
+                        <th class="sywat-col-right" style="width:27%; white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -169,11 +169,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                             </td>
                             <td style="white-space:nowrap;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
                             <td class="sywat-col-right" style="white-space:nowrap;">
-                                <div class="sywat-table-actions" style="white-space:nowrap; display:inline-flex; gap:6px; justify-content:flex-end;">
+                                <div class="sywat-table-actions" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; white-space:nowrap;">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
                                         <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">Staff (<?php echo $linked_count; ?>)</a>
                                         <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
-                                        <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete this location?');">
+                                        <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-table-action-form" style="display:inline-flex; margin:0; padding:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                             <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
