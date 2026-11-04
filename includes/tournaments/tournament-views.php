@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 5.0.3
+ * Version: 5.0.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -158,11 +158,29 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                         <!-- TOP PAGE ACTION CONTROLS -->
                         <div class="sywat-header-inline-controls">
+                            <!-- TFAA Sync Pill -->
+                            <form method="post" class="sywat-sync-pill">
+                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                <input type="hidden" name="sywat_action" value="sync_tfaa_now">
+                                <span class="sywat-sync-pill-count">
+                                    👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
+                                </span>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync sywat-btn-pill-sync">Sync</button>
+                            </form>
+
+                            <?php if ( $can_manage_seasons ): ?>
+                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                    <input type="hidden" name="sywat_action" value="global_push_standings">
+                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
+                                </form>
+                            <?php endif; ?>
+
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
 
-                    <!-- TABLE SUB-HEADER ROW (Title Left, Search/Filter/Actions Right) -->
+                    <!-- TABLE SUB-HEADER ROW (Title Left, Search/Filter Right) -->
                     <div class="sywat-table-header-bar">
                         <h2>Configured Events</h2>
 
@@ -183,24 +201,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             </div>
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
-
-                            <!-- TFAA Sync Pill -->
-                            <form method="post" class="sywat-sync-pill">
-                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                <input type="hidden" name="sywat_action" value="sync_tfaa_now">
-                                <span class="sywat-sync-pill-count">
-                                    👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
-                                </span>
-                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync sywat-btn-pill-sync">Sync</button>
-                            </form>
-
-                            <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
-                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                    <input type="hidden" name="sywat_action" value="global_push_standings">
-                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
-                                </form>
-                            <?php endif; ?>
                         </div>
                     </div>
 
