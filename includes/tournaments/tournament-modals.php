@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
