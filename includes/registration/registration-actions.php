@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 2.9.0
+ * Version: 3.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -250,10 +250,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $msg .= '<div class="sywat-alert sywat-alert-success">Successfully registered ' . $added_count . ' archer(s) under \'' . esc_html($family_base_name) . '\'.</div>';
         }
         if (!empty($skipped_duplicates)) {
-            $msg .= '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ DUPLICATE BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_duplicates)) . ' — already registered on this shooting line!</div>';
+            $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ DUPLICATE BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_duplicates)) . ' — already registered on this shooting line!</div>';
         }
         if (!empty($skipped_full)) {
-            $msg .= '<div class="sywat-alert sywat-alert-danger" style="background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:10px 14px; border-radius:4px; font-weight:bold; margin-bottom:12px;">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
+            $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
         }
 
         $GLOBALS['sywat_modal_notice'] = $msg;
