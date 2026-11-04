@@ -3,7 +3,7 @@
  * View Template: Public Archery Shops & Clubs
  * Path: includes/shops/views/view-shop-public.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -45,10 +45,10 @@ uasort( $filtered_shops, function( $a, $b ) {
             🌐 All Locations
         </a>
         <a href="<?php echo esc_url( add_query_arg( 'type', 'pro_shop', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'pro_shop') ? 'active' : ''; ?>">
-            🏪 Shops
+            🎯 Shops
         </a>
         <a href="<?php echo esc_url( add_query_arg( 'type', 'club', $page_url ) ); ?>" class="sywat-tab-item <?php echo ($type_filter === 'club') ? 'active' : ''; ?>">
-            🌲 Clubs
+            🏹 Clubs
         </a>
     </div>
 
@@ -56,10 +56,10 @@ uasort( $filtered_shops, function( $a, $b ) {
         <!-- UNIFIED TOP CARD HEADER BAR: TITLE (LEFT) & INLINE FILTERS (RIGHT) -->
         <div class="sywat-card-header-bar">
             <h2>
-                🎯 <?php 
-                    if ($type_filter === 'pro_shop') echo 'Shops';
-                    elseif ($type_filter === 'club') echo 'Clubs';
-                    else echo 'Shops and Clubs';
+                <?php 
+                    if ($type_filter === 'pro_shop') echo '🎯 Shops';
+                    elseif ($type_filter === 'club') echo '🏹 Clubs';
+                    else echo '🌐 All Locations';
                 ?>
             </h2>
 
@@ -153,7 +153,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     <strong style="font-size:15px; color:#0f172a;"><?php echo esc_html( $shop['name'] ); ?></strong>
                                     <?php if ($type_filter === 'all'): ?>
                                         <span class="sywat-badge" style="background:<?php echo ($s_type === 'club') ? '#fef3c7; color:#b45309;' : '#e0f2fe; color:#0369a1;'; ?> font-size:10px; padding:2px 6px; margin-left:4px;">
-                                            <?php echo ($s_type === 'club') ? '🌲 Club' : '🏪 Shop'; ?>
+                                            <?php echo ($s_type === 'club') ? '🏹 Club' : '🎯 Shop'; ?>
                                         </span>
                                     <?php endif; ?>
                                     <?php if ( ! empty( $full_address ) ): ?>
