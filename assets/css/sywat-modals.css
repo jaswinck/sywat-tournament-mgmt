@@ -45,6 +45,7 @@
 .sywat-modal-sm { width: min(94vw, 480px); }
 .sywat-modal-md { width: min(94vw, 620px); }
 .sywat-modal-lg { width: min(94vw, 920px); max-width: 780px; }
+.sywat-modal-xl { width: min(96vw, 1100px); max-width: 1100px; }
 
 /* 2. Pinned Header & Footer Structure */
 .sywat-modal-header {
@@ -57,7 +58,22 @@
     flex-shrink: 0;
 }
 
-.sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
+.sywat-modal-header h3 { 
+    margin: 0; 
+    font-size: 1.2em; 
+    color: #0f172a; 
+    font-weight: 700; 
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sywat-modal-header .sywat-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 400;
+    margin-top: 2px;
+}
 
 .sywat-modal-close {
     background: none;
@@ -331,7 +347,7 @@
 
 @media screen and (max-width: 768px) {
     .sywat-modal-backdrop { padding: 10px; }
-    .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 94vh !important; }
+    .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg, .sywat-modal-xl { width: 100% !important; max-height: 94vh !important; }
     .sywat-modal-body { padding: 14px; }
     .sywat-form-grid-2, .sywat-form-grid-4 { grid-template-columns: 1fr !important; gap: 8px !important; }
 
@@ -367,7 +383,7 @@
         display: none !important;
     }
 
-    .sywat-modal-backdrop, .sywat-modal-content, .sywat-modal-body, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg, #sywat_print_modal, #sywat_invoice_modal, #sywat_results_edit_modal {
+    .sywat-modal-backdrop, .sywat-modal-content, .sywat-modal-body, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg, .sywat-modal-xl, #sywat_print_modal, #sywat_invoice_modal, #sywat_results_edit_modal {
         position: static !important;
         top: auto !important;
         left: auto !important;
