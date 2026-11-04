@@ -293,7 +293,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                             <!-- Column 3: Stacked Tournament Action Buttons -->
                                             <td class="sywat-col-center">
-                                                <div style="display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center;">
+                                                <div class="sywat-table-actions-vertical">
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
