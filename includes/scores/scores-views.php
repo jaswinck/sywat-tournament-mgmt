@@ -3,7 +3,7 @@
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * File: includes/scores/scores-views.php
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -311,13 +311,8 @@ function render_sywat_scores_app() {
                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
 
-                    <div class="sywat-card-header-bar" style="margin-bottom:12px;">
-                        <div>
-                            <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Archer Scores</h2>
-                            <div class="sywat-subtitle" style="margin-top:2px;">
-                                Displaying <strong><?php echo count($tourn_registrations); ?></strong> checked-in archer(s) for <?php echo esc_html($selected_tournament); ?>
-                            </div>
-                        </div>
+                    <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                        <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Archer Scores</h2>
 
                         <div class="sywat-header-inline-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <!-- Live Search Input -->
