@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 5.0.8
+ * Version: 5.0.9
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,7 +168,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                         <div class="sywat-table-header-controls">
                             <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                <!-- NO field-group wrapper here -->
                                 <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
                                     <option value="all">All Shops</option>
                                     <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
@@ -177,7 +176,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </select>
                             <?php endif; ?>
 
-                            <!-- NO field-group wrapper here -->
                             <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
@@ -194,7 +192,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                             <!-- Push Standings Form -->
                             <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="global_push_standings">
                                     <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
