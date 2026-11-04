@@ -3,7 +3,7 @@
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.1.6
+ * Version: 5.1.8
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -82,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:28%;">Location Name & ID</th>
-                        <th style="width:9%; white-space:nowrap;">District</th>
-                        <th style="width:11%;">Facilities</th>
-                        <th style="width:21%;">Contact Info</th>
-                        <th style="width:11%; white-space:nowrap;">Phone</th>
-                        <th class="sywat-col-right" style="width:20%; white-space:nowrap;">Actions</th>
+                        <th style="width:24%;">Location Name & ID</th>
+                        <th style="width:8%; white-space:nowrap;">District</th>
+                        <th style="width:10%;">Facilities</th>
+                        <th style="width:20%;">Contact Info</th>
+                        <th style="width:14%; white-space:nowrap;">Phone</th>
+                        <th class="sywat-col-center" style="width:24%; white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -168,8 +168,8 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 ?>
                             </td>
                             <td style="white-space:nowrap; vertical-align:middle;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                            <td class="sywat-col-right" style="white-space:nowrap; vertical-align:middle;">
-                                <div class="sywat-table-actions" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:nowrap !important; white-space:nowrap;">
+                            <td class="sywat-col-center" style="white-space:nowrap; vertical-align:middle;">
+                                <div class="sywat-table-actions" style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:nowrap !important; white-space:nowrap;">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
                                         <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Staff (<?php echo $linked_count; ?>)</a>
                                         <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Edit</a>
