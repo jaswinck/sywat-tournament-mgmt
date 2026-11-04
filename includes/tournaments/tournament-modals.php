@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -51,7 +51,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             <div class="sywat-modal-content sywat-modal-lg">
                 <!-- STANDARDIZED MODAL HEADER -->
                 <div class="sywat-modal-header no-print">
-                    <h3>🎯 <?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
+                    <div>
+                        <h3>🎯 <?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
+                        <div class="sywat-subtitle">Set up tournament details, dates, and shooting line capacity limits.</div>
+                    </div>
                     <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
                 </div>
 
@@ -207,16 +210,19 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
         $is_specific_line = ($filter_line_idx !== 'all' && $filter_line_idx !== '' && $filter_line_idx !== null);
         ?>
         <div class="sywat-modal-backdrop <?php echo $open_modal ? 'active' : ''; ?>" id="sywat_modal">
-            <div class="sywat-modal-content sywat-modal-lg">
+            <div class="sywat-modal-content sywat-modal-xl">
                 <div class="sywat-modal-header no-print">
-                    <h3>
-                        <?php 
-                            if ($modal_action === 'invoice') echo 'TFAA Tournament Invoice';
-                            elseif ($modal_action === 'print') echo 'Print Checked In Roster';
-                            elseif ($modal_action === 'prereg') echo 'Register Shooters & Bulk Import';
-                            else echo 'Manage Archers';
-                        ?>: <?php echo esc_html( $selected_tournament ); ?>
-                    </h3>
+                    <div>
+                        <h3>
+                            <?php 
+                                if ($modal_action === 'invoice') echo '📄 TFAA Tournament Invoice';
+                                elseif ($modal_action === 'print') echo '🖨️ Print Checked In Roster';
+                                elseif ($modal_action === 'prereg') echo '📝 Register Shooters & Bulk Import';
+                                else echo '👥 Registered Archer Roster';
+                            ?>
+                        </h3>
+                        <div class="sywat-subtitle"><?php echo esc_html( $selected_tournament ); ?></div>
+                    </div>
                     <button type="button" class="sywat-modal-close" onclick="closeSywatModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
