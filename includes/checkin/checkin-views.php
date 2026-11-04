@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -123,8 +123,9 @@ function sywat_desk_render_capacity_tracker($data) {
     ?>
     <!-- Nested Section: Line Capacity Tracker -->
     <div style="margin-bottom:24px;">
-        <div class="sywat-card-header-bar" style="margin-bottom:12px;">
+        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
             <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Line Capacity Tracker</h2>
+            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;" onclick="openWalkinModal()">Add Walk-In</button>
         </div>
         <?php if (!empty($lines)): ?>
             <?php
@@ -259,7 +260,6 @@ function sywat_desk_render_archers_table($data) {
                     <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;" onclick="openWalkinModal()">Add Walk-In</button>
             </div>
         </div>
 
