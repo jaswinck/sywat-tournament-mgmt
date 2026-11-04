@@ -3,14 +3,48 @@
  * Path: assets/js/sywat-tournaments.js
  */
 
+let sywatTournamentNameIsCustomized = false;
+
+function sywatMarkNameAsCustomized() {
+    sywatTournamentNameIsCustomized = true;
+}
+
+function sywatAutoGenerateTournamentName() {
+    const shopSelect = document.getElementById('sywat_modal_shop_id');
+    const nameInput  = document.getElementById('sywat_modal_tournament_name');
+
+    if (!shopSelect || !nameInput) return;
+
+    // Do not overwrite if user has manually typed a custom name
+    if (sywatTournamentNameIsCustomized && nameInput.value.trim() !== '') return;
+
+    const selectedOption = shopSelect.options[shopSelect.selectedIndex];
+    if (!selectedOption || !selectedOption.value) return;
+
+    const shopName = selectedOption.getAttribute('data-name') || selectedOption.text || '';
+    const currentCount = parseInt(selectedOption.getAttribute('data-count') || '0', 10);
+    const nextNum = currentCount + 1;
+
+    if (shopName) {
+        nameInput.value = `${shopName.trim()} - ${nextNum}`;
+    }
+}
+
 function openAddTournamentModal() {
     const modal = document.getElementById('sywat_add_tourn_modal');
     if (modal) modal.classList.add('active');
+
+    // Reset flag if starting fresh
+    const nameInput = document.getElementById('sywat_modal_tournament_name');
+    if (nameInput && !nameInput.value) {
+        sywatTournamentNameIsCustomized = false;
+    }
 }
 
 function closeAddTournamentModal() {
     const modal = document.getElementById('sywat_add_tourn_modal');
     if (modal) modal.classList.remove('active');
+    sywatTournamentNameIsCustomized = false;
     const url = new URL(window.location.href);
     url.searchParams.delete('open_add_tournament');
     url.searchParams.delete('edit_tournament_modal');
