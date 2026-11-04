@@ -82,12 +82,12 @@ uasort( $filtered_shops, function( $a, $b ) {
             <table class="sywat-table">
                 <thead>
                     <tr>
-                        <th style="width:25%;">Location Name & ID</th>
-                        <th style="width:12%;">District</th>
-                        <th style="width:20%;">Facilities</th>
-                        <th style="width:22%;">Contact Info</th>
-                        <th style="width:11%;">Phone</th>
-                        <th class="sywat-col-right" style="width:10%;">Actions</th>
+                        <th style="width:22%;">Location Name & ID</th>
+                        <th style="width:11%;">District</th>
+                        <th style="width:18%;">Facilities</th>
+                        <th style="width:21%;">Contact Info</th>
+                        <th style="width:10%;">Phone</th>
+                        <th class="sywat-col-right" style="width:18%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
