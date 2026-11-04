@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -60,9 +60,10 @@ function sywat_desk_render_filter_bar($data) {
         <?php endif; ?>
     </div>
 
-    <!-- Integrated Control Panel Filter Toolbar -->
-    <div class="sywat-card no-print" style="margin-bottom:20px; border-top-left-radius:0;">
-        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:15px; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
+    <!-- Master Single Unified Desk Card -->
+    <div class="sywat-card no-print" style="border-top-left-radius:0;">
+        <!-- Integrated Control Panel Filter Toolbar Header Bar -->
+        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
             <div>
                 <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">📋 Check In Archers</h2>
                 <div class="sywat-subtitle" style="margin-top:2px;">Select an active tournament and line to begin checking in archers.</div>
@@ -103,7 +104,6 @@ function sywat_desk_render_filter_bar($data) {
                 <?php endif; ?>
             </div>
         </div>
-    </div>
     <?php
 }
 
@@ -121,9 +121,10 @@ function sywat_desk_render_capacity_tracker($data) {
     $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
 
     ?>
-    <div class="sywat-card no-print">
-        <div class="sywat-card-header-bar">
-            <h2 style="font-size:16px;">Line Capacity Tracker</h2>
+    <!-- Nested Section: Line Capacity Tracker -->
+    <div style="margin-bottom:24px;">
+        <div class="sywat-card-header-bar" style="margin-bottom:12px;">
+            <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Line Capacity Tracker</h2>
         </div>
         <?php if (!empty($lines)): ?>
             <?php
@@ -249,9 +250,10 @@ function sywat_desk_render_archers_table($data) {
     $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
 
     ?>
-    <div class="sywat-card no-print">
-        <div class="sywat-card-header-bar">
-            <h2 style="font-size:16px;">Registered Archers</h2>
+    <!-- Nested Section: Registered Archers Table -->
+    <div>
+        <div class="sywat-card-header-bar" style="margin-bottom:12px;">
+            <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Registered Archers</h2>
             <div class="sywat-header-inline-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <div style="display:flex; gap:6px; margin:0; align-items:center;">
                     <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
@@ -366,6 +368,8 @@ function sywat_desk_render_archers_table($data) {
         <?php else: ?>
             <p style="color:#666;">No archers registered for this selection.</p>
         <?php endif; ?>
+    </div>
+    <!-- Close Master Single Unified Desk Card -->
     </div>
     <?php
 }
