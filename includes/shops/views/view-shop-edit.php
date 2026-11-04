@@ -3,7 +3,7 @@
  * View Template: Admin Edit Location (Tabbed Layout)
  * Path: includes/shops/views/view-shop-edit.php
  * Author: SYWAT Archery / TFAA
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -56,8 +56,8 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                 <div class="sywat-field-group">
                     <label>Location Type *</label>
                     <select name="location_type" required>
-                        <option value="pro_shop" <?php selected( $curr_type, 'pro_shop' ); ?>>🏪 Shop</option>
-                        <option value="club" <?php selected( $curr_type, 'club' ); ?>>🌲 Club</option>
+                        <option value="pro_shop" <?php selected( $curr_type, 'pro_shop' ); ?>>🎯 Shop</option>
+                        <option value="club" <?php selected( $curr_type, 'club' ); ?>>🏹 Club</option>
                     </select>
                 </div>
                 <div class="sywat-field-group">
