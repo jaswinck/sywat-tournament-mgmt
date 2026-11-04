@@ -83,11 +83,11 @@ uasort( $filtered_shops, function( $a, $b ) {
                 <thead>
                     <tr>
                         <th style="width:24%;">Location Name & ID</th>
-                        <th style="width:8%; white-space:nowrap;">District</th>
+                        <th style="width:8%;">District</th>
                         <th style="width:10%;">Facilities</th>
                         <th style="width:20%;">Contact Info</th>
-                        <th style="width:14%; white-space:nowrap;">Phone</th>
-                        <th class="sywat-col-center" style="width:24%; white-space:nowrap;">Actions</th>
+                        <th style="width:14%;">Phone</th>
+                        <th class="sywat-col-center" style="width:24%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -118,15 +118,15 @@ uasort( $filtered_shops, function( $a, $b ) {
                                 <br>
                                 <code style="font-size:11px; color:#646970;"><?php echo esc_html( $s_id ); ?></code>
                             </td>
-                            <td style="white-space:nowrap; vertical-align:middle;">
+                            <td>
                                 <?php if ( ! empty( $s_dist ) ): ?>
                                     <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $s_dist ); ?></span>
                                 <?php else: ?>
                                     <span style="font-size:12px; color:#94a3b8; font-style:italic;">Unassigned</span>
                                 <?php endif; ?>
                             </td>
-                            <td style="vertical-align:middle;">
-                                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:3px;">
+                            <td>
+                                <div class="sywat-badge-stack">
                                     <?php if ( in_array( 'pro_shop', $s_fac ) ): ?>
                                         <span class="sywat-badge" style="background:#e0f2fe; color:#0369a1;">🏪 Pro Shop</span>
                                     <?php endif; ?>
@@ -144,7 +144,7 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td style="vertical-align:middle;">
+                            <td>
                                 <strong><?php echo esc_html( $s_contact ? $s_contact : 'N/A' ); ?></strong>
                                 <?php if ( ! empty($s_add_cnt) ): ?>
                                     <span class="sywat-badge" style="background:#f1f5f9; color:#475569; font-size:10px; cursor:help;" title="<?php foreach($s_add_cnt as $ac) { echo esc_attr(($ac['name'] ?? 'Contact') . ' (' . ($ac['title'] ?? 'Staff') . ') - ' . ($ac['email'] ?? 'No email') . "\n"); } ?>">
@@ -167,21 +167,21 @@ uasort( $filtered_shops, function( $a, $b ) {
                                     }
                                 ?>
                             </td>
-                            <td style="white-space:nowrap; vertical-align:middle;"><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
-                            <td class="sywat-col-center" style="white-space:nowrap; vertical-align:middle;">
-                                <div class="sywat-table-actions" style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:nowrap !important; white-space:nowrap;">
+                            <td><?php echo esc_html( isset($shop['phone']) ? $shop['phone'] : 'N/A' ); ?></td>
+                            <td class="sywat-col-center">
+                                <div class="sywat-table-actions">
                                     <?php if ( $can_manage_seasons || $is_admin ): ?>
-                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Staff (<?php echo $linked_count; ?>)</a>
-                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Edit</a>
-                                        <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-table-action-form" style="display:inline-flex; margin:0; padding:0; flex-shrink:0;" onsubmit="return confirm('Are you sure you want to delete this location?');">
+                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
+                                        <form method="post" action="<?php echo esc_url( add_query_arg('type', $type_filter, $page_url) ); ?>" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete this location?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="sywat_shop_action" value="delete_shop">
                                             <input type="hidden" name="shop_id" value="<?php echo esc_attr( $s_id ); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Delete</button>
+                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Delete</button>
                                         </form>
                                     <?php elseif ( ! empty( $user_shop_id ) && $s_id === $user_shop_id ): ?>
-                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Staff (<?php echo $linked_count; ?>)</a>
-                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" style="padding:6px 10px; font-size:12px; white-space:nowrap; flex-shrink:0;">Edit My Shop</a>
+                                        <a href="<?php echo esc_url( add_query_arg( array('manage_staff' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">Staff (<?php echo $linked_count; ?>)</a>
+                                        <a href="<?php echo esc_url( add_query_arg( array('edit_shop' => $s_id, 'type' => $type_filter), $page_url ) ); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-edit">Edit My Shop</a>
                                     <?php endif; ?>
                                 </div>
                             </td>
