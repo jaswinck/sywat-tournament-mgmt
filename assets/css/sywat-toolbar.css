@@ -356,7 +356,7 @@
 }
 
 /* ==========================================================================
-   BLUEPRINT: Fixed Modal Structure & Internal Scrolling Engine
+   BLUEPRINT: Fixed Modal Structure, Single-Screen Layout & Mobile Adaptability
    ========================================================================== */
 
 .sywat-modal-backdrop {
@@ -374,7 +374,7 @@
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease, visibility 0.2s ease;
-    padding: 20px;
+    padding: 16px;
     box-sizing: border-box;
 }
 
@@ -387,55 +387,76 @@
     background: #ffffff;
     border-radius: 12px;
     width: 100%;
-    max-width: 850px;
-    max-height: 85vh !important;
+    max-width: 780px;
+    max-height: 88vh !important;
     display: flex !important;
     flex-direction: column !important;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
     overflow: hidden !important;
 }
 
+/* Pinned Modal Header */
 .sywat-modal-header {
-    padding: 16px 24px;
+    padding: 12px 20px !important;
     border-bottom: 1px solid #e2e8f0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
     background: #ffffff;
 }
 
 .sywat-modal-header h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #0f172a;
 }
 
+/* Scrollable Modal Body (Internal Scrollbar when needed) */
 .sywat-modal-body {
-    padding: 20px 24px;
+    padding: 14px 20px !important;
     overflow-y: auto !important;
-    max-height: calc(85vh - 120px) !important;
     flex: 1 1 auto !important;
 }
 
+/* Pinned Modal Footer */
 .sywat-modal-footer {
-    padding: 14px 24px;
+    padding: 10px 20px !important;
     border-top: 1px solid #e2e8f0;
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
     background: #f8fafc;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
 }
 
-/* Modal Field Grid Spacing & Typography Utilities */
+/* Compact Modal Field Utilities */
+.sywat-modal-body .sywat-field-group {
+    margin-bottom: 0 !important;
+}
+
+.sywat-modal-body .sywat-field-group label {
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+}
+
+.sywat-modal-body .sywat-field-group input[type="text"],
+.sywat-modal-body .sywat-field-group input[type="date"],
+.sywat-modal-body .sywat-field-group select {
+    height: 32px !important;
+    min-height: 32px !important;
+    font-size: 12px !important;
+    padding: 3px 8px !important;
+    box-sizing: border-box !important;
+}
+
 .sywat-modal-row-spacing {
-    margin-top: 10px;
+    margin-top: 8px !important;
 }
 
 .sywat-grid-compact {
-    gap: 10px;
+    gap: 8px !important;
 }
 
 .sywat-label-subtext {
@@ -444,40 +465,55 @@
 }
 
 .sywat-modal-section-header {
-    margin-top: 16px;
-    margin-bottom: 8px;
+    margin-top: 10px !important;
+    margin-bottom: 6px !important;
 }
 
-/* Compact Repeater Table Formatting */
+.sywat-modal-section-header h2 {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+}
+
+/* Strict 100% Modal Repeater Table Grid (Zero Horizontal Overflow) */
+.sywat-modal-repeater-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-collapse: collapse !important;
+}
+
 .sywat-modal-repeater-table th,
 .sywat-modal-repeater-table td {
     padding: 4px 6px !important;
     vertical-align: middle !important;
+    box-sizing: border-box !important;
 }
 
 .sywat-modal-repeater-table input,
 .sywat-modal-repeater-table select {
-    height: 30px !important;
-    min-height: 30px !important;
+    height: 28px !important;
+    min-height: 28px !important;
     font-size: 12px !important;
     padding: 2px 6px !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     width: 100% !important;
+    min-width: 0 !important; /* CRITICAL: Overrides filter select min-width */
+    max-width: 100% !important;
 }
 
 .sywat-modal-repeater-table .sywat-col-num-input {
-    width: 65px !important;
+    width: 100% !important;
     text-align: center !important;
-    margin: 0 auto !important;
 }
 
-/* Modal Table Column Sizing Classes */
-.sywat-modal-repeater-table th.sywat-col-day { width: 140px; }
-.sywat-modal-repeater-table th.sywat-col-time { width: 120px; }
-.sywat-modal-repeater-table th.sywat-col-cap { width: 90px; }
-.sywat-modal-repeater-table th.sywat-col-action-sm { width: 80px; }
+/* Proportional Modal Column Percentage Widths */
+.sywat-modal-repeater-table th.sywat-col-day { width: 28% !important; }
+.sywat-modal-repeater-table th.sywat-col-time { width: 24% !important; }
+.sywat-modal-repeater-table th.sywat-col-cap { width: 16% !important; }
+.sywat-modal-repeater-table th.sywat-col-action-sm { width: 16% !important; }
 
+/* Mobile & Tablet Responsiveness */
 @media (max-width: 768px) {
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
     .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
@@ -486,5 +522,32 @@
         width: 100%;
         justify-content: flex-start;
         margin-left: 0;
+    }
+
+    .sywat-modal-backdrop {
+        padding: 8px !important;
+    }
+
+    .sywat-modal-content {
+        max-height: 94vh !important;
+        max-width: 100% !important;
+        border-radius: 8px !important;
+    }
+
+    .sywat-modal-body {
+        padding: 12px 14px !important;
+    }
+
+    .sywat-form-grid-2 {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .sywat-modal-repeater-table {
+        table-layout: auto !important;
+    }
+
+    .sywat-table-responsive {
+        overflow-x: auto !important;
     }
 }
