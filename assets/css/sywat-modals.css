@@ -1,4 +1,7 @@
-/* SYWAT Archery - Modals, Dialogs, and TFAA Autocomplete Dropdowns */
+/* ==========================================================================
+   SYWAT Archery - Modals, Dialogs, and TFAA Autocomplete Dropdowns
+   Path: assets/css/sywat-modals.css
+   ========================================================================== */
 
 .sywat-modal-backdrop {
     display: none;
@@ -15,11 +18,8 @@
     box-sizing: border-box;
 }
 
-.sywat-modal-backdrop.active { 
-    display: flex; 
-}
+.sywat-modal-backdrop.active { display: flex; }
 
-/* Base Fluid Modal Box */
 .sywat-modal-content {
     background: #ffffff;
     width: min(94vw, 560px);
@@ -33,10 +33,10 @@
     box-sizing: border-box;
 }
 
-/* Modal Sizing Modifiers for Responsive Layout Templates */
-.sywat-modal-sm { width: min(94vw, 480px); }  /* Standard Desk Check-In & Walk-In Modals */
-.sywat-modal-md { width: min(94vw, 620px); }  /* Manage Shooters Roster Edit Modal */
-.sywat-modal-lg { width: min(94vw, 920px); }  /* Phone Intake & Bulk Upload Roster Modals */
+/* Modal Sizing Modifiers */
+.sywat-modal-sm { width: min(94vw, 480px); }
+.sywat-modal-md { width: min(94vw, 620px); }
+.sywat-modal-lg { width: min(94vw, 920px); }
 
 .sywat-modal-header {
     display: flex;
@@ -47,12 +47,7 @@
     background: #f6f7f7;
 }
 
-.sywat-modal-header h3 { 
-    margin: 0; 
-    font-size: 1.1em; 
-    color: #1d2327; 
-    font-weight: 600; 
-}
+.sywat-modal-header h3 { margin: 0; font-size: 1.1em; color: #1d2327; font-weight: 600; }
 
 .sywat-modal-close {
     background: none;
@@ -64,23 +59,16 @@
     line-height: 1;
 }
 
-.sywat-modal-close:hover { 
-    color: #d63638; 
-}
+.sywat-modal-close:hover { color: #d63638; }
 
-.sywat-modal-body { 
-    padding: 20px; 
-    overflow-y: auto; 
-}
+.sywat-modal-body { padding: 20px; overflow-y: auto; }
 
-/* Form Grid & Input Row Spacing inside Modals */
 .sywat-modal-body .sywat-form-grid-2,
 .sywat-modal-body .sywat-form-grid-3,
 .sywat-modal-body form > div:not(:last-child) {
     margin-bottom: 16px;
 }
 
-/* Dedicated Modal Footer Container */
 .sywat-modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -91,7 +79,6 @@
     background: #f6f7f7;
 }
 
-/* Fallback: Inline Action Rows (Cancel / Save) Inside Modal Forms */
 .sywat-modal-body form > div:last-child {
     margin-top: 20px !important;
     margin-bottom: 0 !important;
@@ -131,9 +118,7 @@
     color: #1e293b;
 }
 
-.sywat-tfaa-autocomplete-dropdown > div:hover { 
-    background-color: #f1f5f9; 
-}
+.sywat-tfaa-autocomplete-dropdown > div:hover { background-color: #f1f5f9; }
 
 #sywat_edit_archer_modal, 
 #sywat_results_edit_modal,
@@ -141,26 +126,13 @@
     z-index: 100050 !important; 
 }
 
-/* Mobile & Small Screen Adaptations */
 @media screen and (max-width: 600px) {
-    .sywat-modal-backdrop {
-        padding: 10px;
-    }
-    .sywat-modal-content,
-    .sywat-modal-sm,
-    .sywat-modal-md,
-    .sywat-modal-lg {
-        width: 100% !important;
-        max-height: 95vh;
-    }
-    .sywat-modal-body {
-        padding: 14px;
-    }
+    .sywat-modal-backdrop { padding: 10px; }
+    .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg { width: 100% !important; max-height: 95vh; }
+    .sywat-modal-body { padding: 14px; }
 }
 
-/* ==========================================================================
-   Print Engine Reset for Modals & Dialogs
-   ========================================================================== */
+/* Print Engine Reset */
 @media print {
     html, body {
         background: #ffffff !important;
@@ -171,42 +143,11 @@
         overflow: visible !important;
     }
 
-    /* Hide WordPress Admin UI, Theme Headers/Footers, Auth Bar, and Modal Controls */
-    #wpadminbar, 
-    #adminmenumain, 
-    #adminmenuback, 
-    #wpfooter, 
-    #masthead, 
-    header, 
-    footer, 
-    .site-header, 
-    .site-footer, 
-    .entry-header, 
-    h1.entry-title,
-    .sywat-auth-bar, 
-    .sywat-nav-tabs, 
-    .sywat-card, 
-    .sywat-shop-card, 
-    .sywat-public-card, 
-    .sywat-filter-bar, 
-    .sywat-filter-toolbar, 
-    .sywat-modal-header, 
-    .sywat-modal-footer, 
-    .sywat-modal-close, 
-    .no-print {
+    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, #masthead, header, footer, .site-header, .site-footer, .entry-header, h1.entry-title, .sywat-auth-bar, .sywat-nav-tabs, .sywat-card, .sywat-shop-card, .sywat-public-card, .sywat-filter-bar, .sywat-filter-toolbar, .sywat-modal-header, .sywat-modal-footer, .sywat-modal-close, .no-print {
         display: none !important;
     }
 
-    /* Un-fix modal layers so print engines paginate naturally across pages */
-    .sywat-modal-backdrop,
-    .sywat-modal-content,
-    .sywat-modal-body,
-    .sywat-modal-sm,
-    .sywat-modal-md,
-    .sywat-modal-lg,
-    #sywat_print_modal,
-    #sywat_invoice_modal,
-    #sywat_results_edit_modal {
+    .sywat-modal-backdrop, .sywat-modal-content, .sywat-modal-body, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg, #sywat_print_modal, #sywat_invoice_modal, #sywat_results_edit_modal {
         position: static !important;
         top: auto !important;
         left: auto !important;
