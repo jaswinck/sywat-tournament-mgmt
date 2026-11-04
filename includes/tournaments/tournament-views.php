@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -209,9 +209,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 28%;">Tournament, Season & Location</th>
-                                        <th class="sywat-col-center" style="width: 48%;">Line Slot Availability (20yd / Cub)</th>
-                                        <th class="sywat-col-center" style="width: 24%;">Tournament Actions</th>
+                                        <th style="width: 32%;">Tournament, Season & Location</th>
+                                        <th class="sywat-col-center" style="width: 52%;">Line Slot Availability (20yd / Cub)</th>
+                                        <th class="sywat-col-center" style="width: 16%; white-space: nowrap;">Tournament Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
