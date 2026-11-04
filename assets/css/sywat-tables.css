@@ -59,19 +59,26 @@
 .sywat-manage-row td:last-child > div {
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
+    align-items: stretch !important;
     justify-content: center !important;
     gap: 5px !important;
+    width: 160px !important;
+    margin: 0 auto !important;
 }
 
 .sywat-table-actions .sywat-btn,
-.sywat-table-actions form,
+.sywat-table-actions form {
+    margin: 0 !important;
+    flex: 0 0 auto !important;
+}
+
 .sywat-table-actions-vertical .sywat-btn,
 .sywat-table-actions-vertical form,
 .sywat-manage-row td:last-child > div .sywat-btn,
 .sywat-manage-row td:last-child > div form {
     margin: 0 !important;
-    flex: 0 0 auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
 /* Column Utilities */
