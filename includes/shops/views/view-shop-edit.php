@@ -3,7 +3,7 @@
  * View Template: Admin Edit Location (Tabbed Layout)
  * Path: includes/shops/views/view-shop-edit.php
  * Author: SYWAT Archery / TFAA
- * Version: 4.6.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -48,21 +48,21 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
 
         <!-- TAB 1: PROFILE & ADDRESS -->
         <div id="sywat_edit_tab_profile" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'profile') ? 'display:block;' : 'display:none;'; ?>">
-            <div class="sywat-form-grid-3" style="margin-bottom:15px; gap:12px;">
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Location Name *</label>
-                    <input type="text" name="shop_name" value="<?php echo esc_attr( $editing_shop['name'] ); ?>" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" required>
+            <div class="sywat-form-grid-3">
+                <div class="sywat-field-group">
+                    <label>Location Name *</label>
+                    <input type="text" name="shop_name" value="<?php echo esc_attr( $editing_shop['name'] ); ?>" required>
                 </div>
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Location Type *</label>
-                    <select name="location_type" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" required>
+                <div class="sywat-field-group">
+                    <label>Location Type *</label>
+                    <select name="location_type" required>
                         <option value="pro_shop" <?php selected( $curr_type, 'pro_shop' ); ?>>🏪 Shop</option>
                         <option value="club" <?php selected( $curr_type, 'club' ); ?>>🌲 Club</option>
                     </select>
                 </div>
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">District</label>
-                    <select name="shop_district" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                <div class="sywat-field-group">
+                    <label>District</label>
+                    <select name="shop_district">
                         <option value="" <?php selected( empty($curr_dist), true ); ?>>-- Unassigned --</option>
                         <?php foreach ( $districts as $key => $label ): ?>
                             <option value="<?php echo esc_attr( $key ); ?>" <?php selected( $curr_dist, $key ); ?>><?php echo esc_html( $label ); ?></option>
@@ -72,7 +72,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
             </div>
 
             <!-- Facilities & Amenities Multi-Select -->
-            <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:20px;">
+            <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-top:15px; margin-bottom:20px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:700; color:#1e293b;">Facilities & Range Amenities</h4>
                 <div class="sywat-form-grid-4" style="gap:10px;">
                     <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;">
@@ -91,33 +91,35 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
             </div>
 
             <h4 style="margin:20px 0 10px 0; font-size:15px; font-weight:700; color:#1e293b;">Location Address Details (Optional)</h4>
-            <div class="sywat-form-grid-2" style="margin-bottom:15px; gap:12px;">
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Address Line 1</label>
-                    <input type="text" name="shop_address_1" value="<?php echo esc_attr( isset($editing_shop['address_1']) ? $editing_shop['address_1'] : '' ); ?>" placeholder="e.g. 13795 Old Denton Rd" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+            <div class="sywat-form-grid-2">
+                <div class="sywat-field-group">
+                    <label>Address Line 1</label>
+                    <input type="text" name="shop_address_1" value="<?php echo esc_attr( isset($editing_shop['address_1']) ? $editing_shop['address_1'] : '' ); ?>" placeholder="e.g. 13795 Old Denton Rd">
                 </div>
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Address Line 2</label>
-                    <input type="text" name="shop_address_2" value="<?php echo esc_attr( isset($editing_shop['address_2']) ? $editing_shop['address_2'] : '' ); ?>" placeholder="Suite, Bldg, etc." style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                <div class="sywat-field-group">
+                    <label>Address Line 2</label>
+                    <input type="text" name="shop_address_2" value="<?php echo esc_attr( isset($editing_shop['address_2']) ? $editing_shop['address_2'] : '' ); ?>" placeholder="Suite, Bldg, etc.">
                 </div>
-                <div>
-                    <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">City</label>
-                    <input type="text" name="shop_city" value="<?php echo esc_attr( isset($editing_shop['city']) ? $editing_shop['city'] : '' ); ?>" placeholder="e.g. Roanoke" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+            </div>
+            <div class="sywat-form-grid-2" style="margin-top:12px;">
+                <div class="sywat-field-group">
+                    <label>City</label>
+                    <input type="text" name="shop_city" value="<?php echo esc_attr( isset($editing_shop['city']) ? $editing_shop['city'] : '' ); ?>" placeholder="e.g. Roanoke">
                 </div>
-                <div class="sywat-form-grid-2" style="gap:10px;">
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">State</label>
+                <div class="sywat-form-grid-2">
+                    <div class="sywat-field-group">
+                        <label>State</label>
                         <?php $curr_st = isset($editing_shop['state']) ? $editing_shop['state'] : ''; ?>
-                        <select name="shop_state" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                        <select name="shop_state">
                             <option value="" <?php selected( empty($curr_st), true ); ?>>-- Select State --</option>
                             <option value="TX" <?php selected( $curr_st, 'TX' ); ?>>TX - Texas</option>
                             <option value="OK" <?php selected( $curr_st, 'OK' ); ?>>OK - Oklahoma</option>
                             <option value="LA" <?php selected( $curr_st, 'LA' ); ?>>LA - Louisiana</option>
                         </select>
                     </div>
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">ZIP Code</label>
-                        <input type="text" name="shop_zip" value="<?php echo esc_attr( isset($editing_shop['zip']) ? $editing_shop['zip'] : '' ); ?>" placeholder="e.g. 76262" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                    <div class="sywat-field-group">
+                        <label>ZIP Code</label>
+                        <input type="text" name="shop_zip" value="<?php echo esc_attr( isset($editing_shop['zip']) ? $editing_shop['zip'] : '' ); ?>" placeholder="e.g. 76262">
                     </div>
                 </div>
             </div>
@@ -128,22 +130,22 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
             <!-- Primary Contact Section -->
             <div style="background:#f8fafc; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
                 <h4 style="margin:0 0 10px 0; font-size:14px; font-weight:700; color:#1e293b;">👤 Primary Contact Person</h4>
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1.5fr 1fr; gap:10px;">
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Primary Contact Name</label>
-                        <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" placeholder="e.g. Beau Brennan" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                <div class="sywat-form-grid-4">
+                    <div class="sywat-field-group">
+                        <label>Primary Contact Name</label>
+                        <input type="text" name="shop_contact" value="<?php echo esc_attr( isset($editing_shop['contact']) ? $editing_shop['contact'] : '' ); ?>" placeholder="e.g. Beau Brennan">
                     </div>
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Primary Title / Role</label>
-                        <input type="text" name="shop_contact_title" value="<?php echo esc_attr( isset($editing_shop['contact_title']) ? $editing_shop['contact_title'] : '' ); ?>" placeholder="e.g. Shop Owner" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                    <div class="sywat-field-group">
+                        <label>Primary Title / Role</label>
+                        <input type="text" name="shop_contact_title" value="<?php echo esc_attr( isset($editing_shop['contact_title']) ? $editing_shop['contact_title'] : '' ); ?>" placeholder="e.g. Shop Owner">
                     </div>
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Primary Email</label>
-                        <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. beau@domain.com" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                    <div class="sywat-field-group">
+                        <label>Primary Email</label>
+                        <input type="email" name="shop_email" value="<?php echo esc_attr( isset($editing_shop['email']) ? $editing_shop['email'] : '' ); ?>" placeholder="e.g. beau@domain.com">
                     </div>
-                    <div>
-                        <label style="display:block; font-weight:700; margin-bottom:4px; font-size:12px; color:#1e293b;">Primary Phone</label>
-                        <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                    <div class="sywat-field-group">
+                        <label>Primary Phone</label>
+                        <input type="text" name="shop_phone" class="sywat-phone-input" value="<?php echo esc_attr( isset($editing_shop['phone']) ? $editing_shop['phone'] : '' ); ?>" placeholder="817-439-8998">
                     </div>
                 </div>
             </div>
@@ -152,29 +154,29 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
             <div style="background:#ffffff; padding:15px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h4 style="margin:0; font-size:14px; font-weight:700; color:#1e293b;">👥 Additional Location Contacts</h4>
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" style="height:36px;" onclick="addShopContactRow()">Add Additional Contact</button>
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopContactRow()">Add Additional Contact</button>
                 </div>
                 <div id="sywat_shop_contacts_container" style="display:flex; flex-direction:column; gap:10px;">
                     <?php foreach ( $add_contacts as $idx => $ac ): ?>
                         <div class="sywat-contact-row" style="display:grid; grid-template-columns: 1fr 1fr 1.5fr 1fr auto; gap:10px; align-items:end; background:#f8fafc; padding:10px; border:1px solid #e2e8f0; border-radius:4px;">
-                            <div>
-                                <label style="display:block; font-weight:700; margin-bottom:4px; font-size:11px; color:#1e293b;">Contact Name</label>
-                                <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
+                            <div class="sywat-field-group">
+                                <label style="font-size:11px;">Contact Name</label>
+                                <input type="text" name="add_contact_names[]" value="<?php echo esc_attr( isset($ac['name']) ? $ac['name'] : '' ); ?>" placeholder="e.g. Hannah Lange">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label style="font-size:11px;">Role / Title</label>
+                                <input type="text" name="add_contact_titles[]" value="<?php echo esc_attr( isset($ac['title']) ? $ac['title'] : '' ); ?>" placeholder="e.g. Event Manager">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label style="font-size:11px;">Email</label>
+                                <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label style="font-size:11px;">Phone</label>
+                                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998">
                             </div>
                             <div>
-                                <label style="display:block; font-weight:700; margin-bottom:4px; font-size:11px; color:#1e293b;">Role / Title</label>
-                                <input type="text" name="add_contact_titles[]" value="<?php echo esc_attr( isset($ac['title']) ? $ac['title'] : '' ); ?>" placeholder="e.g. Event Manager" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
-                            </div>
-                            <div>
-                                <label style="display:block; font-weight:700; margin-bottom:4px; font-size:11px; color:#1e293b;">Email</label>
-                                <input type="email" name="add_contact_emails[]" value="<?php echo esc_attr( isset($ac['email']) ? $ac['email'] : '' ); ?>" placeholder="e.g. hannah@domain.com" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
-                            </div>
-                            <div>
-                                <label style="display:block; font-weight:700; margin-bottom:4px; font-size:11px; color:#1e293b;">Phone</label>
-                                <input type="text" name="add_contact_phones[]" class="sywat-phone-input" value="<?php echo esc_attr( isset($ac['phone']) ? $ac['phone'] : '' ); ?>" placeholder="817-439-8998" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;">
-                            </div>
-                            <div>
-                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopContactRow(this)">Remove</button>
+                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeShopContactRow(this)">Remove</button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -189,7 +191,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
         <div id="sywat_edit_tab_indoor_lines" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'indoor_lines') ? 'display:block;' : 'display:none;'; ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h4 style="margin:0; font-size:15px; font-weight:700; color:#1e293b;">SYWAT Indoor Lines & Capacity Templates</h4>
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" style="height:36px;" onclick="addShopIndoorLineRow()">Add New Line</button>
+                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopIndoorLineRow()">Add New Line</button>
             </div>
             <div class="sywat-table-responsive" style="margin-bottom:20px;">
                 <table class="sywat-table" id="sywat_shop_indoor_lines_table">
@@ -220,19 +222,33 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                                 }
                         ?>
                             <tr>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;">
-                                    <select name="indoor_line_days[]" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" onchange="checkShopLineDuplicate(this);">
-                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
-                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
-                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
-                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
-                                    </select>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <select name="indoor_line_days[]" onchange="checkShopLineDuplicate(this);">
+                                            <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
+                                            <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                            <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                            <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                        </select>
+                                    </div>
                                 </td>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;"><input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" onchange="checkShopLineDuplicate(this);"></td>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;"><input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;"></td>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;"><input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;"></td>
-                                <td class="sywat-col-center" style="padding:6px; vertical-align:middle;">
-                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopIndoorLineRow(this)">Remove</button>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required onchange="checkShopLineDuplicate(this);">
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <input type="number" name="cap_20yd[]" value="<?php echo esc_attr( isset($l['cap_20yd']) ? $l['cap_20yd'] : 20 ); ?>" min="0" required>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <input type="number" name="cap_cub[]" value="<?php echo esc_attr( isset($l['cap_cub']) ? $l['cap_cub'] : 5 ); ?>" min="0" required>
+                                    </div>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeShopIndoorLineRow(this)">Remove</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -245,7 +261,7 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
         <div id="sywat_edit_tab_outdoor_lines" class="sywat-edit-tab-content" style="<?php echo ($active_sub_tab === 'outdoor_lines') ? 'display:block;' : 'display:none;'; ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h4 style="margin:0; font-size:15px; font-weight:700; color:#1e293b;">SYWAT Outdoor Lines & Schedule Templates</h4>
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" style="height:36px;" onclick="addShopOutdoorLineRow()">Add New Line</button>
+                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addShopOutdoorLineRow()">Add New Line</button>
             </div>
             <div class="sywat-table-responsive" style="margin-bottom:20px;">
                 <table class="sywat-table" id="sywat_shop_outdoor_lines_table">
@@ -272,17 +288,23 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
                                 }
                         ?>
                             <tr>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;">
-                                    <select name="outdoor_line_days[]" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" onchange="checkShopLineDuplicate(this);">
-                                        <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
-                                        <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
-                                        <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
-                                        <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
-                                    </select>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <select name="outdoor_line_days[]" onchange="checkShopLineDuplicate(this);">
+                                            <option value="" disabled <?php selected( empty($day_val), true ); ?>>-- Select Day --</option>
+                                            <option value="Friday" <?php selected( $day_val, 'Friday' ); ?>>Friday</option>
+                                            <option value="Saturday" <?php selected( $day_val, 'Saturday' ); ?>>Saturday</option>
+                                            <option value="Sunday" <?php selected( $day_val, 'Sunday' ); ?>>Sunday</option>
+                                        </select>
+                                    </div>
                                 </td>
-                                <td style="padding:6px; vertical-align:middle; text-align:left;"><input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; height:38px; box-sizing:border-box; background:#fff;" onchange="checkShopLineDuplicate(this);"></td>
-                                <td class="sywat-col-center" style="padding:6px; vertical-align:middle;">
-                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height:38px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;" onclick="removeShopOutdoorLineRow(this)">Remove</button>
+                                <td>
+                                    <div class="sywat-field-group">
+                                        <input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required onchange="checkShopLineDuplicate(this);">
+                                    </div>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="removeShopOutdoorLineRow(this)">Remove</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -293,8 +315,8 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( $_POST['a
 
         <!-- GLOBAL FORM ACTIONS -->
         <div style="display:flex; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid #cbd5e1;">
-            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save" style="height:38px;">Save Changes</button>
-            <a href="<?php echo esc_url( $fallback_list_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="height:38px; display:inline-flex; align-items:center;" onclick="return confirmBackToList(event);">Back to List</a>
+            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Changes</button>
+            <a href="<?php echo esc_url( $fallback_list_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" onclick="return confirmBackToList(event);">Back to List</a>
         </div>
     </form>
 </div>
