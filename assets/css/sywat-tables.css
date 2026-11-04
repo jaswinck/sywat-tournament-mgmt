@@ -94,6 +94,7 @@
 .sywat-table th.text-right, .sywat-table td.text-right, .sywat-table th.sywat-col-right, .sywat-table td.sywat-col-right, .sywat-col-right { text-align: right !important; }
 .sywat-table th.text-left, .sywat-table td.text-left, .sywat-table th.sywat-col-left, .sywat-table td.sywat-col-left, .sywat-col-left { text-align: left !important; }
 
+/* Table Column Width Utilities */
 .sywat-col-date       { width: 22%; }
 .sywat-col-tourn      { width: 32%; }
 .sywat-col-shooters   { width: 15%; text-align: center; }
@@ -103,6 +104,12 @@
 .sywat-col-score       { width: 110px; text-align: center; }
 .sywat-col-total       { width: 130px; text-align: right; }
 .sywat-col-tourn-score { width: 140px; text-align: right; }
+
+/* Line Slot Usage Table Specific Columns */
+.sywat-col-line-name   { width: 30%; }
+.sywat-col-cap-20yd    { width: 25%; text-align: center; }
+.sywat-col-cap-cub     { width: 25%; text-align: center; }
+.sywat-col-line-action { width: 20%; text-align: center; }
 
 /* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
@@ -135,9 +142,31 @@
     text-align: center;
 }
 
-/* Status Indicator Utilities */
+/* Status Indicator Utilities & Badges */
 .sywat-text-open   { color: #008a20; font-weight: 600; }
 .sywat-text-closed { color: #d63638; font-weight: 600; }
+
+.sywat-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 12px;
+    margin-left: 6px;
+    line-height: 1.2;
+}
+
+.sywat-badge-open {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.sywat-badge-full {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
 
 /* Tournament Row Metadata Typography & Chips */
 .sywat-tourn-title  { font-size: 15px; color: #0f172a; display: block; }
