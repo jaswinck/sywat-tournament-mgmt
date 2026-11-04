@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -39,24 +39,58 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $edit_t_season = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start  = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end    = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
+
+        // Calculate existing tournament counts per shop for auto-naming logic
+        $shop_counts = array();
+        foreach ( $tournaments as $t_name => $t_info ) {
+            $s_id = sywat_get_tournament_shop_id( $t_info );
+            $shop_counts[$s_id] = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] + 1 : 1;
+        }
         ?>
         <div class="sywat-modal-backdrop <?php echo $open_tourn_modal ? 'active' : ''; ?>" id="sywat_add_tourn_modal">
             <div class="sywat-modal-content sywat-modal-lg">
+                <!-- STANDARDIZED MODAL HEADER -->
                 <div class="sywat-modal-header no-print">
-                    <h3><?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
+                    <h3>🎯 <?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
                     <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
                 </div>
-                <form method="post" action="?tab=manage" onsubmit="return validateTournamentLines();">
+
+                <form method="post" action="?tab=manage" id="sywat_tournament_config_form" onsubmit="return validateTournamentLines();">
                     <div class="sywat-modal-body">
                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                         <input type="hidden" name="sywat_action" value="save_tournament">
                         <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
 
+                        <!-- SHOP FIRST LAYOUT GRID -->
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
-                                <label>Tournament Name *</label>
-                                <input type="text" name="tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="e.g. CCR October 2026" required>
+                                <label>Host Archery Shop *</label>
+                                <?php if ( $can_manage_seasons ): ?>
+                                    <select name="shop_id" id="sywat_modal_shop_id" onchange="sywatAutoGenerateTournamentName()" required>
+                                        <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
+                                        <?php foreach ( $all_shops as $s_id => $s_name ): ?>
+                                            <?php $count = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] : 0; ?>
+                                            <option value="<?php echo esc_attr( $s_id ); ?>" 
+                                                    data-name="<?php echo esc_attr( $s_name['name'] ); ?>" 
+                                                    data-count="<?php echo $count; ?>" 
+                                                    <?php selected( $edit_t_shop, $s_id ); ?>>
+                                                <?php echo esc_html( $s_name['name'] ); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php else: ?>
+                                    <input type="hidden" name="shop_id" id="sywat_modal_shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
+                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly>
+                                <?php endif; ?>
                             </div>
+
+                            <div class="sywat-field-group">
+                                <label>Tournament Name * <small style="font-weight: normal; color: #64748b;">(Auto-generated, editable)</small></label>
+                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>Competition Season *</label>
                                 <select name="season_slug" required>
@@ -67,41 +101,25 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                        </div>
 
-                        <div class="sywat-field-group">
-                            <label>Host Archery Shop *</label>
-                            <?php if ( $can_manage_seasons ): ?>
-                                <select name="shop_id" required>
-                                    <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
-                                    <?php foreach ( $all_shops as $s_id => $s_name ): ?>
-                                        <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $edit_t_shop, $s_id ); ?>>
-                                            <?php echo esc_html( $s_name['name'] ); ?> (<?php echo esc_html( $s_id ); ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            <?php else: ?>
-                                <input type="hidden" name="shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
-                                <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="sywat-form-grid-2">
-                            <div class="sywat-field-group">
-                                <label>Start Date *</label>
-                                <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
-                            </div>
-                            <div class="sywat-field-group">
-                                <label>End Date (Optional for multi-day)</label>
-                                <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
+                            <div class="sywat-form-grid-2">
+                                <div class="sywat-field-group">
+                                    <label>Start Date *</label>
+                                    <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>End Date (Optional)</label>
+                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Dynamic Shooting Lines Repeater Table -->
-                        <div class="sywat-table-header-bar">
-                            <h4>Shooting Lines & Capacity Templates</h4>
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
+                        <!-- STANDARDIZED SECTION SUB-HEADER BAR -->
+                        <div class="sywat-table-header-bar" style="margin-top: 20px;">
+                            <h2>📋 Shooting Lines & Capacity Templates</h2>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">+ Add New Line</button>
                         </div>
+
                         <div class="sywat-table-responsive">
                             <table class="sywat-table" id="sywat_tourn_lines_table">
                                 <thead>
