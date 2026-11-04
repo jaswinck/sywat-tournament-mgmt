@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 5.9.0
+ * Version: 6.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -11,14 +11,14 @@ if (!defined('ABSPATH')) exit;
 function sywat_desk_render_family_banner($added_family_prompt) {
     if (!$added_family_prompt) return;
     ?>
-    <div class="no-print" style="background: #e0f2fe; border: 2px solid #0284c7; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-        <div style="font-size: 15px; font-weight: bold; color: #0369a1; margin-bottom: 6px;">
+    <div class="sywat-alert sywat-alert-success no-print" style="display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:15px; font-weight:bold;">
             ✅ <?php echo esc_html($added_family_prompt['archer_name']); ?> added under <?php echo esc_html($added_family_prompt['family_name']); ?>!
         </div>
-        <div style="font-size: 13px; color: #334155; margin-bottom: 12px;">
+        <div style="font-size:13px;">
             Is there another family member to register under this same payment group?
         </div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js($added_family_prompt['family_id']); ?>', '<?php echo esc_js($added_family_prompt['line_idx']); ?>')">
                 Yes, Add Next Family Member
             </button>
@@ -61,22 +61,22 @@ function sywat_desk_render_filter_bar($data) {
     </div>
 
     <!-- Master Single Unified Desk Card -->
-    <div class="sywat-card no-print" style="border-top-left-radius:0;">
+    <div class="sywat-card no-print">
         <!-- Integrated Control Panel Filter Toolbar Header Bar -->
-        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e2e8f0;">
+        <div class="sywat-card-header-bar">
             <div>
-                <h2 style="margin:0; font-size:20px; font-weight:700; color:#1e3a8a;">📋 Check In Archers</h2>
-                <div class="sywat-subtitle" style="margin-top:2px;">Select an active tournament and line to begin checking in archers.</div>
+                <h2>📋 Check In Archers</h2>
+                <div class="sywat-subtitle">Select an active tournament and line to begin checking in archers.</div>
             </div>
 
-            <div class="sywat-header-inline-controls" style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+            <div class="sywat-header-inline-controls">
                 <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
                     <!-- Stacked Active Tournament Select -->
-                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
-                        <label for="sywat_selected_tournament" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Active Tournament:</label>
-                        <select id="sywat_selected_tournament" name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:200px;">
+                    <div class="sywat-field-group" style="width:auto;">
+                        <label for="sywat_selected_tournament">Active Tournament:</label>
+                        <select id="sywat_selected_tournament" name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="min-width:200px;">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                                 <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
                                     <?php echo esc_html($t_name); ?>
@@ -86,9 +86,9 @@ function sywat_desk_render_filter_bar($data) {
                     </div>
 
                     <!-- Stacked Shooting Line Select -->
-                    <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
-                        <label for="sywat_selected_line_idx" style="font-weight:600; font-size:12px; color:#475569; margin:0;">Shooting Line:</label>
-                        <select id="sywat_selected_line_idx" name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; margin:0; background:#fff; min-width:160px;">
+                    <div class="sywat-field-group" style="width:auto;">
+                        <label for="sywat_selected_line_idx">Shooting Line:</label>
+                        <select id="sywat_selected_line_idx" name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="min-width:160px;">
                             <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
                             <?php foreach ($data['lines'] as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
@@ -100,7 +100,7 @@ function sywat_desk_render_filter_bar($data) {
                 </form>
 
                 <?php if ($is_hub_enabled): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back" style="height:38px; margin:0;">Back to Hub</a>
+                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -123,9 +123,9 @@ function sywat_desk_render_capacity_tracker($data) {
     ?>
     <!-- Nested Section: Line Capacity Tracker -->
     <div style="margin-bottom:24px;">
-        <div class="sywat-card-header-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-            <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Line Capacity Tracker</h2>
-            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" style="height:38px;" onclick="openWalkinModal()">Add Walk-In</button>
+        <div class="sywat-table-header-bar">
+            <h2>Line Capacity Tracker</h2>
+            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
         </div>
         <?php if (!empty($lines)): ?>
             <?php
@@ -253,12 +253,12 @@ function sywat_desk_render_archers_table($data) {
     ?>
     <!-- Nested Section: Registered Archers Table -->
     <div>
-        <div class="sywat-card-header-bar" style="margin-bottom:12px;">
-            <h2 style="font-size:16px; margin:0; font-weight:700; color:#0f172a;">Registered Archers</h2>
-            <div class="sywat-header-inline-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div class="sywat-table-header-bar">
+            <h2>Registered Archers</h2>
+            <div class="sywat-table-header-controls">
                 <div style="display:flex; gap:6px; margin:0; align-items:center;">
-                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px; box-sizing:border-box; background:#fff;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height:38px;" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
             </div>
         </div>
@@ -269,14 +269,14 @@ function sywat_desk_render_archers_table($data) {
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th style="text-align:center;">Type</th>
+                            <th class="sywat-col-center">Type</th>
                             <th>Line</th>
                             <th>Division</th>
-                            <th style="text-align:center;">Gender</th>
+                            <th class="sywat-col-center">Gender</th>
                             <th>Style</th>
                             <th>Paid Status</th>
-                            <th style="text-align:center;">Distance</th>
-                            <th style="text-align:right;">Actions</th>
+                            <th class="sywat-col-center">Distance</th>
+                            <th class="sywat-col-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -316,16 +316,16 @@ function sywat_desk_render_archers_table($data) {
                                         <?php } ?>
                                     <?php endif; ?>
                                 </td>
-                                <td style="text-align:center;">
+                                <td class="sywat-col-center">
                                     <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
                                 </td>
                                 <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'N/A'); ?></td>
                                 <td><?php echo esc_html($div_disp); ?></td>
-                                <td style="text-align:center;"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
+                                <td class="sywat-col-center"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
                                 <td><?php echo esc_html($style_disp); ?></td>
                                 <td style="font-weight:bold; color:#0073aa;"><?php echo esc_html($paid_disp); ?></td>
-                                <td style="text-align:center;"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
-                                <td style="text-align:right;">
+                                <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
+                                <td class="sywat-col-right">
                                     <div class="sywat-table-actions">
                                         <form method="post" style="margin:0;">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
@@ -376,13 +376,11 @@ function sywat_desk_render_archers_table($data) {
 ?>
 
 <script>
-// Stop the browser from resubmitting the form when you press Refresh (F5)
 if ( window.history.replaceState ) {
     window.history.replaceState( null, null, window.location.href );
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-    // Auto-dismiss Check-In Desk alert banners after 4 seconds
     setTimeout(function() {
         const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
         notices.forEach(function(notice) {
