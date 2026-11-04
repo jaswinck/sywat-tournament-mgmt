@@ -3,7 +3,7 @@
  * Sub-Module: Shop & Club Administration Management Views Controller
  * Path: includes/shops/shops-views.php
  * Author: SYWAT Archery / TFAA
- * Version: 3.6.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,7 +15,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
 
         if ( ! $can_manage_shops && empty( $user_shop_id ) ) {
-            echo '<p style="color:red; padding:20px;">Management access required to manage shops and clubs.</p>';
+            echo '<div class="sywat-alert sywat-alert-danger">Management access required to manage shops and clubs.</div>';
             return;
         }
 
