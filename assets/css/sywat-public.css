@@ -1,0 +1,115 @@
+/* ==========================================================================
+   SYWAT Archery - Public Results, Standings & Dynamic Schedules
+   Path: assets/css/sywat-public.css
+   ========================================================================== */
+
+.sywat-public-card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+
+.sywat-filter-bar {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 25px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.sywat-filter-bar .sywat-field-group { flex: 1 1 140px; width: auto; }
+.sywat-filter-bar .sywat-field-group:last-child { flex: 2 1 240px; }
+
+.sywat-search-input-wrapper { display: flex; gap: 5px; align-items: center; }
+.sywat-search-input-wrapper input[type="text"] { flex: 1; height: 38px; box-sizing: border-box; margin: 0; }
+.sywat-search-input-wrapper .sywat-btn { height: 38px; font-size: 13px; padding: 4px 12px; margin: 0; white-space: nowrap; }
+
+/* Participation Stat Banners */
+.sywat-counter-banner {
+    margin-top: 15px;
+    margin-bottom: 20px;
+    padding: 11px 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e40af;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.sywat-counter-banner.is-filtered {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.sywat-counter-banner strong { font-size: 16px; font-weight: 700; }
+
+/* Leaderboard & Division Cards */
+.sywat-div-gen-card {
+    margin-bottom: 30px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.sywat-div-gen-header {
+    background: #1e3a8a;
+    color: #ffffff;
+    padding: 12px 18px;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.sywat-style-block { margin-bottom: 25px; }
+.sywat-style-block:last-child { margin-bottom: 5px; }
+
+.sywat-single-category-header {
+    background: #1e3a8a;
+    color: #ffffff;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sywat-style-header {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #e2e8f0;
+    padding: 8px 14px;
+    border-left: 5px solid #2563eb;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.sywat-shop-location { font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px; }
+.sywat-empty-notice { color: #646970; font-style: italic; padding: 20px 0; }
+.sywat-badge-pending { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 6px 12px; font-size: 12px; }
+
+@media (max-width: 768px) {
+    .sywat-filter-bar .sywat-field-group { flex: 1 1 100% !important; width: 100% !important; }
+}
