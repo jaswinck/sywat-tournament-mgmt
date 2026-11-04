@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -223,5 +223,86 @@ if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
         }
 
         return $matches;
+    }
+}
+
+/**
+ * Master Data Retrieval Engine for Admin Portal & Views
+ */
+if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
+    function sywat_get_master_portal_data() {
+        global $wpdb;
+
+        $can_manage_seasons = sywat_can_manage_seasons();
+        $can_access_desk    = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
+        $can_edit_scores    = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
+
+        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        $seasons            = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
+
+        $tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( ! is_array( $tournaments ) ) $tournaments = array();
+
+        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
+        if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
+
+        // Load Registrations from DB with Master Roster Fallback
+        $registrations = array();
+        $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+        if ( is_array( $results ) ) {
+            foreach ($results as $row) {
+                $reg_data = maybe_unserialize($row->option_value);
+                if (is_array($reg_data) && isset($reg_data['id'])) {
+                    $registrations[] = $reg_data;
+                }
+            }
+        }
+
+        // Fallback: Query master registration options if single option keys return empty
+        if ( empty( $registrations ) && function_exists( 'sywat_get_registrations' ) ) {
+            $registrations = sywat_get_registrations();
+        }
+
+        // Filter Tournaments by Shop Scoping & Collect Unique Shops for Filter Dropdown
+        $scoped_tournaments = array();
+        $filter_shops       = array();
+
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $t_shop = sywat_get_tournament_shop_id( $t_data );
+            if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
+                $scoped_tournaments[$t_name] = $t_data;
+                if ( isset( $all_shops[$t_shop]['name'] ) ) {
+                    $filter_shops[$t_shop] = $all_shops[$t_shop]['name'];
+                }
+            }
+        }
+        asort( $filter_shops );
+
+        // Sort tournaments chronologically by Start Date (Soonest first)
+        uasort( $scoped_tournaments, function( $a, $b ) {
+            $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
+            $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
+            if ( $a_date === $b_date ) return 0;
+            return ( $a_date < $b_date ) ? -1 : 1;
+        });
+
+        $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
+        $tfaa_count = isset( $tfaa_cache['count'] ) ? $tfaa_cache['count'] : 0;
+
+        return array(
+            'can_manage_seasons' => $can_manage_seasons,
+            'can_access_desk'    => $can_access_desk,
+            'can_edit_scores'    => $can_edit_scores,
+            'user_shop_id'       => $user_shop_id,
+            'all_shops'          => $all_shops,
+            'seasons'            => $seasons,
+            'tournaments'        => $tournaments,
+            'active_tournaments' => $active_tournaments,
+            'registrations'      => $registrations,
+            'scoped_tournaments' => $scoped_tournaments,
+            'filter_shops'       => $filter_shops,
+            'tfaa_count'         => $tfaa_count,
+        );
     }
 }
