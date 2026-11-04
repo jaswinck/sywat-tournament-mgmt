@@ -474,9 +474,9 @@
     font-weight: 700 !important;
 }
 
-/* Strict 100% Modal Repeater Table Grid (Zero Horizontal Overflow) */
+/* Dynamic Shrink-Wrap Table Engine */
 .sywat-modal-repeater-table {
-    table-layout: fixed !important;
+    table-layout: auto !important;
     width: 100% !important;
     margin: 0 !important;
     border-collapse: collapse !important;
@@ -489,8 +489,8 @@
     box-sizing: border-box !important;
 }
 
-.sywat-modal-repeater-table input,
-.sywat-modal-repeater-table select {
+.sywat-modal-repeater-table select,
+.sywat-modal-repeater-table input[type="text"] {
     height: 28px !important;
     min-height: 28px !important;
     font-size: 12px !important;
@@ -498,29 +498,38 @@
     margin: 0 !important;
     box-sizing: border-box !important;
     width: 100% !important;
-    min-width: 0 !important; /* Overrides filter select min-width */
+    min-width: 0 !important;
     max-width: 100% !important;
 }
 
+.sywat-modal-repeater-table input[type="number"].sywat-col-num-input {
+    width: 55px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    padding: 2px 4px !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+}
+
 .sywat-modal-repeater-table .sywat-btn-sm {
-    padding: 3px 8px !important;
+    padding: 3px 10px !important;
     font-size: 11px !important;
     height: 26px !important;
     min-height: 26px !important;
     line-height: 1 !important;
     white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
 
-.sywat-modal-repeater-table .sywat-col-num-input {
-    width: 100% !important;
-    text-align: center !important;
-}
-
-/* Optimized Proportional Column Widths (22% + 18% + 15% + 15% + 30% = 100%) */
-.sywat-modal-repeater-table th.sywat-col-day       { width: 22% !important; }
-.sywat-modal-repeater-table th.sywat-col-time      { width: 18% !important; }
-.sywat-modal-repeater-table th.sywat-col-cap       { width: 15% !important; }
-.sywat-modal-repeater-table th.sywat-col-action-sm { width: 30% !important; }
+/* Dynamic Column Shrink-Wrap & Stretch Rules:
+   Setting 'width: 1%' forces the browser to shrink-wrap Capacities and Remove buttons down to their exact content dimensions.
+   Shooting Day and Start Time expand to take up all remaining flex space. */
+.sywat-modal-repeater-table th.sywat-col-day       { width: 55% !important; }
+.sywat-modal-repeater-table th.sywat-col-time      { width: 35% !important; }
+.sywat-modal-repeater-table th.sywat-col-cap       { width: 1% !important; white-space: nowrap !important; }
+.sywat-modal-repeater-table th.sywat-col-action-sm { width: 1% !important; white-space: nowrap !important; }
 
 /* Mobile & Tablet Responsiveness */
 @media (max-width: 768px) {
