@@ -50,41 +50,64 @@
     font-size: 11px;
 }
 
-/* Dashboard Action Cells (Standard Wrap Flow for Main Tables) */
+/* Action Cell Horizontal Alignment */
 .sywat-table-actions {
     display: flex !important;
     gap: 6px !important;
     align-items: center !important;
-    justify-content: flex-end !important;
-    flex-wrap: wrap !important;
+    justify-content: center !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    margin: 0 auto !important;
 }
 
-/* Stacked Roster Action Buttons (Strictly Isolated - Identical 80px Button Dimensions) */
-.sywat-roster-actions-cell,
-.sywat-table-actions-stacked {
+/* ==========================================================================
+   RESTORED: Main Dashboard Tournament Actions (180px Wide) 
+   ========================================================================== */
+.sywat-table-actions-vertical,
+.sywat-manage-row td:last-child > div {
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    width: 100% !important;
+    max-width: 180px !important;
+    margin: 0 auto !important;
+}
+
+.sywat-table-actions-vertical .sywat-btn,
+.sywat-table-actions-vertical form,
+.sywat-manage-row td:last-child > div .sywat-btn,
+.sywat-manage-row td:last-child > div form {
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* ==========================================================================
+   NEW: Isolated Modal Roster Buttons (90px Wide, Equal Size) 
+   ========================================================================== */
+.sywat-modal-roster-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
     justify-content: center !important;
     gap: 3px !important;
     width: 100% !important;
+    max-width: 90px !important;
+    margin: 0 auto !important;
 }
 
-.sywat-roster-actions-cell a.sywat-btn,
-.sywat-roster-actions-cell form,
-.sywat-roster-actions-cell form .sywat-btn,
-.sywat-table-actions-stacked a.sywat-btn,
-.sywat-table-actions-stacked form,
-.sywat-table-actions-stacked form .sywat-btn {
+.sywat-modal-roster-actions a.sywat-btn,
+.sywat-modal-roster-actions form,
+.sywat-modal-roster-actions form .sywat-btn {
     margin: 0 !important;
-    width: 80px !important;
+    width: 100% !important;
     height: 26px !important;
-    min-height: 26px !important;
-    max-height: 26px !important;
     line-height: 24px !important;
     padding: 0 6px !important;
     font-size: 11px !important;
-    font-weight: 600 !important;
     box-sizing: border-box !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -92,18 +115,18 @@
     border-radius: 4px !important;
 }
 
-/* Default Last Column Alignment */
+/* Default Last Column Behavior */
 .sywat-table th:last-child, 
 .sywat-table td:last-child { 
     text-align: right; 
 }
 
-/* Explicit Alignment Utilities */
+/* Explicit Alignment Utilities (Overrides Defaults) */
 .sywat-table th.text-center, .sywat-table td.text-center, .sywat-table th.sywat-col-center, .sywat-table td.sywat-col-center, .sywat-col-center { text-align: center !important; }
 .sywat-table th.text-right, .sywat-table td.text-right, .sywat-table th.sywat-col-right, .sywat-table td.sywat-col-right, .sywat-col-right { text-align: right !important; }
 .sywat-table th.text-left, .sywat-table td.text-left, .sywat-table th.sywat-col-left, .sywat-table td.sywat-col-left, .sywat-col-left { text-align: left !important; }
 
-/* Dashboard Column Width Utilities */
+/* Table Column Width Utilities */
 .sywat-col-date       { width: 22%; }
 .sywat-col-tourn      { width: 32%; }
 .sywat-col-shooters   { width: 15%; text-align: center; }
@@ -120,18 +143,19 @@
 .sywat-col-cap-cub     { width: 25%; text-align: center; }
 .sywat-col-line-action { width: 20%; text-align: center; }
 
-/* Archer Roster Table Specific Columns (Explicit Centered Action Column) */
-.sywat-col-roster-name   { width: 30%; text-align: left !important; }
+/* Archer Roster Table Specific Columns (Restored Widths & Centered Action) */
+.sywat-col-roster-name   { width: 30%; }
 .sywat-col-roster-type   { width: 20%; text-align: center !important; }
-.sywat-col-roster-line   { width: 24%; text-align: left !important; }
+.sywat-col-roster-line   { width: 22%; }
 .sywat-col-roster-dist   { width: 12%; text-align: center !important; }
-.sywat-col-roster-action { width: 14%; text-align: center !important; }
+.sywat-col-roster-action { width: 16%; text-align: center !important; }
 
-/* Line Slot Capacity Stack & Spacing */
-.sywat-line-slot-section {
+/* Fixed Spacing for "Current Line Slot Usage" Headers */
+.sywat-table-header-bar {
     margin-top: 24px !important;
 }
 
+/* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
     display: flex;
     flex-direction: column;
