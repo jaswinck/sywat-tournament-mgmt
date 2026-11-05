@@ -362,7 +362,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                 </td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage" onclick="document.getElementById('sywat_line_roster_modal_<?php echo esc_js( $idx ); ?>').classList.add('active', 'sywat-modal-active');">
+                                        <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full" onclick="document.getElementById('sywat_line_roster_modal_<?php echo esc_js( $idx ); ?>').classList.add('active', 'sywat-modal-active');">
                                             View Roster
                                         </button>
                                         <?php if ( $total_line_shooters > 0 || ($waitlisted_20 + $waitlisted_cub) > 0 ): ?>
@@ -373,7 +373,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                                 <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
                                                 <input type="hidden" name="redirect_action" value="prereg">
-                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Clear Line</button>
+                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Clear Line</button>
                                             </form>
                                         <?php endif; ?>
                                     </div>
