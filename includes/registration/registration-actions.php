@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.1.0-DIAGNOSTIC
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -91,19 +91,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_dist_tallies[$key]['count']++;
         }
 
-        // ==========================================
-        // METHODICAL DIAGNOSTIC TRAP
-        // ==========================================
-        $is_diagnostic = (strcasecmp($group_name, 'DEBUG CAPACITY') === 0);
-        $diagnostic_data = array();
-        if ($is_diagnostic) {
-            $diagnostic_data['System'] = 'Checking backend math at exact moment of POST';
-            $diagnostic_data['Tournament_Name'] = $tourn_name;
-            $diagnostic_data['Total_Archers_Submitted'] = count($valid_archers);
-            $diagnostic_data['Line_Evaluations'] = array();
-        }
-        // ==========================================
-
         $capacity_overflows = array();
         foreach ($line_dist_tallies as $key => $tally) {
             $l_idx    = $tally['line_idx'];
@@ -132,18 +119,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             $open_slots = max(0, $max_capacity - $current_count);
 
-            if ($is_diagnostic) {
-                $diagnostic_data['Line_Evaluations'][] = array(
-                    'Line_Name' => $line_name,
-                    'Distance' => $dist,
-                    'Requested_Spots' => $req_cnt,
-                    'DB_Count_Found' => $current_count,
-                    'DB_Max_Capacity' => $max_capacity,
-                    'Calculated_Open_Slots' => $open_slots,
-                    'Did_It_Trigger_Overflow?' => ($req_cnt > $open_slots) ? 'YES' : 'NO'
-                );
-            }
-
             if ($req_cnt > $open_slots) {
                 $capacity_overflows[] = array(
                     'line_idx'   => $l_idx,
@@ -153,18 +128,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     'open_slots' => $open_slots,
                 );
             }
-        }
-
-        // ==========================================
-        // DIAGNOSTIC SCREEN PRINT & HALT
-        // ==========================================
-        if ($is_diagnostic) {
-            echo '<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;color:#0f0;z-index:9999999;padding:40px;box-sizing:border-box;overflow:auto;font-family:monospace;">';
-            echo '<h1 style="color:#0f0;border-bottom:2px solid #0f0;padding-bottom:10px;">SYWAT CAPACITY DIAGNOSTIC</h1>';
-            echo '<pre style="font-size:16px;">' . print_r($diagnostic_data, true) . '</pre>';
-            echo '<button onclick="window.history.back()" style="padding:15px 30px;background:#0f0;color:#000;border:none;font-size:18px;cursor:pointer;margin-top:20px;font-weight:bold;">Go Back</button>';
-            echo '</div>';
-            exit;
         }
 
         if ( ! empty( $capacity_overflows ) && ! $allow_partial ) {
@@ -181,10 +144,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
             }
 
-            $prompt_html  = '<div class="sywat-overflow-dialog">';
-            $prompt_html .= '<div class="sywat-overflow-title" style="font-size: 1.25rem; font-weight: bold; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
-            $prompt_html .= '<div class="sywat-overflow-body" style="font-size: 0.98rem; margin-bottom: 16px; line-height: 1.5; color: #1f2937;">' . implode('<br>', $overflow_details) . '</div>';
-            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 20px; color: #4b5563; font-size: 0.95rem;">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
+            $prompt_html  = '<div class="sywat-overflow-dialog" style="color:#000;">';
+            $prompt_html .= '<div class="sywat-overflow-title" style="font-size: 1.3rem; font-weight: bold; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
+            $prompt_html .= '<div class="sywat-overflow-body" style="font-size: 1.05rem; margin-bottom: 16px; line-height: 1.5; color: #1f2937;">' . implode('<br>', $overflow_details) . '</div>';
+            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 25px; color: #4b5563; font-size: 1rem;">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
             $prompt_html .= '<div class="sywat-overflow-actions" style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">';
             $prompt_html .= '<form method="post" style="display: inline-block; margin: 0;">';
             $prompt_html .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
@@ -202,7 +165,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
-            return '';
+            return ''; // Stops the normal top-of-page rendering so the modal takes over entirely
         }
 
         $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'];
@@ -377,6 +340,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
         }
 
-        return $msg;
+        return $msg; // Returns normal successes directly to the top banner
     }
 }
