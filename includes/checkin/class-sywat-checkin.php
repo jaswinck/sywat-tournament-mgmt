@@ -5,7 +5,7 @@
  * Description: Main entry point and shortcode definition for the Check-In Desk portal.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 6.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -18,6 +18,11 @@ require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-modals.php';
 
 add_shortcode('sywat_desk', 'render_sywat_desk_app');
 
+/**
+ * Shortcode handler rendering the Check-In Desk Portal.
+ *
+ * @return string Rendered HTML markup output.
+ */
 function render_sywat_desk_app() {
     // Central Permissions Check
     if (function_exists('sywat_can_access_desk') && !sywat_can_access_desk()) {
@@ -40,7 +45,10 @@ function render_sywat_desk_app() {
         $data = sywat_desk_get_data();
     }
 
-    // 4. Render Interface
+    // 4. Enqueue External JS & Localize Data State
+    sywat_desk_enqueue_scripts($data);
+
+    // 5. Render Interface
     echo '<div class="sywat-wrap">';
     echo $action_notice;
     sywat_desk_render_family_banner($data['added_family_prompt']);
@@ -49,9 +57,52 @@ function render_sywat_desk_app() {
     sywat_desk_render_archers_table($data);
     echo '</div>';
 
-    // 5. Render Modals & Client Scripts
+    // 6. Render Modals
     sywat_desk_render_modals($data);
-    sywat_desk_render_client_scripts($data);
 
     return ob_get_clean();
+}
+
+/**
+ * Enqueues external JS asset and injects localized JSON datasets.
+ *
+ * @param array $data Aggregated state dataset.
+ * @return void
+ */
+function sywat_desk_enqueue_scripts($data) {
+    $tfaa_cache = get_option('sywat_tfaa_cache', array());
+    $exact_entries = isset($tfaa_cache['exact']) && is_array($tfaa_cache['exact']) ? $tfaa_cache['exact'] : array();
+
+    $js_tfaa_desk_data = array();
+    foreach ($exact_entries as $norm_key => $records) {
+        if (!is_array($records) || empty($records)) continue;
+
+        $best_rec = $records[0];
+        foreach ($records as $rec) {
+            if (isset($rec['style']) && stripos($rec['style'], 'FS Pro') !== false) {
+                $best_rec = $rec;
+                break;
+            }
+        }
+
+        $name = isset($best_rec['full_name']) ? $best_rec['full_name'] : (isset($best_rec['name']) ? $best_rec['name'] : '');
+        if (!empty($name)) {
+            $js_tfaa_desk_data[] = array(
+                'name'     => $name,
+                'division' => isset($best_rec['division']) ? $best_rec['division'] : '',
+                'gender'   => isset($best_rec['gender']) ? $best_rec['gender'] : '',
+                'style'    => isset($best_rec['style']) ? $best_rec['style'] : '',
+            );
+        }
+    }
+
+    $handle = 'sywat-checkin-js';
+    wp_enqueue_script($handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', array(), SYWAT_VERSION, true);
+
+    $inline_js = 'window.sywatHistory = ' . json_encode($data['history_profiles']) . '; ' .
+                 'window.tfaaData = ' . json_encode($data['tfaa_data_bundle']) . '; ' .
+                 'window.sywatDeskTfaaShooters = ' . json_encode(array_values($js_tfaa_desk_data)) . '; ' .
+                 'window.existingFamiliesByLine = ' . json_encode($data['existing_families_by_line']) . ';';
+
+    wp_add_inline_script($handle, $inline_js, 'before');
 }
