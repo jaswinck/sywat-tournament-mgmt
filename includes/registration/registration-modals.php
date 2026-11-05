@@ -70,7 +70,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
-                <h2>Phone & Group Registration Intake</h2>
+                <h2>📞 Phone & Group Registration Intake</h2>
             </div>
             
             <form method="post" id="sywat_phone_intake_form">
@@ -201,7 +201,7 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
-                <h2>Bulk Upload Roster File (FareHarbor CSV)</h2>
+                <h2>📁 Bulk Upload Roster File (FareHarbor CSV)</h2>
             </div>
             <form method="post" enctype="multipart/form-data" id="sywat_import_form">
                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -248,9 +248,9 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
 if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
     function sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations ) {
         ?>
-        <div>
+        <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
-                <h2>Current Line Slot Usage</h2>
+                <h2>📊 Current Line Slot Usage</h2>
             </div>
             <div class="sywat-table-responsive">
                 <table class="sywat-table">
