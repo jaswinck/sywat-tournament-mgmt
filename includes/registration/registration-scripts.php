@@ -3,11 +3,16 @@
  * Sub-Module: Registration Engine Client Scripts Enqueuer
  * Path: includes/registration/registration-scripts.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Enqueues registration portal client scripts and localizes cached TFAA and phone data.
+ *
+ * @return void
+ */
 if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
     function sywat_render_registration_scripts() {
         $tfaa_cache   = get_option( 'sywat_tfaa_cache', array() );
@@ -65,8 +70,10 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
             ? SYWAT_PLUGIN_URL . 'assets/js/sywat-registration.js' 
             : plugins_url( '../../assets/js/sywat-registration.js', __FILE__ );
 
+        $version = defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '6.0.0';
+
         // Enqueue external JavaScript file
-        wp_enqueue_script( 'sywat-registration-js', $js_url, array(), '5.0.0', true );
+        wp_enqueue_script( 'sywat-registration-js', $js_url, array(), $version, true );
 
         // Localize database caches to JS window object safely
         wp_localize_script( 'sywat-registration-js', 'sywatRegData', array(
