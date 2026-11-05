@@ -1,6 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Unified Button System Spec
    Path: assets/css/sywat-buttons.css
+   Version: 6.3.1
    ========================================================================== */
 
 /* Universal Button Base (38px Standard Height) */
@@ -14,7 +15,9 @@
 .sywat-btn-checkedin,
 .sywat-btn-push,
 .sywat-btn-live,
-.sywat-btn-global-push {
+.sywat-btn-global-push,
+.sywat-btn-warning,
+.sywat-btn-warning-solid {
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
@@ -66,6 +69,29 @@
 .sywat-btn-success-solid:hover {
     background-color: #006e19;
     border-color: #006e19;
+    color: #ffffff !important;
+}
+
+/* Warning Buttons (Capacity Overflows & Waitlists) */
+.sywat-btn-warning {
+    background-color: #ffffff;
+    border: 1px solid #d97706;
+    color: #d97706 !important;
+}
+.sywat-btn-warning:hover {
+    background-color: #d97706;
+    border-color: #d97706;
+    color: #ffffff !important;
+}
+
+.sywat-btn-warning-solid {
+    background-color: #d97706;
+    border: 1px solid #d97706;
+    color: #ffffff !important;
+}
+.sywat-btn-warning-solid:hover {
+    background-color: #b45309;
+    border-color: #b45309;
     color: #ffffff !important;
 }
 
@@ -171,6 +197,19 @@
 .sywat-btn-full {
     width: 100%;
     max-width: 140px;
+}
+
+/* Multi-Line Full-Width Block Button (For Modal Dialog Actions & Responsive Stacks) */
+.sywat-btn-block {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 42px !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.4 !important;
+    padding: 10px 16px !important;
+    text-align: center !important;
 }
 
 .sywat-btn-sm {
