@@ -93,16 +93,17 @@
 }
 
 /* ==========================================================================
-   NEW: Isolated Modal Roster Buttons (Tight 75px Width, Equal Size)
+   NEW: Isolated Modal Roster Buttons (Strict 85px Width, Equal Size)
    ========================================================================== */
 .sywat-modal-roster-actions {
-    display: inline-flex !important;
+    display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: center !important;
     gap: 4px !important;
-    width: 100% !important;
-    max-width: 75px !important;
+    width: 85px !important;
+    min-width: 85px !important;
+    max-width: 85px !important;
     margin: 0 auto !important;
 }
 
@@ -113,7 +114,7 @@
     width: 100% !important;
     height: 26px !important;
     line-height: 24px !important;
-    padding: 0 6px !important;
+    padding: 0 4px !important;
     font-size: 11px !important;
     box-sizing: border-box !important;
     display: inline-flex !important;
@@ -156,12 +157,22 @@
     margin: 0 auto !important;
 }
 
-/* Archer Roster Table Specific Columns (Adjusted for Fit) */
-.sywat-col-roster-name   { width: 25%; }
-.sywat-col-roster-type   { width: 20%; text-align: center; }
+/* Archer Roster Table Specific Columns & Lock */
+.sywat-roster-table {
+    table-layout: fixed !important;
+    min-width: 0 !important;
+    width: 100% !important;
+}
+.sywat-roster-table th, .sywat-roster-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-wrap: break-word;
+}
+.sywat-col-roster-name   { width: 28%; }
+.sywat-col-roster-type   { width: 18%; text-align: center; }
 .sywat-col-roster-line   { width: 22%; }
-.sywat-col-roster-dist   { width: 13%; text-align: center; }
-.sywat-col-roster-action { width: 20%; text-align: center !important; }
+.sywat-col-roster-dist   { width: 14%; text-align: center; }
+.sywat-col-roster-action { width: 18%; text-align: center !important; }
 
 /* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
