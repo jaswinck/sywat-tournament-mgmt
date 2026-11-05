@@ -11,14 +11,14 @@ if (!defined('ABSPATH')) exit;
 function sywat_desk_render_family_banner($added_family_prompt) {
     if (!$added_family_prompt) return;
     ?>
-    <div class="sywat-alert sywat-alert-success no-print" style="display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:15px; font-weight:bold;">
+    <div class="sywat-alert sywat-alert-success no-print sywat-family-banner">
+        <div class="sywat-family-banner-title">
             ✅ <?php echo esc_html($added_family_prompt['archer_name']); ?> added under <?php echo esc_html($added_family_prompt['family_name']); ?>!
         </div>
-        <div style="font-size:13px;">
+        <div class="sywat-family-banner-subtext">
             Is there another family member to register under this same payment group?
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+        <div class="sywat-family-banner-actions">
             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js($added_family_prompt['family_id']); ?>', '<?php echo esc_js($added_family_prompt['line_idx']); ?>')">
                 Yes, Add Next Family Member
             </button>
@@ -70,13 +70,13 @@ function sywat_desk_render_filter_bar($data) {
             </div>
 
             <div class="sywat-header-inline-controls">
-                <form method="post" id="sywat_filter_form" style="margin:0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+                <form method="post" id="sywat_filter_form" class="sywat-filter-bar-form">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                     
                     <!-- Stacked Active Tournament Select -->
-                    <div class="sywat-field-group" style="width:auto;">
+                    <div class="sywat-field-group sywat-field-auto">
                         <label for="sywat_selected_tournament">Active Tournament:</label>
-                        <select id="sywat_selected_tournament" name="selected_tournament" onchange="document.getElementById('sywat_filter_form').submit();" style="min-width:200px;">
+                        <select id="sywat_selected_tournament" name="selected_tournament" class="sywat-select-tournament" onchange="document.getElementById('sywat_filter_form').submit();">
                             <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
                                 <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
                                     <?php echo esc_html($t_name); ?>
@@ -86,9 +86,9 @@ function sywat_desk_render_filter_bar($data) {
                     </div>
 
                     <!-- Stacked Shooting Line Select -->
-                    <div class="sywat-field-group" style="width:auto;">
+                    <div class="sywat-field-group sywat-field-auto">
                         <label for="sywat_selected_line_idx">Shooting Line:</label>
-                        <select id="sywat_selected_line_idx" name="selected_line_idx" onchange="document.getElementById('sywat_filter_form').submit();" style="min-width:160px;">
+                        <select id="sywat_selected_line_idx" name="selected_line_idx" class="sywat-select-line" onchange="document.getElementById('sywat_filter_form').submit();">
                             <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
                             <?php foreach ($data['lines'] as $idx => $line): ?>
                                 <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
@@ -122,7 +122,7 @@ function sywat_desk_render_capacity_tracker($data) {
 
     ?>
     <!-- Nested Section: Line Capacity Tracker -->
-    <div style="margin-bottom:24px;">
+    <div class="sywat-tracker-container">
         <div class="sywat-table-header-bar">
             <h2>Line Capacity Tracker</h2>
             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
@@ -230,7 +230,7 @@ function sywat_desk_render_capacity_tracker($data) {
                 <?php endforeach; ?>
             </div>
         <?php else: ?>
-            <p style="color:#64748b; font-style:italic;">No shooting lines configured.</p>
+            <p class="sywat-empty-text">No shooting lines configured.</p>
         <?php endif; ?>
     </div>
     <?php
@@ -256,7 +256,7 @@ function sywat_desk_render_archers_table($data) {
         <div class="sywat-table-header-bar">
             <h2>Registered Archers</h2>
             <div class="sywat-table-header-controls">
-                <div style="display:flex; gap:6px; margin:0; align-items:center;">
+                <div class="sywat-search-input-group">
                     <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
@@ -297,10 +297,10 @@ function sywat_desk_render_archers_table($data) {
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
-                                    <div style="font-weight:bold; color:#0f172a;"><?php echo esc_html($reg['name']); ?></div>
+                                    <div class="sywat-archer-name"><?php echo esc_html($reg['name']); ?></div>
                                     <?php if ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—'): ?>
                                         <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
-                                            <div style="margin-top:4px;">
+                                            <div class="sywat-owe-badge-wrap">
                                                 <span class="sywat-badge sywat-badge-full">
                                                     <?php if ($is_family_due): ?>
                                                         ⚠️ OWE: FAMILY
@@ -323,11 +323,11 @@ function sywat_desk_render_archers_table($data) {
                                 <td><?php echo esc_html($div_disp); ?></td>
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
                                 <td><?php echo esc_html($style_disp); ?></td>
-                                <td style="font-weight:bold; color:#0073aa;"><?php echo esc_html($paid_disp); ?></td>
+                                <td class="sywat-col-paid"><?php echo esc_html($paid_disp); ?></td>
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
                                 <td class="sywat-col-right">
                                     <div class="sywat-table-actions">
-                                        <form method="post" style="margin:0;">
+                                        <form method="post" class="sywat-table-action-form">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
@@ -336,7 +336,7 @@ function sywat_desk_render_archers_table($data) {
                                         </form>
 
                                         <?php if (!empty($reg['checked_in'])): ?>
-                                            <form method="post" style="margin:0;">
+                                            <form method="post" class="sywat-table-action-form">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
@@ -349,7 +349,7 @@ function sywat_desk_render_archers_table($data) {
                                             <?php if ($is_line_closed): ?>
                                                 <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                             <?php else: ?>
-                                                <form method="post" style="margin:0;">
+                                                <form method="post" class="sywat-table-action-form">
                                                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
@@ -366,7 +366,7 @@ function sywat_desk_render_archers_table($data) {
                 </table>
             </div>
         <?php else: ?>
-            <p style="color:#666;">No archers registered for this selection.</p>
+            <p class="sywat-empty-text">No archers registered for this selection.</p>
         <?php endif; ?>
     </div>
     <!-- Close Master Single Unified Desk Card -->
