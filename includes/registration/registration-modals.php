@@ -23,6 +23,9 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 <?php if ( stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
                     <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active">
                         <div class="sywat-modal-content">
+                            <div class="sywat-modal-header">
+                                <h2>⚠️ Shooting Line Capacity Exceeded</h2>
+                            </div>
                             <div class="sywat-modal-body">
                                 <?php echo $modal_notice; ?>
                             </div>
