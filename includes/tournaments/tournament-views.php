@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -198,6 +198,19 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                                 $c_cub = sywat_count_registered( $t_name, $idx, 'Cub', $registrations );
                                                                 $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
                                                                 $rem_cub = max( 0, $m_cub - $c_cub );
+
+                                                                // Count waitlisted archers for this specific line
+                                                                $line_waitlist = 0;
+                                                                foreach ( $registrations as $r ) {
+                                                                    if ( ! isset( $r['tournament'] ) || strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) !== 0 ) continue;
+                                                                    $match_idx  = isset( $r['line_index'] ) && (string)$r['line_index'] === (string)$idx;
+                                                                    $match_name = isset( $r['line_name'] ) && is_string( $idx ) && strcasecmp( trim( $r['line_name'] ), trim( $line_title ) ) === 0;
+                                                                    if ( $match_idx || $match_name ) {
+                                                                        if ( isset( $r['status'] ) && strcasecmp( trim( $r['status'] ), 'Waitlist' ) === 0 ) {
+                                                                            $line_waitlist++;
+                                                                        }
+                                                                    }
+                                                                }
                                                             ?>
                                                             <div class="sywat-line-slot-compact">
                                                                 <span class="sywat-line-slot-title"><?php echo esc_html( $line_title ); ?></span>
@@ -205,6 +218,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                                     <span>20yd: <strong><?php echo $c_20; ?>/<?php echo $m_20; ?></strong> <span class="<?php echo ($rem_20 > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_20; ?> open)</span></span>
                                                                     <span>•</span>
                                                                     <span>Cub: <strong><?php echo $c_cub; ?>/<?php echo $m_cub; ?></strong> <span class="<?php echo ($rem_cub > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_cub; ?> open)</span></span>
+                                                                    <?php if ( $line_waitlist > 0 ): ?>
+                                                                        <span>•</span>
+                                                                        <span class="sywat-waitlist-pill">🕒 <?php echo $line_waitlist; ?> Waitlisted</span>
+                                                                    <?php endif; ?>
                                                                 </div>
                                                             </div>
                                                         <?php endforeach; ?>
