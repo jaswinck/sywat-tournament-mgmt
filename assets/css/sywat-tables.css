@@ -93,16 +93,16 @@
 }
 
 /* ==========================================================================
-   NEW: Isolated Modal Roster Buttons (80px Wide, Equal Size)
+   NEW: Isolated Modal Roster Buttons (Tight 75px Width, Equal Size)
    ========================================================================== */
 .sywat-modal-roster-actions {
-    display: flex !important;
+    display: inline-flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: center !important;
     gap: 4px !important;
     width: 100% !important;
-    max-width: 80px !important;
+    max-width: 75px !important;
     margin: 0 auto !important;
 }
 
@@ -156,12 +156,12 @@
     margin: 0 auto !important;
 }
 
-/* Archer Roster Table Specific Columns */
-.sywat-col-roster-name   { width: 30%; }
-.sywat-col-roster-type   { width: 18%; text-align: center; }
+/* Archer Roster Table Specific Columns (Adjusted for Fit) */
+.sywat-col-roster-name   { width: 25%; }
+.sywat-col-roster-type   { width: 20%; text-align: center; }
 .sywat-col-roster-line   { width: 22%; }
-.sywat-col-roster-dist   { width: 12%; text-align: center; }
-.sywat-col-roster-action { width: 18%; text-align: center !important; }
+.sywat-col-roster-dist   { width: 13%; text-align: center; }
+.sywat-col-roster-action { width: 20%; text-align: center !important; }
 
 /* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
