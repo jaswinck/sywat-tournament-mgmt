@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
