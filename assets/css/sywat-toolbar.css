@@ -31,9 +31,13 @@
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .sywat-filter-title { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; white-space: nowrap; }
 .sywat-filter-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 14px; }
+.sywat-filter-bar-form { display: flex !important; align-items: flex-end !important; gap: 12px !important; flex-wrap: wrap !important; margin: 0 !important; }
 .sywat-filter-field { display: flex; flex-direction: column; gap: 4px; }
+.sywat-field-auto { width: auto !important; }
 .sywat-filter-field label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
 .sywat-wrap .sywat-filter-field select, .sywat-app .sywat-filter-field select, .sywat-filter-field select { height: 34px !important; font-size: 13px !important; font-weight: 600 !important; padding: 4px 10px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; min-width: 190px !important; box-sizing: border-box !important; }
+.sywat-select-tournament { min-width: 200px !important; }
+.sywat-select-line { min-width: 160px !important; }
 
 /* Line Capacity Tracker Grid */
 .sywat-tracker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 10px; }
