@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -210,8 +210,15 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     <?php foreach ( $filtered_registrations as $reg ): ?>
                                         <?php 
                                             $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
-                                            $badge_type  = ! empty( $reg['is_walkin'] ) || (isset($reg['type']) && $reg['type'] === 'Walk-In') ? 'Walk-In' : 'Pre-Reg';
-                                            $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                            $is_waitlist = isset( $reg['status'] ) && strcasecmp( trim( $reg['status'] ), 'Waitlist' ) === 0;
+
+                                            if ( $is_waitlist ) {
+                                                $badge_type  = 'Waitlist';
+                                                $badge_class = 'sywat-waitlist-pill';
+                                            } else {
+                                                $badge_type  = ! empty( $reg['is_walkin'] ) || (isset($reg['type']) && $reg['type'] === 'Walk-In') ? 'Walk-In' : 'Pre-Reg';
+                                                $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                            }
 
                                             $paid_status = isset($reg['paid']) ? $reg['paid'] : '';
                                             $lidx        = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx($reg, $available_lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
@@ -235,7 +242,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                 <?php endif; ?>
                                             </td>
                                             <td class="sywat-col-center">
-                                                <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span>
+                                                <?php if ( $is_waitlist ): ?>
+                                                    <span class="sywat-waitlist-pill">🕒 Waitlist</span>
+                                                <?php else: ?>
+                                                    <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html( $badge_type ); ?></span>
+                                                <?php endif; ?>
                                                 <?php if ($paid_status === 'Family'): ?>
                                                     <br><span class="sywat-badge-family-cap">Family Cap</span>
                                                 <?php endif; ?>
@@ -247,7 +258,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                     <!-- Edit Button Link -->
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
 
-                                                    <!-- Remove Form (Removed Conflicting CSS Class) -->
+                                                    <!-- Remove Form -->
                                                     <form method="post" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
                                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                         <input type="hidden" name="sywat_action" value="delete_shooter">
