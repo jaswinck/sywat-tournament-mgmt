@@ -45,6 +45,15 @@
     font-size: 12px;
 }
 
+/* Inline Table Action Forms (Centered Alignment) */
+.sywat-table-action-form {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+}
+
 /* Action Cell Alignment & Vertical Stacking Support */
 .sywat-table-actions {
     display: flex !important;
@@ -140,6 +149,12 @@
 .sywat-col-cap-20yd    { width: 20%; text-align: center !important; }
 .sywat-col-cap-cub     { width: 20%; text-align: center !important; }
 .sywat-col-line-action { width: 20%; text-align: center !important; }
+.sywat-col-line-action form,
+.sywat-col-line-action .sywat-table-action-form {
+    display: inline-flex !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+}
 
 /* Archer Roster Table Specific Columns */
 .sywat-col-roster-name   { width: 30%; }
