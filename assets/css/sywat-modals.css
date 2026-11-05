@@ -386,33 +386,85 @@
 }
 
 /* ==========================================================================
-   7. Print Engine Reset (Strict Absolute Isolation & Zero Top-Offset)
+   7. Print Engine Reset (Normal Flow Multi-Page & Single-Page Isolation)
    ========================================================================== */
 @media print {
     @page {
-        margin: 0.25in !important;
+        margin: 8mm 10mm !important;
     }
 
-    /* 1. Hide every WP admin page element by default when printing */
-    body * {
-        visibility: hidden !important;
+    /* Reset HTML, body and WP wrappers to 0 margin/padding */
+    html, body, #wpwrap, #wpcontent, #wpbody, #wpbody-content, .wrap {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        float: none !important;
+        box-sizing: border-box !important;
     }
 
-    /* 2. Unhide only the target print area, invoice box, and their child nodes */
-    #sywat_print_area, #sywat_print_area *,
-    .invoice-box, .invoice-box * {
+    /* Hide WP Admin chrome & non-print page elements completely from flow */
+    #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, #masthead, header, footer, 
+    .site-header, .site-footer, .entry-header, h1.entry-title, .sywat-auth-bar, 
+    .sywat-nav-tabs, .sywat-card, .sywat-shop-card, .sywat-public-card, 
+    .sywat-filter-bar, .sywat-filter-toolbar, .sywat-modal-header, 
+    .sywat-modal-footer, .sywat-modal-close, .no-print {
+        display: none !important;
+    }
+
+    /* Standardize modal overlay wrappers when printing */
+    .sywat-modal-backdrop {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        transform: none !important;
+        opacity: 1 !important;
         visibility: visible !important;
+        display: block !important;
     }
 
-    /* 3. Absolutely pin print containers to top-left (0,0) corner */
+    .sywat-modal-content, .sywat-modal-body {
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        transform: none !important;
+        display: block !important;
+    }
+
+    /* Keep print area & invoice in normal document flow (enables clean multi-page breaks & prevents double-print) */
     #sywat_print_area, .invoice-box {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
+        overflow: visible !important;
         display: block !important;
     }
 }
