@@ -1,11 +1,22 @@
 <?php
 /**
  * Sub-Module: FareHarbor CSV & Raw Text Import Engine
+ * Path: includes/registration/registration-import.php
+ * Author: SYWAT Archery
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Action: Handle CSV / Text File Import
+/**
+ * Handles CSV file and raw text payload roster imports for pre-registration intake.
+ *
+ * @param string $tourn_name       Selected tournament name.
+ * @param string $target_line_idx  Target shooting line index key.
+ * @param array  $tournaments      Master tournament configuration array.
+ * @param array  $registrations    Master registration state array reference.
+ * @return string Rendered HTML notice message.
+ */
 if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
     function sywat_handle_import_shooters( $tourn_name, $target_line_idx, $tournaments, &$registrations ) {
         $t_data         = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
