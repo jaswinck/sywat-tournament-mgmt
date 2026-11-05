@@ -19,14 +19,16 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         ?>
         <div class="no-print sywat-intake-wrapper">
             
-            <?php if ( ! empty( $modal_notice ) && stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
-                <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
-                    <div class="sywat-modal-content" style="background: #ffffff; padding: 28px; border-radius: 12px; max-width: 580px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-top: 6px solid #dc2626; box-sizing: border-box;">
-                        <div class="sywat-modal-body">
+            <?php if ( ! empty( $modal_notice ) ): ?>
+                <?php if ( stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
+                    <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active" style="position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background: rgba(0, 0, 0, 0.85) !important; z-index: 9999999 !important; display: flex !important; align-items: center !important; justify-content: center !important; opacity: 1 !important; visibility: visible !important; box-sizing: border-box !important; padding: 20px !important;">
+                        <div class="sywat-modal-content" style="background: #ffffff !important; padding: 30px !important; border-radius: 12px !important; max-width: 600px !important; width: 90% !important; box-shadow: 0 25px 50px rgba(0,0,0,0.5) !important; border-top: 6px solid #dc2626 !important; position: relative !important; display: block !important; opacity: 1 !important; visibility: visible !important;">
                             <?php echo $modal_notice; ?>
                         </div>
                     </div>
-                </div>
+                <?php else: ?>
+                    <div class="sywat-modal-notice"><?php echo $modal_notice; ?></div>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ( ! empty( $skipped_duplicates ) ): ?>
