@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 2.8.0
+ * Version: 6.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -33,6 +33,10 @@ if ( ! function_exists( 'sywat_get_line_max_cap' ) ) {
     }
 }
 
+/**
+ * Counts registered archers for a specific line and target distance.
+ * Explicitly excludes Waitlisted and Cancelled archers from physical line occupancy counts.
+ */
 if ( ! function_exists( 'sywat_count_registered' ) ) {
     function sywat_count_registered( $t_name, $l_idx, $dist, $registrations ) {
         $count = 0;
@@ -40,6 +44,12 @@ if ( ! function_exists( 'sywat_count_registered' ) ) {
 
         foreach ( $registrations as $reg ) {
             if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( $reg['tournament'] ), trim( $t_name ) ) !== 0 ) {
+                continue;
+            }
+
+            // Exclude Waitlisted and Cancelled archers from active target butt occupancy
+            $status = isset( $reg['status'] ) ? trim( $reg['status'] ) : '';
+            if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
                 continue;
             }
 
@@ -94,11 +104,19 @@ if ( ! function_exists( 'sywat_get_registrations' ) ) {
     }
 }
 
+/**
+ * Gets total active registered archers count for a tournament.
+ * Excludes Waitlisted and Cancelled archers.
+ */
 if ( ! function_exists( 'sywat_get_tournament_count' ) ) {
     function sywat_get_tournament_count( $t_name, $registrations ) {
         $count = 0;
         foreach ( $registrations as $reg ) {
             if ( isset( $reg['tournament'] ) && strcasecmp( trim( $reg['tournament'] ), trim( $t_name ) ) === 0 ) {
+                $status = isset( $reg['status'] ) ? trim( $reg['status'] ) : '';
+                if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
                 $count++;
             }
         }
