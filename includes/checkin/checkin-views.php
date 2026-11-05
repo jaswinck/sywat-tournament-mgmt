@@ -327,14 +327,6 @@ function sywat_desk_render_archers_table($data) {
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <form method="post" class="sywat-table-action-form">
-                                            <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                            <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
-                                            <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                            <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
-                                        </form>
-
                                         <?php if (!empty($reg['checked_in'])): ?>
                                             <form method="post" class="sywat-table-action-form">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -358,6 +350,14 @@ function sywat_desk_render_archers_table($data) {
                                                 </form>
                                             <?php endif; ?>
                                         <?php endif; ?>
+
+                                        <form method="post" class="sywat-table-action-form">
+                                            <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                            <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                                            <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                            <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
