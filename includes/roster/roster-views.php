@@ -124,12 +124,14 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         <div class="sywat-modal-backdrop active no-print" id="sywat_roster_modal">
             <div class="sywat-modal-content sywat-modal-xl">
                 
-                <!-- Standard Pinned Header -->
+                <!-- Standard Pinned Header (Inline) -->
                 <div class="sywat-modal-header">
-                    <div>
-                        <h3>👥 Registered Archer Roster</h3>
-                        <div class="sywat-subtitle">Active Event: <?php echo esc_html( $selected_tournament ); ?></div>
-                    </div>
+                    <h3 style="display: flex; align-items: baseline; gap: 8px; margin: 0;">
+                        👥 Registered Archer Roster 
+                        <span class="sywat-subtitle" style="margin: 0; font-size: 14px; font-weight: 500; color: #64748b;">
+                            (<?php echo esc_html( $selected_tournament ); ?>)
+                        </span>
+                    </h3>
                     <button type="button" class="sywat-modal-close" onclick="window.location.href='?tab=manage'">&times;</button>
                 </div>
 
@@ -227,8 +229,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             <td>
                                                 <strong><?php echo esc_html( $reg['name'] ); ?></strong>
                                                 <?php if (!empty($fam_label)): ?>
-                                                    <div class="sywat-chip-family">
-                                                        🟢 <?php echo esc_html($fam_label); ?>
+                                                    <div style="margin-top: 4px;">
+                                                        <span class="sywat-chip-family">🟢 <?php echo esc_html($fam_label); ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
@@ -241,6 +243,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             <td><?php echo esc_html( $line_disp ); ?></td>
                                             <td class="sywat-col-center"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                             <td class="sywat-col-roster-action sywat-col-center">
+                                                <!-- UPDATED WRAPPER CLASS -->
                                                 <div class="sywat-modal-roster-actions">
                                                     <!-- Edit Button Link -->
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
