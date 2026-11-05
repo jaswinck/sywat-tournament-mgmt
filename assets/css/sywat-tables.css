@@ -100,7 +100,7 @@
    NEW: Isolated Modal Roster Buttons (Strict Block Width Lock)
    ========================================================================== */
 .sywat-modal-roster-actions {
-    display: block !important; /* Replaced flex with strict block */
+    display: block !important;
     width: 85px !important;
     min-width: 85px !important;
     max-width: 85px !important;
@@ -116,7 +116,7 @@
 }
 
 .sywat-modal-roster-actions a.sywat-btn {
-    margin: 0 0 4px 0 !important; /* Gap replacement */
+    margin: 0 0 4px 0 !important;
 }
 
 .sywat-modal-roster-actions a.sywat-btn,
@@ -157,7 +157,7 @@
 .sywat-col-total       { width: 130px; text-align: right; }
 .sywat-col-tourn-score { width: 140px; text-align: right; }
 
-/* Line Slot Usage Table Specific Columns (Tighter Math & Forced Center Alignment) */
+/* Line Slot Usage Table Specific Columns */
 .sywat-col-line-name   { width: 40%; }
 .sywat-col-cap-20yd    { width: 20%; text-align: center !important; }
 .sywat-col-cap-cub     { width: 20%; text-align: center !important; }
@@ -186,7 +186,7 @@
 .sywat-col-roster-dist   { width: 14%; text-align: center; }
 .sywat-col-roster-action { width: 18%; text-align: center !important; }
 
-/* Line Slot Capacity Stack & Totals */
+/* Line Slot Capacity Stack & Compact Waitlist Pill */
 .sywat-lines-grid {
     display: flex;
     flex-direction: column;
@@ -213,12 +213,17 @@
     gap: 8px; 
     color: #475569; 
     align-items: center; 
-    font-size: 12px; /* Increased 20yd & Cub text to 12px for high readability */
-    font-weight: 600;
+    font-size: 11px; 
     white-space: nowrap; 
 }
 
 .sywat-line-slot-caps .sywat-waitlist-pill {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    padding: 1px 6px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
     margin: 0 !important;
 }
 
