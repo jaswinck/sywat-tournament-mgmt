@@ -111,7 +111,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $prompt .= '<input type="hidden" name="allow_partial" value="1">';
                     $prompt .= '<button type="submit" class="sywat-btn sywat-btn-warning">Import Available Spots (' . intval($open_slots) . ')</button>';
                     $prompt .= '</form>';
+                    $prompt .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Pick Another Line</button>';
                     $prompt .= '</div></div>';
+
+                    $GLOBALS['sywat_modal_notice'] = $prompt;
                     return $prompt;
                 }
             }
