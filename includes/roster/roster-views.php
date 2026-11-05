@@ -227,7 +227,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     <td><?php echo esc_html( $line_disp ); ?></td>
                                     <td class="sywat-col-center"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                     <td class="sywat-col-roster-action">
-                                        <div class="sywat-table-actions-stacked">
+                                        <div class="sywat-modal-roster-actions">
                                             <!-- Edit Button Link -->
                                             <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
 
