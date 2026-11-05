@@ -1,13 +1,20 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Data Layer
- * File: checkin-data.php
+ * File: includes/checkin/checkin-data.php
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 6.0.0
  */
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Resolves the array line index for a registration entry.
+ *
+ * @param array $reg   Archer registration dataset.
+ * @param array $lines Shooting line configuration array.
+ * @return string Resolved array line key index.
+ */
 function sywat_desk_resolve_line_idx($reg, $lines) {
     if (isset($reg['line_index']) && $reg['line_index'] !== '') {
         $idx = (string)$reg['line_index'];
@@ -28,6 +35,11 @@ function sywat_desk_resolve_line_idx($reg, $lines) {
     return isset($reg['line_index']) ? (string)$reg['line_index'] : '0';
 }
 
+/**
+ * Runs legacy database migrations for registration option keys.
+ *
+ * @return void
+ */
 function sywat_desk_run_migrations() {
     global $wpdb;
 
@@ -56,6 +68,11 @@ function sywat_desk_run_migrations() {
     }
 }
 
+/**
+ * Fetches and prepares all Check-In Desk portal state datasets.
+ *
+ * @return array Aggregated state array containing tournaments, lines, archers, and TFAA bundles.
+ */
 function sywat_desk_get_data() {
     global $wpdb;
 
@@ -130,33 +147,38 @@ function sywat_desk_get_data() {
         }
     }
 
-    $all_db_results = $wpdb->get_results("SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'");
-    $history_profiles = array();
+    // High Concurrency Caching: Wrap DB history lookup in Transient to optimize performance
+    $history_profiles = get_transient('sywat_history_profiles_cache');
+    if (false === $history_profiles || !is_array($history_profiles)) {
+        $all_db_results = $wpdb->get_results("SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'");
+        $history_profiles = array('exact' => array(), 'fl' => array());
 
-    foreach ($all_db_results as $row) {
-        $r = maybe_unserialize($row->option_value);
-        if (is_array($r) && !empty($r['name'])) {
-            $clean_name = trim($r['name']);
-            if (empty($clean_name)) continue;
+        foreach ($all_db_results as $row) {
+            $r = maybe_unserialize($row->option_value);
+            if (is_array($r) && !empty($r['name'])) {
+                $clean_name = trim($r['name']);
+                if (empty($clean_name)) continue;
 
-            $div_val   = isset($r['division']) ? $r['division'] : '';
-            $gen_val   = isset($r['gender']) ? $r['gender'] : '';
-            $style_val = isset($r['style']) ? $r['style'] : '';
-            $paid_val  = isset($r['paid']) ? $r['paid'] : '';
+                $div_val   = isset($r['division']) ? $r['division'] : '';
+                $gen_val   = isset($r['gender']) ? $r['gender'] : '';
+                $style_val = isset($r['style']) ? $r['style'] : '';
+                $paid_val  = isset($r['paid']) ? $r['paid'] : '';
 
-            if ($div_val === 'No Show' || $style_val === 'No Show' || empty($div_val) || empty($style_val)) continue;
+                if ($div_val === 'No Show' || $style_val === 'No Show' || empty($div_val) || empty($style_val)) continue;
 
-            $norm_key = strtolower(preg_replace('/[[:space:]]+/', ' ', $clean_name));
-            $parts    = explode(' ', $norm_key);
-            $fl_key   = (count($parts) > 1) ? reset($parts) . '___' . end($parts) : $norm_key;
+                $norm_key = strtolower(preg_replace('/[[:space:]]+/', ' ', $clean_name));
+                $parts    = explode(' ', $norm_key);
+                $fl_key   = (count($parts) > 1) ? reset($parts) . '___' . end($parts) : $norm_key;
 
-            $profile_data = array('full_name' => $clean_name, 'division' => $div_val, 'gender' => $gen_val, 'style' => $style_val, 'paid' => $paid_val);
+                $profile_data = array('full_name' => $clean_name, 'division' => $div_val, 'gender' => $gen_val, 'style' => $style_val, 'paid' => $paid_val);
 
-            $history_profiles['exact'][$norm_key] = $profile_data;
-            if (!isset($history_profiles['fl'][$fl_key])) {
-                $history_profiles['fl'][$fl_key] = $profile_data;
+                $history_profiles['exact'][$norm_key] = $profile_data;
+                if (!isset($history_profiles['fl'][$fl_key])) {
+                    $history_profiles['fl'][$fl_key] = $profile_data;
+                }
             }
         }
+        set_transient('sywat_history_profiles_cache', $history_profiles, 15 * MINUTE_IN_SECONDS);
     }
 
     $tfaa_cache_option = get_option('sywat_tfaa_cache', array());
