@@ -343,11 +343,12 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
 
                                 $manage_url = add_query_arg(
                                     array(
+                                        'tab'             => 'manage',
                                         'view_tournament' => $selected_tournament,
                                         'modal_action'    => 'manage',
-                                        'filter_line'     => $idx,
+                                        'filter_line_idx' => $idx,
                                     ),
-                                    admin_url( 'admin.php?page=sywat-manage-tournaments' )
+                                    site_url( '/sywat-manage-tournaments/' )
                                 );
                             ?>
                             <tr>
