@@ -276,7 +276,7 @@ function sywat_desk_render_archers_table($data) {
                             <th>Style</th>
                             <th>Paid Status</th>
                             <th class="sywat-col-center">Distance</th>
-                            <th class="sywat-col-right">Actions</th>
+                            <th class="sywat-col-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -325,8 +325,8 @@ function sywat_desk_render_archers_table($data) {
                                 <td><?php echo esc_html($style_disp); ?></td>
                                 <td class="sywat-col-paid"><?php echo esc_html($paid_disp); ?></td>
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
-                                <td class="sywat-col-right">
-                                    <div class="sywat-table-actions">
+                                <td class="sywat-col-center">
+                                    <div class="sywat-table-actions-vertical">
                                         <form method="post" class="sywat-table-action-form">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
