@@ -50,19 +50,18 @@
     font-size: 11px;
 }
 
-/* Action Cell Horizontal & Vertical Stacking Support */
+/* Action Cell Horizontal Alignment (For Dashboard & Standard Tables) */
 .sywat-table-actions {
     display: flex !important;
-    gap: 4px !important;
+    gap: 6px !important;
     align-items: center !important;
     justify-content: flex-end !important;
     flex-wrap: nowrap !important;
     white-space: nowrap !important;
 }
 
-/* Stacked Action Buttons (90px Uniform Width) */
-.sywat-table-actions-stacked,
-.sywat-manage-row td:last-child > div {
+/* Stacked Roster Action Buttons (Strictly Scoped - Equal Size & Dimensions) */
+.sywat-table-actions-stacked {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
@@ -70,31 +69,26 @@
     gap: 3px !important;
     width: 100% !important;
     max-width: 90px !important;
-    margin: 0 0 0 auto !important;
-}
-
-.sywat-table-actions .sywat-btn,
-.sywat-table-actions form {
-    margin: 0 !important;
-    flex: 0 0 auto !important;
+    margin: 0 auto !important;
 }
 
 .sywat-table-actions-stacked .sywat-btn,
 .sywat-table-actions-stacked form,
-.sywat-table-actions-stacked form .sywat-btn,
-.sywat-manage-row td:last-child > div .sywat-btn,
-.sywat-manage-row td:last-child > div form,
-.sywat-manage-row td:last-child > div form .sywat-btn {
+.sywat-table-actions-stacked form .sywat-btn {
     margin: 0 !important;
     width: 100% !important;
-    height: 25px !important;
-    line-height: 23px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+    line-height: 24px !important;
     padding: 0 6px !important;
     font-size: 11px !important;
+    font-weight: 600 !important;
     box-sizing: border-box !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    border-radius: 4px !important;
 }
 
 /* Default Last Column Behavior */
@@ -125,14 +119,18 @@
 .sywat-col-cap-cub     { width: 25%; text-align: center; }
 .sywat-col-line-action { width: 20%; text-align: center; }
 
-/* Archer Roster Table Specific Columns (Right-Sized Layout) */
-.sywat-col-roster-name   { width: 32%; }
-.sywat-col-roster-type   { width: 18%; text-align: center; }
-.sywat-col-roster-line   { width: 22%; }
-.sywat-col-roster-dist   { width: 12%; text-align: center; }
-.sywat-col-roster-action { width: 16%; text-align: right; }
+/* Archer Roster Table Specific Columns (Centered Action Header) */
+.sywat-col-roster-name   { width: 30%; }
+.sywat-col-roster-type   { width: 20%; text-align: center !important; }
+.sywat-col-roster-line   { width: 24%; }
+.sywat-col-roster-dist   { width: 12%; text-align: center !important; }
+.sywat-col-roster-action { width: 14%; text-align: center !important; }
 
-/* Line Slot Capacity Stack & Totals */
+/* Line Slot Capacity Stack & Spacing */
+.sywat-line-slot-section {
+    margin-top: 24px !important;
+}
+
 .sywat-lines-grid {
     display: flex;
     flex-direction: column;
