@@ -21,7 +21,7 @@ add_shortcode('sywat_desk', 'render_sywat_desk_app');
 function render_sywat_desk_app() {
     // Central Permissions Check
     if (function_exists('sywat_can_access_desk') && !sywat_can_access_desk()) {
-        return '<div class="sywat-wrap" style="max-width:600px; margin:20px auto;"><div class="sywat-alert sywat-alert-danger">Access denied. Management or staff access required.</div></div>';
+        return '<div class="sywat-wrap sywat-card-sm"><div class="sywat-alert sywat-alert-danger">Access denied. Management or staff access required.</div></div>';
     }
 
     ob_start();
