@@ -3,13 +3,15 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Render Full Registration Desk Page (Shortcode Handler: [sywat_register])
+ *
+ * @return string Rendered HTML markup output for the registration portal.
  */
 if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
     function sywat_render_registration_desk() {
@@ -25,7 +27,6 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         $can_edit_scores    = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
 
         $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
-        $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( ! is_array( $tournaments ) ) $tournaments = array();
@@ -33,7 +34,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         // Scope Tournaments to User's Assigned Shop
         $scoped_tournaments = array();
         foreach ( $tournaments as $t_name => $t_data ) {
-            $t_shop = sywat_get_tournament_shop_id( $t_data );
+            $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
                 $scoped_tournaments[$t_name] = $t_data;
             }
@@ -46,18 +47,26 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             $selected_tournament = reset( $keys );
         }
 
-        $available_lines = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] ) 
+        $available_lines = ( ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] ) && function_exists('sywat_get_tournament_lines') ) 
             ? sywat_get_tournament_lines( $tournaments[$selected_tournament] ) 
             : array();
 
-        // Load Registrations from DB
+        $active_t_slug = sanitize_title( $selected_tournament );
+
+        // High Concurrency Scoped Query: Fetch registrations for active tournament only
         $registrations = array();
-        $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
-        if ( is_array( $results ) ) {
-            foreach ($results as $row) {
-                $reg_data = maybe_unserialize($row->option_value);
-                if (is_array($reg_data) && isset($reg_data['id'])) {
-                    $registrations[] = $reg_data;
+        if ( ! empty( $active_t_slug ) ) {
+            $results = $wpdb->get_results( $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
+            ) );
+
+            if ( is_array( $results ) ) {
+                foreach ( $results as $row ) {
+                    $reg_data = maybe_unserialize( $row->option_value );
+                    if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
+                        $registrations[] = $reg_data;
+                    }
                 }
             }
         }
@@ -72,8 +81,13 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                     $notice = sywat_handle_register_shooter( $tournaments, $registrations );
                 } elseif ( $action === 'import_shooters' && function_exists( 'sywat_handle_import_shooters' ) ) {
                     $notice = sywat_handle_import_shooters( $tournaments, $registrations );
-                } elseif ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
-                    $notice = sywat_handle_purge_line( $tournaments, $registrations );
+                } elseif ( $action === 'purge_line' ) {
+                    if ( ! function_exists( 'sywat_handle_purge_line' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php' ) ) {
+                        require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';
+                    }
+                    if ( function_exists( 'sywat_handle_purge_line' ) ) {
+                        $notice = sywat_handle_purge_line( $tournaments, $registrations );
+                    }
                 }
             } else {
                 $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
