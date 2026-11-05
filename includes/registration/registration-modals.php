@@ -282,7 +282,7 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
 }
 
 /**
- * Component 3: Line Slot Usage Table with Waitlist Counters & Roster Inspection
+ * Component 3: Line Slot Usage Table with Direct Manage Roster Links
  */
 if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
     function sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations ) {
@@ -313,7 +313,6 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
 
                                 $waitlisted_20  = 0;
                                 $waitlisted_cub = 0;
-                                $line_archers   = array();
 
                                 foreach ($registrations as $r) {
                                     if ( ! isset( $r['tournament'] ) || strcasecmp( trim( $r['tournament'] ), trim( $selected_tournament ) ) !== 0 ) {
@@ -332,8 +331,6 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                     }
 
                                     if ( $match_idx || $match_name ) {
-                                        $line_archers[] = $r;
-
                                         if ( isset( $r['status'] ) && strcasecmp( trim( $r['status'] ), 'Waitlist' ) === 0 ) {
                                             if ( isset( $r['distance'] ) && strcasecmp( trim( $r['distance'] ), 'Cub' ) === 0 ) {
                                                 $waitlisted_cub++;
@@ -343,6 +340,15 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                         }
                                     }
                                 }
+
+                                $manage_url = add_query_arg(
+                                    array(
+                                        'view_tournament' => $selected_tournament,
+                                        'modal_action'    => 'manage',
+                                        'filter_line'     => $idx,
+                                    ),
+                                    admin_url( 'admin.php?page=sywat-manage-tournaments' )
+                                );
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
@@ -362,9 +368,9 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                 </td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full" onclick="document.getElementById('sywat_line_roster_modal_<?php echo esc_js( $idx ); ?>').classList.add('active', 'sywat-modal-active');">
-                                            View Roster
-                                        </button>
+                                        <a href="<?php echo esc_url( $manage_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">
+                                            Manage Roster
+                                        </a>
                                         <?php if ( $total_line_shooters > 0 || ($waitlisted_20 + $waitlisted_cub) > 0 ): ?>
                                             <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to clear ALL archers from <?php echo esc_js( $line_title ); ?>?');">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
@@ -377,84 +383,11 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                             </form>
                                         <?php endif; ?>
                                     </div>
-                                    <?php sywat_render_line_roster_modal( $selected_tournament, $idx, $line_title, $line_archers ); ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
-        </div>
-        <?php
-    }
-}
-
-/**
- * Component 4: Line Roster & Waitlist Inspection Modal Overlay
- */
-if ( ! function_exists( 'sywat_render_line_roster_modal' ) ) {
-    function sywat_render_line_roster_modal( $selected_tournament, $idx, $line_title, $line_archers ) {
-        $modal_id  = 'sywat_line_roster_modal_' . $idx;
-        $is_active = isset( $_REQUEST['view_line_idx'] ) && (string)$_REQUEST['view_line_idx'] === (string)$idx;
-        ?>
-        <div id="<?php echo esc_attr( $modal_id ); ?>" class="sywat-modal-backdrop <?php echo $is_active ? 'active sywat-modal-active' : ''; ?>">
-            <div class="sywat-modal-content sywat-modal-lg">
-                <div class="sywat-modal-header">
-                    <h3>👥 Line Roster & Waitlist: <?php echo esc_html( $line_title ); ?></h3>
-                    <button type="button" class="sywat-modal-close" onclick="document.getElementById('<?php echo esc_js( $modal_id ); ?>').classList.remove('active', 'sywat-modal-active');">&times;</button>
-                </div>
-                <div class="sywat-modal-body">
-                    <?php if ( empty( $line_archers ) ): ?>
-                        <div class="sywat-alert sywat-alert-info">
-                            No archers are currently registered or waitlisted on <strong><?php echo esc_html( $line_title ); ?></strong>.
-                        </div>
-                    <?php else: ?>
-                        <div class="sywat-table-responsive">
-                            <table class="sywat-table">
-                                <thead>
-                                    <tr>
-                                        <th>Archer Name</th>
-                                        <th>Division</th>
-                                        <th class="sywat-col-center">Distance</th>
-                                        <th class="sywat-col-center">Status</th>
-                                        <th>Caller / Family Group</th>
-                                        <th>Contact Phone</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ( $line_archers as $r ): ?>
-                                        <?php 
-                                            $a_name   = ! empty( $r['name'] ) ? $r['name'] : ( ! empty( $r['archer_name'] ) ? $r['archer_name'] : '—' );
-                                            $a_div    = ! empty( $r['division'] ) ? $r['division'] : '—';
-                                            $a_dist   = ! empty( $r['distance'] ) ? $r['distance'] : '20yd';
-                                            $a_status = ! empty( $r['status'] ) ? $r['status'] : 'Pre-Reg';
-                                            $a_fam    = ! empty( $r['family_name'] ) ? $r['family_name'] : '—';
-                                            $a_phone  = ! empty( $r['phone'] ) ? $r['phone'] : '—';
-                                            $is_wait  = strcasecmp( trim( $a_status ), 'Waitlist' ) === 0;
-                                        ?>
-                                        <tr>
-                                            <td><strong><?php echo esc_html( $a_name ); ?></strong></td>
-                                            <td><?php echo esc_html( $a_div ); ?></td>
-                                            <td class="sywat-col-center"><?php echo esc_html( $a_dist ); ?></td>
-                                            <td class="sywat-col-center">
-                                                <?php if ( $is_wait ): ?>
-                                                    <span class="sywat-waitlist-pill">🕒 Waitlist</span>
-                                                <?php else: ?>
-                                                    <span class="sywat-badge sywat-badge-open"><?php echo esc_html( $a_status ); ?></span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo esc_html( $a_fam ); ?></td>
-                                            <td><?php echo esc_html( $a_phone ); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                <div class="sywat-modal-footer">
-                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="document.getElementById('<?php echo esc_js( $modal_id ); ?>').classList.remove('active', 'sywat-modal-active');">Close Roster</button>
-                </div>
             </div>
         </div>
         <?php
