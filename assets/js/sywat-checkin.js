@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.0.0
+ * Version: 6.2.0
  */
 
 function escapeHtmlDesk(str) {
@@ -123,11 +123,32 @@ function matchDeskTfaaSelect(value, selectEl) {
             selectEl.value = opt.value;
             return;
         }
+    }
+
+    if (clean === 'm' || clean === 'male') {
+        for (let opt of selectEl.options) {
+            if (opt.value.toLowerCase().startsWith('male')) { selectEl.value = opt.value; return; }
+        }
+    }
+    if (clean === 'f' || clean === 'female') {
+        for (let opt of selectEl.options) {
+            if (opt.value.toLowerCase().startsWith('female')) { selectEl.value = opt.value; return; }
+        }
+    }
+
+    for (let opt of selectEl.options) {
+        if (!opt.value) continue;
+        const optLower = opt.value.trim().toLowerCase();
         
         const cleanPrefix = clean.split(' –')[0].split(' (')[0].trim();
         const optPrefix   = optLower.split(' –')[0].split(' (')[0].trim();
-        
-        if (cleanPrefix === optPrefix) {
+
+        if (cleanPrefix === optPrefix && cleanPrefix.length > 1) {
+            selectEl.value = opt.value;
+            return;
+        }
+
+        if (optLower.includes(clean) || clean.includes(optPrefix)) {
             selectEl.value = opt.value;
             return;
         }
@@ -284,9 +305,12 @@ function evaluateTfaaStatus(prefix) {
         const uGen = currGen.toLowerCase();
         const uSty = currStyle.toLowerCase();
 
-        const divMatch   = (cDiv === uDiv) || (cDiv && uDiv && cDiv.split(' (')[0].trim() === uDiv.split(' (')[0].trim());
+        const divMatch   = (cDiv === uDiv) || (cDiv && uDiv && (cDiv.includes(uDiv.split(' (')[0].trim()) || uDiv.includes(cDiv.split(' (')[0].trim())));
         const genMatch   = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
-        const styleMatch = (cSty === uSty) || (cSty && uSty && cSty.split(' –')[0].trim() === uSty.split(' –')[0].trim());
+        
+        const cStylePrefix = cSty.split(' –')[0].trim();
+        const uStylePrefix = uSty.split(' –')[0].trim();
+        const styleMatch   = (cSty === uSty) || (cStylePrefix === uStylePrefix) || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
         if (divMatch && genMatch && styleMatch) {
             isExactMatch = true;
@@ -494,7 +518,11 @@ function handleStyleRestrictions(type) {
     }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
+/**
+ * Initializes Check-In Desk event listeners and pre-fills active forms.
+ * Safe for footer enqueuing regardless of document.readyState.
+ */
+function initSywatCheckin() {
     const walkinInput = document.getElementById('walkin_name_input');
     if (walkinInput) {
         walkinInput.addEventListener('input', function() {
@@ -519,7 +547,7 @@ document.addEventListener("DOMContentLoaded", function() {
             
             rows.forEach(row => {
                 const name = row.getAttribute('data-name');
-                if (name.includes(filter)) {
+                if (name && name.includes(filter)) {
                     row.classList.remove('sywat-hidden');
                 } else {
                     row.classList.add('sywat-hidden');
@@ -535,10 +563,17 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.dispatchEvent(new Event('input'));
     }
 
-    if(document.getElementById('walkin_division')) handleStyleRestrictions('walkin');
-    if(document.getElementById('checkin_division')) handleStyleRestrictions('checkin');
-    if(document.getElementById('edit_division')) handleStyleRestrictions('edit');
-});
+    if (document.getElementById('walkin_division')) handleStyleRestrictions('walkin');
+    if (document.getElementById('checkin_division')) handleStyleRestrictions('checkin');
+    if (document.getElementById('edit_division')) handleStyleRestrictions('edit');
+}
+
+// Execution Guard: Run immediately if DOM is ready, otherwise attach to DOMContentLoaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSywatCheckin);
+} else {
+    initSywatCheckin();
+}
 
 document.addEventListener('input', function(e) {
     if (e.target && (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name')) {
