@@ -96,8 +96,9 @@ function sywat_desk_enqueue_scripts($data) {
         }
     }
 
-    $handle = 'sywat-checkin-js';
-    wp_enqueue_script($handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', array(), SYWAT_VERSION, true);
+    $handle  = 'sywat-checkin-js';
+    $version = defined('SYWAT_PLUGIN_VERSION') ? SYWAT_PLUGIN_VERSION : '6.0.0';
+    wp_enqueue_script($handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', array(), $version, true);
 
     $inline_js = 'window.sywatHistory = ' . json_encode($data['history_profiles']) . '; ' .
                  'window.tfaaData = ' . json_encode($data['tfaa_data_bundle']) . '; ' .
