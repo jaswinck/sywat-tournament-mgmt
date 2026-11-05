@@ -167,11 +167,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
 
             $prompt_html  = '<div class="sywat-overflow-dialog">';
-            $prompt_html .= '<div class="sywat-overflow-title">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
-            $prompt_html .= '<div class="sywat-overflow-body">' . implode('<br>', $overflow_details) . '</div>';
-            $prompt_html .= '<p class="sywat-overflow-subtext">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
-            $prompt_html .= '<div class="sywat-overflow-actions">';
-            $prompt_html .= '<form method="post" class="sywat-inline-block">';
+            $prompt_html .= '<div class="sywat-overflow-title" style="font-size: 1.25rem; font-weight: bold; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
+            $prompt_html .= '<div class="sywat-overflow-body" style="font-size: 0.98rem; margin-bottom: 16px; line-height: 1.5; color: #1f2937;">' . implode('<br>', $overflow_details) . '</div>';
+            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 20px; color: #4b5563; font-size: 0.95rem;">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
+            $prompt_html .= '<div class="sywat-overflow-actions" style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">';
+            $prompt_html .= '<form method="post" style="display: inline-block; margin: 0;">';
             $prompt_html .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
             $prompt_html .= '<input type="hidden" name="sywat_action" value="register_shooter">';
             $prompt_html .= '<input type="hidden" name="selected_tournament" value="' . esc_attr($tourn_name) . '">';
@@ -183,7 +183,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $prompt_html .= $hidden_archers_html;
             $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning">⚠️ Book Partial Available Spots</button>';
             $prompt_html .= '</form>';
-            $prompt_html .= ' <button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
@@ -355,7 +355,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             update_option( 'sywat_shooter_phones_cache', $phone_cache, false );
         }
 
-        // Store globals so registration-views can render inline alerts & popup dialogs inside the modal
+        // Store globals so registration-views can render inline alerts
         $GLOBALS['sywat_last_added_count']    = $added_count;
         $GLOBALS['sywat_skipped_duplicates']  = $skipped_duplicates;
         $GLOBALS['sywat_skipped_full']        = $skipped_full;
@@ -371,7 +371,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
         }
 
-        $GLOBALS['sywat_modal_notice'] = $msg;
         return $msg;
     }
 }
