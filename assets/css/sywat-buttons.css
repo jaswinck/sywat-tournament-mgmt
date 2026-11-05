@@ -121,6 +121,38 @@
     color: #ffffff !important;
 }
 
+/* Special Pill Buttons & Action Triggers */
+.sywat-btn-pill {
+    background-color: #0284c7;
+    color: #ffffff !important;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.sywat-btn-pill:hover {
+    background-color: #0369a1;
+}
+
+.sywat-btn-use-official {
+    background-color: #0d9488;
+    color: #ffffff !important;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background-color 0.15s ease;
+}
+.sywat-btn-use-official:hover {
+    background-color: #0f766e;
+}
+
 /* Sizing Helpers */
 .sywat-btn-full {
     width: 100%;
