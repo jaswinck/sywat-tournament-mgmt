@@ -3,17 +3,11 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.1.0-DIAGNOSTIC
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/**
- * Detects paid category (Family, Youth, Adult) from a given string or array of strings.
- *
- * @param string|array $text Text or array of text values to scan.
- * @return string Category string ('Family', 'Youth', 'Adult', or empty string).
- */
 if ( ! function_exists( 'sywat_detect_paid_category' ) ) {
     function sywat_detect_paid_category($text) {
         $str = is_array($text) ? implode(' ', $text) : (string)$text;
@@ -24,12 +18,6 @@ if ( ! function_exists( 'sywat_detect_paid_category' ) ) {
     }
 }
 
-/**
- * Extracts numeric due balance amount from a string value.
- *
- * @param string $str Input currency or raw text string.
- * @return float Extracted float balance value.
- */
 if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
     function sywat_extract_due_amount($str) {
         $clean = preg_replace('/[^\d\.]/', '', (string)$str);
@@ -37,13 +25,6 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
     }
 }
 
-/**
- * Handles multi-archer phone intake, line group fee calculation, family capping, and database persistence.
- *
- * @param array $tournaments   Master tournament configuration array.
- * @param array $registrations Master registration state array reference.
- * @return string Rendered HTML notice message.
- */
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
         $group_name       = trim( sanitize_text_field( $_POST['group_name'] ?? '' ) );
@@ -94,7 +75,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
-        // Tally required spots per (line_idx, distance) combination
         $line_dist_tallies = array();
         foreach ($valid_archers as $archer) {
             $l_idx = $archer['line_idx'];
@@ -111,7 +91,19 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_dist_tallies[$key]['count']++;
         }
 
-        // Pre-validate capacity for each tally before creating ANY records
+        // ==========================================
+        // METHODICAL DIAGNOSTIC TRAP
+        // ==========================================
+        $is_diagnostic = (strcasecmp($group_name, 'DEBUG CAPACITY') === 0);
+        $diagnostic_data = array();
+        if ($is_diagnostic) {
+            $diagnostic_data['System'] = 'Checking backend math at exact moment of POST';
+            $diagnostic_data['Tournament_Name'] = $tourn_name;
+            $diagnostic_data['Total_Archers_Submitted'] = count($valid_archers);
+            $diagnostic_data['Line_Evaluations'] = array();
+        }
+        // ==========================================
+
         $capacity_overflows = array();
         foreach ($line_dist_tallies as $key => $tally) {
             $l_idx    = $tally['line_idx'];
@@ -140,6 +132,18 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             $open_slots = max(0, $max_capacity - $current_count);
 
+            if ($is_diagnostic) {
+                $diagnostic_data['Line_Evaluations'][] = array(
+                    'Line_Name' => $line_name,
+                    'Distance' => $dist,
+                    'Requested_Spots' => $req_cnt,
+                    'DB_Count_Found' => $current_count,
+                    'DB_Max_Capacity' => $max_capacity,
+                    'Calculated_Open_Slots' => $open_slots,
+                    'Did_It_Trigger_Overflow?' => ($req_cnt > $open_slots) ? 'YES' : 'NO'
+                );
+            }
+
             if ($req_cnt > $open_slots) {
                 $capacity_overflows[] = array(
                     'line_idx'   => $l_idx,
@@ -151,7 +155,18 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
         }
 
-        // If capacity overflow is detected and operator has NOT explicitly confirmed partial booking
+        // ==========================================
+        // DIAGNOSTIC SCREEN PRINT & HALT
+        // ==========================================
+        if ($is_diagnostic) {
+            echo '<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;color:#0f0;z-index:9999999;padding:40px;box-sizing:border-box;overflow:auto;font-family:monospace;">';
+            echo '<h1 style="color:#0f0;border-bottom:2px solid #0f0;padding-bottom:10px;">SYWAT CAPACITY DIAGNOSTIC</h1>';
+            echo '<pre style="font-size:16px;">' . print_r($diagnostic_data, true) . '</pre>';
+            echo '<button onclick="window.history.back()" style="padding:15px 30px;background:#0f0;color:#000;border:none;font-size:18px;cursor:pointer;margin-top:20px;font-weight:bold;">Go Back</button>';
+            echo '</div>';
+            exit;
+        }
+
         if ( ! empty( $capacity_overflows ) && ! $allow_partial ) {
             $overflow_details = array();
             foreach ($capacity_overflows as $ov) {
@@ -190,7 +205,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '';
         }
 
-        // Anchor group naming to primary archer if caller name is blank
         $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'];
         $line_groups      = array();
 
@@ -219,7 +233,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
         }
 
-        // Calculate per-line fees and family caps
         $overall_fee = 0;
         foreach ($line_groups as $l_idx => &$grp) {
             $grp['raw_total'] = ($grp['youth_count'] * 25) + ($grp['adult_count'] * 30);
@@ -229,7 +242,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
         unset($grp);
 
-        // Allocate amount paid today sequentially across line groups
         $rem_paid          = $amount_paid;
         $total_balance_due = 0;
         foreach ($line_groups as $l_idx => &$grp) {
@@ -249,14 +261,12 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $skipped_duplicates = array();
         $skipped_full       = array();
 
-        // Fetch master roster array to ensure unified persistence
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
         if ( ! is_array( $master_regs ) ) {
             $master_regs = array();
         }
 
         foreach ($line_groups as $l_idx => $grp) {
-            // Resolve numeric index vs line name matching
             $resolved_idx = $l_idx;
             if ( ! is_numeric( $resolved_idx ) && ! empty( $t_lines ) ) {
                 foreach ( $t_lines as $idx => $line ) {
@@ -274,7 +284,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $distance = $archer['distance'];
                 $name     = $archer['name'];
 
-                // Duplicate check: prevent registering the same archer on the same line twice
                 $is_duplicate = false;
                 if ( function_exists( 'sywat_is_archer_on_line' ) ) {
                     $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
@@ -295,7 +304,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     continue; 
                 }
 
-                // Capacity check
                 $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $l_idx, $distance, $registrations ) : 0;
                 $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $distance ) : 0;
                 
@@ -340,7 +348,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
 
-        // Store phone lookup cache for future recall
         if ( ! empty( $group_phone ) && $added_count > 0 ) {
             $phone_cache = get_option( 'sywat_shooter_phones_cache', array() );
             if ( ! is_array( $phone_cache ) ) {
@@ -355,7 +362,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             update_option( 'sywat_shooter_phones_cache', $phone_cache, false );
         }
 
-        // Store globals so registration-views can render inline alerts
         $GLOBALS['sywat_last_added_count']    = $added_count;
         $GLOBALS['sywat_skipped_duplicates']  = $skipped_duplicates;
         $GLOBALS['sywat_skipped_full']        = $skipped_full;
