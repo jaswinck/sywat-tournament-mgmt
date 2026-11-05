@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -174,17 +174,17 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             
             $prompt_html .= '<form method="post" class="sywat-overflow-form">' . $base_hidden_fields;
             $prompt_html .= '<input type="hidden" name="waitlist_mode" value="all">';
-            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-full">🕒 Waitlist ENTIRE Group (Keep Group Together - $0 Due)</button>';
+            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-block">🕒 Waitlist ENTIRE Group (Keep Group Together - $0 Due)</button>';
             $prompt_html .= '</form>';
 
             if ($max_open_available > 0) {
                 $prompt_html .= '<form method="post" class="sywat-overflow-form">' . $base_hidden_fields;
                 $prompt_html .= '<input type="hidden" name="waitlist_mode" value="remainder">';
-                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning sywat-btn-full">⚠️ Book Available Spots (' . intval($max_open_available) . ') & Waitlist Remainder</button>';
+                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning-solid sywat-btn-block">⚠️ Book Available Spots (' . intval($max_open_available) . ') & Waitlist Remainder</button>';
                 $prompt_html .= '</form>';
             }
 
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-full" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-block" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
