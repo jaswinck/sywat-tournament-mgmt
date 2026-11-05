@@ -22,10 +22,10 @@
 .sywat-table-header-bar h2 { margin: 0; white-space: nowrap; }
 .sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; flex: 1 1 0%; min-width: 0; max-width: 100%; margin-left: auto; box-sizing: border-box; }
 .sywat-table-header-controls .sywat-field-group, .sywat-table-header-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
-.sywat-table-header-controls input[type="text"], .sywat-table-header-controls select, .sywat-table-header-controls .sywat-btn, .sywat-table-header-controls .sywat-sync-pill { height: 32px !important; min-height: 32px !important; box-sizing: border-box !important; margin: 0 !important; }
+.sywat-table-header-controls input[type="text"], .sywat-table-header-controls select, .sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync), .sywat-table-header-controls .sywat-sync-pill { height: 32px !important; min-height: 32px !important; box-sizing: border-box !important; margin: 0 !important; }
 .sywat-table-header-controls input[type="text"] { width: 130px !important; font-size: 12px !important; padding: 3px 8px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
 .sywat-table-header-controls select { width: 125px !important; font-size: 12px !important; padding: 3px 6px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
-.sywat-table-header-controls .sywat-btn { padding: 3px 10px !important; font-size: 12px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
+.sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync) { padding: 3px 10px !important; font-size: 12px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
 
 /* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -47,8 +47,8 @@
 
 /* TFAA Sync Pill Component */
 .sywat-sync-pill { margin: 0 !important; display: inline-flex !important; align-items: center !important; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 18px; padding: 2px 4px 2px 8px !important; gap: 6px; height: 32px !important; box-sizing: border-box !important; }
-.sywat-sync-pill-count { font-size: 11px; color: #475569; font-weight: 600; white-space: nowrap; }
-.sywat-btn-pill-sync { height: 24px !important; min-height: 24px !important; padding: 2px 6px !important; font-size: 10px !important; border-radius: 12px !important; background: #ffffff !important; margin: 0 !important; }
+.sywat-sync-pill-count { font-size: 11px; color: #475569; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; line-height: 1; }
+.sywat-btn-pill-sync { height: 24px !important; min-height: 24px !important; max-height: 24px !important; padding: 2px 8px !important; font-size: 10px !important; font-weight: 700 !important; border-radius: 12px !important; background: #ffffff !important; border: 1px solid #cbd5e1 !important; color: #334155 !important; margin: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; }
 
 @media (max-width: 768px) {
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
