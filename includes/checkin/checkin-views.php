@@ -346,7 +346,7 @@ function sywat_desk_render_archers_table($data) {
                                                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                                                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                                                     <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Archer</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-success-solid sywat-btn-icon-checkin">Check In Archer</button>
                                                 </form>
                                             <?php endif; ?>
                                         <?php endif; ?>
