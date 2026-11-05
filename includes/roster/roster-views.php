@@ -196,7 +196,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <p class="sywat-label-subtext" style="padding: 20px 0; text-align: center;">No archers found matching your filter criteria.</p>
                     <?php else: ?>
                         <div class="sywat-table-responsive">
-                            <table class="sywat-table">
+                            <table class="sywat-table sywat-roster-table">
                                 <thead>
                                     <tr>
                                         <th class="sywat-col-roster-name">Shooter Name</th>
@@ -243,13 +243,12 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             <td><?php echo esc_html( $line_disp ); ?></td>
                                             <td class="sywat-col-center"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                             <td class="sywat-col-roster-action sywat-col-center">
-                                                <!-- UPDATED WRAPPER CLASS -->
                                                 <div class="sywat-modal-roster-actions">
                                                     <!-- Edit Button Link -->
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
 
-                                                    <!-- Remove Form -->
-                                                    <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
+                                                    <!-- Remove Form (Removed Conflicting CSS Class) -->
+                                                    <form method="post" onsubmit="return confirm('Are you sure you want to remove <?php echo esc_js( $reg['name'] ); ?>?');">
                                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                         <input type="hidden" name="sywat_action" value="delete_shooter">
                                                         <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
