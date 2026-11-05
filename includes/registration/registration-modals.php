@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -20,7 +20,17 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         <div class="no-print sywat-intake-wrapper">
             
             <?php if ( ! empty( $modal_notice ) ): ?>
-                <div class="sywat-modal-notice"><?php echo $modal_notice; ?></div>
+                <?php if ( stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
+                    <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active">
+                        <div class="sywat-modal-content">
+                            <div class="sywat-modal-body">
+                                <?php echo $modal_notice; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="sywat-modal-notice"><?php echo $modal_notice; ?></div>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ( ! empty( $skipped_duplicates ) ): ?>
