@@ -18,6 +18,7 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms (`.sywat-filter-bar-form`), field alignment wrappers (`.sywat-field-auto`), select dropdown specificity overrides (`.sywat-select-tournament`, `.sywat-select-line`), search input groups, and line capacity tracker grid cards (`.sywat-tracker-grid`).
 - **`assets/images/logo.png`** — TFAA brand asset logo graphic.
 - **`assets/images/zelle-qr-code.png`** — Accounting payment Zelle QR code graphic asset.
+- **`assets/js/sywat-checkin.js`** — Client-side JavaScript engine managing check-in desk modals, TFAA autocomplete dropdowns, dynamic family group selectors, unpaid balance banners, and division/style restriction enforcement.
 - **`assets/js/sywat-shops.js`** — Client-side JavaScript engine managing tabbed location editing, dynamic contact repeaters, shooting line schedule repeaters, phone number formatting, and live directory/district filtering.
 
 ---
@@ -42,9 +43,9 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
   - **State 3 (Set New Password)**: Front-end password update form for operators arriving via email reset tokens.
 
 #### 3. Check-In Desk Sub-System (`includes/checkin/`)
-- **`class-sywat-checkin.php`** — Sub-module loader shell and shortcode binding (`[sywat_desk]`). Enforces permission access via `sywat_can_access_desk()` and renders permission notices inside clean `.sywat-card-sm` containers.
+- **`class-sywat-checkin.php`** — Sub-module loader shell and shortcode binding (`[sywat_desk]`). Enforces permission access via `sywat_can_access_desk()`, enqueues `sywat-checkin.js`, localizes data state via `wp_add_inline_script()`, and renders permission notices inside clean `.sywat-card-sm` containers.
 - **`checkin-actions.php`** — Action handler for check-ins, line closing/reopening, walk-in registrations, and multi-archer family balance synchronization.
-- **`checkin-data.php`** — Data aggregation, line index resolution, and TFAA / shop profile history matching.
+- **`checkin-data.php`** — Data aggregation engine featuring transient caching for historical profile lookups (`sywat_history_profiles_cache`), line index resolution, and TFAA / shop profile history matching.
 - **`checkin-modals.php`** — Pre-registration check-in, edit, and walk-in modal overlays with real-time unpaid balance warning banners, zero inline styles, and class-driven TFAA autocomplete dropdowns (`.sywat-desk-tfaa-dropdown`).
 - **`checkin-views.php`** — Visual views, line capacity tracker grid cards, filter bar toolbar, family prompt banners, and registered archers data table featuring centered `.sywat-table-actions-vertical` column with top-positioned solid green primary CTA (`.sywat-btn-success-solid`) and secondary edit triggers.
 
