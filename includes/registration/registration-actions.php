@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -25,6 +25,13 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
     }
 }
 
+/**
+ * Handles multi-archer phone intake, line group fee calculation, family capping, waitlists, and persistence.
+ *
+ * @param array $tournaments   Master tournament configuration array.
+ * @param array $registrations Master registration state array reference.
+ * @return string Rendered HTML notice message.
+ */
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
         $group_name       = trim( sanitize_text_field( $_POST['group_name'] ?? '' ) );
@@ -33,6 +40,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $tourn_name       = sanitize_text_field( $_POST['selected_tournament'] ?? '' );
         $amount_paid      = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
         $allow_partial    = isset($_POST['allow_partial']) && $_POST['allow_partial'] === '1';
+        $waitlist_mode    = sanitize_text_field($_POST['waitlist_mode'] ?? ''); // 'all', 'remainder', or empty
         $t_slug           = sanitize_title( $tourn_name );
 
         $t_data  = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
@@ -75,6 +83,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
+        // Tally required spots per (line_idx, distance) combination
         $line_dist_tallies = array();
         foreach ($valid_archers as $archer) {
             $l_idx = $archer['line_idx'];
@@ -91,6 +100,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_dist_tallies[$key]['count']++;
         }
 
+        // Pre-validate capacity for each tally before creating ANY records
         $capacity_overflows = array();
         foreach ($line_dist_tallies as $key => $tally) {
             $l_idx    = $tally['line_idx'];
@@ -130,10 +140,16 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
         }
 
-        if ( ! empty( $capacity_overflows ) && ! $allow_partial ) {
+        // Trigger Capacity Overflow Modal if capacity exceeded and no explicit waitlist/partial mode chosen
+        if ( ! empty( $capacity_overflows ) && empty( $waitlist_mode ) && ! $allow_partial ) {
             $overflow_details = array();
+            $max_open_available = 0;
+
             foreach ($capacity_overflows as $ov) {
                 $overflow_details[] = 'Line <strong>' . esc_html($ov['line_name']) . '</strong> (' . esc_html($ov['distance']) . ') has <strong>' . intval($ov['open_slots']) . ' open spot(s)</strong>, but you requested <strong>' . intval($ov['requested']) . ' archer(s)</strong>.';
+                if ($ov['open_slots'] > $max_open_available) {
+                    $max_open_available = $ov['open_slots'];
+                }
             }
 
             $hidden_archers_html = '';
@@ -144,83 +160,61 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
             }
 
+            $base_hidden_fields  = wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
+            $base_hidden_fields .= '<input type="hidden" name="sywat_action" value="register_shooter">';
+            $base_hidden_fields .= '<input type="hidden" name="selected_tournament" value="' . esc_attr($tourn_name) . '">';
+            $base_hidden_fields .= '<input type="hidden" name="group_name" value="' . esc_attr($group_name) . '">';
+            $base_hidden_fields .= '<input type="hidden" name="group_phone" value="' . esc_attr($group_phone) . '">';
+            $base_hidden_fields .= '<input type="hidden" name="default_line_idx" value="' . esc_attr($default_line_idx) . '">';
+            $base_hidden_fields .= '<input type="hidden" name="amount_paid_today" value="' . esc_attr($amount_paid) . '">';
+            $base_hidden_fields .= $hidden_archers_html;
+
             $prompt_html  = '<div class="sywat-overflow-dialog" style="color:#000;">';
             $prompt_html .= '<div class="sywat-overflow-title" style="font-size: 1.3rem; font-weight: bold; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
             $prompt_html .= '<div class="sywat-overflow-body" style="font-size: 1.05rem; margin-bottom: 16px; line-height: 1.5; color: #1f2937;">' . implode('<br>', $overflow_details) . '</div>';
-            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 25px; color: #4b5563; font-size: 1rem;">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
-            $prompt_html .= '<div class="sywat-overflow-actions" style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">';
-            $prompt_html .= '<form method="post" style="display: inline-block; margin: 0;">';
-            $prompt_html .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
-            $prompt_html .= '<input type="hidden" name="sywat_action" value="register_shooter">';
-            $prompt_html .= '<input type="hidden" name="selected_tournament" value="' . esc_attr($tourn_name) . '">';
-            $prompt_html .= '<input type="hidden" name="group_name" value="' . esc_attr($group_name) . '">';
-            $prompt_html .= '<input type="hidden" name="group_phone" value="' . esc_attr($group_phone) . '">';
-            $prompt_html .= '<input type="hidden" name="default_line_idx" value="' . esc_attr($default_line_idx) . '">';
-            $prompt_html .= '<input type="hidden" name="amount_paid_today" value="' . esc_attr($amount_paid) . '">';
-            $prompt_html .= '<input type="hidden" name="allow_partial" value="1">';
-            $prompt_html .= $hidden_archers_html;
-            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning">⚠️ Book Partial Available Spots</button>';
+            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 22px; color: #4b5563; font-size: 0.98rem;">No archers were registered yet. Please select how you would like to handle this group:</p>';
+            $prompt_html .= '<div class="sywat-overflow-actions" style="display: flex; flex-direction: column; gap: 10px; align-items: stretch;">';
+            
+            // Option 1: Waitlist ENTIRE Group
+            $prompt_html .= '<form method="post" style="margin: 0;">' . $base_hidden_fields;
+            $prompt_html .= '<input type="hidden" name="waitlist_mode" value="all">';
+            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-primary" style="width: 100%; text-align: center; justify-content: center;">🕒 Waitlist ENTIRE Group (Keep Group Together - $0 Due)</button>';
             $prompt_html .= '</form>';
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+
+            // Option 2: Book Open Spots & Waitlist Remainder (if any spots open)
+            if ($max_open_available > 0) {
+                $prompt_html .= '<form method="post" style="margin: 0;">' . $base_hidden_fields;
+                $prompt_html .= '<input type="hidden" name="waitlist_mode" value="remainder">';
+                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning" style="width: 100%; text-align: center; justify-content: center;">⚠️ Book Available Spots (' . intval($max_open_available) . ') & Waitlist Remainder</button>';
+                $prompt_html .= '</form>';
+            }
+
+            // Option 3: Cancel & Change Line
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" style="width: 100%; text-align: center; justify-content: center;" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
-            return ''; // Stops the normal top-of-page rendering so the modal takes over entirely
+            return '';
         }
 
+        // Anchor group naming
         $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'];
-        $line_groups      = array();
 
-        foreach ($valid_archers as $archer) {
-            $l_idx = $archer['line_idx'];
-            if (!isset($line_groups[$l_idx])) {
-                $fam_hash = 'fam_' . $t_slug . '_l' . sanitize_title($l_idx) . '_' . sanitize_title($family_base_name) . '_' . substr(md5(uniqid()), 0, 4);
-                $line_groups[$l_idx] = array(
-                    'archers'     => array(),
-                    'youth_count' => 0,
-                    'adult_count' => 0,
-                    'raw_total'   => 0,
-                    'is_capped'   => false,
-                    'line_fee'    => 0,
-                    'paid_amount' => 0,
-                    'balance_due' => 0,
-                    'family_id'   => $fam_hash,
-                );
-            }
+        // Track open spots remaining per line/distance key for remainder waitlisting
+        $remaining_open_slots = array();
+        foreach ($line_dist_tallies as $key => $tally) {
+            $l_idx     = $tally['line_idx'];
+            $dist      = $tally['distance'];
+            $line_data = isset( $t_lines[$l_idx] ) ? $t_lines[$l_idx] : array();
+            $curr_cnt  = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $l_idx, $dist, $registrations ) : 0;
+            $max_cap   = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $dist ) : 0;
+            if (!$max_cap || $max_cap <= 0) $max_cap = ($dist === 'Cub') ? 5 : 20;
 
-            $line_groups[$l_idx]['archers'][] = $archer;
-            if ($archer['paid_tier'] === 'Youth') {
-                $line_groups[$l_idx]['youth_count']++;
-            } else {
-                $line_groups[$l_idx]['adult_count']++;
-            }
+            $remaining_open_slots[$key] = max(0, $max_cap - $curr_cnt);
         }
-
-        $overall_fee = 0;
-        foreach ($line_groups as $l_idx => &$grp) {
-            $grp['raw_total'] = ($grp['youth_count'] * 25) + ($grp['adult_count'] * 30);
-            $grp['is_capped'] = ($grp['raw_total'] >= 75 || count($grp['archers']) >= 3);
-            $grp['line_fee']  = $grp['is_capped'] ? 75.00 : $grp['raw_total'];
-            $overall_fee      += $grp['line_fee'];
-        }
-        unset($grp);
-
-        $rem_paid          = $amount_paid;
-        $total_balance_due = 0;
-        foreach ($line_groups as $l_idx => &$grp) {
-            $grp_paid           = min($rem_paid, $grp['line_fee']);
-            $grp['paid_amount'] = $grp_paid;
-            $rem_paid          -= $grp_paid;
-
-            $grp['balance_due'] = max(0, $grp['line_fee'] - $grp_paid);
-            $total_balance_due += $grp['balance_due'];
-
-            $archer_cnt            = count($grp['archers']);
-            $grp['per_archer_due'] = $archer_cnt > 0 ? round($grp['balance_due'] / $archer_cnt, 2) : 0;
-        }
-        unset($grp);
 
         $added_count        = 0;
+        $waitlisted_count   = 0;
         $skipped_duplicates = array();
         $skipped_full       = array();
 
@@ -229,7 +223,12 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $master_regs = array();
         }
 
-        foreach ($line_groups as $l_idx => $grp) {
+        foreach ($valid_archers as $archer) {
+            $l_idx = $archer['line_idx'];
+            $dist  = $archer['distance'];
+            $name  = $archer['name'];
+            $key   = $l_idx . '___' . $dist;
+
             $resolved_idx = $l_idx;
             if ( ! is_numeric( $resolved_idx ) && ! empty( $t_lines ) ) {
                 foreach ( $t_lines as $idx => $line ) {
@@ -243,67 +242,74 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_data = isset( $t_lines[$resolved_idx] ) ? $t_lines[$resolved_idx] : array();
             $line_name = isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ((int)$l_idx + 1) : $l_idx );
 
-            foreach ($grp['archers'] as $archer) {
-                $distance = $archer['distance'];
-                $name     = $archer['name'];
-
-                $is_duplicate = false;
-                if ( function_exists( 'sywat_is_archer_on_line' ) ) {
-                    $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
-                } else {
-                    foreach ( $registrations as $existing ) {
-                        if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'] ) &&
-                             strcasecmp( trim( $existing['tournament'] ), trim( $tourn_name ) ) === 0 &&
-                             (string)$existing['line_index'] === (string)$l_idx &&
-                             strcasecmp( trim( $existing['name'] ), trim( $name ) ) === 0 ) {
-                            $is_duplicate = true;
-                            break;
-                        }
+            // Duplicate check
+            $is_duplicate = false;
+            if ( function_exists( 'sywat_is_archer_on_line' ) ) {
+                $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
+            } else {
+                foreach ( $registrations as $existing ) {
+                    if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'] ) &&
+                         strcasecmp( trim( $existing['tournament'] ), trim( $tourn_name ) ) === 0 &&
+                         (string)$existing['line_index'] === (string)$l_idx &&
+                         strcasecmp( trim( $existing['name'] ), trim( $name ) ) === 0 ) {
+                        $is_duplicate = true;
+                        break;
                     }
                 }
+            }
 
-                if ($is_duplicate) { 
-                    $skipped_duplicates[] = $name . ' (' . $line_name . ')'; 
-                    continue; 
+            if ($is_duplicate) { 
+                $skipped_duplicates[] = $name . ' (' . $line_name . ')'; 
+                continue; 
+            }
+
+            // Determine if archer gets an active line spot or goes to waitlist
+            $is_waitlist = false;
+            if ($waitlist_mode === 'all') {
+                $is_waitlist = true;
+            } elseif (isset($remaining_open_slots[$key]) && $remaining_open_slots[$key] <= 0) {
+                if ($waitlist_mode === 'remainder') {
+                    $is_waitlist = true;
+                } else {
+                    $skipped_full[] = $name . ' (' . $line_name . ' - ' . $dist . ')';
+                    continue;
                 }
+            }
 
-                $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $l_idx, $distance, $registrations ) : 0;
-                $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $distance ) : 0;
-                
-                if ( ! $max_capacity || $max_capacity <= 0 ) {
-                    $max_capacity = ($distance === 'Cub') ? 5 : 20;
-                }
+            if (!$is_waitlist && isset($remaining_open_slots[$key])) {
+                $remaining_open_slots[$key]--;
+            }
 
-                if ($current_count >= $max_capacity) { 
-                    $skipped_full[] = $name . ' (' . $line_name . ' - ' . $distance . ')'; 
-                    continue; 
-                }
+            $reg_status  = $is_waitlist ? 'Waitlist' : 'Pre-Reg';
+            $paid_status = $is_waitlist ? 'Waitlist' : $archer['paid_tier'];
+            $due_amount  = $is_waitlist ? 0.00 : ($archer['paid_tier'] === 'Youth' ? 25.00 : 30.00);
 
-                $paid_status = $grp['is_capped'] ? 'Family' : $archer['paid_tier'];
-                $display_fam_name = $grp['is_capped'] ? ($family_base_name . ' (Family Cap)') : $family_base_name;
+            $new_reg = array(
+                'id'          => uniqid( 'reg_' ),
+                'tournament'  => $tourn_name,
+                'line_index'  => $l_idx,
+                'line_name'   => $line_name,
+                'name'        => $name,
+                'phone'       => $group_phone,
+                'distance'    => $dist,
+                'division'    => $archer['division'],
+                'gender'      => '',
+                'style'       => '',
+                'paid'        => $paid_status,
+                'family_id'   => 'fam_' . $t_slug . '_' . sanitize_title($family_base_name),
+                'family_name' => $family_base_name,
+                'balance_due' => $due_amount,
+                'status'      => $reg_status,
+                'created_at'  => current_time( 'mysql' ),
+            );
 
-                $new_reg = array(
-                    'id'          => uniqid( 'reg_' ),
-                    'tournament'  => $tourn_name,
-                    'line_index'  => $l_idx,
-                    'line_name'   => $line_name,
-                    'name'        => $name,
-                    'phone'       => $group_phone,
-                    'distance'    => $distance,
-                    'division'    => $archer['division'],
-                    'gender'      => '',
-                    'style'       => '',
-                    'paid'        => $paid_status,
-                    'family_id'   => $grp['family_id'],
-                    'family_name' => $display_fam_name,
-                    'balance_due' => $grp['per_archer_due'],
-                    'status'      => 'Pre-Reg',
-                    'created_at'  => current_time( 'mysql' ),
-                );
+            update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
+            $master_regs[$new_reg['id']] = $new_reg;
+            $registrations[] = $new_reg;
 
-                update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-                $master_regs[$new_reg['id']] = $new_reg;
-                $registrations[] = $new_reg;
+            if ($is_waitlist) {
+                $waitlisted_count++;
+            } else {
                 $added_count++;
             }
         }
@@ -311,7 +317,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
 
-        if ( ! empty( $group_phone ) && $added_count > 0 ) {
+        if ( ! empty( $group_phone ) && ($added_count + $waitlisted_count) > 0 ) {
             $phone_cache = get_option( 'sywat_shooter_phones_cache', array() );
             if ( ! is_array( $phone_cache ) ) {
                 $phone_cache = array();
@@ -333,6 +339,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         if ($added_count > 0) {
             $msg .= '<div class="sywat-alert sywat-alert-success">Successfully registered ' . $added_count . ' archer(s) under \'' . esc_html($family_base_name) . '\'.</div>';
         }
+        if ($waitlisted_count > 0) {
+            $msg .= '<div class="sywat-alert sywat-alert-warning">🕒 Added ' . $waitlisted_count . ' archer(s) to the WAITLIST under \'' . esc_html($family_base_name) . '\' ($0 Balance Due).</div>';
+        }
         if (!empty($skipped_duplicates)) {
             $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ DUPLICATE BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_duplicates)) . ' — already registered on this shooting line!</div>';
         }
@@ -340,6 +349,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ LINE FULL BLOCKED: ' . implode(', ', array_map('esc_html', $skipped_full)) . ' — target shooting line is at maximum capacity!</div>';
         }
 
-        return $msg; // Returns normal successes directly to the top banner
+        return $msg;
     }
 }
