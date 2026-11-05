@@ -166,11 +166,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
             }
 
-            $prompt_html  = '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">';
-            $prompt_html .= '<div class="sywat-alert-title">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
-            $prompt_html .= '<div class="sywat-alert-subtext">' . implode('<br>', $overflow_details) . '</div>';
-            $prompt_html .= '<div class="sywat-alert-subtext">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</div>';
-            $prompt_html .= '<div class="sywat-field-group">';
+            $prompt_html  = '<div class="sywat-overflow-dialog">';
+            $prompt_html .= '<div class="sywat-overflow-title">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
+            $prompt_html .= '<div class="sywat-overflow-body">' . implode('<br>', $overflow_details) . '</div>';
+            $prompt_html .= '<p class="sywat-overflow-subtext">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</p>';
+            $prompt_html .= '<div class="sywat-overflow-actions">';
             $prompt_html .= '<form method="post" class="sywat-inline-block">';
             $prompt_html .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
             $prompt_html .= '<input type="hidden" name="sywat_action" value="register_shooter">';
@@ -183,11 +183,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $prompt_html .= $hidden_archers_html;
             $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning">⚠️ Book Partial Available Spots</button>';
             $prompt_html .= '</form>';
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+            $prompt_html .= ' <button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
-            return $prompt_html;
+            return '';
         }
 
         // Anchor group naming to primary archer if caller name is blank
