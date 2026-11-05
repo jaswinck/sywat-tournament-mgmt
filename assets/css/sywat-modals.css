@@ -23,9 +23,11 @@
     transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-.sywat-modal-backdrop.active { 
-    opacity: 1; 
-    visibility: visible; 
+.sywat-modal-backdrop.active,
+.sywat-modal-backdrop.sywat-modal-active { 
+    opacity: 1 !important; 
+    visibility: visible !important; 
+    display: flex !important;
 }
 
 .sywat-modal-content {
@@ -46,6 +48,19 @@
 .sywat-modal-md { width: min(94vw, 620px); }
 .sywat-modal-lg { width: min(94vw, 780px); max-width: 780px; }
 .sywat-modal-xl { width: min(94vw, 900px); max-width: 900px; }
+
+/* Capacity Overflow Overlay Overrides */
+.sywat-modal-overflow-backdrop {
+    background: rgba(15, 23, 42, 0.85) !important;
+    z-index: 9999999 !important;
+}
+
+.sywat-modal-overflow-content {
+    border-top: 6px solid #dc2626 !important;
+    padding: 28px !important;
+    max-width: 600px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
 
 /* 2. Pinned Header & Footer Structure */
 .sywat-modal-header {
@@ -162,6 +177,59 @@
 
 .sywat-checkbox-auto {
     width: auto !important;
+}
+
+/* Overflow Warning Modal Formatting */
+.sywat-overflow-dialog {
+    color: #0f172a;
+}
+
+.sywat-overflow-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #b91c1c;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sywat-overflow-body {
+    font-size: 1rem;
+    margin-bottom: 16px;
+    line-height: 1.5;
+    color: #1f2937;
+}
+
+.sywat-overflow-subtext {
+    margin-bottom: 22px;
+    color: #4b5563;
+    font-size: 0.95rem;
+}
+
+.sywat-overflow-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.sywat-overflow-form {
+    margin: 0;
+    padding: 0;
+}
+
+.sywat-btn-full {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+}
+
+.sywat-waitlist-pill {
+    font-size: 0.8rem;
+    color: #d97706;
+    margin-top: 2px;
+    font-weight: 700;
 }
 
 /* In-body Form Actions Wrappers */
