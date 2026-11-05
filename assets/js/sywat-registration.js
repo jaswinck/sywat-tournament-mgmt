@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 5.0.0
+ * Version: 6.1.0
  */
 
 (function() {
@@ -193,7 +193,7 @@
 
         const parent = input.parentElement;
         if (getComputedStyle(parent).position === 'static') {
-            parent.style.position = 'relative';
+            parent.classList.add('sywat-relative-parent');
         }
 
         const dropdown = document.createElement('div');
@@ -404,9 +404,11 @@
 
         if (totalDisp) totalDisp.textContent = '$' + overallTotal.toFixed(2);
         if (capBadge) {
-            capBadge.style.display = anyCapped ? 'inline-block' : 'none';
             if (anyCapped) {
+                capBadge.classList.remove('sywat-hidden');
                 capBadge.textContent = '🟢 Family Cap Applied (' + cappedLinesCount + ' Line' + (cappedLinesCount > 1 ? 's' : '') + ')';
+            } else {
+                capBadge.classList.add('sywat-hidden');
             }
         }
 
@@ -417,20 +419,17 @@
     };
 
     /**
-     * Auto-dismiss Alert Banners
+     * Auto-dismiss Alert Banners (Excludes interactive action forms/prompts)
      */
     window.initAutoDismissAlerts = function() {
         setTimeout(function() {
             const alerts = document.querySelectorAll('.sywat-alert, #sywat-notice, .sywat-modal-notice');
             alerts.forEach(function(alert) {
-                alert.style.transition = 'opacity 0.5s ease, max-height 0.5s ease, margin 0.5s ease, padding 0.5s ease';
-                alert.style.opacity = '0';
-                alert.style.maxHeight = '0';
-                alert.style.paddingTop = '0';
-                alert.style.paddingBottom = '0';
-                alert.style.marginTop = '0';
-                alert.style.marginBottom = '0';
-                alert.style.overflow = 'hidden';
+                // Do not auto-dismiss alerts containing interactive form actions or overflow warning prompts
+                if (alert.querySelector('form') || alert.querySelector('button') || (alert.textContent && alert.textContent.includes('OVERFLOW'))) {
+                    return;
+                }
+                alert.classList.add('sywat-dismissing');
                 setTimeout(function() { alert.remove(); }, 500);
             });
         }, 5000);
