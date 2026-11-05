@@ -12,8 +12,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Component Renderer: Archer Roster Management Table & Controls
  */
 if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
-    function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '' ) {
+    function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '', $tournaments = array() ) {
         
+        // Build list of tournaments for switcher dropdown
+        $tourn_options = array();
+        if ( is_array( $tournaments ) && ! empty( $tournaments ) ) {
+            foreach ( $tournaments as $t_key => $t_val ) {
+                $t_name = is_string( $t_key ) ? $t_key : ( is_string( $t_val ) ? $t_val : '' );
+                if ( ! empty( $t_name ) ) {
+                    $tourn_options[$t_name] = $t_name;
+                }
+            }
+        }
+        if ( empty( $tourn_options ) && ! empty( $selected_tournament ) ) {
+            $tourn_options[$selected_tournament] = $selected_tournament;
+        }
+
         // STRICT FILTER: Build Line-Scoped & Smart-Named Family Groups array for JS dynamic dropdowns & labels
         $existing_families_by_line = array();
         $family_members_by_id      = array();
@@ -112,8 +126,18 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             <div class="sywat-roster-filter-bar">
                 <form method="get" class="sywat-roster-filter-form">
                     <input type="hidden" name="tab" value="manage">
-                    <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                     <input type="hidden" name="modal_action" value="manage">
+
+                    <div class="sywat-field-group">
+                        <label for="view_tournament">Active Tournament</label>
+                        <select name="view_tournament" id="view_tournament" onchange="this.form.submit()">
+                            <?php foreach ( $tourn_options as $t_name ): ?>
+                                <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
+                                    <?php echo esc_html( $t_name ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
                     <div class="sywat-field-group">
                         <label for="filter_line_idx">Filter by Line</label>
@@ -203,7 +227,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     <td><?php echo esc_html( $line_disp ); ?></td>
                                     <td class="sywat-col-center"><?php echo esc_html( isset( $reg['distance'] ) ? $reg['distance'] : '20yd' ); ?></td>
                                     <td class="sywat-col-right">
-                                        <div class="sywat-table-actions">
+                                        <div class="sywat-table-actions-stacked">
                                             <!-- Edit Button Link -->
                                             <a href="?tab=manage&view_tournament=<?php echo urlencode( $selected_tournament ); ?>&modal_action=manage&edit_archer=<?php echo esc_attr( $reg_id ); ?>&filter_line_idx=<?php echo esc_attr( $filter_line_idx ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
 
