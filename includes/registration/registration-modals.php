@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -75,6 +75,29 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
         $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
             ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
             : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
+
+        $is_overflow_notice = ! empty( $GLOBALS['sywat_modal_notice'] ) && stripos( $GLOBALS['sywat_modal_notice'], 'OVERFLOW' ) !== false;
+        $retain_form_data   = $is_overflow_notice || ! empty( $GLOBALS['sywat_skipped_duplicates'] ) || ! empty( $GLOBALS['sywat_skipped_full'] );
+
+        $group_name_val  = $retain_form_data && isset($_POST['group_name']) ? sanitize_text_field($_POST['group_name']) : '';
+        $group_phone_val = $retain_form_data && isset($_POST['group_phone']) ? sanitize_text_field($_POST['group_phone']) : '';
+        $amount_paid_val = $retain_form_data && isset($_POST['amount_paid_today']) ? sanitize_text_field($_POST['amount_paid_today']) : '0.00';
+
+        $archers_data = array();
+        if ( $retain_form_data && isset($_POST['archers']) && is_array($_POST['archers']) ) {
+            $archers_data = $_POST['archers'];
+        }
+
+        if ( empty( $archers_data ) ) {
+            $archers_data = array(
+                array(
+                    'name'     => '',
+                    'distance' => '20yd',
+                    'division' => '',
+                    'line_idx' => $current_default_line,
+                )
+            );
+        }
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
@@ -91,12 +114,12 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                 <div class="sywat-form-grid-4 sywat-intake-group-wrapper">
                     <div class="sywat-field-group">
                         <label for="sywat_group_name">Caller / Primary Archer Name</label>
-                        <input type="text" name="group_name" id="sywat_group_name" placeholder="e.g. John Smith" oninput="handleCallerNameInput(this)">
+                        <input type="text" name="group_name" id="sywat_group_name" value="<?php echo esc_attr( $group_name_val ); ?>" placeholder="e.g. John Smith" oninput="handleCallerNameInput(this)">
                     </div>
 
                     <div class="sywat-field-group">
                         <label for="sywat_group_phone">Contact Phone Number</label>
-                        <input type="tel" name="group_phone" id="sywat_group_phone" placeholder="e.g. 817-555-1234" oninput="formatPhoneNumber(this)">
+                        <input type="tel" name="group_phone" id="sywat_group_phone" value="<?php echo esc_attr( $group_phone_val ); ?>" placeholder="e.g. 817-555-1234" oninput="formatPhoneNumber(this)">
                     </div>
 
                     <div class="sywat-field-group">
@@ -112,7 +135,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
 
                     <div class="sywat-field-group">
                         <label for="sywat_amount_paid_today">Amount Paid Today ($)</label>
-                        <input type="number" step="0.01" min="0" name="amount_paid_today" id="sywat_amount_paid_today" value="0.00" oninput="recalculateGroupTotal()">
+                        <input type="number" step="0.01" min="0" name="amount_paid_today" id="sywat_amount_paid_today" value="<?php echo esc_attr( $amount_paid_val ); ?>" oninput="recalculateGroupTotal()">
                     </div>
                 </div>
 
@@ -125,45 +148,53 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                 </div>
 
                 <div id="sywat_archer_rows_container">
-                    <div class="sywat-archer-input-row">
-                        <div class="sywat-field-group sywat-col-archer-name">
-                            <input type="text" name="archers[0][name]" id="sywat_first_archer_name" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
-                        </div>
+                    <?php foreach ( $archers_data as $i => $a ): ?>
+                        <?php 
+                            $a_name = isset($a['name']) ? sanitize_text_field($a['name']) : '';
+                            $a_dist = isset($a['distance']) ? sanitize_text_field($a['distance']) : '20yd';
+                            $a_div  = isset($a['division']) ? sanitize_text_field($a['division']) : '';
+                            $a_line = isset($a['line_idx']) ? sanitize_text_field($a['line_idx']) : $current_default_line;
+                        ?>
+                        <div class="sywat-archer-input-row">
+                            <div class="sywat-field-group sywat-col-archer-name">
+                                <input type="text" name="archers[<?php echo $i; ?>][name]" <?php if ($i === 0) echo 'id="sywat_first_archer_name"'; ?> class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required value="<?php echo esc_attr($a_name); ?>" oninput="handleArcherNameInput(this); recalculateGroupTotal();">
+                            </div>
 
-                        <div class="sywat-field-group sywat-col-archer-dist">
-                            <select name="archers[0][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
-                                <option value="20yd" selected>20yd</option>
-                                <option value="Cub">Cub (10yd)</option>
-                            </select>
-                        </div>
+                            <div class="sywat-field-group sywat-col-archer-dist">
+                                <select name="archers[<?php echo $i; ?>][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
+                                    <option value="20yd" <?php selected($a_dist, '20yd'); ?>>20yd</option>
+                                    <option value="Cub" <?php selected($a_dist, 'Cub'); ?>>Cub (10yd)</option>
+                                </select>
+                            </div>
 
-                        <div class="sywat-field-group sywat-col-archer-div">
-                            <select name="archers[0][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
-                                <option value="" disabled selected hidden>Select Division</option>
-                                <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
-                                <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
-                                <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                                <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
-                                <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
-                                <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
-                                <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
-                            </select>
-                        </div>
+                            <div class="sywat-field-group sywat-col-archer-div">
+                                <select name="archers[<?php echo $i; ?>][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
+                                    <option value="" disabled <?php selected($a_div, ''); ?> hidden>Select Division</option>
+                                    <option value="Cub (8 - 11)" <?php selected($a_div, 'Cub (8 - 11)'); ?>>Cub (8 - 11) [$25]</option>
+                                    <option value="Youth (12 - 14)" <?php selected($a_div, 'Youth (12 - 14)'); ?>>Youth (12 - 14) [$25]</option>
+                                    <option value="Young Adult (15 - 17)" <?php selected($a_div, 'Young Adult (15 - 17)'); ?>>Young Adult (15 - 17) [$25]</option>
+                                    <option value="Adult (18 - 49)" <?php selected($a_div, 'Adult (18 - 49)'); ?>>Adult (18 - 49) [$30]</option>
+                                    <option value="Senior (50 - 59)" <?php selected($a_div, 'Senior (50 - 59)'); ?>>Senior (50 - 59) [$30]</option>
+                                    <option value="Silver Senior (60 - 69)" <?php selected($a_div, 'Silver Senior (60 - 69)'); ?>>Silver Senior (60 - 69) [$30]</option>
+                                    <option value="Master Senior (70+) " <?php selected(trim($a_div), 'Master Senior (70+)'); ?>>Master Senior (70+) [$30]</option>
+                                </select>
+                            </div>
 
-                        <div class="sywat-field-group sywat-col-archer-line">
-                            <select name="archers[0][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
-                                <?php foreach ( $available_lines as $idx => $line ): ?>
-                                    <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
-                                        <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                            <div class="sywat-field-group sywat-col-archer-line">
+                                <select name="archers[<?php echo $i; ?>][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
+                                    <?php foreach ( $available_lines as $idx => $line ): ?>
+                                        <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$a_line, (string)$idx ); ?>>
+                                            <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
 
-                        <div class="sywat-col-archer-action">
-                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                            <div class="sywat-col-archer-action">
+                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                            </div>
                         </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
 
                 <div class="sywat-intake-footer-bar">
