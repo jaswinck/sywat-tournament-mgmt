@@ -93,31 +93,39 @@
 }
 
 /* ==========================================================================
-   NEW: Isolated Modal Roster Buttons (Strict 85px Width, Equal Size)
+   NEW: Isolated Modal Roster Buttons (Strict Block Width Lock)
    ========================================================================== */
 .sywat-modal-roster-actions {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    justify-content: center !important;
-    gap: 4px !important;
+    display: block !important; /* Replaced flex with strict block */
     width: 85px !important;
     min-width: 85px !important;
     max-width: 85px !important;
     margin: 0 auto !important;
 }
 
-.sywat-modal-roster-actions a.sywat-btn,
-.sywat-modal-roster-actions form,
-.sywat-modal-roster-actions form .sywat-btn {
+.sywat-modal-roster-actions form {
+    display: block !important;
+    width: 100% !important;
     margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+.sywat-modal-roster-actions a.sywat-btn {
+    margin: 0 0 4px 0 !important; /* Gap replacement */
+}
+
+.sywat-modal-roster-actions a.sywat-btn,
+.sywat-modal-roster-actions form button.sywat-btn {
     width: 100% !important;
     height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
     line-height: 24px !important;
-    padding: 0 4px !important;
+    padding: 0 !important;
     font-size: 11px !important;
     box-sizing: border-box !important;
-    display: inline-flex !important;
+    display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     border-radius: 4px !important;
