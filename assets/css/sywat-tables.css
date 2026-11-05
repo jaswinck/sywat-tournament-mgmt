@@ -214,6 +214,33 @@
     text-align: center;
 }
 
+.sywat-tracker-container {
+    margin-bottom: 24px;
+}
+
+/* Check-In Family Prompt Banner */
+.sywat-family-banner {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.sywat-family-banner-title {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.sywat-family-banner-subtext {
+    font-size: 13px;
+}
+
+.sywat-family-banner-actions {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+    margin-top: 4px !important;
+}
+
 /* Status Indicator Utilities & Badges */
 .sywat-text-open   { color: #008a20; font-weight: 600; }
 .sywat-text-closed { color: #d63638; font-weight: 600; }
@@ -286,6 +313,25 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+}
+
+.sywat-archer-name {
+    font-weight: bold;
+    color: #0f172a;
+}
+
+.sywat-owe-badge-wrap {
+    margin-top: 4px;
+}
+
+.sywat-col-paid {
+    font-weight: bold;
+    color: #0073aa;
+}
+
+.sywat-empty-text {
+    color: #64748b;
+    font-style: italic;
 }
 
 .sywat-score-null { color: #94a3b8; }
