@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -203,6 +203,7 @@ function sywat_desk_render_capacity_tracker($data) {
                             <form method="post">
                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
+                                <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                                 <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
                             </form>
 
@@ -213,6 +214,7 @@ function sywat_desk_render_capacity_tracker($data) {
                                         <input type="hidden" name="sywat_action" value="reopen_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                        <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                                         <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Reopen</button>
                                     </form>
                                 <?php else: ?>
@@ -221,6 +223,7 @@ function sywat_desk_render_capacity_tracker($data) {
                                         <input type="hidden" name="sywat_action" value="close_line">
                                         <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
                                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                        <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-lock">Close</button>
                                     </form>
                                 <?php endif; ?>
@@ -381,6 +384,55 @@ if ( window.history.replaceState ) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    // Persistent Archer Search Query Retention & Dynamic Table Filter
+    const searchInput = document.getElementById('sywat_search_input');
+    
+    function applySearchFilter(query) {
+        const cleanQuery = query.trim().toLowerCase();
+        const rows = document.querySelectorAll('.sywat-archer-row');
+        
+        rows.forEach(function(row) {
+            const archerName = row.getAttribute('data-name') || '';
+            if (!cleanQuery || archerName.includes(cleanQuery)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Sync hidden search fields across all forms on the page
+        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
+            hiddenInput.value = query;
+        });
+
+        // Store query in sessionStorage for retention across action posts
+        if (query) {
+            sessionStorage.setItem('sywat_checkin_search_query', query);
+        } else {
+            sessionStorage.removeItem('sywat_checkin_search_query');
+        }
+    }
+
+    if (searchInput) {
+        let initialQuery = searchInput.value;
+        if (!initialQuery) {
+            const savedQuery = sessionStorage.getItem('sywat_checkin_search_query');
+            if (savedQuery) {
+                initialQuery = savedQuery;
+                searchInput.value = savedQuery;
+            }
+        }
+
+        if (initialQuery) {
+            applySearchFilter(initialQuery);
+        }
+
+        searchInput.addEventListener('input', function() {
+            applySearchFilter(this.value);
+        });
+    }
+
+    // Auto-dismiss standard notices after 4 seconds
     setTimeout(function() {
         const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
         notices.forEach(function(notice) {
