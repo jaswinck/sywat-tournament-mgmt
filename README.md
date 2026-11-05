@@ -6,7 +6,7 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 
 ## Included Structure & Assets
 
-- **`sywat-archery-manager.php`** — Main plugin header (v6.0.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
+- **`sywat-archery-manager.php`** — Main plugin header (v6.1.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
 
 ### Style & Asset Bundle (`assets/`)
 
@@ -19,6 +19,7 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 - **`assets/images/logo.png`** — TFAA brand asset logo graphic.
 - **`assets/images/zelle-qr-code.png`** — Accounting payment Zelle QR code graphic asset.
 - **`assets/js/sywat-checkin.js`** — Client-side JavaScript engine managing check-in desk modals, TFAA autocomplete dropdowns, dynamic family group selectors, unpaid balance banners, and division/style restriction enforcement.
+- **`assets/js/sywat-registration.js`** — Client-side JavaScript engine managing phone intake forms, TFAA autocomplete dropdowns, dynamic archer row repeaters, real-time family fee calculation, line capacity prompts, and interactive alert banner retention.
 - **`assets/js/sywat-shops.js`** — Client-side JavaScript engine managing tabbed location editing, dynamic contact repeaters, shooting line schedule repeaters, phone number formatting, and live directory/district filtering.
 
 ---
@@ -61,10 +62,10 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 
 #### 6. Archer Registration Sub-System (`includes/registration/`)
 - **`class-sywat-registration.php`** — Sub-module loader shell.
-- **`registration-actions.php`** — Multi-archer phone intake handler, per-line $75 family capping engine, duplicate/capacity blocking banners, and database options persistence.
-- **`registration-import.php`** — FareHarbor CSV roster importer and raw report text parser.
-- **`registration-views.php`** — Phone intake modal UI, CSV upload form, and current line slot usage table.
-- **`registration-scripts.php`** — Client-side JavaScript engine (phone number auto-formatting, dynamic archer row addition, real-time family fee calculation, TFAA autocomplete dropdown, caller name population, and 5-second banner auto-dismissal).
+- **`registration-actions.php`** — Multi-archer phone intake handler, per-line $75 family capping engine, duplicate/capacity blocking banners, Group Capacity Pre-Validation Guard preventing arbitrary partial bookings, and database options persistence.
+- **`registration-import.php`** — FareHarbor CSV roster importer and raw report text parser with pre-import capacity tally and overflow warning prompts.
+- **`registration-views.php`** — Phone intake modal UI, CSV upload form, current line slot usage table, and high-concurrency scoped database query execution.
+- **`registration-scripts.php`** — Client-side JavaScript enqueuer localizing cached TFAA and phone data (`assets/js/sywat-registration.js`), managing phone formatting, dynamic archer rows, fee calculations, TFAA autocomplete, caller name population, and interactive alert banner retention.
 
 #### 7. Public Results & Standings Sub-System (`includes/results/`)
 - **`class-sywat-results.php`** — Sub-module loader shell and shortcode binding (`[sywat_results]`). Features conditional `✏️ Enter Scores` desk shortcuts in the tournament directory table for authorized staff (`sywat_can_edit_scores()`).
