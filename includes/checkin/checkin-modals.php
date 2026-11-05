@@ -24,19 +24,6 @@ function sywat_desk_render_modals($data) {
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
 
     ?>
-    <style>
-        .sywat-badge-verified { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; display: block; margin-top: 4px; }
-        .sywat-badge-known { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; display: block; margin-top: 4px; }
-        .sywat-badge-none { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; display: block; margin-top: 4px; }
-        .sywat-pill-box { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-        .sywat-btn-pill { background: #0284c7; color: #ffffff; border: none; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; cursor: pointer; }
-        .sywat-btn-pill:hover { background: #0369a1; }
-        .sywat-btn-use-official { background: #0d9488; color: #ffffff; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 6px; }
-        .sywat-btn-use-official:hover { background: #0f766e; }
-        .sywat-multi-style-alert { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 10px; border-radius: 6px; font-size: 11px; margin-bottom: 6px; width: 100%; box-sizing: border-box; }
-        .sywat-multi-style-title { font-weight: bold; font-size: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; color: #856404; }
-    </style>
-
     <!-- CHECK-IN MODAL (PRE-REG) -->
     <?php if ($modal_archer): ?>
     <?php 
@@ -53,7 +40,7 @@ function sywat_desk_render_modals($data) {
         <div class="sywat-modal-content sywat-modal-sm">
             <div class="sywat-modal-header no-print">
                 <h3>Check In Archer</h3>
-                <form method="post" style="margin:0;">
+                <form method="post">
                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <button type="submit" name="sywat_action" value="cancel" class="sywat-modal-close" formnovalidate>&times;</button>
@@ -67,19 +54,19 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_archer['id']); ?>">
 
-                    <div class="sywat-field-group" style="position:relative;">
+                    <div class="sywat-field-group sywat-field-relative">
                         <label>Name:</label>
-                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" style="font-weight:bold;">
+                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" class="sywat-input-bold">
                         <div id="checkin_tfaa_badge"></div>
                         <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
 
                     <?php if ($modal_due > 0): ?>
-                        <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger" style="text-align:center; margin-top:12px;">
-                            <div style="font-size:16px; font-weight:bold;">
+                        <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger sywat-alert-center">
+                            <div class="sywat-alert-title">
                                 ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
                             </div>
-                            <div style="font-size:13px; margin-top:4px; font-weight:600;">
+                            <div class="sywat-alert-subtext">
                                 <?php if ($is_family): ?>
                                     Family Cap Group Outstanding Balance. Collect Payment Onsite.
                                 <?php else: ?>
@@ -89,8 +76,8 @@ function sywat_desk_render_modals($data) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label style="color:#721c24; cursor:pointer; display:flex; align-items:center; gap:8px;">
-                                <input type="checkbox" name="checkin_payment_verified" id="sywat_payment_verified_check" value="1" required style="width:auto;" onchange="toggleUnpaidBanner(this.checked)">
+                            <label class="sywat-checkbox-label-danger">
+                                <input type="checkbox" name="checkin_payment_verified" id="sywat_payment_verified_check" value="1" required class="sywat-checkbox-auto" onchange="toggleUnpaidBanner(this.checked)">
                                 Payment / Resolution Verified with Event Staff
                             </label>
                         </div>
@@ -153,7 +140,7 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div class="sywat-field-group" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="checkin_family_box">
+                    <div class="sywat-field-group <?php echo ($curr_pay_opt === 'Family') ? '' : 'sywat-hidden'; ?>" id="checkin_family_box">
                         <label>Line Family Group:</label>
                         <select name="checkin_family_group_id" id="checkin_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
@@ -166,7 +153,7 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <div class="sywat-modal-form-actions">
                         <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
                         <button type="submit" name="sywat_action" value="save_checkin" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Complete Check-In</button>
                     </div>
@@ -186,7 +173,7 @@ function sywat_desk_render_modals($data) {
         <div class="sywat-modal-content sywat-modal-sm">
             <div class="sywat-modal-header no-print">
                 <h3>Edit Archer Registration</h3>
-                <form method="post" style="margin:0;">
+                <form method="post">
                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <button type="submit" name="sywat_action" value="cancel" class="sywat-modal-close" formnovalidate>&times;</button>
@@ -200,7 +187,7 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
                     <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_edit_archer['id']); ?>">
 
-                    <div class="sywat-field-group" style="position:relative;">
+                    <div class="sywat-field-group sywat-field-relative">
                         <label>Full Name:</label>
                         <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" autocomplete="off" required>
                     </div>
@@ -276,7 +263,7 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div class="sywat-field-group" style="<?php echo ($curr_pay_opt === 'Family') ? '' : 'display:none;'; ?>" id="edit_family_box">
+                    <div class="sywat-field-group <?php echo ($curr_pay_opt === 'Family') ? '' : 'sywat-hidden'; ?>" id="edit_family_box">
                         <label>Line Family Group:</label>
                         <select name="edit_family_group_id" id="edit_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
@@ -294,10 +281,10 @@ function sywat_desk_render_modals($data) {
                         <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>">
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                    <div class="sywat-modal-form-actions-split">
                         <button type="submit" name="sywat_action" value="delete_archer" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="return confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?');" formnovalidate>Delete</button>
                         
-                        <div style="display:flex; gap:10px;">
+                        <div class="sywat-modal-form-actions-right">
                             <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
                             <button type="submit" name="sywat_action" value="save_edit" class="sywat-btn sywat-btn-primary sywat-btn-icon-save">Save Changes</button>
                         </div>
@@ -322,7 +309,7 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
 
-                    <div class="sywat-field-group" style="position:relative;">
+                    <div class="sywat-field-group sywat-field-relative">
                         <label>Full Name:</label>
                         <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off">
                         <div id="walkin_tfaa_badge"></div>
@@ -383,7 +370,7 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div class="sywat-field-group" style="display:none;" id="walkin_family_box">
+                    <div class="sywat-field-group sywat-hidden" id="walkin_family_box">
                         <label>Line Family Group:</label>
                         <select name="walkin_family_group_id" id="walkin_family_group_id">
                             <option value="">[ + Start New Family Group for This Line ]</option>
@@ -393,7 +380,7 @@ function sywat_desk_render_modals($data) {
                         </select>
                     </div>
 
-                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <div class="sywat-modal-form-actions">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeWalkinModal()">Cancel</button>
                         <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Register & Check In</button>
                     </div>
@@ -482,7 +469,11 @@ function sywat_desk_render_client_scripts($data) {
     function toggleUnpaidBanner(isChecked) {
         const banner = document.getElementById('sywat_unpaid_warning_banner');
         if (banner) {
-            banner.style.display = isChecked ? 'none' : 'block';
+            if (isChecked) {
+                banner.classList.add('sywat-hidden');
+            } else {
+                banner.classList.remove('sywat-hidden');
+            }
         }
     }
 
@@ -609,12 +600,11 @@ function sywat_desk_render_client_scripts($data) {
 
         const dropdown = document.createElement('div');
         dropdown.className = 'sywat-desk-tfaa-dropdown';
-        dropdown.style.cssText = 'position:absolute; top:100%; left:0; width:100%; min-width:240px; z-index:99999; background:#fff; border:1px solid #94a3b8; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:180px; overflow-y:auto; margin-top:2px;';
 
         matches.forEach(m => {
             const item = document.createElement('div');
-            item.style.cssText = 'padding:7px 10px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:12px; display:flex; justify-content:space-between; align-items:center; color:#1e293b;';
-            item.innerHTML = `<strong>${escapeHtmlDesk(m.name)}</strong> <span style="font-size:11px; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:3px;">${escapeHtmlDesk(m.division || '')}</span>`;
+            item.className = 'sywat-desk-tfaa-item';
+            item.innerHTML = `<strong>${escapeHtmlDesk(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtmlDesk(m.division || '')}</span>`;
 
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
@@ -636,7 +626,7 @@ function sywat_desk_render_client_scripts($data) {
 
                     if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
                     if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
-                    if (styleEl && m.style) matchDeskTfaaSelect(m.style, styleEl);
+                    if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
                 }
 
                 if (typeof autoFillOnNameChange === 'function' && (prefix === 'walkin' || prefix === 'checkin')) {
@@ -701,7 +691,7 @@ function sywat_desk_render_client_scripts($data) {
         let knownStyles = [];
 
         let buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;';
+        buttonContainer.className = 'sywat-pill-box';
 
         tfaaMatches.forEach(cat => {
             if (cat.style) {
@@ -766,7 +756,7 @@ function sywat_desk_render_client_scripts($data) {
         }
 
         if (cleanTyped !== cleanOfficial && officialName !== '') {
-            badgeText += '<br><span style="font-size:11px; font-weight:normal; display:inline-block; margin-top:4px;">↳ Official TFAA Name: <strong>' + officialName + '</strong></span>';
+            badgeText += '<br><span class="sywat-badge-subtext">↳ Official TFAA Name: <strong>' + officialName + '</strong></span>';
             badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
         }
 
@@ -863,7 +853,11 @@ function sywat_desk_render_client_scripts($data) {
         const payOpt = document.getElementById(type + '_pay_option');
         const box    = document.getElementById(type + '_family_box');
         if (payOpt && box) {
-            box.style.display = (payOpt.value === 'Family') ? 'block' : 'none';
+            if (payOpt.value === 'Family') {
+                box.classList.remove('sywat-hidden');
+            } else {
+                box.classList.add('sywat-hidden');
+            }
         }
     }
 
@@ -914,9 +908,9 @@ function sywat_desk_render_client_scripts($data) {
                 rows.forEach(row => {
                     const name = row.getAttribute('data-name');
                     if (name.includes(filter)) {
-                        row.style.display = '';
+                        row.classList.remove('sywat-hidden');
                     } else {
-                        row.style.display = 'none';
+                        row.classList.add('sywat-hidden');
                     }
                 });
 
