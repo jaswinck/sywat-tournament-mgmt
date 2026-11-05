@@ -135,11 +135,11 @@
 .sywat-col-total       { width: 130px; text-align: right; }
 .sywat-col-tourn-score { width: 140px; text-align: right; }
 
-/* Line Slot Usage Table Specific Columns */
-.sywat-col-line-name   { width: 30%; }
-.sywat-col-cap-20yd    { width: 25%; text-align: center; }
-.sywat-col-cap-cub     { width: 25%; text-align: center; }
-.sywat-col-line-action { width: 20%; text-align: center; }
+/* Line Slot Usage Table Specific Columns (Tighter Math & Forced Center Alignment) */
+.sywat-col-line-name   { width: 40%; }
+.sywat-col-cap-20yd    { width: 20%; text-align: center !important; }
+.sywat-col-cap-cub     { width: 20%; text-align: center !important; }
+.sywat-col-line-action { width: 20%; text-align: center !important; }
 
 /* Archer Roster Table Specific Columns */
 .sywat-col-roster-name   { width: 30%; }
