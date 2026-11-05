@@ -3,7 +3,7 @@
  * Sub-Module: FareHarbor CSV & Raw Text Import Engine
  * Path: includes/registration/registration-import.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -22,6 +22,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
         $t_data         = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
         $t_lines        = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
         $t_slug         = sanitize_title( $tourn_name );
+        $allow_partial  = isset( $_POST['allow_partial'] ) && $_POST['allow_partial'] === '1';
         $imported_count = 0;
         $skipped_dup    = 0;
         $skipped_cap    = 0;
@@ -36,6 +37,8 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
             $blacklist_phrases = array( 'sywat', 'cinnamon creek', 'intro to archery', 'full name', 'adult categories', 'cub/youth/young adult' );
             $blacklist_words   = array( 'contact', 'total', 'due', 'bookings', 'archers', 'generated' );
+
+            $parsed_shooters = array();
 
             foreach ( $lines as $raw_line ) {
                 $clean_line = trim( $raw_line );
@@ -68,10 +71,57 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 $clean_line = trim( ltrim( $clean_line, '| ' ) );
                 if ( strlen( $clean_line ) < 2 || strlen( $clean_line ) > 60 ) continue;
 
-                $line_idx  = $target_line_idx;
+                $dist_val  = function_exists('sywat_normalize_dist') ? sywat_normalize_dist( $current_dist ) : $current_dist;
+                $final_paid = !empty($current_paid_context) ? $current_paid_context : ($dist_val === 'Cub' ? 'Youth' : 'Adult');
+                $final_div  = ($final_paid === 'Youth') ? ($dist_val === 'Cub' ? 'Cub (8 - 11)' : 'Youth (12 - 14)') : 'Adult (18 - 49)';
+
+                $parsed_shooters[] = array(
+                    'name'     => $clean_line,
+                    'line_idx' => $target_line_idx,
+                    'distance' => $dist_val,
+                    'paid'     => $final_paid,
+                    'division' => $final_div,
+                );
+            }
+
+            // Group Capacity Pre-Check Guard
+            if ( ! empty( $parsed_shooters ) && ! $allow_partial ) {
+                $line_data = isset( $t_lines[$target_line_idx] ) ? $t_lines[$target_line_idx] : array();
+                $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
+                $dist_val  = $parsed_shooters[0]['distance'];
+
+                $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $target_line_idx, $dist_val, $registrations ) : 0;
+                $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
+                if ( ! $max_capacity || $max_capacity <= 0 ) $max_capacity = ($dist_val === 'Cub') ? 5 : 20;
+
+                $open_slots = max(0, $max_capacity - $current_count);
+                $req_cnt    = count($parsed_shooters);
+
+                if ( $req_cnt > $open_slots ) {
+                    $prompt  = '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">';
+                    $prompt .= '<div class="sywat-alert-title">⚠️ IMPORT CAPACITY OVERFLOW WARNING</div>';
+                    $prompt .= '<div class="sywat-alert-subtext">Target line <strong>' . esc_html($line_name) . '</strong> (' . esc_html($dist_val) . ') has <strong>' . intval($open_slots) . ' open spot(s)</strong>, but your import contains <strong>' . intval($req_cnt) . ' archers</strong>. No archers were imported yet.</div>';
+                    $prompt .= '<div class="sywat-field-group">';
+                    $prompt .= '<form method="post" class="sywat-inline-block">';
+                    $prompt .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
+                    $prompt .= '<input type="hidden" name="sywat_action" value="import_shooters">';
+                    $prompt .= '<input type="hidden" name="selected_tournament" value="' . esc_attr($tourn_name) . '">';
+                    $prompt .= '<input type="hidden" name="target_line_idx" value="' . esc_attr($target_line_idx) . '">';
+                    $prompt .= '<input type="hidden" name="pasted_text" value="' . esc_attr($raw_text_payload) . '">';
+                    $prompt .= '<input type="hidden" name="allow_partial" value="1">';
+                    $prompt .= '<button type="submit" class="sywat-btn sywat-btn-warning">Import Available Spots (' . intval($open_slots) . ')</button>';
+                    $prompt .= '</form>';
+                    $prompt .= '</div></div>';
+                    return $prompt;
+                }
+            }
+
+            foreach ( $parsed_shooters as $s ) {
+                $line_idx  = $s['line_idx'];
                 $line_data = isset( $t_lines[$line_idx] ) ? $t_lines[$line_idx] : array();
                 $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
-                $dist_val  = sywat_normalize_dist( $current_dist );
+                $dist_val  = $s['distance'];
+                $clean_line = $s['name'];
 
                 $is_duplicate = false;
                 foreach ( $registrations as $existing ) {
@@ -86,13 +136,11 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
                 if ( $is_duplicate ) { $skipped_dup++; continue; }
 
-                $current_count = sywat_count_registered( $tourn_name, $line_idx, $dist_val, $registrations );
-                $max_capacity  = sywat_get_line_max_cap( $line_data, $dist_val );
+                $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $line_idx, $dist_val, $registrations ) : 0;
+                $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
+                if ( ! $max_capacity || $max_capacity <= 0 ) $max_capacity = ($dist_val === 'Cub') ? 5 : 20;
 
                 if ( $current_count >= $max_capacity ) { $skipped_cap++; continue; }
-
-                $final_paid = !empty($current_paid_context) ? $current_paid_context : ($dist_val === 'Cub' ? 'Youth' : 'Adult');
-                $final_div  = ($final_paid === 'Youth') ? ($dist_val === 'Cub' ? 'Cub (8 - 11)' : 'Youth (12 - 14)') : 'Adult (18 - 49)';
 
                 $new_reg = array(
                     'id'          => uniqid( 'reg_' ),
@@ -102,9 +150,9 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     'name'        => $clean_line,
                     'phone'       => '',
                     'distance'    => $dist_val,
-                    'division'    => $final_div,
-                    'paid'        => $final_paid,
-                    'family_id'   => ($final_paid === 'Family') ? uniqid('fam_') : '',
+                    'division'    => $s['division'],
+                    'paid'        => $s['paid'],
+                    'family_id'   => ($s['paid'] === 'Family') ? uniqid('fam_') : '',
                     'balance_due' => 0,
                     'status'      => 'Pre-Reg',
                     'created_at'  => current_time( 'mysql' ),
@@ -168,9 +216,9 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $raw_names = '';
                     $booking_id_val = ($booking_col_idx !== -1 && isset($data[$booking_col_idx])) ? trim($data[$booking_col_idx]) : '';
                     $matched_line_idx = $target_line_idx;
-                    $dist_val = sywat_normalize_dist( $current_dist );
-                    $row_paid_cat = sywat_detect_paid_category($data);
-                    $row_due_val  = ($due_col_idx !== -1 && isset($data[$due_col_idx])) ? sywat_extract_due_amount($data[$due_col_idx]) : 0;
+                    $dist_val = function_exists('sywat_normalize_dist') ? sywat_normalize_dist( $current_dist ) : $current_dist;
+                    $row_paid_cat = function_exists('sywat_detect_paid_category') ? sywat_detect_paid_category($data) : '';
+                    $row_due_val  = ($due_col_idx !== -1 && isset($data[$due_col_idx]) && function_exists('sywat_extract_due_amount')) ? sywat_extract_due_amount($data[$due_col_idx]) : 0;
 
                     if ($is_fh_format) {
                         if ($name_col_idx !== -1 && isset($data[$name_col_idx])) $raw_names = trim($data[$name_col_idx]);
@@ -194,7 +242,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                                 }
                             }
                         }
-                        if (!empty($col_distance)) $dist_val = sywat_normalize_dist( $col_distance );
+                        if (!empty($col_distance)) $dist_val = function_exists('sywat_normalize_dist') ? sywat_normalize_dist( $col_distance ) : $col_distance;
                     }
 
                     if (empty($raw_names)) continue;
@@ -248,8 +296,9 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
                         if ( $is_duplicate ) { $skipped_dup++; continue; }
 
-                        $current_count = sywat_count_registered( $tourn_name, $matched_line_idx, $dist_val, $registrations );
-                        $max_capacity  = sywat_get_line_max_cap( $line_data, $dist_val );
+                        $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $matched_line_idx, $dist_val, $registrations ) : 0;
+                        $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
+                        if ( ! $max_capacity || $max_capacity <= 0 ) $max_capacity = ($dist_val === 'Cub') ? 5 : 20;
 
                         if ( $current_count >= $max_capacity ) { $skipped_cap++; continue; }
 
