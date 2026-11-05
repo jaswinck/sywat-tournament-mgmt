@@ -19,21 +19,14 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
         ?>
         <div class="no-print sywat-intake-wrapper">
             
-            <?php if ( ! empty( $modal_notice ) ): ?>
-                <?php if ( stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
-                    <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active">
-                        <div class="sywat-modal-content">
-                            <div class="sywat-modal-header">
-                                <h2>⚠️ Shooting Line Capacity Exceeded</h2>
-                            </div>
-                            <div class="sywat-modal-body">
-                                <?php echo $modal_notice; ?>
-                            </div>
+            <?php if ( ! empty( $modal_notice ) && stripos( $modal_notice, 'OVERFLOW' ) !== false ): ?>
+                <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+                    <div class="sywat-modal-content" style="background: #ffffff; padding: 28px; border-radius: 12px; max-width: 580px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-top: 6px solid #dc2626; box-sizing: border-box;">
+                        <div class="sywat-modal-body">
+                            <?php echo $modal_notice; ?>
                         </div>
                     </div>
-                <?php else: ?>
-                    <div class="sywat-modal-notice"><?php echo $modal_notice; ?></div>
-                <?php endif; ?>
+                </div>
             <?php endif; ?>
 
             <?php if ( ! empty( $skipped_duplicates ) ): ?>
