@@ -406,17 +406,18 @@
         box-sizing: border-box !important;
     }
 
-    /* Hide WP Admin chrome & non-print page elements completely from flow */
+    /* Hide WP Admin chrome, non-print elements, AND inactive modals */
     #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, #masthead, header, footer, 
     .site-header, .site-footer, .entry-header, h1.entry-title, .sywat-auth-bar, 
     .sywat-nav-tabs, .sywat-card, .sywat-shop-card, .sywat-public-card, 
     .sywat-filter-bar, .sywat-filter-toolbar, .sywat-modal-header, 
-    .sywat-modal-footer, .sywat-modal-close, .no-print {
+    .sywat-modal-footer, .sywat-modal-close, .no-print,
+    .sywat-modal-backdrop:not(.active) {
         display: none !important;
     }
 
-    /* Standardize modal overlay wrappers when printing */
-    .sywat-modal-backdrop {
+    /* Standardize ONLY active modal overlay wrapper when printing */
+    .sywat-modal-backdrop.active {
         position: static !important;
         top: auto !important;
         left: auto !important;
@@ -436,7 +437,8 @@
         display: block !important;
     }
 
-    .sywat-modal-content, .sywat-modal-body {
+    .sywat-modal-backdrop.active .sywat-modal-content, 
+    .sywat-modal-backdrop.active .sywat-modal-body {
         position: static !important;
         top: auto !important;
         left: auto !important;
@@ -455,7 +457,7 @@
         display: block !important;
     }
 
-    /* Keep print area & invoice in normal document flow (enables clean multi-page breaks & prevents double-print) */
+    /* Keep print area & invoice in normal document flow */
     #sywat_print_area, .invoice-box {
         position: relative !important;
         top: auto !important;
