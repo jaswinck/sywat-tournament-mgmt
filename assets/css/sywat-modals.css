@@ -44,7 +44,7 @@
 /* Modal Sizing Modifiers */
 .sywat-modal-sm { width: min(94vw, 480px); }
 .sywat-modal-md { width: min(94vw, 620px); }
-.sywat-modal-lg { width: min(94vw, 920px); max-width: 780px; }
+.sywat-modal-lg { width: min(94vw, 780px); max-width: 780px; }
 .sywat-modal-xl { width: min(94vw, 900px); max-width: 900px; }
 
 /* 2. Pinned Header & Footer Structure */
@@ -107,7 +107,7 @@
 
 .sywat-modal-body .sywat-form-grid-2,
 .sywat-modal-body .sywat-form-grid-3,
-.sywat-modal-body form > div:not(:last-child) {
+.sywat-modal-body .sywat-form-grid-4 {
     margin-bottom: 16px;
 }
 
@@ -115,7 +115,9 @@
 .sywat-modal-body .sywat-field-group { margin-bottom: 0 !important; }
 .sywat-modal-body .sywat-field-group label { font-size: 11px !important; margin-bottom: 4px !important; }
 .sywat-modal-body .sywat-field-group input[type="text"],
+.sywat-modal-body .sywat-field-group input[type="number"],
 .sywat-modal-body .sywat-field-group input[type="date"],
+.sywat-modal-body .sywat-field-group input[type="email"],
 .sywat-modal-body .sywat-field-group select {
     height: 32px !important;
     min-height: 32px !important;
@@ -130,7 +132,9 @@
 .sywat-modal-section-header { margin-top: 10px !important; margin-bottom: 6px !important; }
 .sywat-modal-section-header h2 { font-size: 14px !important; font-weight: 700 !important; margin: 0; }
 
-.sywat-modal-body form > div:last-child {
+/* In-body Form Actions Wrapper */
+.sywat-modal-body .sywat-modal-form-actions,
+.sywat-modal-body form > div.sywat-modal-form-actions {
     margin-top: 20px !important;
     margin-bottom: 0 !important;
     padding-top: 16px;
