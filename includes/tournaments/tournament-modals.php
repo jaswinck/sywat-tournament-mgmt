@@ -211,17 +211,14 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
         <div class="sywat-modal-backdrop <?php echo $open_modal ? 'active' : ''; ?>" id="sywat_modal">
             <div class="sywat-modal-content sywat-modal-xl">
                 <div class="sywat-modal-header no-print">
-                    <div>
-                        <h3>
-                            <?php 
-                                if ($modal_action === 'invoice') echo '📄 TFAA Tournament Invoice';
-                                elseif ($modal_action === 'print') echo '🖨️ Print Checked In Roster';
-                                elseif ($modal_action === 'prereg') echo '📝 Register Shooters & Bulk Import';
-                                else echo '👥 Registered Archer Roster';
-                            ?>
-                        </h3>
-                        <div class="sywat-subtitle"><?php echo esc_html( $selected_tournament ); ?></div>
-                    </div>
+                    <h3>
+                        <?php 
+                            if ($modal_action === 'invoice') echo '📄 TFAA Tournament Invoice — ' . esc_html( $selected_tournament );
+                            elseif ($modal_action === 'print') echo '🖨️ Print Checked In Roster — ' . esc_html( $selected_tournament );
+                            elseif ($modal_action === 'prereg') echo '📝 Register Shooters & Bulk Import — ' . esc_html( $selected_tournament );
+                            else echo '👥 Registered Archer Roster — ' . esc_html( $selected_tournament );
+                        ?>
+                    </h3>
                     <button type="button" class="sywat-modal-close" onclick="closeSywatModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
