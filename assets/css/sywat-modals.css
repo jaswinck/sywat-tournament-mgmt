@@ -386,16 +386,22 @@
 }
 
 /* ==========================================================================
-   7. Print Engine Reset
+   7. Print Engine Reset (Stripped Top Margins & WP Wrapper Padding)
    ========================================================================== */
 @media print {
-    html, body {
+    @page {
+        margin: 8mm 10mm !important;
+    }
+
+    html, body, #wpwrap, #wpcontent, #wpbody, #wpbody-content, .wrap {
         background: #ffffff !important;
         color: #000000 !important;
         margin: 0 !important;
         padding: 0 !important;
         height: auto !important;
+        min-height: 0 !important;
         overflow: visible !important;
+        float: none !important;
     }
 
     #wpadminbar, #adminmenumain, #adminmenuback, #wpfooter, #masthead, header, footer, .site-header, .site-footer, .entry-header, h1.entry-title, .sywat-auth-bar, .sywat-nav-tabs, .sywat-card, .sywat-shop-card, .sywat-public-card, .sywat-filter-bar, .sywat-filter-toolbar, .sywat-modal-header, .sywat-modal-footer, .sywat-modal-close, .no-print {
@@ -419,9 +425,10 @@
         transform: none !important;
     }
 
-    #sywat_print_area {
+    #sywat_print_area, .invoice-box {
         position: static !important;
         width: 100% !important;
+        max-width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
         overflow: visible !important;
