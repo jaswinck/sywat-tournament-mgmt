@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -51,6 +51,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $default_line_idx = sanitize_text_field( $_POST['default_line_idx'] ?? '0' );
         $tourn_name       = sanitize_text_field( $_POST['selected_tournament'] ?? '' );
         $amount_paid      = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
+        $allow_partial    = isset($_POST['allow_partial']) && $_POST['allow_partial'] === '1';
         $t_slug           = sanitize_title( $tourn_name );
 
         $t_data  = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
@@ -91,6 +92,102 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
         if (empty($valid_archers)) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
+        }
+
+        // Tally required spots per (line_idx, distance) combination
+        $line_dist_tallies = array();
+        foreach ($valid_archers as $archer) {
+            $l_idx = $archer['line_idx'];
+            $dist  = $archer['distance'];
+            $key   = $l_idx . '___' . $dist;
+
+            if (!isset($line_dist_tallies[$key])) {
+                $line_dist_tallies[$key] = array(
+                    'line_idx' => $l_idx,
+                    'distance' => $dist,
+                    'count'    => 0,
+                );
+            }
+            $line_dist_tallies[$key]['count']++;
+        }
+
+        // Pre-validate capacity for each tally before creating ANY records
+        $capacity_overflows = array();
+        foreach ($line_dist_tallies as $key => $tally) {
+            $l_idx    = $tally['line_idx'];
+            $dist     = $tally['distance'];
+            $req_cnt  = $tally['count'];
+
+            $resolved_idx = $l_idx;
+            if ( ! is_numeric( $resolved_idx ) && ! empty( $t_lines ) ) {
+                foreach ( $t_lines as $idx => $line ) {
+                    if ( isset( $line['name'] ) && strcasecmp( trim( $line['name'] ), trim( $resolved_idx ) ) === 0 ) {
+                        $resolved_idx = $idx;
+                        break;
+                    }
+                }
+            }
+
+            $line_data = isset( $t_lines[$resolved_idx] ) ? $t_lines[$resolved_idx] : array();
+            $line_name = isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ((int)$l_idx + 1) : $l_idx );
+
+            $current_count = function_exists('sywat_count_registered') ? sywat_count_registered( $tourn_name, $l_idx, $dist, $registrations ) : 0;
+            $max_capacity  = function_exists('sywat_get_line_max_cap') ? sywat_get_line_max_cap( $line_data, $dist ) : 0;
+
+            if ( ! $max_capacity || $max_capacity <= 0 ) {
+                $max_capacity = ($dist === 'Cub') ? 5 : 20;
+            }
+
+            $open_slots = max(0, $max_capacity - $current_count);
+
+            if ($req_cnt > $open_slots) {
+                $capacity_overflows[] = array(
+                    'line_idx'   => $l_idx,
+                    'line_name'  => $line_name,
+                    'distance'   => $dist,
+                    'requested'  => $req_cnt,
+                    'open_slots' => $open_slots,
+                );
+            }
+        }
+
+        // If capacity overflow is detected and operator has NOT explicitly confirmed partial booking
+        if ( ! empty( $capacity_overflows ) && ! $allow_partial ) {
+            $overflow_details = array();
+            foreach ($capacity_overflows as $ov) {
+                $overflow_details[] = 'Line <strong>' . esc_html($ov['line_name']) . '</strong> (' . esc_html($ov['distance']) . ') has <strong>' . intval($ov['open_slots']) . ' open spot(s)</strong>, but you requested <strong>' . intval($ov['requested']) . ' archer(s)</strong>.';
+            }
+
+            $hidden_archers_html = '';
+            foreach ($archers_raw as $i => $a) {
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][name]" value="' . esc_attr($a['name'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][distance]" value="' . esc_attr($a['distance'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][division]" value="' . esc_attr($a['division'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
+            }
+
+            $prompt_html  = '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">';
+            $prompt_html .= '<div class="sywat-alert-title">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
+            $prompt_html .= '<div class="sywat-alert-subtext">' . implode('<br>', $overflow_details) . '</div>';
+            $prompt_html .= '<div class="sywat-alert-subtext">No archers were registered. Would you like to book the available spots partially, or cancel to pick another shooting line?</div>';
+            $prompt_html .= '<div class="sywat-field-group">';
+            $prompt_html .= '<form method="post" class="sywat-inline-block">';
+            $prompt_html .= wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
+            $prompt_html .= '<input type="hidden" name="sywat_action" value="register_shooter">';
+            $prompt_html .= '<input type="hidden" name="selected_tournament" value="' . esc_attr($tourn_name) . '">';
+            $prompt_html .= '<input type="hidden" name="group_name" value="' . esc_attr($group_name) . '">';
+            $prompt_html .= '<input type="hidden" name="group_phone" value="' . esc_attr($group_phone) . '">';
+            $prompt_html .= '<input type="hidden" name="default_line_idx" value="' . esc_attr($default_line_idx) . '">';
+            $prompt_html .= '<input type="hidden" name="amount_paid_today" value="' . esc_attr($amount_paid) . '">';
+            $prompt_html .= '<input type="hidden" name="allow_partial" value="1">';
+            $prompt_html .= $hidden_archers_html;
+            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning">⚠️ Book Partial Available Spots</button>';
+            $prompt_html .= '</form>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="window.scrollTo({top: 0, behavior: \'smooth\'});">Cancel & Change Line</button>';
+            $prompt_html .= '</div></div>';
+
+            $GLOBALS['sywat_modal_notice'] = $prompt_html;
+            return $prompt_html;
         }
 
         // Anchor group naming to primary archer if caller name is blank
