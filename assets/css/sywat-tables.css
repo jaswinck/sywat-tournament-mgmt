@@ -16,56 +16,61 @@
 
 .sywat-table {
     width: 100%;
-    min-width: 880px;
+    min-width: 720px;
     border-collapse: collapse;
     margin-top: 10px;
     font-size: 13px;
 }
 
+/* Dark Slate High-Contrast Column Headers */
 .sywat-table th {
-    background-color: #f6f7f7;
+    background-color: #1e293b;
     text-align: left;
     padding: 8px 10px;
-    font-weight: 600;
-    color: #1d2327;
-    border-bottom: 1px solid #c3c4c7;
+    font-weight: 700;
+    color: #f8fafc;
+    border-bottom: 2px solid #0f172a;
     white-space: nowrap;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
+/* High-Density Row Padding */
 .sywat-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #f0f0f1;
-    color: #2c3338;
+    padding: 6px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #1e293b;
     vertical-align: middle;
 }
 
 .sywat-table .sywat-btn {
-    height: 28px;
-    padding: 2px 8px;
-    font-size: 12px;
+    height: 26px;
+    padding: 0 8px;
+    font-size: 11px;
 }
 
-/* Action Cell Alignment & Vertical Stacking Support */
+/* Action Cell Horizontal & Vertical Stacking Support */
 .sywat-table-actions {
     display: flex !important;
-    gap: 6px !important;
+    gap: 4px !important;
     align-items: center !important;
-    justify-content: center !important;
+    justify-content: flex-end !important;
     flex-wrap: nowrap !important;
     white-space: nowrap !important;
-    margin: 0 auto !important;
 }
 
-.sywat-table-actions-vertical,
+/* Stacked Action Buttons (90px Uniform Width) */
+.sywat-table-actions-stacked,
 .sywat-manage-row td:last-child > div {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: center !important;
-    gap: 5px !important;
+    gap: 3px !important;
     width: 100% !important;
-    max-width: 180px !important;
-    margin: 0 auto !important;
+    max-width: 90px !important;
+    margin: 0 0 0 auto !important;
 }
 
 .sywat-table-actions .sywat-btn,
@@ -74,13 +79,22 @@
     flex: 0 0 auto !important;
 }
 
-.sywat-table-actions-vertical .sywat-btn,
-.sywat-table-actions-vertical form,
+.sywat-table-actions-stacked .sywat-btn,
+.sywat-table-actions-stacked form,
+.sywat-table-actions-stacked form .sywat-btn,
 .sywat-manage-row td:last-child > div .sywat-btn,
-.sywat-manage-row td:last-child > div form {
+.sywat-manage-row td:last-child > div form,
+.sywat-manage-row td:last-child > div form .sywat-btn {
     margin: 0 !important;
     width: 100% !important;
+    height: 25px !important;
+    line-height: 23px !important;
+    padding: 0 6px !important;
+    font-size: 11px !important;
     box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 /* Default Last Column Behavior */
@@ -111,12 +125,12 @@
 .sywat-col-cap-cub     { width: 25%; text-align: center; }
 .sywat-col-line-action { width: 20%; text-align: center; }
 
-/* Archer Roster Table Specific Columns */
-.sywat-col-roster-name   { width: 30%; }
+/* Archer Roster Table Specific Columns (Right-Sized Layout) */
+.sywat-col-roster-name   { width: 32%; }
 .sywat-col-roster-type   { width: 18%; text-align: center; }
 .sywat-col-roster-line   { width: 22%; }
 .sywat-col-roster-dist   { width: 12%; text-align: center; }
-.sywat-col-roster-action { width: 18%; text-align: right; }
+.sywat-col-roster-action { width: 16%; text-align: right; }
 
 /* Line Slot Capacity Stack & Totals */
 .sywat-lines-grid {
@@ -159,7 +173,6 @@
     font-size: 11px;
     font-weight: 700;
     border-radius: 12px;
-    margin-left: 6px;
     line-height: 1.2;
 }
 
@@ -267,7 +280,6 @@
 .sywat-modal-repeater-table th:nth-child(5), .sywat-modal-repeater-table td:nth-child(5) { width: 16% !important; text-align: center !important; } /* Action */
 
 @media (max-width: 768px) {
-    /* Keep table totally locked even on mobile */
     .sywat-modal-body .sywat-table-responsive { overflow-x: hidden !important; }
     .sywat-modal-repeater-table { table-layout: fixed !important; }
 }
