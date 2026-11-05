@@ -6,16 +6,16 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
 
 ## Included Structure & Assets
 
-- **`sywat-archery-manager.php`** — Main plugin header (v5.0.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
+- **`sywat-archery-manager.php`** — Main plugin header (v6.0.0), master sub-module loader, asset enqueuer, and activation hook invoking custom role registration (`tfaa_member`, `tfaa_tournament_director`, `tfaa_field_governor`, `tfaa_admin`, `tfaa_webmaster`, `tfaa_president`, `staff_shooter`, `management`, `non-shooting-member`, `sywat_shop_manager`, `sywat_shop_user`).
 
 ### Style & Asset Bundle (`assets/`)
 
-- **`assets/css/sywat-buttons.css`** — Dedicated button palette stylesheet enforcing uniform color tiers (`.sywat-btn-primary`, `.sywat-btn-secondary`, `.sywat-btn-success`, `.sywat-btn-danger`, `.sywat-btn-global-push`), icon alignment utilities, hover states, and full-width block sizing.
-- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing card containers (`.sywat-card`), form input wrappers (`.sywat-field-group`), card header bars (`.sywat-card-header-bar`), table toolbars (`.sywat-table-header-bar`), centered division headers, left-aligned table data, descender padding resets (`min-height: 38px`, `line-height: 1.5`), operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
-- **`assets/css/sywat-modals.css`** — High-contrast modal overlay styling (`.sywat-modal-backdrop`), dialog containers (`.sywat-modal-content`), backdrop filters, high z-index nested modal overlays, and popup animation rules.
+- **`assets/css/sywat-buttons.css`** — Dedicated button palette stylesheet enforcing uniform color tiers (`.sywat-btn-primary`, `.sywat-btn-secondary`, `.sywat-btn-success`, `.sywat-btn-success-solid`, `.sywat-btn-danger`, `.sywat-btn-global-push`), dedicated solid green primary CTA styling for high-volume row check-ins, outline success triggers for general actions, pill action triggers (`.sywat-btn-pill`, `.sywat-btn-use-official`), icon alignment utilities, hover states, and full-width block sizing.
+- **`assets/css/sywat-core.css`** — Centralized master stylesheet enforcing card containers (`.sywat-card`, `.sywat-card-sm`), structural utilities (`.sywat-hidden`), form input wrappers (`.sywat-field-group`), card header bars (`.sywat-card-header-bar`), table toolbars (`.sywat-table-header-bar`), navigation tab tracks (`.sywat-nav-tabs`), centered division headers, left-aligned table data, descender padding resets (`min-height: 38px`, `line-height: 1.5`), operator top bars, branded login cards, unified single-category headers (`.sywat-single-category-header`), and dynamic participation stat banners (`.sywat-counter-banner`).
+- **`assets/css/sywat-modals.css`** — High-contrast modal overlay styling (`.sywat-modal-backdrop`), dialog containers (`.sywat-modal-content`), modal header/footer structures, modal action split wrappers (`.sywat-modal-form-actions-split`), TFAA status badges (`.sywat-badge-verified`, `.sywat-badge-known`, `.sywat-badge-none`), class-driven TFAA autocomplete dropdowns (`.sywat-desk-tfaa-dropdown`), multi-style alert callouts (`.sywat-multi-style-alert`), high z-index nested modal overlays, and `@media print` engine reset rules.
 - **`assets/css/sywat-public.css`** — Dedicated public-facing stylesheet styling read-only tournament results tables, season standings leaderboards, member directory search grids, and public location directory cards.
-- **`assets/css/sywat-tables.css`** — Responsive data table structures (`.sywat-table-responsive`), cell padding alignments, hover states, alignment helper classes (`.sywat-col-center`, `.sywat-col-right`), inline action forms (`.sywat-table-action-form`), and ranking column layouts.
-- **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms, select input specificity overrides, and line capacity tracker responsive grid cards (`.sywat-tracker-grid`).
+- **`assets/css/sywat-tables.css`** — Responsive data table structures (`.sywat-table-responsive`), cell padding alignments, hover states, alignment helper classes (`.sywat-col-center`, `.sywat-col-right`), stacked vertical action button containers (`.sywat-table-actions-vertical`), family prompt callout banners (`.sywat-family-banner`), owe status badges, and table column width lock utilities.
+- **`assets/css/sywat-toolbar.css`** — Dedicated toolbar stylesheet managing filter forms (`.sywat-filter-bar-form`), field alignment wrappers (`.sywat-field-auto`), select dropdown specificity overrides (`.sywat-select-tournament`, `.sywat-select-line`), search input groups, and line capacity tracker grid cards (`.sywat-tracker-grid`).
 - **`assets/images/logo.png`** — TFAA brand asset logo graphic.
 - **`assets/images/zelle-qr-code.png`** — Accounting payment Zelle QR code graphic asset.
 - **`assets/js/sywat-shops.js`** — Client-side JavaScript engine managing tabbed location editing, dynamic contact repeaters, shooting line schedule repeaters, phone number formatting, and live directory/district filtering.
@@ -42,11 +42,11 @@ Custom WordPress plugin consolidating multi-tenant shop scoping, tournament admi
   - **State 3 (Set New Password)**: Front-end password update form for operators arriving via email reset tokens.
 
 #### 3. Check-In Desk Sub-System (`includes/checkin/`)
-- **`class-sywat-checkin.php`** — Sub-module loader shell and shortcode binding (`[sywat_desk]`). Enforces access using `sywat_can_access_desk()`.
-- **`checkin-actions.php`** — Action handler for check-ins, line closing/reopening, walk-ins, and multi-archer family balance synchronization.
-- **`checkin-data.php`** — Data aggregation and TFAA / shop profile history matching.
-- **`checkin-modals.php`** — Check-in and walk-in modals with dynamic real-time unpaid balance banner toggles.
-- **`checkin-views.php`** — Visual views, line capacity tracker, dynamic return navigation bar, and registered archers table.
+- **`class-sywat-checkin.php`** — Sub-module loader shell and shortcode binding (`[sywat_desk]`). Enforces permission access via `sywat_can_access_desk()` and renders permission notices inside clean `.sywat-card-sm` containers.
+- **`checkin-actions.php`** — Action handler for check-ins, line closing/reopening, walk-in registrations, and multi-archer family balance synchronization.
+- **`checkin-data.php`** — Data aggregation, line index resolution, and TFAA / shop profile history matching.
+- **`checkin-modals.php`** — Pre-registration check-in, edit, and walk-in modal overlays with real-time unpaid balance warning banners, zero inline styles, and class-driven TFAA autocomplete dropdowns (`.sywat-desk-tfaa-dropdown`).
+- **`checkin-views.php`** — Visual views, line capacity tracker grid cards, filter bar toolbar, family prompt banners, and registered archers data table featuring centered `.sywat-table-actions-vertical` column with top-positioned solid green primary CTA (`.sywat-btn-success-solid`) and secondary edit triggers.
 
 #### 4. Third-Party Library Dependencies (`includes/lib/`)
 - **`SimpleXLSX.php`** — High-performance PHP XLSX reader library for parsing Excel spreadsheet files (`.xlsx` / `.xls`) during shop/club directory imports without requiring external server extensions.
