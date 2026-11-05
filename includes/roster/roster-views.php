@@ -153,7 +153,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     <div class="sywat-filter-field">
                         <label for="filter_line_idx">Filter by Line</label>
                         <select name="filter_line_idx" id="filter_line_idx" onchange="this.form.submit()">
-                            <option value="all" <?php selected( $filter_line_idx, 'all' ); me=all lines -- >(All Lines)</option>
+                            <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>(All Lines)</option>
                             <?php foreach ( $available_lines as $idx => $line ): ?>
                                 <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>>
                                     <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
