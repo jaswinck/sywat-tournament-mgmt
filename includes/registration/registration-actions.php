@@ -183,7 +183,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $prompt_html .= $hidden_archers_html;
             $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning">⚠️ Book Partial Available Spots</button>';
             $prompt_html .= '</form>';
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="window.scrollTo({top: 0, behavior: \'smooth\'});">Cancel & Change Line</button>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
