@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -282,7 +282,7 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
 }
 
 /**
- * Component 3: Line Slot Usage Table
+ * Component 3: Line Slot Usage Table with Waitlist Counters
  */
 if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
     function sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations ) {
@@ -310,20 +310,42 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                 $c_cub = sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations );
                                 $m_cub = sywat_get_line_max_cap( $line, 'Cub' );
                                 $total_line_shooters = $c_20 + $c_cub;
+
+                                // Count waitlisted archers for this line
+                                $waitlisted_20  = 0;
+                                $waitlisted_cub = 0;
+                                foreach ($registrations as $r) {
+                                    if (isset($r['tournament'], $r['line_index'], $r['status']) && 
+                                        strcasecmp($r['tournament'], $selected_tournament) === 0 && 
+                                        (string)$r['line_index'] === (string)$idx && 
+                                        strcasecmp($r['status'], 'Waitlist') === 0) {
+                                        if (isset($r['distance']) && strcasecmp($r['distance'], 'Cub') === 0) {
+                                            $waitlisted_cub++;
+                                        } else {
+                                            $waitlisted_20++;
+                                        }
+                                    }
+                                }
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
                                 <td class="sywat-col-center">
                                     <strong><?php echo $c_20; ?></strong> / <?php echo $m_20; ?>
                                     <span class="sywat-badge <?php echo ($c_20 >= $m_20) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_20 >= $m_20) ? 'Full' : 'Open'; ?></span>
+                                    <?php if ($waitlisted_20 > 0): ?>
+                                        <div style="font-size:0.8rem; color:#d97706; margin-top:2px; font-weight:bold;">🕒 <?php echo $waitlisted_20; ?> Waitlisted</div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="sywat-col-center">
                                     <strong><?php echo $c_cub; ?></strong> / <?php echo $m_cub; ?>
                                     <span class="sywat-badge <?php echo ($c_cub >= $m_cub) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ($c_cub >= $m_cub) ? 'Full' : 'Open'; ?></span>
+                                    <?php if ($waitlisted_cub > 0): ?>
+                                        <div style="font-size:0.8rem; color:#d97706; margin-top:2px; font-weight:bold;">🕒 <?php echo $waitlisted_cub; ?> Waitlisted</div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="sywat-col-center">
-                                    <?php if ( $total_line_shooters > 0 ): ?>
-                                        <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to clear ALL <?php echo $total_line_shooters; ?> archers from <?php echo esc_js( $line_title ); ?>?');">
+                                    <?php if ( $total_line_shooters > 0 || ($waitlisted_20 + $waitlisted_cub) > 0 ): ?>
+                                        <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to clear ALL archers from <?php echo esc_js( $line_title ); ?>?');">
                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                             <input type="hidden" name="sywat_action" value="purge_line">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
