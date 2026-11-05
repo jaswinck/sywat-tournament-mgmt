@@ -257,9 +257,9 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                     <thead>
                         <tr>
                             <th class="sywat-col-line-name">Line Name</th>
-                            <th class="sywat-col-cap-20yd">20yd Capacity</th>
-                            <th class="sywat-col-cap-cub">Cub Capacity</th>
-                            <th class="sywat-col-line-action">Action</th>
+                            <th class="sywat-col-cap-20yd sywat-col-center">20yd Capacity</th>
+                            <th class="sywat-col-cap-cub sywat-col-center">Cub Capacity</th>
+                            <th class="sywat-col-line-action sywat-col-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
