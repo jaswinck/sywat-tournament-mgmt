@@ -40,7 +40,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $tourn_name       = sanitize_text_field( $_POST['selected_tournament'] ?? '' );
         $amount_paid      = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
         $allow_partial    = isset($_POST['allow_partial']) && $_POST['allow_partial'] === '1';
-        $waitlist_mode    = sanitize_text_field($_POST['waitlist_mode'] ?? ''); // 'all', 'remainder', or empty
+        $waitlist_mode    = sanitize_text_field($_POST['waitlist_mode'] ?? '');
         $t_slug           = sanitize_title( $tourn_name );
 
         $t_data  = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
@@ -83,7 +83,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
-        // Tally required spots per (line_idx, distance) combination
         $line_dist_tallies = array();
         foreach ($valid_archers as $archer) {
             $l_idx = $archer['line_idx'];
@@ -100,7 +99,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_dist_tallies[$key]['count']++;
         }
 
-        // Pre-validate capacity for each tally before creating ANY records
         $capacity_overflows = array();
         foreach ($line_dist_tallies as $key => $tally) {
             $l_idx    = $tally['line_idx'];
@@ -140,7 +138,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
         }
 
-        // Trigger Capacity Overflow Modal if capacity exceeded and no explicit waitlist/partial mode chosen
         if ( ! empty( $capacity_overflows ) && empty( $waitlist_mode ) && ! $allow_partial ) {
             $overflow_details = array();
             $max_open_available = 0;
@@ -169,38 +166,33 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $base_hidden_fields .= '<input type="hidden" name="amount_paid_today" value="' . esc_attr($amount_paid) . '">';
             $base_hidden_fields .= $hidden_archers_html;
 
-            $prompt_html  = '<div class="sywat-overflow-dialog" style="color:#000;">';
-            $prompt_html .= '<div class="sywat-overflow-title" style="font-size: 1.3rem; font-weight: bold; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
-            $prompt_html .= '<div class="sywat-overflow-body" style="font-size: 1.05rem; margin-bottom: 16px; line-height: 1.5; color: #1f2937;">' . implode('<br>', $overflow_details) . '</div>';
-            $prompt_html .= '<p class="sywat-overflow-subtext" style="margin-bottom: 22px; color: #4b5563; font-size: 0.98rem;">No archers were registered yet. Please select how you would like to handle this group:</p>';
-            $prompt_html .= '<div class="sywat-overflow-actions" style="display: flex; flex-direction: column; gap: 10px; align-items: stretch;">';
+            $prompt_html  = '<div class="sywat-overflow-dialog">';
+            $prompt_html .= '<div class="sywat-overflow-title">⚠️ GROUP CAPACITY OVERFLOW WARNING</div>';
+            $prompt_html .= '<div class="sywat-overflow-body">' . implode('<br>', $overflow_details) . '</div>';
+            $prompt_html .= '<p class="sywat-overflow-subtext">No archers were registered yet. Please select how you would like to handle this group:</p>';
+            $prompt_html .= '<div class="sywat-overflow-actions">';
             
-            // Option 1: Waitlist ENTIRE Group
-            $prompt_html .= '<form method="post" style="margin: 0;">' . $base_hidden_fields;
+            $prompt_html .= '<form method="post" class="sywat-overflow-form">' . $base_hidden_fields;
             $prompt_html .= '<input type="hidden" name="waitlist_mode" value="all">';
-            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-primary" style="width: 100%; text-align: center; justify-content: center;">🕒 Waitlist ENTIRE Group (Keep Group Together - $0 Due)</button>';
+            $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-full">🕒 Waitlist ENTIRE Group (Keep Group Together - $0 Due)</button>';
             $prompt_html .= '</form>';
 
-            // Option 2: Book Open Spots & Waitlist Remainder (if any spots open)
             if ($max_open_available > 0) {
-                $prompt_html .= '<form method="post" style="margin: 0;">' . $base_hidden_fields;
+                $prompt_html .= '<form method="post" class="sywat-overflow-form">' . $base_hidden_fields;
                 $prompt_html .= '<input type="hidden" name="waitlist_mode" value="remainder">';
-                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning" style="width: 100%; text-align: center; justify-content: center;">⚠️ Book Available Spots (' . intval($max_open_available) . ') & Waitlist Remainder</button>';
+                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning sywat-btn-full">⚠️ Book Available Spots (' . intval($max_open_available) . ') & Waitlist Remainder</button>';
                 $prompt_html .= '</form>';
             }
 
-            // Option 3: Cancel & Change Line
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary" style="width: 100%; text-align: center; justify-content: center;" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-full" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
             return '';
         }
 
-        // Anchor group naming
         $family_base_name = !empty($group_name) ? $group_name : $valid_archers[0]['name'];
 
-        // Track open spots remaining per line/distance key for remainder waitlisting
         $remaining_open_slots = array();
         foreach ($line_dist_tallies as $key => $tally) {
             $l_idx     = $tally['line_idx'];
@@ -242,7 +234,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $line_data = isset( $t_lines[$resolved_idx] ) ? $t_lines[$resolved_idx] : array();
             $line_name = isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ((int)$l_idx + 1) : $l_idx );
 
-            // Duplicate check
             $is_duplicate = false;
             if ( function_exists( 'sywat_is_archer_on_line' ) ) {
                 $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
@@ -263,7 +254,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 continue; 
             }
 
-            // Determine if archer gets an active line spot or goes to waitlist
             $is_waitlist = false;
             if ($waitlist_mode === 'all') {
                 $is_waitlist = true;
