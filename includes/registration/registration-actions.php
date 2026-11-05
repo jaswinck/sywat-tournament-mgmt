@@ -3,11 +3,17 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Detects paid category (Family, Youth, Adult) from a given string or array of strings.
+ *
+ * @param string|array $text Text or array of text values to scan.
+ * @return string Category string ('Family', 'Youth', 'Adult', or empty string).
+ */
 if ( ! function_exists( 'sywat_detect_paid_category' ) ) {
     function sywat_detect_paid_category($text) {
         $str = is_array($text) ? implode(' ', $text) : (string)$text;
@@ -18,6 +24,12 @@ if ( ! function_exists( 'sywat_detect_paid_category' ) ) {
     }
 }
 
+/**
+ * Extracts numeric due balance amount from a string value.
+ *
+ * @param string $str Input currency or raw text string.
+ * @return float Extracted float balance value.
+ */
 if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
     function sywat_extract_due_amount($str) {
         $clean = preg_replace('/[^\d\.]/', '', (string)$str);
@@ -25,7 +37,13 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
     }
 }
 
-// Action: Handle Multi-Archer Phone / Group Intake
+/**
+ * Handles multi-archer phone intake, line group fee calculation, family capping, and database persistence.
+ *
+ * @param array $tournaments   Master tournament configuration array.
+ * @param array $registrations Master registration state array reference.
+ * @return string Rendered HTML notice message.
+ */
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
         $group_name       = trim( sanitize_text_field( $_POST['group_name'] ?? '' ) );
