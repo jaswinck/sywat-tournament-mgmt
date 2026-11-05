@@ -202,7 +202,6 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
         $open_modal          = ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] );
 
         $modal_edit_archer   = isset( $_REQUEST['edit_archer'] ) ? sanitize_text_field( $_REQUEST['edit_archer'] ) : '';
-        $existing_families   = function_exists( 'sywat_get_existing_families' ) ? sywat_get_existing_families( $registrations ) : array();
 
         $available_lines = $open_modal ? sywat_get_tournament_lines( $tournaments[$selected_tournament] ) : array();
         $filter_line_idx = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( $_REQUEST['filter_line_idx'] ) : 'all';
@@ -231,7 +230,7 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
                             if ( $modal_action === 'prereg' && function_exists( 'sywat_render_registration_modal' ) ) {
                                 sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
                             } elseif ( $modal_action === 'manage' && function_exists( 'sywat_render_roster_modal' ) ) {
-                                sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer, $existing_families );
+                                sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer, $tournaments );
                             } elseif ( $modal_action === 'invoice' && function_exists( 'sywat_render_invoice_modal' ) ) {
                                 sywat_render_invoice_modal( $selected_tournament, $registrations );
                             } elseif ( $modal_action === 'print' && function_exists( 'sywat_render_print_modal' ) ) {
