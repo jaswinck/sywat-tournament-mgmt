@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 function escapeHtmlDesk(str) {
@@ -54,46 +54,62 @@ function toggleUnpaidBanner(isChecked) {
     }
 }
 
+/**
+ * Searches TFAA sync cache supporting both Array and Object structures, and partial name typing.
+ */
 function findTfaaMatch(typedName) {
-    if (!typedName || !window.tfaaData) return null;
+    if (!typedName || !window.tfaaData || !window.tfaaData.exact) return null;
     const clean = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!clean || clean.length < 2) return null;
 
-    let matches = null;
+    let rawMatches = [];
 
-    if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
-        matches = window.tfaaData.exact[clean];
-    } else {
+    // 1. Exact key lookup
+    if (window.tfaaData.exact[clean]) {
+        const entry = window.tfaaData.exact[clean];
+        if (Array.isArray(entry)) rawMatches = entry;
+        else if (entry && typeof entry === 'object') rawMatches = [entry];
+    }
+
+    // 2. First/Last key lookup
+    if (rawMatches.length === 0 && window.tfaaData.fl) {
         const parts = clean.split(' ');
         if (parts.length > 1) {
             const flKey = parts[0] + '___' + parts[parts.length - 1];
-            if (window.tfaaData.fl && window.tfaaData.fl[flKey]) matches = window.tfaaData.fl[flKey];
+            if (window.tfaaData.fl[flKey]) {
+                const entry = window.tfaaData.fl[flKey];
+                if (Array.isArray(entry)) rawMatches = entry;
+                else if (entry && typeof entry === 'object') rawMatches = [entry];
+            }
         }
     }
 
-    if (!matches && window.tfaaData.exact) {
-        let partialMatches = [];
+    // 3. Partial substring lookup across keys
+    if (rawMatches.length === 0) {
         const keys = Object.keys(window.tfaaData.exact);
         for (let i = 0; i < keys.length; i++) {
-            if (keys[i].includes(clean)) {
-                const arr = window.tfaaData.exact[keys[i]];
-                if (Array.isArray(arr)) {
-                    partialMatches = partialMatches.concat(arr);
+            if (keys[i].toLowerCase().includes(clean)) {
+                const entry = window.tfaaData.exact[keys[i]];
+                if (Array.isArray(entry)) {
+                    rawMatches = rawMatches.concat(entry);
+                } else if (entry && typeof entry === 'object') {
+                    rawMatches.push(entry);
                 }
             }
         }
-        if (partialMatches.length > 0) matches = partialMatches;
     }
 
-    if (Array.isArray(matches) && matches.length > 1) {
-        matches.sort((a, b) => {
+    if (rawMatches.length === 0) return null;
+
+    if (rawMatches.length > 1) {
+        rawMatches.sort((a, b) => {
             const aPro = (a.style && a.style.indexOf('FS Pro') !== -1) ? 1 : 0;
             const bPro = (b.style && b.style.indexOf('FS Pro') !== -1) ? 1 : 0;
             return bPro - aPro;
         });
     }
 
-    return matches;
+    return rawMatches;
 }
 
 function findShopHistoryMatch(typedName) {
@@ -111,20 +127,54 @@ function findShopHistoryMatch(typedName) {
     return null;
 }
 
+/**
+ * Smart option matcher translating TFAA style codes, full titles, and gender letters to standard select values.
+ */
 function matchDeskTfaaSelect(value, selectEl) {
     if (!value || !selectEl) return;
     const clean = value.trim().toLowerCase();
+    if (!clean) return;
 
+    const styleMap = {
+        'fs': 'fs – freestyle',
+        'freestyle': 'fs – freestyle',
+        'fs pro': 'fs pro – freestyle pro',
+        'freestyle pro': 'fs pro – freestyle pro',
+        'fsl': 'fsl – freestyle limited',
+        'freestyle limited': 'fsl – freestyle limited',
+        'fsl-r': 'fsl-r – freestyle limited recurve',
+        'fslr': 'fsl-r – freestyle limited recurve',
+        'olympic recurve': 'fsl-r – freestyle limited recurve',
+        'bhfs': 'bhfs – bowhunter freestyle',
+        'bowhunter freestyle': 'bhfs – bowhunter freestyle',
+        'mbh': 'mbh – modern bowhunter',
+        'modern bowhunter': 'mbh – modern bowhunter',
+        'bbc': 'bbc – barebow compound',
+        'barebow compound': 'bbc – barebow compound',
+        'bbr': 'bbr – barebow recurve',
+        'barebow recurve': 'bbr – barebow recurve',
+        'trad': 'trad – traditional',
+        'traditional': 'trad – traditional',
+        'lb': 'lb – longbow',
+        'longbow': 'lb – longbow',
+        'genesis': 'genesis'
+    };
+
+    const cleanBase = clean.split(' –')[0].trim();
+    let mappedTarget = styleMap[clean] || styleMap[cleanBase] || '';
+
+    // 1. Direct or mapped target matching
     for (let opt of selectEl.options) {
         if (!opt.value) continue;
         const optLower = opt.value.trim().toLowerCase();
-        
-        if (optLower === clean) {
+
+        if (optLower === clean || (mappedTarget && optLower.startsWith(mappedTarget.split(' –')[0]))) {
             selectEl.value = opt.value;
             return;
         }
     }
 
+    // 2. Gender resolution ("M" / "Male", "F" / "Female")
     if (clean === 'm' || clean === 'male') {
         for (let opt of selectEl.options) {
             if (opt.value.toLowerCase().startsWith('male')) { selectEl.value = opt.value; return; }
@@ -136,19 +186,20 @@ function matchDeskTfaaSelect(value, selectEl) {
         }
     }
 
+    // 3. Fallback prefix/substring match
     for (let opt of selectEl.options) {
         if (!opt.value) continue;
         const optLower = opt.value.trim().toLowerCase();
-        
-        const cleanPrefix = clean.split(' –')[0].split(' (')[0].trim();
-        const optPrefix   = optLower.split(' –')[0].split(' (')[0].trim();
 
-        if (cleanPrefix === optPrefix && cleanPrefix.length > 1) {
+        const cleanSanitized = cleanBase.replace(/[^a-z0-9]/gi, '');
+        const optSanitized   = optLower.split(' –')[0].replace(/[^a-z0-9]/gi, '');
+
+        if (cleanSanitized && optSanitized && cleanSanitized === optSanitized) {
             selectEl.value = opt.value;
             return;
         }
 
-        if (optLower.includes(clean) || clean.includes(optPrefix)) {
+        if (optLower.includes(clean) || (cleanSanitized.length >= 2 && optLower.includes(cleanSanitized))) {
             selectEl.value = opt.value;
             return;
         }
@@ -167,9 +218,10 @@ function handleDeskTfaaAutocomplete(input) {
     } else if (window.tfaaData && window.tfaaData.exact) {
         const keys = Object.keys(window.tfaaData.exact);
         for (let i = 0; i < keys.length; i++) {
-            if (keys[i].includes(query)) {
-                const arr = window.tfaaData.exact[keys[i]];
-                if (Array.isArray(arr) && arr.length > 0) {
+            if (keys[i].toLowerCase().includes(query)) {
+                const entry = window.tfaaData.exact[keys[i]];
+                const arr = Array.isArray(entry) ? entry : [entry];
+                if (arr.length > 0 && arr[0]) {
                     let best = arr[0];
                     for (let k = 0; k < arr.length; k++) {
                         if (arr[k].style && arr[k].style.indexOf('FS Pro') !== -1) {
@@ -178,7 +230,7 @@ function handleDeskTfaaAutocomplete(input) {
                         }
                     }
                     matches.push({
-                        name: best.full_name || keys[i],
+                        name: best.full_name || best.name || keys[i],
                         division: best.division || '',
                         gender: best.gender || '',
                         style: best.style || ''
@@ -227,9 +279,7 @@ function handleDeskTfaaAutocomplete(input) {
                 if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
             }
 
-            if (typeof autoFillOnNameChange === 'function' && (prefix === 'walkin' || prefix === 'checkin')) {
-                autoFillOnNameChange(prefix);
-            }
+            autoFillOnNameChange(prefix);
         });
 
         dropdown.appendChild(item);
@@ -379,7 +429,7 @@ function autoFillOnNameChange(prefix) {
 
         if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
         if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
-        if (styleEl && targetMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
+        if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
 
         handleStyleRestrictions(prefix);
     } else if (prefix === 'walkin') {
@@ -520,7 +570,6 @@ function handleStyleRestrictions(type) {
 
 /**
  * Initializes Check-In Desk event listeners and pre-fills active forms.
- * Safe for footer enqueuing regardless of document.readyState.
  */
 function initSywatCheckin() {
     const walkinInput = document.getElementById('walkin_name_input');
@@ -568,7 +617,7 @@ function initSywatCheckin() {
     if (document.getElementById('edit_division')) handleStyleRestrictions('edit');
 }
 
-// Execution Guard: Run immediately if DOM is ready, otherwise attach to DOMContentLoaded
+// Execution Guard
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initSywatCheckin);
 } else {
