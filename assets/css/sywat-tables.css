@@ -207,7 +207,26 @@
 }
 
 .sywat-line-slot-title { font-weight: 700; color: #1e293b; white-space: nowrap; }
-.sywat-line-slot-caps  { display: flex; gap: 8px; color: #475569; align-items: center; font-size: 11px; white-space: nowrap; }
+
+.sywat-line-slot-caps { 
+    display: flex; 
+    gap: 8px; 
+    color: #475569; 
+    align-items: center; 
+    font-size: 11px; 
+    font-weight: 500;
+    white-space: nowrap; 
+}
+
+.sywat-line-slot-caps .sywat-waitlist-pill {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    padding: 1px 6px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+}
 
 .sywat-lines-total {
     margin-top: 8px;
