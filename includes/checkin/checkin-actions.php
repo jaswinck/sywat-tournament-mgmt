@@ -1,404 +1,470 @@
 <?php
 /**
- * Sub-Module: Check-In Desk Actions Handler
- * Path: includes/checkin/checkin-actions.php
+ * Sub-Module: Check-In Desk Modals
+ * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.1
+ * Version: 6.4.3
  */
 
 if (!defined('ABSPATH')) exit;
 
 /**
- * Handles desk POST actions including walk-in registration, check-in updates, line closure, and edits.
+ * Render modal popups for Check-In, Edit Archer, and Add Walk-In.
  *
- * @param array $data Aggregated Check-In Desk dataset passed by reference.
- * @return string Alert HTML notice markup.
+ * @param array $data Aggregated Check-In Desk dataset.
+ * @return void
  */
-function sywat_desk_handle_actions(&$data) {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') return '';
-
-    $is_valid_nonce = (isset($_POST['sywat_nonce']) && wp_verify_nonce($_POST['sywat_nonce'], 'sywat_desk_action'));
-    $action         = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
-
-    if ($action && !$is_valid_nonce && $action !== 'cancel') {
-        return '<div class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
-    }
-
-    if (!$is_valid_nonce) return '';
-
-    $active_t_slug       = $data['active_t_slug'];
-    $selected_tournament = $data['selected_tournament'];
-    $closed_lines_key    = $data['closed_lines_key'];
-    $registrations       = &$data['registrations'];
-    $lines               = $data['lines'];
-    
-    $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
+function sywat_desk_render_modals($data) {
+    $modal_archer              = $data['modal_archer'];
+    $modal_edit_archer         = $data['modal_edit_archer'];
+    $selected_tournament       = $data['selected_tournament'];
+    $selected_line_idx         = $data['selected_line_idx'];
+    $search_query              = $data['search_query'];
+    $lines                     = $data['lines'];
+    $closed_lines              = $data['closed_lines'];
+    $divs                      = $data['divs'];
+    $genders                   = $data['genders'];
+    $sywat_styles              = $data['sywat_styles'];
+    $legacy_div_map            = $data['legacy_div_map'];
     $existing_families         = $data['existing_families'];
-
-    $calculate_paid_status = function($pay_option, $division) {
-        if ($pay_option === 'Family') return 'Family';
-        if ($pay_option === 'Field Governor') return 'Field Governor';
-        $youth_divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
-        return in_array($division, $youth_divs) ? 'Youth' : 'Adult';
-    };
-
-    $sanitize_style_for_division = function($style, $division) {
-        if ($division === 'No Show' || $style === 'No Show') return 'No Show';
-        if (strpos($style, 'Genesis') !== false && $division !== 'Cub (8 - 11)') return 'FS – Freestyle';
-
-        $is_pro_fsl_trad = (strpos($style, 'FS Pro') !== false || strpos($style, 'FSL –') !== false || strpos($style, 'TRAD') !== false || stripos($style, 'Traditional') !== false);
-        $allowed = array('Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)');
-
-        if ($is_pro_fsl_trad && !in_array($division, $allowed)) return 'FS – Freestyle';
-        $is_lb = (strpos($style, 'LB') !== false || stripos($style, 'Longbow') !== false);
-        if ($is_lb && $division !== 'Adult (18 - 49)') return 'FS – Freestyle';
-
-        return $style;
-    };
-
-    // Close Line
-    if ($action === 'close_line' && $data['is_admin']) {
-        $target_idx  = trim(sanitize_text_field($_POST['target_line_idx']));
-        $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
-        
-        $live_closed = get_option($closed_lines_key, array());
-        if (!is_array($live_closed)) $live_closed = array();
-
-        if (!in_array($target_idx, $live_closed)) {
-            $live_closed[] = $target_idx;
-        }
-        if ($target_name !== '' && !in_array($target_name, $live_closed)) {
-            $live_closed[] = $target_name;
-        }
-        
-        $live_closed = array_values(array_unique($live_closed));
-
-        update_option($closed_lines_key, $live_closed, false);
-        update_option('sywat_current_tournament', $selected_tournament, false); 
-        
-        $data['closed_lines'] = $live_closed; 
-
-        $update_count = 0;
-        foreach ($registrations as &$r) {
-            $r_resolved_lidx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($r, $lines) : (isset($r['line_index']) ? (string)$r['line_index'] : '0');
-            if (isset($r['tournament']) && $r['tournament'] === $selected_tournament && (string)$r_resolved_lidx === $target_idx) {
-                if (empty($r['checked_in'])) {
-                    $r['division'] = 'No Show'; $r['gender'] = 'No Show'; $r['style'] = 'No Show';
-                    update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
-                    $update_count++;
-                }
-            }
-        }
-        unset($r);
-        return '<div class="sywat-alert sywat-alert-success"><strong>Line closed successfully.</strong> ' . $update_count . ' absent archer(s) marked as No Show.</div>';
-    }
-
-    // Reopen Line
-    if ($action === 'reopen_line' && $data['is_admin']) {
-        $target_idx  = trim(sanitize_text_field($_POST['target_line_idx']));
-        $target_name = isset($lines[$target_idx]['name']) ? trim($lines[$target_idx]['name']) : '';
-        
-        $live_closed = get_option($closed_lines_key, array());
-        if (!is_array($live_closed)) $live_closed = array();
-
-        $new_closed = array();
-        foreach ($live_closed as $val) {
-            $v_clean = trim((string)$val);
-            if ($v_clean !== $target_idx && ($target_name === '' || $v_clean !== $target_name)) {
-                $new_closed[] = $v_clean;
-            }
-        }
-
-        update_option($closed_lines_key, $new_closed, false);
-        update_option('sywat_current_tournament', $selected_tournament, false);
-        
-        $data['closed_lines'] = $new_closed;
-        
-        return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
-    }
-
-    // Add Walk-In (Supports standard completion and fast-loop "Save & Add Next")
-    if ($action === 'add_walkin' || $action === 'add_walkin_next') {
-        $name_val    = trim(sanitize_text_field($_POST['walkin_name']));
-        $group_name  = isset($_POST['walkin_group_name']) ? trim(sanitize_text_field($_POST['walkin_group_name'])) : '';
-        $group_phone = isset($_POST['walkin_group_phone']) ? trim(sanitize_text_field($_POST['walkin_group_phone'])) : '';
-        $line_idx    = sanitize_text_field($_POST['walkin_line_index']);
-        $pay_opt     = sanitize_text_field($_POST['walkin_pay_option']);
-        $division    = sanitize_text_field($_POST['walkin_division']);
-        $gender      = sanitize_text_field($_POST['walkin_gender']);
-        $style       = sanitize_text_field($_POST['walkin_style']);
-
-        if (empty($name_val)) {
-            return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
-        }
-
-        $is_duplicate = false;
-        if (function_exists('sywat_is_archer_on_line')) {
-            $is_duplicate = sywat_is_archer_on_line($selected_tournament, $line_idx, $name_val, $registrations);
-        } else {
-            foreach ($registrations as $r) {
-                if (isset($r['tournament'], $r['line_index'], $r['name']) &&
-                    strcasecmp(trim($r['tournament']), trim($selected_tournament)) === 0 &&
-                    (string)$r['line_index'] === (string)$line_idx &&
-                    strcasecmp(trim($r['name']), trim($name_val)) === 0) {
-                    $is_duplicate = true;
-                    break;
-                }
-            }
-        }
-
-        if ($is_duplicate) {
-            $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js($name_val) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
-            return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
-                   '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
-        }
-
-        $new_id    = uniqid('reg_');
-        $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
-        $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
-
-        $family_id   = ''; 
-        $family_name = '';
-
-        if ($pay_opt === 'Family') {
-            $sel_fam_id = isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '';
-            $checkin_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
-
-            if (!empty($sel_fam_id)) {
-                $family_id   = $sel_fam_id;
-                $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
-            } else {
-                $fam_base_name = !empty($group_name) ? $group_name : $name_val;
-                $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($fam_base_name) . '_' . substr(md5(uniqid()), 0, 4);
-                $family_name = $fam_base_name . ' (Family Cap)';
-            }
-
-            $GLOBALS['sywat_added_family_prompt'] = array(
-                'archer_name' => $name_val,
-                'family_id'   => $family_id,
-                'family_name' => $family_name,
-                'line_idx'    => $line_idx
-            );
-        }
-
-        $new_reg = array(
-            'id'          => $new_id,
-            'tournament'  => $selected_tournament,
-            'name'        => $name_val,
-            'phone'       => $group_phone,
-            'line_index'  => $line_idx,
-            'line_name'   => $line_name,
-            'distance'    => $distance,
-            'type'        => 'Walk-In',
-            'division'    => $division,
-            'gender'      => $gender,
-            'style'       => $sanitize_style_for_division($style, $division),
-            'paid'        => $calculate_paid_status($pay_opt, $division),
-            'family_id'   => $family_id,
-            'family_name' => $family_name,
-            'balance_due' => 0,
-            'checked_in'  => 1
+    $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
+    
+    // Fast-Loop Context Persistence with 3-tier fail-safe checking
+    $walkin_context = array();
+    if (!empty($data['walkin_loop_context'])) {
+        $walkin_context = $data['walkin_loop_context'];
+    } elseif (!empty($GLOBALS['sywat_walkin_loop_context'])) {
+        $walkin_context = $GLOBALS['sywat_walkin_loop_context'];
+    } elseif (isset($_POST['sywat_action']) && $_POST['sywat_action'] === 'add_walkin_next') {
+        $walkin_context = array(
+            'primary_contact' => isset($_POST['walkin_group_name']) ? sanitize_text_field($_POST['walkin_group_name']) : '',
+            'phone'           => isset($_POST['walkin_group_phone']) ? sanitize_text_field($_POST['walkin_group_phone']) : '',
+            'line_idx'        => isset($_POST['walkin_line_index']) ? sanitize_text_field($_POST['walkin_line_index']) : $selected_line_idx,
+            'pay_option'      => isset($_POST['walkin_pay_option']) ? sanitize_text_field($_POST['walkin_pay_option']) : 'Individual',
+            'family_id'       => isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '',
+            'last_added_name' => isset($_POST['walkin_name']) ? sanitize_text_field($_POST['walkin_name']) : '',
         );
-
-        update_option('sywat_t_' . $active_t_slug . '_' . $new_id, $new_reg, false);
-        $registrations[] = $new_reg;
-
-        $t_slug      = sanitize_title($selected_tournament);
-        $master_regs = get_option('sywat_registrations_' . $t_slug, array());
-        if (!is_array($master_regs)) $master_regs = array();
-        $master_regs[$new_id] = $new_reg;
-        update_option('sywat_registrations_' . $t_slug, $master_regs, false);
-
-        // Fast-Loop Persistence: Return loop context to keep modal active
-        if ($action === 'add_walkin_next') {
-            $data['walkin_loop_context'] = array(
-                'primary_contact' => !empty($group_name) ? $group_name : $name_val,
-                'phone'           => $group_phone,
-                'line_idx'        => $line_idx,
-                'pay_option'      => $pay_opt,
-                'family_id'       => $family_id,
-                'last_added_name' => $name_val,
-            );
-            return '<div class="sywat-alert sywat-alert-success">✅ <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully! Enter next archer below.</div>';
-        }
-
-        return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully.</div>';
     }
 
-    // Check-In
-    if ($action === 'save_checkin') {
-        $target_id = sanitize_text_field($_POST['reg_id']);
-        $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
-        $reg       = get_option($opt_key);
-        
-        if ($reg) {
-            $due_amt  = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-            $verified = !empty($_POST['checkin_payment_verified']);
+    $is_walkin_active          = !empty($walkin_context);
+    $saved_contact             = isset($walkin_context['primary_contact']) ? $walkin_context['primary_contact'] : '';
+    $saved_phone               = isset($walkin_context['phone']) ? $walkin_context['phone'] : '';
+    $saved_line_idx            = isset($walkin_context['line_idx']) ? $walkin_context['line_idx'] : $selected_line_idx;
+    $saved_pay_option          = isset($walkin_context['pay_option']) ? $walkin_context['pay_option'] : 'Individual';
+    $saved_fam_id              = isset($walkin_context['family_id']) ? $walkin_context['family_id'] : '';
+    $last_added_name           = isset($walkin_context['last_added_name']) ? $walkin_context['last_added_name'] : '';
 
-            if ($due_amt > 0 && !$verified) {
-                return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance. Please see event staff for payment and check the verification box.</div>';
-            } else {
-                $division = sanitize_text_field($_POST['checkin_division']);
-                $distance = ($division === 'Cub (8 - 11)' || $division === 'No Show') ? 'Cub' : '20yd';
-                $pay_opt  = sanitize_text_field($_POST['checkin_pay_option']);
-                $style    = sanitize_text_field($_POST['checkin_style']);
-                
-                if (!empty($_POST['checkin_name'])) $reg['name'] = sanitize_text_field($_POST['checkin_name']);
+    ?>
+    <!-- CHECK-IN MODAL (PRE-REG) -->
+    <?php if ($modal_archer): ?>
+    <?php 
+        $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
+        $is_family = isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family';
+        $curr_div_check = isset($modal_archer['division']) ? $modal_archer['division'] : '';
+        $is_youth_check = (stripos($curr_div_check, 'Cub') !== false || stripos($curr_div_check, 'Youth') !== false || stripos($curr_div_check, 'Young Adult') !== false);
+        $display_due    = $is_family ? $modal_due : ($is_youth_check ? 25.00 : 30.00);
 
-                $reg['distance']    = $distance;
-                $reg['division']    = $division;
-                $reg['gender']      = sanitize_text_field($_POST['checkin_gender']);
-                $reg['style']       = $sanitize_style_for_division($style, $division);
-                $reg['paid']        = $calculate_paid_status($pay_opt, $division);
-                $reg['checked_in']  = 1;
-                $reg['balance_due'] = 0;
-                
-                if ($reg['paid'] === 'Family') {
-                    $sel_fam_id = isset($_POST['checkin_family_group_id']) ? sanitize_text_field($_POST['checkin_family_group_id']) : '';
-                    $line_idx   = isset($reg['line_index']) ? $reg['line_index'] : '0';
-                    $checkin_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
+        $checkin_line_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($modal_archer, $lines) : (isset($modal_archer['line_index']) ? $modal_archer['line_index'] : '0');
+        $checkin_families = isset($existing_families_by_line[$checkin_line_idx]) ? $existing_families_by_line[$checkin_line_idx] : $existing_families;
+    ?>
+    <div class="sywat-modal-backdrop active">
+        <div class="sywat-modal-content sywat-modal-sm">
+            <div class="sywat-modal-header no-print">
+                <h3>Check In Archer</h3>
+                <form method="post">
+                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                    <button type="submit" name="sywat_action" value="cancel" class="sywat-modal-close" formnovalidate>&times;</button>
+                </form>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post">
+                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                    <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_archer['id']); ?>">
 
-                    if (!empty($sel_fam_id)) {
-                        $reg['family_id']   = $sel_fam_id;
-                        $reg['family_name'] = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
-                    } elseif (empty($reg['family_id'])) {
-                        $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($reg['name']) . '_' . substr(md5(uniqid()), 0, 4);
-                        $reg['family_name'] = $reg['name'] . ' (Family Cap)';
-                    }
-                } else {
-                    unset($reg['family_id']); unset($reg['family_name']);
-                }
-                
-                update_option($opt_key, $reg, false);
+                    <div class="sywat-field-group sywat-field-relative">
+                        <label>Name:</label>
+                        <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr($modal_archer['name']); ?>" autocomplete="off" class="sywat-input-bold">
+                        <div id="checkin_tfaa_badge"></div>
+                        <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
+                    </div>
 
-                $fam_id      = !empty($reg['family_id']) ? $reg['family_id'] : '';
-                $book_id     = !empty($reg['booking_id']) ? $reg['booking_id'] : '';
-                $target_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
+                    <?php if ($modal_due > 0): ?>
+                        <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger sywat-alert-center">
+                            <div class="sywat-alert-title">
+                                ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
+                            </div>
+                            <div class="sywat-alert-subtext">
+                                <?php if ($is_family): ?>
+                                    Family Cap Group Outstanding Balance. Collect Payment Onsite.
+                                <?php else: ?>
+                                    Please See Event Staff for Payment
+                                <?php endif; ?>
+                            </div>
+                        </div>
 
-                foreach ($registrations as &$r) {
-                    if (isset($r['id']) && $r['id'] === $target_id) {
-                        $r = $reg;
-                    }
-                    if (!empty($fam_id) || !empty($book_id)) {
-                        if (isset($r['tournament'], $r['line_index']) 
-                            && strcasecmp($r['tournament'], $selected_tournament) === 0
-                            && (string)$r['line_index'] === $target_line) {
-                            
-                            $is_fam_match = (!empty($fam_id) && isset($r['family_id']) && $r['family_id'] === $fam_id) ||
-                                            (!empty($book_id) && isset($r['booking_id']) && $r['booking_id'] === $book_id);
-                            if ($is_fam_match) {
-                                $r['balance_due'] = 0;
-                                update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
+                        <div class="sywat-field-group">
+                            <label class="sywat-checkbox-label-danger">
+                                <input type="checkbox" name="checkin_payment_verified" id="sywat_payment_verified_check" value="1" required class="sywat-checkbox-auto" onchange="toggleUnpaidBanner(this.checked)">
+                                Payment / Resolution Verified with Event Staff
+                            </label>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="sywat-field-group">
+                        <label>Division:</label>
+                        <select name="checkin_division" id="checkin_division" required onchange="handleStyleRestrictions('checkin'); evaluateTfaaStatus('checkin');">
+                            <?php
+                            $curr_div = isset($modal_archer['division']) ? $modal_archer['division'] : '';
+                            if (isset($legacy_div_map[$curr_div])) $curr_div = $legacy_div_map[$curr_div];
+
+                            echo '<option value="" disabled ' . (empty($curr_div) ? 'selected' : '') . ' hidden>Select Division</option>';
+                            foreach ($divs as $d) {
+                                if ($d === 'No Show' && $curr_div !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($d) . '" ' . selected($curr_div, $d, false) . '>' . esc_html($d) . '</option>';
                             }
-                        }
-                    }
-                }
-                unset($r);
-            }
-        }
-    }
+                            ?>
+                        </select>
+                    </div>
 
-    // Undo Check-In
-    if ($action === 'undo_checkin') {
-        $target_id = sanitize_text_field($_POST['reg_id']);
-        $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
-        $reg       = get_option($opt_key);
-        if ($reg) {
-            $reg['checked_in'] = 0;
-            update_option($opt_key, $reg, false);
+                    <div class="sywat-field-group">
+                        <label>Gender:</label>
+                        <select name="checkin_gender" id="checkin_gender" required onchange="evaluateTfaaStatus('checkin')">
+                            <?php
+                            $curr_gen = isset($modal_archer['gender']) && in_array($modal_archer['gender'], $genders) ? $modal_archer['gender'] : '';
+                            echo '<option value="" disabled ' . (empty($curr_gen) ? 'selected' : '') . ' hidden>Select Gender</option>';
+                            foreach ($genders as $g) {
+                                if ($g === 'No Show' && $curr_gen !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($g) . '" ' . selected($curr_gen, $g, false) . '>' . esc_html($g) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-            foreach ($registrations as &$r) {
-                if (isset($r['id']) && $r['id'] === $target_id) {
-                    $r['checked_in'] = 0;
-                }
-            }
-            unset($r);
-        }
-    }
+                    <div class="sywat-field-group">
+                        <label>Style:</label>
+                        <select name="checkin_style" id="checkin_style" required onchange="evaluateTfaaStatus('checkin')">
+                            <?php
+                            $curr_sty = isset($modal_archer['style']) && in_array($modal_archer['style'], $sywat_styles) ? $modal_archer['style'] : '';
+                            echo '<option value="" disabled ' . (empty($curr_sty) ? 'selected' : '') . ' hidden>Select Style</option>';
+                            foreach ($sywat_styles as $s) {
+                                if ($s === 'No Show' && $curr_sty !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($s) . '" ' . selected($curr_sty, $s, false) . '>' . esc_html($s) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-    // Save Edit
-    if ($action === 'save_edit') {
-        $target_id = sanitize_text_field($_POST['reg_id']);
-        $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
-        $reg       = get_option($opt_key);
-        
-        if ($reg) {
-            $edit_name = trim(sanitize_text_field($_POST['edit_name']));
-            $line_idx  = sanitize_text_field($_POST['edit_line_index']);
-            $orig_name = isset($reg['name']) ? trim($reg['name']) : '';
-            $orig_line = isset($reg['line_index']) ? (string)$reg['line_index'] : '';
+                    <div class="sywat-field-group">
+                        <label>Paid Option:</label>
+                        <select name="checkin_pay_option" id="checkin_pay_option" required onchange="toggleFamilyBox('checkin')">
+                            <?php
+                            $curr_paid = isset($modal_archer['paid']) ? $modal_archer['paid'] : '';
+                            $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
+                            ?>
+                            <option value="Individual" <?php selected($curr_pay_opt, 'Individual'); ?>>Individual</option>
+                            <option value="Family" <?php selected($curr_pay_opt, 'Family'); ?>>Family</option>
+                            <option value="Field Governor" <?php selected($curr_pay_opt, 'Field Governor'); ?>>Field Governor</option>
+                        </select>
+                    </div>
 
-            if ( (strcasecmp($orig_name, $edit_name) !== 0 || (string)$orig_line !== (string)$line_idx) ) {
-                $dupe_found = false;
-                foreach ($registrations as $other) {
-                    if (isset($other['id']) && $other['id'] === $target_id) continue;
-                    if (isset($other['tournament'], $other['line_index'], $other['name']) &&
-                        strcasecmp(trim($other['tournament']), trim($selected_tournament)) === 0 &&
-                        (string)$other['line_index'] === (string)$line_idx &&
-                        strcasecmp(trim($other['name']), trim($edit_name)) === 0) {
-                        $dupe_found = true;
-                        break;
-                    }
-                }
+                    <div class="sywat-field-group <?php echo ($curr_pay_opt === 'Family') ? '' : 'sywat-hidden'; ?>" id="checkin_family_box">
+                        <label>Line Family Group:</label>
+                        <select name="checkin_family_group_id" id="checkin_family_group_id">
+                            <option value="">[ + Start New Family Group for This Line ]</option>
+                            <?php
+                            $curr_fam_id = isset($modal_archer['family_id']) ? $modal_archer['family_id'] : '';
+                            foreach ($checkin_families as $fid => $flabel) {
+                                echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-                if ($dupe_found) {
-                    $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js($edit_name) . ' is already registered on this shooting line.';
-                    return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html($edit_name) . '</strong> is already registered on this shooting line.</div>' .
-                           '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
-                }
-            }
+                    <div class="sywat-modal-form-actions">
+                        <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
+                        <button type="submit" name="sywat_action" value="save_checkin" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Complete Check-In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
-            $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
-            $division  = sanitize_text_field($_POST['edit_division']);
-            $distance  = ($division === 'Cub (8 - 11)' || $division === 'No Show') ? 'Cub' : '20yd';
-            $pay_opt   = sanitize_text_field($_POST['edit_pay_option']);
-            $style     = sanitize_text_field($_POST['edit_style']);
+    <!-- EDIT ARCHER MODAL -->
+    <?php if ($modal_edit_archer): ?>
+    <?php
+        $edit_line_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($modal_edit_archer, $lines) : (isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : '0');
+        $edit_families = isset($existing_families_by_line[$edit_line_idx]) ? $existing_families_by_line[$edit_line_idx] : $existing_families;
+    ?>
+    <div class="sywat-modal-backdrop active">
+        <div class="sywat-modal-content sywat-modal-sm">
+            <div class="sywat-modal-header no-print">
+                <h3>Edit Archer Registration</h3>
+                <form method="post">
+                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                    <button type="submit" name="sywat_action" value="cancel" class="sywat-modal-close" formnovalidate>&times;</button>
+                </form>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post">
+                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                    <input type="hidden" name="reg_id" value="<?php echo esc_attr($modal_edit_archer['id']); ?>">
 
-            $reg['name']        = $edit_name;
-            $reg['line_index']  = $line_idx;
-            $reg['line_name']   = $line_name;
-            $reg['distance']    = $distance;
-            $reg['division']    = $division;
-            $reg['gender']      = sanitize_text_field($_POST['edit_gender']);
-            $reg['style']       = $sanitize_style_for_division($style, $division);
-            $reg['paid']        = $calculate_paid_status($pay_opt, $division);
-            $reg['balance_due'] = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
-            
-            if ($reg['paid'] === 'Family') {
-                $sel_fam_id = isset($_POST['edit_family_group_id']) ? sanitize_text_field($_POST['edit_family_group_id']) : '';
-                $edit_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
+                    <div class="sywat-field-group sywat-field-relative">
+                        <label>Full Name:</label>
+                        <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr($modal_edit_archer['name']); ?>" autocomplete="off" required>
+                    </div>
 
-                if (!empty($sel_fam_id)) {
-                    $reg['family_id']   = $sel_fam_id;
-                    $reg['family_name'] = isset($edit_families[$sel_fam_id]) ? $edit_families[$sel_fam_id] : 'Family Group';
-                } elseif (empty($reg['family_id']) || $orig_line !== $line_idx) {
-                    $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($edit_name) . '_' . substr(md5(uniqid()), 0, 4);
-                    $reg['family_name'] = $edit_name . ' (Family Cap)';
-                }
-            } else {
-                unset($reg['family_id']); unset($reg['family_name']);
-            }
+                    <div class="sywat-field-group">
+                        <label>Shooting Line:</label>
+                        <select name="edit_line_index" id="edit_line_index" required onchange="updateEditFamilyOptions(this.value)">
+                            <?php $curr_line = isset($modal_edit_archer['line_index']) ? $modal_edit_archer['line_index'] : ''; ?>
+                            <?php foreach ($lines as $idx => $line): ?>
+                                <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$curr_line, (string)$idx); ?>>
+                                    <?php echo esc_html($line['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-            update_option($opt_key, $reg, false);
+                    <div class="sywat-field-group">
+                        <label>Division:</label>
+                        <select name="edit_division" id="edit_division" required onchange="handleStyleRestrictions('edit');">
+                            <?php
+                            $raw_div = isset($modal_edit_archer['division']) ? $modal_edit_archer['division'] : '';
+                            if (isset($legacy_div_map[$raw_div])) $raw_div = $legacy_div_map[$raw_div];
+                            
+                            $curr_div = in_array($raw_div, $divs) ? $raw_div : '';
+                            
+                            echo '<option value="" disabled ' . (empty($curr_div) ? 'selected' : '') . ' hidden>Select Division</option>';
+                            foreach ($divs as $d) {
+                                if ($d === 'No Show' && $curr_div !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($d) . '" ' . selected($curr_div, $d, false) . '>' . esc_html($d) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-            foreach ($registrations as &$r) {
-                if (isset($r['id']) && $r['id'] === $target_id) {
-                    $r = $reg;
-                }
-            }
-            unset($r);
-        }
-    }
+                    <div class="sywat-field-group">
+                        <label>Gender:</label>
+                        <select name="edit_gender" id="edit_gender" required>
+                            <?php
+                            $curr_gen = isset($modal_edit_archer['gender']) && in_array($modal_edit_archer['gender'], $genders) ? $modal_edit_archer['gender'] : '';
+                            echo '<option value="" disabled ' . (empty($curr_gen) ? 'selected' : '') . ' hidden>Select Gender</option>';
+                            foreach ($genders as $g) {
+                                if ($g === 'No Show' && $curr_gen !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($g) . '" ' . selected($curr_gen, $g, false) . '>' . esc_html($g) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-    // Delete Archer
-    if ($action === 'delete_archer') {
-        $target_id = sanitize_text_field($_POST['reg_id']);
-        delete_option('sywat_t_' . $active_t_slug . '_' . $target_id);
+                    <div class="sywat-field-group">
+                        <label>Style:</label>
+                        <select name="edit_style" id="edit_style" required>
+                            <?php
+                            $curr_sty = isset($modal_edit_archer['style']) && in_array($modal_edit_archer['style'], $sywat_styles) ? $modal_edit_archer['style'] : '';
+                            echo '<option value="" disabled ' . (empty($curr_sty) ? 'selected' : '') . ' hidden>Select Style</option>';
+                            foreach ($sywat_styles as $s) {
+                                if ($s === 'No Show' && $curr_sty !== 'No Show') continue;
+                                echo '<option value="' . esc_attr($s) . '" ' . selected($curr_sty, $s, false) . '>' . esc_html($s) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
 
-        $registrations = array_values(array_filter($registrations, function($r) use ($target_id) {
-            return !(isset($r['id']) && $r['id'] === $target_id);
-        }));
-    }
+                    <div class="sywat-field-group">
+                        <label>Paid Option:</label>
+                        <select name="edit_pay_option" id="edit_pay_option" required onchange="toggleFamilyBox('edit')">
+                            <?php
+                            $curr_paid = isset($modal_edit_archer['paid']) ? $modal_edit_archer['paid'] : '';
+                            $curr_pay_opt = ($curr_paid === 'Family') ? 'Family' : (($curr_paid === 'Field Governor') ? 'Field Governor' : 'Individual');
+                            ?>
+                            <option value="Individual" <?php selected($curr_pay_opt, 'Individual'); ?>>Individual</option>
+                            <option value="Family" <?php selected($curr_pay_opt, 'Family'); ?>>Family</option>
+                            <option value="Field Governor" <?php selected($curr_pay_opt, 'Field Governor'); ?>>Field Governor</option>
+                        </select>
+                    </div>
 
-    return '';
+                    <div class="sywat-field-group <?php echo ($curr_pay_opt === 'Family') ? '' : 'sywat-hidden'; ?>" id="edit_family_box">
+                        <label>Line Family Group:</label>
+                        <select name="edit_family_group_id" id="edit_family_group_id">
+                            <option value="">[ + Start New Family Group for This Line ]</option>
+                            <?php
+                            $curr_fam_id = isset($modal_edit_archer['family_id']) ? $modal_edit_archer['family_id'] : '';
+                            foreach ($edit_families as $fid => $flabel) {
+                                echo '<option value="' . esc_attr($fid) . '" ' . selected($curr_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <div class="sywat-field-group">
+                        <label>Balance Due ($):</label>
+                        <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr(isset($modal_edit_archer['balance_due']) ? $modal_edit_archer['balance_due'] : 0); ?>">
+                    </div>
+
+                    <div class="sywat-modal-form-actions-split">
+                        <button type="submit" name="sywat_action" value="delete_archer" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" onclick="return confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?');" formnovalidate>Delete</button>
+                        
+                        <div class="sywat-modal-form-actions-right">
+                            <button type="submit" name="sywat_action" value="cancel" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" formnovalidate>Cancel</button>
+                            <button type="submit" name="sywat_action" value="save_edit" class="sywat-btn sywat-btn-primary sywat-btn-icon-save">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ADD WALK-IN MODAL (FAST-LOOP "SAVE & ADD NEXT" WORKFLOW) -->
+    <div id="walkinModal" class="sywat-modal-backdrop <?php echo $is_walkin_active ? 'active' : ''; ?>">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <div>
+                    <h3>📋 Add Walk-In Registration</h3>
+                    <div class="sywat-subtitle">Register walk-in archers, assign shooting lines, and calculate fees on-site.</div>
+                </div>
+                <button type="button" class="sywat-modal-close" onclick="closeWalkinModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <?php if (!empty($last_added_name)): ?>
+                    <div class="sywat-alert sywat-alert-success sywat-modal-row-spacing">
+                        ✅ <strong><?php echo esc_html($last_added_name); ?></strong> registered and checked in successfully! Enter next archer below.
+                    </div>
+                <?php endif; ?>
+
+                <form method="post" id="sywat_walkin_form">
+                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+
+                    <!-- Persistent Group Intake Header -->
+                    <div class="sywat-intake-group-wrapper">
+                        <div class="sywat-form-grid-2">
+                            <div class="sywat-field-group sywat-field-relative">
+                                <label for="walkin_group_name">Primary Contact / Group Name:</label>
+                                <input type="text" name="walkin_group_name" id="walkin_group_name" value="<?php echo esc_attr($saved_contact); ?>" placeholder="e.g. John Smith" autocomplete="off" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this); if(window.handleWalkinGroupInput) window.handleWalkinGroupInput(this);">
+                                <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
+                            </div>
+
+                            <div class="sywat-field-group">
+                                <label for="walkin_group_phone">Phone Number:</label>
+                                <input type="text" name="walkin_group_phone" id="walkin_group_phone" value="<?php echo esc_attr($saved_phone); ?>" placeholder="XXX-XXX-XXXX" autocomplete="off" onkeyup="if(window.formatPhoneNumber) window.formatPhoneNumber(this)">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
+                            <div class="sywat-field-group">
+                                <label for="walkin_line_index">Default Shooting Line:</label>
+                                <select name="walkin_line_index" id="walkin_line_index" required onchange="updateWalkinFamilyOptions(this.value)">
+                                    <?php foreach ($lines as $idx => $line): ?>
+                                        <?php $is_c = in_array((string)$idx, $closed_lines); ?>
+                                        <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$saved_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
+                                            <?php echo esc_html($line['name']) . ($is_c ? ' (Closed)' : ''); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-field-group">
+                                <label for="walkin_pay_option">Paid Option:</label>
+                                <select name="walkin_pay_option" id="walkin_pay_option" required onchange="toggleFamilyBox('walkin')">
+                                    <option value="Individual" <?php selected($saved_pay_option, 'Individual'); ?>>Individual Rate ($25 / $30)</option>
+                                    <option value="Family" <?php selected($saved_pay_option, 'Family'); ?>>Family Group ($75 Cap)</option>
+                                    <option value="Field Governor" <?php selected($saved_pay_option, 'Field Governor'); ?>>Field Governor (Free)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="sywat-field-group sywat-modal-row-spacing <?php echo ($saved_pay_option === 'Family') ? '' : 'sywat-hidden'; ?>" id="walkin_family_box">
+                            <label for="walkin_family_group_id">Line Family Group:</label>
+                            <select name="walkin_family_group_id" id="walkin_family_group_id">
+                                <option value="">[ + Start New Family Group for This Line ]</option>
+                                <?php 
+                                $fam_found = false;
+                                foreach ($existing_families as $fid => $flabel) {
+                                    if ($fid === $saved_fam_id) $fam_found = true;
+                                    echo '<option value="' . esc_attr($fid) . '" ' . selected($saved_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                                }
+                                if (!empty($saved_fam_id) && !$fam_found) {
+                                    echo '<option value="' . esc_attr($saved_fam_id) . '" selected>' . esc_html($saved_contact . ' (Family Cap)') . '</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Archer Intake Section -->
+                    <div class="sywat-modal-section-header">
+                        <h2>🏹 Archer Details</h2>
+                    </div>
+
+                    <div class="sywat-field-group sywat-field-relative">
+                        <label for="walkin_name_input">Archer Full Name *</label>
+                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this);">
+                        <div id="walkin_tfaa_badge"></div>
+                        <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
+                        <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-modal-row-spacing">
+                        <div class="sywat-field-group">
+                            <label for="walkin_division">Division *</label>
+                            <select name="walkin_division" id="walkin_division" required onchange="handleStyleRestrictions('walkin'); evaluateTfaaStatus('walkin');">
+                                <option value="" disabled selected hidden>Select Division</option>
+                                <?php foreach ($divs as $d): ?>
+                                    <?php if ($d === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($d); ?>"><?php echo esc_html($d); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="sywat-field-group">
+                            <label for="walkin_gender">Gender *</label>
+                            <select name="walkin_gender" id="walkin_gender" required onchange="evaluateTfaaStatus('walkin')">
+                                <option value="" disabled selected hidden>Select Gender</option>
+                                <?php foreach ($genders as $g): ?>
+                                    <?php if ($g === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($g); ?>"><?php echo esc_html($g); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="sywat-field-group">
+                            <label for="walkin_style">Style *</label>
+                            <select name="walkin_style" id="walkin_style" required onchange="evaluateTfaaStatus('walkin')">
+                                <option value="" disabled selected hidden>Select Style</option>
+                                <?php foreach ($sywat_styles as $s): ?>
+                                    <?php if ($s === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($s); ?>"><?php echo esc_html($s); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Action Footer with Dual Save Options -->
+                    <div class="sywat-modal-form-actions-split">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeWalkinModal()">Cancel</button>
+                        
+                        <div class="sywat-modal-form-actions-right">
+                            <button type="submit" name="sywat_action" value="add_walkin_next" class="sywat-btn sywat-btn-success sywat-btn-icon-add">Save & Add Next Archer</button>
+                            <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Register & Complete</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php
 }
