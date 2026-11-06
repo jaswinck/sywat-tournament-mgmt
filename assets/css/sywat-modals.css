@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
-   Version: 6.2.0
+   Version: 6.3.1
    ========================================================================== */
 
 /* 1. Modal Container & Backdrop Engine */
@@ -48,7 +48,7 @@
 .sywat-modal-sm { width: min(94vw, 480px); }
 .sywat-modal-md { width: min(94vw, 620px); }
 .sywat-modal-lg { width: min(96vw, 920px); max-width: 920px; }
-.sywat-modal-xl { width: min(96vw, 1150px); max-width: 1150px; }
+.sywat-modal-xl { width: min(96vw, 1180px); max-width: 1180px; }
 
 /* Capacity Overflow Overlay Overrides */
 .sywat-modal-overflow-backdrop {
@@ -307,31 +307,46 @@
     gap: 12px;
 }
 
-/* Archer Row Grid Columns */
+/* Archer Row Grid Columns - Strict Single Horizontal Line Layout */
 .sywat-archer-header-row {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     margin-bottom: 6px;
     padding: 0 4px;
     font-weight: 700;
     font-size: 12px;
     color: #475569;
+    flex-wrap: nowrap;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sywat-archer-input-row {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     margin-bottom: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.sywat-col-archer-name   { flex: 2; min-width: 180px; position: relative; }
-.sywat-col-archer-dist   { flex: 1; min-width: 100px; }
-.sywat-col-archer-div    { flex: 1.5; min-width: 160px; }
-.sywat-col-archer-line   { flex: 1.2; min-width: 130px; }
-.sywat-col-archer-action { width: 38px; display: flex; justify-content: center; }
+.sywat-col-archer-name   { flex: 2.2; min-width: 0; position: relative; }
+.sywat-col-archer-div    { flex: 1.8; min-width: 0; }
+.sywat-col-archer-gender { flex: 1.1; min-width: 0; }
+.sywat-col-archer-style  { flex: 1.8; min-width: 0; }
+.sywat-col-archer-line   { flex: 1.4; min-width: 0; }
+.sywat-col-archer-action { flex: 0 0 36px; display: flex; justify-content: center; }
+
+.sywat-col-archer-name input,
+.sywat-col-archer-div select,
+.sywat-col-archer-gender select,
+.sywat-col-archer-style select,
+.sywat-col-archer-line select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
 
 /* Intake Footer & Totals Summary */
 .sywat-intake-footer-bar {
@@ -567,7 +582,7 @@
     .sywat-modal-body { padding: 14px; }
     .sywat-form-grid-2, .sywat-form-grid-4 { grid-template-columns: 1fr !important; gap: 8px !important; }
 
-    /* Responsive Archer Input Row Stacking */
+    /* Responsive Archer Input Row Stacking on Mobile Only */
     .sywat-archer-header-row { display: none; }
     .sywat-archer-input-row { 
         flex-direction: column; 
@@ -577,7 +592,7 @@
         border: 1px solid #e2e8f0; 
         border-radius: 6px; 
     }
-    .sywat-col-archer-name, .sywat-col-archer-dist, .sywat-col-archer-div, .sywat-col-archer-line { width: 100%; min-width: 0; }
+    .sywat-col-archer-name, .sywat-col-archer-div, .sywat-col-archer-gender, .sywat-col-archer-style, .sywat-col-archer-line { width: 100%; min-width: 0; }
     .sywat-col-archer-action { width: 100%; margin-top: 4px; }
     .sywat-col-archer-action .sywat-btn { width: 100%; }
 }
