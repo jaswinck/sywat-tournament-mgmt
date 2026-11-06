@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.1.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -183,15 +183,19 @@ function sywat_desk_render_capacity_tracker($data) {
                         $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
                         
                         $is_closed_line = in_array($idx, $closed_lines, true) || ($line_name !== '' && in_array($line_name, $closed_lines, true));
-                        $closed_badge   = $is_closed_line ? ' <span class="sywat-badge sywat-badge-full">[CLOSED]</span>' : '';
                     ?>
                     <div class="sywat-tracker-card">
                         <div>
                             <div class="sywat-tracker-card-header">
-                                <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']) . $closed_badge; ?></strong>
-                                <span class="sywat-badge sywat-badge-prereg">
-                                    <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
-                                </span>
+                                <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']); ?></strong>
+                                <div class="sywat-tracker-header-badges">
+                                    <?php if ($is_closed_line): ?>
+                                        <span class="sywat-badge sywat-badge-full">CLOSED</span>
+                                    <?php endif; ?>
+                                    <span class="sywat-badge sywat-badge-prereg">
+                                        <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
+                                    </span>
+                                </div>
                             </div>
                             <div class="sywat-tracker-card-stats">
                                 <span><strong>20yd:</strong> <?php echo $disp_20yd; ?></span>
