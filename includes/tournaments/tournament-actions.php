@@ -3,10 +3,95 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Converts Excel Serial Dates or standard date strings to 'YYYY-MM-DD'
+ *
+ * @param string|int $val Raw date value from spreadsheet
+ * @return string Formatted date string
+ */
+if ( ! function_exists( 'sywat_format_imported_date' ) ) {
+    function sywat_format_imported_date( $val ) {
+        $val = trim( (string) $val );
+        if ( empty( $val ) ) return '';
+
+        // Handle Excel Date Serial Numbers (e.g. 46318 -> 2026-10-23)
+        if ( is_numeric( $val ) && intval( $val ) > 30000 ) {
+            $unix = ( intval( $val ) - 25569 ) * 86400;
+            return date( 'Y-m-d', $unix );
+        }
+
+        $time = strtotime( $val );
+        return ( $time !== false ) ? date( 'Y-m-d', $time ) : $val;
+    }
+}
+
+/**
+ * Universal Spreadsheet File Parser (.xlsx via SimpleXLSX and .csv fallback)
+ *
+ * @param string $file_path Path to uploaded file
+ * @param string $file_name Original file name
+ * @return array Parsed row arrays
+ */
+if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
+    function sywat_parse_schedule_file_rows( $file_path, $file_name ) {
+        $raw_rows = array();
+        $ext      = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+
+        // 1. Excel (.xlsx) Parser via includes/lib/SimpleXLSX.php
+        if ( $ext === 'xlsx' ) {
+            $lib_path = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
+            if ( file_exists( $lib_path ) && ! class_exists( 'SimpleXLSX' ) ) {
+                require_once $lib_path;
+            }
+
+            if ( class_exists( 'SimpleXLSX' ) && ( $xlsx = SimpleXLSX::parse( $file_path ) ) ) {
+                foreach ( $xlsx->rows() as $idx => $r ) {
+                    if ( $idx === 0 ) continue; // Skip header row
+                    if ( count( $r ) >= 3 ) {
+                        $raw_rows[] = array(
+                            'start_date'           => isset( $r[0] ) ? trim( (string) $r[0] ) : '',
+                            'end_date'             => isset( $r[1] ) ? trim( (string) $r[1] ) : '',
+                            'host_shop_city'       => isset( $r[2] ) ? trim( (string) $r[2] ) : '',
+                            'line_times'           => isset( $r[3] ) ? trim( (string) $r[3] ) : '',
+                            'event_type'           => isset( $r[4] ) ? trim( (string) $r[4] ) : '',
+                            'national_event_title' => isset( $r[5] ) ? trim( (string) $r[5] ) : '',
+                            'notes'                => isset( $r[6] ) ? trim( (string) $r[6] ) : '',
+                        );
+                    }
+                }
+                if ( ! empty( $raw_rows ) ) {
+                    return $raw_rows;
+                }
+            }
+        }
+
+        // 2. CSV Fallback
+        if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+            $header = fgetcsv( $handle, 1000, ',' );
+            while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
+                if ( count( $data ) >= 3 ) {
+                    $raw_rows[] = array(
+                        'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
+                        'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
+                        'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
+                        'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
+                        'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
+                        'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
+                        'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
+                    );
+                }
+            }
+            fclose( $handle );
+        }
+
+        return $raw_rows;
+    }
+}
 
 /**
  * Parses raw human line string into structured line slot arrays.
@@ -87,9 +172,13 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
         $all_shops   = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
         $known_shops = array();
 
+        // Multi-Key Shop Directory Extraction ('name', 'shop_name', 'title')
         foreach ( $all_shops as $s_id => $s_data ) {
-            if ( ! empty( $s_data['shop_name'] ) ) {
-                $known_shops[ strtolower( trim( $s_data['shop_name'] ) ) ] = $s_data['shop_name'];
+            if ( is_array( $s_data ) ) {
+                $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                if ( ! empty( $title ) ) {
+                    $known_shops[ strtolower( trim( $title ) ) ] = trim( $title );
+                }
             }
         }
 
@@ -111,8 +200,8 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 continue;
             }
 
-            $start_date_formatted = date( 'Y-m-d', strtotime( $start_date ) );
-            $end_date_formatted   = ! empty( $row['end_date'] ) ? date( 'Y-m-d', strtotime( $row['end_date'] ) ) : $start_date_formatted;
+            $start_date_formatted = sywat_format_imported_date( $start_date );
+            $end_date_formatted   = ! empty( $row['end_date'] ) ? sywat_format_imported_date( $row['end_date'] ) : $start_date_formatted;
 
             // -------------------------------------------------------------
             // DUPLICATE GUARD: Prohibit duplicate event on same date & shop
@@ -330,7 +419,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully!</div>';
         }
 
-        // Action: Upload & Stage Bulk Schedule File
+        // Action: Upload & Stage Bulk Schedule File (.xlsx or .csv)
         if ( $action === 'import_schedule_file' ) {
             check_admin_referer( 'sywat_import_schedule_nonce', 'sywat_import_schedule_nonce' );
 
@@ -340,27 +429,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
             $target_season = isset( $_POST['import_target_season'] ) ? sanitize_text_field( $_POST['import_target_season'] ) : '2026-2027 Indoor';
             $file_path     = $_FILES['schedule_file']['tmp_name'];
-            $raw_rows      = array();
+            $file_name     = $_FILES['schedule_file']['name'];
 
-            if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
-                $header = fgetcsv( $handle, 1000, ',' );
-                while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
-                    if ( count( $data ) >= 3 ) {
-                        $raw_rows[] = array(
-                            'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
-                            'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
-                            'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
-                            'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
-                            'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
-                            'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
-                            'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
-                        );
-                    }
-                }
-                fclose( $handle );
-            }
-
-            $processed = sywat_process_schedule_import_rows( $raw_rows, $target_season );
+            $raw_rows      = sywat_parse_schedule_file_rows( $file_path, $file_name );
+            $processed     = sywat_process_schedule_import_rows( $raw_rows, $target_season );
             $processed['target_season'] = $target_season;
 
             set_transient( 'sywat_pending_schedule_import_' . get_current_user_id(), $processed, 3600 );
