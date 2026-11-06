@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.3.0
+ * Version: 6.4.1
  */
 
 function escapeHtmlDesk(str) {
@@ -233,7 +233,8 @@ function handleDeskTfaaAutocomplete(input) {
                         name: best.full_name || best.name || keys[i],
                         division: best.division || '',
                         gender: best.gender || '',
-                        style: best.style || ''
+                        style: best.style || '',
+                        phone: best.phone || best.phone_number || ''
                     });
                 }
                 if (matches.length >= 8) break;
@@ -258,6 +259,7 @@ function handleDeskTfaaAutocomplete(input) {
 
         item.addEventListener('mousedown', function(e) {
             e.preventDefault();
+            const isPrimaryContact = (input.id === 'walkin_group_name' || input.name === 'walkin_group_name');
             input.value = m.name;
             closeAllDeskTfaaAutocompletes();
 
@@ -269,17 +271,50 @@ function handleDeskTfaaAutocomplete(input) {
                 prefix = 'edit';
             }
 
-            if (form) {
-                const divEl   = form.querySelector('select[name="walkin_division"], select[name="checkin_division"], select[name="edit_division"]');
-                const genEl   = form.querySelector('select[name="walkin_gender"], select[name="checkin_gender"], select[name="edit_gender"]');
-                const styleEl = form.querySelector('select[name="walkin_style"], select[name="checkin_style"], select[name="edit_style"]');
+            if (isPrimaryContact) {
+                // Primary Contact Selection Flow
+                const phoneEl      = form ? form.querySelector('#walkin_group_phone, input[name="walkin_group_phone"]') : null;
+                const archerNameEl = form ? form.querySelector('#walkin_name_input, input[name="walkin_name"]') : null;
+
+                // 1. Auto-fill Phone Number if available
+                if (phoneEl && (m.phone || m.phone_number)) {
+                    phoneEl.value = m.phone || m.phone_number;
+                } else if (phoneEl) {
+                    const shopMatch = findShopHistoryMatch(m.name);
+                    if (shopMatch && shopMatch.phone) {
+                        phoneEl.value = shopMatch.phone;
+                    }
+                }
+
+                // 2. Auto-fill Archer Name if empty or previously matching
+                if (archerNameEl && (!archerNameEl.value || archerNameEl.value === m.name)) {
+                    archerNameEl.value = m.name;
+                }
+
+                // 3. Auto-select Division, Gender, Style for Walk-In archer
+                const divEl   = form ? form.querySelector('select[name="walkin_division"]') : null;
+                const genEl   = form ? form.querySelector('select[name="walkin_gender"]') : null;
+                const styleEl = form ? form.querySelector('select[name="walkin_style"]') : null;
 
                 if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
                 if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
                 if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
-            }
 
-            autoFillOnNameChange(prefix);
+                autoFillOnNameChange('walkin');
+            } else {
+                // Standard Archer Selection Flow
+                if (form) {
+                    const divEl   = form.querySelector('select[name="walkin_division"], select[name="checkin_division"], select[name="edit_division"]');
+                    const genEl   = form.querySelector('select[name="walkin_gender"], select[name="checkin_gender"], select[name="edit_gender"]');
+                    const styleEl = form.querySelector('select[name="walkin_style"], select[name="checkin_style"], select[name="edit_style"]');
+
+                    if (divEl && m.division) matchDeskTfaaSelect(m.division, divEl);
+                    if (genEl && m.gender) matchDeskTfaaSelect(m.gender, genEl);
+                    if (styleEl && m.style) matchDeskTfaaSelect(styleEl, styleEl);
+                }
+
+                autoFillOnNameChange(prefix);
+            }
         });
 
         dropdown.appendChild(item);
@@ -464,6 +499,12 @@ function closeWalkinModal() {
     const modal = document.getElementById('walkinModal');
     if (modal) modal.classList.remove('active');
 
+    const contactInput = document.getElementById('walkin_group_name');
+    if (contactInput) contactInput.value = '';
+
+    const phoneInput = document.getElementById('walkin_group_phone');
+    if (phoneInput) phoneInput.value = '';
+
     const nameInput = document.getElementById('walkin_name_input');
     if (nameInput) nameInput.value = '';
 
@@ -572,6 +613,17 @@ function handleStyleRestrictions(type) {
  * Initializes Check-In Desk event listeners and pre-fills active forms.
  */
 function initSywatCheckin() {
+    const walkinGroupName = document.getElementById('walkin_group_name');
+    if (walkinGroupName) {
+        walkinGroupName.addEventListener('input', function() {
+            const archerNameInput = document.getElementById('walkin_name_input');
+            if (archerNameInput && (!archerNameInput.value || archerNameInput.value === this.value.substring(0, this.value.length - 1))) {
+                archerNameInput.value = this.value;
+                autoFillOnNameChange('walkin');
+            }
+        });
+    }
+
     const walkinInput = document.getElementById('walkin_name_input');
     if (walkinInput) {
         walkinInput.addEventListener('input', function() {
@@ -625,7 +677,7 @@ if (document.readyState === 'loading') {
 }
 
 document.addEventListener('input', function(e) {
-    if (e.target && (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name')) {
+    if (e.target && (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name' || e.target.id === 'walkin_group_name' || e.target.name === 'walkin_group_name')) {
         handleDeskTfaaAutocomplete(e.target);
     }
 });
