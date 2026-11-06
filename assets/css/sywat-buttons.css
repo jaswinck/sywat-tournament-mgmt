@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Unified Button System Spec
    Path: assets/css/sywat-buttons.css
-   Version: 6.3.1
+   Version: 6.4.0
    ========================================================================== */
 
 /* Universal Button Base (38px Standard Height) */
@@ -245,6 +245,7 @@
 .sywat-btn-icon-checkin::before     { content: "📋\00a0"; }
 .sywat-btn-icon-checkedin::before   { content: "✓\00a0"; }
 .sywat-btn-icon-export::before      { content: "📥\00a0"; }
+.sywat-btn-icon-import::before      { content: "📁\00a0"; }
 .sywat-btn-icon-invoice::before     { content: "📄\00a0"; }
 .sywat-btn-icon-print::before       { content: "🖨️\00a0"; }
 .sywat-btn-icon-lock::before        { content: "🔒\00a0"; }
