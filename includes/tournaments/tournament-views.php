@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 6.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -115,8 +115,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </form>
                             <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">📁 Bulk Import Schedule</button>
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">+ Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">Bulk Import Schedule</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
                         </div>
                     </div>
 
@@ -150,7 +150,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     </div>
 
                     <?php if ( empty( $scoped_tournaments ) ): ?>
-                        <p class="sywat-score-null">No tournaments created yet for this location. Click on <strong>"+ Add Tournament"</strong> to configure your first tournament.</p>
+                        <p class="sywat-score-null">No tournaments created yet for this location. Click on <strong>"Add Tournament"</strong> to configure your first tournament.</p>
                     <?php else: ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table">
@@ -229,7 +229,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <div class="sywat-lines-grid">
                                                         <?php foreach ( $t_lines as $idx => $line ): ?>
                                                             <?php 
-                                                                $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ($idx + 1);
+                                                                $day_str   = isset( $line['day'] ) ? $line['day'] : '';
+                                                                $time_str  = isset( $line['time'] ) ? $line['time'] : ( isset( $line['start_time'] ) ? $line['start_time'] : '' );
+                                                                $line_title = ! empty( $line['name'] ) ? $line['name'] : ( ( ! empty( $day_str ) && ! empty( $time_str ) ) ? trim( $day_str . ' ' . $time_str ) : 'Line ' . ($idx + 1) );
+
                                                                 $c_20 = sywat_count_registered( $t_name, $idx, '20yd', $registrations );
                                                                 $m_20 = sywat_get_line_max_cap( $line, '20yd' );
                                                                 $rem_20 = max( 0, $m_20 - $c_20 );
