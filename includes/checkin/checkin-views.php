@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.1.1
+ * Version: 6.1.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -125,7 +125,9 @@ function sywat_desk_render_capacity_tracker($data) {
     <div class="sywat-tracker-container">
         <div class="sywat-table-header-bar">
             <h2>Line Capacity Tracker</h2>
-            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
+            <div class="sywat-table-header-controls">
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
+            </div>
         </div>
         <?php if (!empty($lines)): ?>
             <?php
@@ -334,20 +336,28 @@ function sywat_desk_render_archers_table($data) {
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <?php if (!empty($reg['checked_in'])): ?>
-                                            <form method="post" class="sywat-table-action-form">
-                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                                <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
-                                                <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
-                                                <input type="hidden" name="sywat_action" value="undo_checkin">
-                                                <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
-                                            </form>
-                                        <?php else: ?>
-                                            <?php if ($is_line_closed): ?>
-                                                <span class="sywat-badge sywat-badge-full">Line Closed</span>
+                                        <?php if ($is_line_closed): ?>
+                                            <?php if (!empty($reg['checked_in'])): ?>
+                                                <!-- Static Badge on Closed Lines (Removes Undo Form/Link) -->
+                                                <span class="sywat-badge sywat-badge-open">✓ Checked In</span>
                                             <?php else: ?>
+                                                <!-- Static Badge for Unchecked/Waitlist on Closed Lines -->
+                                                <span class="sywat-badge sywat-badge-full">Line Closed</span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <?php if (!empty($reg['checked_in'])): ?>
+                                                <!-- Interactive Undo Form Button on Open Lines -->
+                                                <form method="post" class="sywat-table-action-form">
+                                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
+                                                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                                                    <input type="hidden" name="sywat_action" value="undo_checkin">
+                                                    <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                                    <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <!-- Interactive Check In Form Button on Open Lines -->
                                                 <form method="post" class="sywat-table-action-form">
                                                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
@@ -358,6 +368,7 @@ function sywat_desk_render_archers_table($data) {
                                             <?php endif; ?>
                                         <?php endif; ?>
 
+                                        <!-- Always Accessible Edit Button -->
                                         <form method="post" class="sywat-table-action-form">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                                             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
