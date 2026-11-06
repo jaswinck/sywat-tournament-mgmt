@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-accounting.php
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -51,6 +51,81 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
     }
 }
 
+/**
+ * Calculates the exact balance and family cap status for a group of archers sharing a family_id on a line.
+ * 
+ * Rules:
+ * - Adult / Senior / SS / MS = $30.00 standard rate
+ * - Cub / Youth / Young Adult = $25.00 standard rate
+ * - 1 or 2 Archers: Billed at standard individual rates (Sum < $75.00). Not eligible for $75 family cap.
+ * - 3+ Archers: Billed at capped $75.00 family rate (Sum >= $75.00).
+ * 
+ * @param string     $family_id        The unique family identifier.
+ * @param string|int $line_idx         The line index or line name context ('all' for entire event).
+ * @param array      $all_registrations Master list of registrations.
+ * @return array Calculated billing breakdown.
+ */
+if ( ! function_exists( 'sywat_calculate_family_group_balance' ) ) {
+    function sywat_calculate_family_group_balance( $family_id, $line_idx, $all_registrations ) {
+        $youth_divs = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
+        
+        if ( empty( $family_id ) ) {
+            return array(
+                'is_family_capped' => false,
+                'total_fee'        => 0.00,
+                'member_count'     => 0,
+                'raw_sum'          => 0.00,
+                'members'          => array()
+            );
+        }
+
+        $family_members = array();
+        $raw_sum        = 0.00;
+
+        foreach ( $all_registrations as $reg ) {
+            $reg_fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
+            
+            // Fallback family identifier matching if family_id field is empty
+            if ( empty( $reg_fam_id ) && isset( $reg['paid'] ) && $reg['paid'] === 'Family' ) {
+                $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
+                $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
+                $reg_l_idx  = isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0';
+                $reg_fam_id = 'line_' . $reg_l_idx . '_last_' . $last_name;
+            }
+
+            if ( $reg_fam_id === $family_id ) {
+                // Line match check when a specific line context is provided
+                if ( $line_idx !== 'all' && isset( $reg['line_index'] ) && (string)$reg['line_index'] !== (string)$line_idx ) {
+                    continue;
+                }
+
+                $div        = isset( $reg['division'] ) ? $reg['division'] : '';
+                $is_youth   = ( in_array( $div, $youth_divs ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'youth' ) );
+                $indiv_rate = $is_youth ? 25.00 : 30.00;
+
+                $raw_sum += $indiv_rate;
+                $family_members[] = array(
+                    'reg'        => $reg,
+                    'indiv_rate' => $indiv_rate,
+                    'is_youth'   => $is_youth
+                );
+            }
+        }
+
+        $count            = count( $family_members );
+        $is_family_capped = ( $count >= 3 && $raw_sum >= 75.00 );
+        $final_total      = $is_family_capped ? 75.00 : $raw_sum;
+
+        return array(
+            'is_family_capped' => $is_family_capped,
+            'total_fee'        => $final_total,
+            'member_count'     => $count,
+            'raw_sum'          => $raw_sum,
+            'members'          => $family_members
+        );
+    }
+}
+
 if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
     function sywat_calculate_accounting_totals($regs_list) {
         $g1_youth = 0; $g2_adult = 0; $g4_fg = 0; $g5_noshow = 0;
@@ -83,7 +158,11 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
                     $line_idx   = isset($r['line_index']) ? $r['line_index'] : '0';
                     $fam_key    = 'line_' . $line_idx . '_last_' . $last_name;
                 }
-                $family_groups[$fam_key] = true;
+                
+                if (!isset($family_groups[$fam_key])) {
+                    $family_groups[$fam_key] = array();
+                }
+                $family_groups[$fam_key][] = $r;
             } else {
                 if (in_array($div, $youth_divs) || $paid_cat === 'Youth') {
                     $g1_youth++;
@@ -93,7 +172,31 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
             }
         }
 
-        $unique_families    = count($family_groups);
+        // Process Family Groups to enforce 3+ Archers / $75+ Cap Threshold
+        $unique_capped_families = 0;
+        foreach ($family_groups as $fam_key => $members) {
+            $group_raw_sum = 0;
+            foreach ($members as $m) {
+                $m_div = isset($m['division']) ? $m['division'] : '';
+                $group_raw_sum += (in_array($m_div, $youth_divs) || (isset($m['rate_type']) && strtolower($m['rate_type']) === 'youth')) ? 25 : 30;
+            }
+
+            if (count($members) >= 3 && $group_raw_sum >= 75) {
+                $unique_capped_families++;
+            } else {
+                // Solo or 2-shooter entries fallback to individual Youth/Adult billing buckets
+                foreach ($members as $m) {
+                    $m_div = isset($m['division']) ? $m['division'] : '';
+                    if (in_array($m_div, $youth_divs) || (isset($m['rate_type']) && strtolower($m['rate_type']) === 'youth')) {
+                        $g1_youth++;
+                    } else {
+                        $g2_adult++;
+                    }
+                }
+            }
+        }
+
+        $unique_families    = $unique_capped_families;
         $total_transactions = $g1_youth + $g2_adult + $unique_families + $g4_fg;
         $total_archers      = count($regs_list);
         $total_checked_in   = $total_archers - $g5_noshow;
