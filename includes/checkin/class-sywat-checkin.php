@@ -5,7 +5,7 @@
  * Description: Main entry point and shortcode definition for the Check-In Desk portal.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -64,40 +64,19 @@ function render_sywat_desk_app() {
 }
 
 /**
- * Enqueues external JS asset and injects localized JSON datasets.
+ * Enqueues external JS asset and injects localized JSON datasets using 18-month historical results.
  *
  * @param array $data Aggregated state dataset.
  * @return void
  */
 function sywat_desk_enqueue_scripts($data) {
-    $tfaa_cache = get_option('sywat_tfaa_cache', array());
-    $exact_entries = isset($tfaa_cache['exact']) && is_array($tfaa_cache['exact']) ? $tfaa_cache['exact'] : array();
-
-    $js_tfaa_desk_data = array();
-    foreach ($exact_entries as $norm_key => $records) {
-        if (!is_array($records) || empty($records)) continue;
-
-        $best_rec = $records[0];
-        foreach ($records as $rec) {
-            if (isset($rec['style']) && stripos($rec['style'], 'FS Pro') !== false) {
-                $best_rec = $rec;
-                break;
-            }
-        }
-
-        $name = isset($best_rec['full_name']) ? $best_rec['full_name'] : (isset($best_rec['name']) ? $best_rec['name'] : '');
-        if (!empty($name)) {
-            $js_tfaa_desk_data[] = array(
-                'name'     => $name,
-                'division' => isset($best_rec['division']) ? $best_rec['division'] : '',
-                'gender'   => isset($best_rec['gender']) ? $best_rec['gender'] : '',
-                'style'    => isset($best_rec['style']) ? $best_rec['style'] : '',
-            );
-        }
-    }
+    // Fetch 18-month rolling window historical shooters
+    $js_tfaa_desk_data = function_exists('sywat_get_historical_shooters') 
+        ? sywat_get_historical_shooters() 
+        : array();
 
     $handle  = 'sywat-checkin-js';
-    $version = defined('SYWAT_PLUGIN_VERSION') ? SYWAT_PLUGIN_VERSION : '6.0.0';
+    $version = defined('SYWAT_PLUGIN_VERSION') ? SYWAT_PLUGIN_VERSION : '6.1.0';
     wp_enqueue_script($handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', array(), $version, true);
 
     $inline_js = 'window.sywatHistory = ' . json_encode($data['history_profiles']) . '; ' .
