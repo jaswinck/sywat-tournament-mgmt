@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.2.1
+ * Version: 6.2.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -314,41 +314,37 @@ function sywat_desk_render_archers_table($data) {
 
                                 $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines, true) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines, true));
                                 $is_checked_in  = !empty($reg['checked_in']);
+                                $is_no_show     = ($div_disp === 'No Show') || ($is_line_closed && !$is_checked_in);
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
                                     <div class="sywat-archer-name"><?php echo esc_html($reg['name']); ?></div>
-                                    <?php if (!$is_waitlist && ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—' || $is_family_due)): ?>
-                                        <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
-                                            <div class="sywat-owe-badge-wrap">
-                                                <span class="sywat-badge sywat-badge-full">
-                                                    <?php 
-                                                        $fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
-                                                        if ( empty( $fam_id ) && $is_family_due ) {
-                                                            $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
-                                                            $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
-                                                            $reg_l_idx  = isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0';
-                                                            $fam_id     = 'line_' . $reg_l_idx . '_last_' . $last_name;
-                                                        }
+                                    <!-- OWE Badge Rule: Suppress for Waitlists, No Shows, Closed Unchecked Lines, and Zero Balances -->
+                                    <?php if (!$is_waitlist && !$is_no_show && $balance_due > 0): ?>
+                                        <div class="sywat-owe-badge-wrap">
+                                            <span class="sywat-badge sywat-badge-full">
+                                                <?php 
+                                                    $fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
+                                                    if ( empty( $fam_id ) && $is_family_due ) {
+                                                        $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
+                                                        $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
+                                                        $reg_l_idx  = isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0';
+                                                        $fam_id     = 'line_' . $reg_l_idx . '_last_' . $last_name;
+                                                    }
 
-                                                        $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) ) 
-                                                            ? sywat_calculate_family_group_balance( $fam_id, 'all', $tourn_registrations ) 
-                                                            : null;
+                                                    $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) ) 
+                                                        ? sywat_calculate_family_group_balance( $fam_id, 'all', $tourn_registrations ) 
+                                                        : null;
 
-                                                        $is_true_family_cap = ( $fam_calc && ! empty( $fam_calc['is_family_capped'] ) );
-                                                    ?>
-                                                    <?php if ( $is_true_family_cap ): ?>
-                                                        ⚠️ OWE: FAMILY
-                                                    <?php else: ?>
-                                                        <?php 
-                                                            $is_youth_div = (stripos($div_disp, 'Cub') !== false || stripos($div_disp, 'Youth') !== false || stripos($div_disp, 'Young Adult') !== false);
-                                                            $fixed_due = $is_youth_div ? 25.00 : 30.00;
-                                                        ?>
-                                                        ⚠️ OWE $<?php echo number_format($fixed_due, 2); ?>
-                                                    <?php endif; ?>
-                                                </span>
-                                            </div>
-                                        <?php } ?>
+                                                    $is_true_family_cap = ( $fam_calc && ! empty( $fam_calc['is_family_capped'] ) );
+                                                ?>
+                                                <?php if ( $is_true_family_cap ): ?>
+                                                    ⚠️ OWE: FAMILY
+                                                <?php else: ?>
+                                                    ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
+                                                <?php endif; ?>
+                                            </span>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="sywat-col-center">
