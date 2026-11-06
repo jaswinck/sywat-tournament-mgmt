@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.5.5
+ * Version: 6.5.6
  */
 
 function escapeHtmlDesk(str) {
@@ -9,20 +9,9 @@ function escapeHtmlDesk(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/**
- * Ported from sywat-registration.js: Universal TFAA Shooter Array Reader
- */
-function getTfaaShooters() {
-    if (Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
-        return window.sywatDeskTfaaShooters;
-    }
-    if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
-        return sywatTfaaShooters;
-    }
-    if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
-        return window.sywatDeskData.tfaaShooters;
-    }
-    return [];
+function cleanDeskName(str) {
+    if (!str) return '';
+    return String(str).replace(/[\s\u00a0]+/g, ' ').trim().toLowerCase();
 }
 
 function updateWalkinFamilyOptions(lineIdx) {
@@ -71,40 +60,118 @@ function toggleUnpaidBanner(isChecked) {
 }
 
 /**
- * Ported from sywat-registration.js: Array Filter TFAA Match Engine
+ * Universal TFAA Match Engine querying both window.tfaaData object cache and desk array caches.
  */
-function findTfaaMatch(typedName) {
-    if (!typedName) return null;
-    const query = typedName.trim().toLowerCase();
-    if (query.length < 2) return null;
+function getAllTfaaMatches(typedName) {
+    if (!typedName) return [];
+    const clean = cleanDeskName(typedName);
+    if (!clean || clean.length < 2) return [];
 
-    const shooters = getTfaaShooters();
-    if (!Array.isArray(shooters) || shooters.length === 0) return null;
+    let rawMatches = [];
 
-    const matches = shooters.filter(s => s.name && s.name.trim().toLowerCase().includes(query));
-    if (matches.length === 0) return null;
+    // 1. Primary Check: Master TFAA database cache (window.tfaaData)
+    if (window.tfaaData) {
+        if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
+            const entry = window.tfaaData.exact[clean];
+            const arr = Array.isArray(entry) ? entry : [entry];
+            rawMatches = rawMatches.concat(arr);
+        }
 
-    if (matches.length > 1) {
-        matches.sort((a, b) => {
-            const aPro = (a.style && a.style.indexOf('FS Pro') !== -1) ? 1 : 0;
-            const bPro = (b.style && b.style.indexOf('FS Pro') !== -1) ? 1 : 0;
-            return bPro - aPro;
-        });
+        if (window.tfaaData.fl) {
+            const parts = clean.split(' ');
+            if (parts.length > 1) {
+                const flKey = parts[0] + '___' + parts[parts.length - 1];
+                if (window.tfaaData.fl[flKey]) {
+                    const entry = window.tfaaData.fl[flKey];
+                    const arr = Array.isArray(entry) ? entry : [entry];
+                    rawMatches = rawMatches.concat(arr);
+                }
+            }
+        }
+
+        if (window.tfaaData.exact) {
+            const keys = Object.keys(window.tfaaData.exact);
+            for (let i = 0; i < keys.length; i++) {
+                const kClean = cleanDeskName(keys[i]);
+                if (kClean.includes(clean) || clean.includes(kClean)) {
+                    const entry = window.tfaaData.exact[keys[i]];
+                    const arr = Array.isArray(entry) ? entry : [entry];
+                    rawMatches = rawMatches.concat(arr);
+                }
+            }
+        }
     }
 
-    return matches.map(m => ({
-        name: m.name || m.full_name || '',
-        full_name: m.full_name || m.name || '',
-        division: m.division || '',
-        gender: m.gender || '',
-        style: m.style || '',
-        phone: m.phone || m.phone_number || ''
-    }));
+    // 2. Secondary Check: Desk array caches (window.sywatDeskTfaaShooters / sywatTfaaShooters)
+    let shooterArray = [];
+    if (Array.isArray(window.sywatDeskTfaaShooters)) {
+        shooterArray = shooterArray.concat(window.sywatDeskTfaaShooters);
+    }
+    if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
+        shooterArray = shooterArray.concat(sywatTfaaShooters);
+    }
+    if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
+        shooterArray = shooterArray.concat(window.sywatDeskData.tfaaShooters);
+    }
+
+    if (shooterArray.length > 0) {
+        const arrMatches = shooterArray.filter(s => {
+            const sName = cleanDeskName(s.name || s.full_name || '');
+            return sName && (sName.includes(clean) || clean.includes(sName));
+        });
+        rawMatches = rawMatches.concat(arrMatches);
+    }
+
+    // Deduplicate matches
+    const seen = new Set();
+    const uniqueMatches = [];
+
+    for (let m of rawMatches) {
+        if (!m) continue;
+        const nameStr = (m.full_name || m.name || '').trim();
+        if (!nameStr) continue;
+        const divStr  = (m.division || '').trim();
+        const styStr  = (m.style || '').trim();
+        const genStr  = (m.gender || '').trim();
+        
+        const dedupKey = (cleanDeskName(nameStr) + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
+        if (!seen.has(dedupKey)) {
+            seen.add(dedupKey);
+            uniqueMatches.push({
+                name: nameStr,
+                full_name: nameStr,
+                division: m.division || '',
+                gender: m.gender || '',
+                style: m.style || '',
+                phone: m.phone || m.phone_number || ''
+            });
+        }
+    }
+
+    // Sort: Exact name matches first, then FS Pro prioritization
+    uniqueMatches.sort((a, b) => {
+        const aName = cleanDeskName(a.name);
+        const bName = cleanDeskName(b.name);
+        const aExact = (aName === clean) ? 1 : 0;
+        const bExact = (bName === clean) ? 1 : 0;
+        if (aExact !== bExact) return bExact - aExact;
+
+        const aPro = (a.style && a.style.indexOf('FS Pro') !== -1) ? 1 : 0;
+        const bPro = (b.style && b.style.indexOf('FS Pro') !== -1) ? 1 : 0;
+        return bPro - aPro;
+    });
+
+    return uniqueMatches;
+}
+
+function findTfaaMatch(typedName) {
+    const matches = getAllTfaaMatches(typedName);
+    return matches.length > 0 ? matches : null;
 }
 
 function findShopHistoryMatch(typedName) {
     if (!typedName || !window.sywatHistory || !window.sywatHistory.exact) return null;
-    const clean = typedName.trim().toLowerCase();
+    const clean = cleanDeskName(typedName);
     if (!clean) return null;
 
     if (window.sywatHistory.exact[clean]) return window.sywatHistory.exact[clean];
@@ -196,19 +263,13 @@ function matchDeskTfaaSelect(value, selectEl) {
     }
 }
 
-/**
- * Ported from sywat-registration.js: TFAA Autocomplete Generator
- */
 function handleDeskTfaaAutocomplete(input) {
-    const query = input.value.trim().toLowerCase();
+    const query = cleanDeskName(input.value);
     closeAllDeskTfaaAutocompletes();
 
     if (query.length < 2) return;
 
-    const shooters = getTfaaShooters();
-    if (!Array.isArray(shooters) || shooters.length === 0) return;
-
-    const matches = shooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
+    const matches = getAllTfaaMatches(query).slice(0, 8);
     if (matches.length === 0) return;
 
     const parent = input.parentElement;
@@ -326,7 +387,7 @@ function evaluateTfaaStatus(prefix) {
     if (!nameInput || !badgeEl || !pillsEl) return;
 
     const typedName   = nameInput.value.trim();
-    const cleanTyped  = typedName.toLowerCase();
+    const cleanTyped  = cleanDeskName(typedName);
     const tfaaMatches = findTfaaMatch(typedName);
 
     pillsEl.innerHTML = '';
@@ -371,7 +432,7 @@ function evaluateTfaaStatus(prefix) {
         const styleMatch   = (cSty === uSty) || (cStylePrefix === uStylePrefix) || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
         if (divMatch && genMatch && styleMatch) {
-            if (!hasMultipleMatches || catName.trim().toLowerCase() === cleanTyped) {
+            if (!hasMultipleMatches || cleanDeskName(catName) === cleanTyped) {
                 isCategoryMatch = true;
             }
         }
@@ -411,9 +472,9 @@ function evaluateTfaaStatus(prefix) {
         pillsEl.appendChild(alertBox);
     }
 
-    let exactNameMatchRecord = tfaaMatches.find(m => (m.full_name || m.name || '').trim().toLowerCase() === cleanTyped);
+    let exactNameMatchRecord = tfaaMatches.find(m => cleanDeskName(m.full_name || m.name) === cleanTyped);
     let officialName         = exactNameMatchRecord ? (exactNameMatchRecord.full_name || exactNameMatchRecord.name) : (tfaaMatches[0].full_name || tfaaMatches[0].name || '');
-    let cleanOfficial        = officialName.trim().toLowerCase();
+    let cleanOfficial        = cleanDeskName(officialName);
 
     let isNameMatch = (cleanTyped === cleanOfficial);
 
