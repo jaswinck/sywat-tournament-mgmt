@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.3.1
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -37,12 +37,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( $_REQUEST['tab'] ) : 'manage';
 
         // POST Action Handling
-        $is_valid_nonce = (isset($_POST['sywat_nonce']) && wp_verify_nonce($_POST['sywat_nonce'], 'sywat_desk_action'));
-        $action         = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
+        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) )
+                       || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_import_schedule_nonce'], 'sywat_import_schedule_nonce' ) )
+                       || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_confirm_schedule_nonce'], 'sywat_confirm_schedule_nonce' ) );
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action && !$is_valid_nonce && $action !== 'cancel') {
+        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+
+        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'cancel' ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
-        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce) {
+        } elseif ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
             if ( function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $notice = sywat_handle_tournament_post_actions( $tournaments, $active_tournaments, $registrations, $can_manage_seasons, $user_shop_id );
             }
@@ -81,8 +84,29 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-subtitle">Set up upcoming events, configure shooting lines, and print desk rosters.</div>
                         </div>
 
-                        <!-- TOP PAGE ACTION CONTROLS -->
+                        <!-- TOP PAGE ACTION CONTROLS & SEASON SWITCHER -->
                         <div class="sywat-header-inline-controls">
+                            <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
+                                <?php
+                                $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : '';
+                                ?>
+                                <form method="get" class="sywat-filter-inline-form">
+                                    <input type="hidden" name="page" value="sywat-manage-tournaments">
+                                    <select name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
+                                        <option value="">🏆 All Seasons</option>
+                                        <?php foreach ( $seasons as $s_slug => $s_data ): ?>
+                                            <?php 
+                                            $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
+                                            ?>
+                                            <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
+                                                🏆 <?php echo esc_html( $s_name ); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </form>
+                            <?php endif; ?>
+
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">📁 Bulk Import Schedule</button>
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">+ Add Tournament</button>
                         </div>
                     </div>
@@ -104,16 +128,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
-
-                            <!-- TFAA Sync Pill Form -->
-                            <form method="post" class="sywat-sync-pill">
-                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                <input type="hidden" name="sywat_action" value="sync_tfaa_now">
-                                <span class="sywat-sync-pill-count">
-                                    👤 <strong><?php echo $tfaa_count; ?></strong> TFAA
-                                </span>
-                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync sywat-btn-pill-sync">Sync</button>
-                            </form>
 
                             <!-- Push Standings Form -->
                             <?php if ( $can_manage_seasons ): ?>
@@ -261,6 +275,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             // Render Modals via Modal Component Helper
             if ( function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 sywat_render_add_edit_tournament_modal( $data );
+            }
+            if ( function_exists( 'sywat_render_import_schedule_modal' ) ) {
+                sywat_render_import_schedule_modal( $data );
             }
             if ( function_exists( 'sywat_render_delegated_modal_container' ) ) {
                 sywat_render_delegated_modal_container( $data );
