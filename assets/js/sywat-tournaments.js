@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 5.3.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -192,23 +192,27 @@ function validateTournamentLines() {
 }
 
 function sywatApplyTournamentFilters() {
-    const shopSelect   = document.getElementById('sywat_tournament_shop_filter');
-    const searchInput  = document.getElementById('sywat_tournament_search_input');
+    const districtSelect = document.getElementById('sywat_tournament_district_filter');
+    const shopSelect     = document.getElementById('sywat_tournament_shop_filter');
+    const searchInput    = document.getElementById('sywat_tournament_search_input');
 
-    const shopFilter   = shopSelect ? shopSelect.value.toLowerCase().trim() : 'all';
-    const searchFilter = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const districtFilter = districtSelect ? districtSelect.value.toLowerCase().trim() : 'all';
+    const shopFilter     = shopSelect ? shopSelect.value.toLowerCase().trim() : 'all';
+    const searchFilter   = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
     const rows = document.querySelectorAll('.sywat-tournament-row');
 
     rows.forEach(row => {
         const name     = (row.getAttribute('data-name') || '').toLowerCase();
         const shop     = (row.getAttribute('data-shop') || '').toLowerCase();
+        const district = (row.getAttribute('data-district') || '').toLowerCase();
         const fullText = row.textContent.toLowerCase();
 
-        const shopMatch   = (shopFilter === 'all' || shop === shopFilter || shop.includes(shopFilter));
-        const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter) || fullText.includes(searchFilter));
+        const districtMatch = (districtFilter === 'all' || district === districtFilter || district.includes(districtFilter));
+        const shopMatch     = (shopFilter === 'all' || shop === shopFilter || shop.includes(shopFilter));
+        const searchMatch   = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter) || district.includes(searchFilter) || fullText.includes(searchFilter));
 
-        if (shopMatch && searchMatch) {
+        if (districtMatch && shopMatch && searchMatch) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
@@ -217,8 +221,11 @@ function sywatApplyTournamentFilters() {
 }
 
 function sywatResetTournamentFilters() {
-    const shopSelect  = document.getElementById('sywat_tournament_shop_filter');
-    const searchInput = document.getElementById('sywat_tournament_search_input');
+    const districtSelect = document.getElementById('sywat_tournament_district_filter');
+    const shopSelect     = document.getElementById('sywat_tournament_shop_filter');
+    const searchInput    = document.getElementById('sywat_tournament_search_input');
+
+    if (districtSelect) districtSelect.value = 'all';
     if (shopSelect) shopSelect.value = 'all';
     if (searchInput) searchInput.value = '';
     sywatApplyTournamentFilters();
