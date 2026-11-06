@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -508,13 +508,29 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $target_season = isset( $processed['target_season'] ) ? $processed['target_season'] : '2026-2027 Indoor';
             $created_count = 0;
 
+            // Extract shop lookup map for assigning shop_id on import
+            $all_shops       = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
+            $shop_name_to_id = array();
+            foreach ( $all_shops as $s_id => $s_data ) {
+                if ( is_array( $s_data ) ) {
+                    $s_name = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                    if ( ! empty( $s_name ) ) {
+                        $shop_name_to_id[ strtolower( trim( $s_name ) ) ] = $s_id;
+                    }
+                }
+            }
+
             foreach ( $processed['valid_tournaments'] as $t ) {
-                $t_name = $t['tournament_name'];
+                $t_name   = $t['tournament_name'];
+                $official = $t['official_shop_name'];
+                $norm_off = strtolower( trim( $official ) );
+                $assoc_id = isset( $shop_name_to_id[$norm_off] ) ? $shop_name_to_id[$norm_off] : '';
 
                 $tournaments[$t_name] = array(
                     'name'                 => $t_name,
                     'season'               => $target_season,
-                    'shop_name'            => $t['official_shop_name'],
+                    'shop_id'              => $assoc_id,
+                    'shop_name'            => $official,
                     'location_display'     => $t['location_display'],
                     'start_date'           => $t['start_date_formatted'],
                     'end_date'             => $t['end_date_formatted'],
