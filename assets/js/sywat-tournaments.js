@@ -1,6 +1,8 @@
 /**
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
+ * Author: SYWAT Archery
+ * Version: 5.1.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -49,6 +51,16 @@ function closeAddTournamentModal() {
     url.searchParams.delete('open_add_tournament');
     url.searchParams.delete('edit_tournament_modal');
     window.history.replaceState({}, document.title, url.toString());
+}
+
+function openImportScheduleModal() {
+    const modal = document.getElementById('sywat_import_schedule_modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeImportScheduleModal() {
+    const modal = document.getElementById('sywat_import_schedule_modal');
+    if (modal) modal.classList.remove('active');
 }
 
 function closeSywatModal() {
