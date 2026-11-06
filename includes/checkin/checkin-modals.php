@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.4
+ * Version: 6.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -40,7 +40,6 @@ function sywat_desk_render_modals($data) {
             'primary_contact' => isset($_POST['walkin_group_name']) ? sanitize_text_field($_POST['walkin_group_name']) : '',
             'phone'           => isset($_POST['walkin_group_phone']) ? sanitize_text_field($_POST['walkin_group_phone']) : '',
             'line_idx'        => isset($_POST['walkin_line_index']) ? sanitize_text_field($_POST['walkin_line_index']) : $selected_line_idx,
-            'pay_option'      => isset($_POST['walkin_pay_option']) ? sanitize_text_field($_POST['walkin_pay_option']) : 'Individual',
             'family_id'       => isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '',
             'last_added_name' => isset($_POST['walkin_name']) ? sanitize_text_field($_POST['walkin_name']) : '',
         );
@@ -50,9 +49,11 @@ function sywat_desk_render_modals($data) {
     $saved_contact             = isset($walkin_context['primary_contact']) ? $walkin_context['primary_contact'] : '';
     $saved_phone               = isset($walkin_context['phone']) ? $walkin_context['phone'] : '';
     $saved_line_idx            = isset($walkin_context['line_idx']) ? $walkin_context['line_idx'] : $selected_line_idx;
-    $saved_pay_option          = isset($walkin_context['pay_option']) ? $walkin_context['pay_option'] : 'Individual';
     $saved_fam_id              = isset($walkin_context['family_id']) ? $walkin_context['family_id'] : '';
     $last_added_name           = isset($walkin_context['last_added_name']) ? $walkin_context['last_added_name'] : '';
+    $session_archers           = isset($walkin_context['session_archers']) ? $walkin_context['session_archers'] : array();
+    $session_total             = isset($walkin_context['session_total']) ? floatval($walkin_context['session_total']) : 0.00;
+    $is_capped                 = !empty($walkin_context['is_capped']);
 
     ?>
     <!-- CHECK-IN MODAL (PRE-REG) -->
@@ -326,7 +327,7 @@ function sywat_desk_render_modals($data) {
     </div>
     <?php endif; ?>
 
-    <!-- ADD WALK-IN MODAL (FAST-LOOP "SAVE & ADD NEXT" WORKFLOW) -->
+    <!-- ADD WALK-IN MODAL (AUTOMATED FEE & FAMILY CAP ENGINE) -->
     <div id="walkinModal" class="sywat-modal-backdrop <?php echo $is_walkin_active ? 'active' : ''; ?>">
         <div class="sywat-modal-content sywat-modal-md">
             <div class="sywat-modal-header no-print">
@@ -348,6 +349,7 @@ function sywat_desk_render_modals($data) {
                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+                    <input type="hidden" name="walkin_session_archers_json" value="<?php echo esc_attr(json_encode($session_archers)); ?>">
 
                     <!-- Persistent Group Intake Header -->
                     <div class="sywat-intake-group-wrapper">
@@ -378,30 +380,28 @@ function sywat_desk_render_modals($data) {
                             </div>
 
                             <div class="sywat-field-group">
-                                <label for="walkin_pay_option">Paid Option:</label>
-                                <select name="walkin_pay_option" id="walkin_pay_option" required onchange="toggleFamilyBox('walkin')">
-                                    <option value="Individual" <?php selected($saved_pay_option, 'Individual'); ?>>Individual Rate ($25 / $30)</option>
-                                    <option value="Family" <?php selected($saved_pay_option, 'Family'); ?>>Family Group ($75 Cap)</option>
-                                    <option value="Field Governor" <?php selected($saved_pay_option, 'Field Governor'); ?>>Field Governor (Free)</option>
+                                <label for="walkin_family_group_id">Link Existing Line Family Group:</label>
+                                <select name="walkin_family_group_id" id="walkin_family_group_id">
+                                    <option value="">[ Auto-Create Group for Primary Contact ]</option>
+                                    <?php 
+                                    $fam_found = false;
+                                    foreach ($existing_families as $fid => $flabel) {
+                                        if ($fid === $saved_fam_id) $fam_found = true;
+                                        echo '<option value="' . esc_attr($fid) . '" ' . selected($saved_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                                    }
+                                    if (!empty($saved_fam_id) && !$fam_found) {
+                                        echo '<option value="' . esc_attr($saved_fam_id) . '" selected>' . esc_html($saved_contact . ' (Family Cap)') . '</option>';
+                                    }
+                                    ?>
                                 </select>
                             </div>
                         </div>
 
-                        <div class="sywat-field-group sywat-modal-row-spacing <?php echo ($saved_pay_option === 'Family') ? '' : 'sywat-hidden'; ?>" id="walkin_family_box">
-                            <label for="walkin_family_group_id">Line Family Group:</label>
-                            <select name="walkin_family_group_id" id="walkin_family_group_id">
-                                <option value="">[ + Start New Family Group for This Line ]</option>
-                                <?php 
-                                $fam_found = false;
-                                foreach ($existing_families as $fid => $flabel) {
-                                    if ($fid === $saved_fam_id) $fam_found = true;
-                                    echo '<option value="' . esc_attr($fid) . '" ' . selected($saved_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
-                                }
-                                if (!empty($saved_fam_id) && !$fam_found) {
-                                    echo '<option value="' . esc_attr($saved_fam_id) . '" selected>' . esc_html($saved_contact . ' (Family Cap)') . '</option>';
-                                }
-                                ?>
-                            </select>
+                        <div class="sywat-field-group sywat-modal-row-spacing">
+                            <label class="sywat-checkbox-label">
+                                <input type="checkbox" name="walkin_is_courtesy" value="1" class="sywat-checkbox-auto">
+                                Field Governor / Staff Courtesy (Free Registration)
+                            </label>
                         </div>
                     </div>
 
@@ -452,6 +452,31 @@ function sywat_desk_render_modals($data) {
                             </select>
                         </div>
                     </div>
+
+                    <!-- Dynamic Intake Roster & Live Balance Summary Card -->
+                    <?php if (!empty($session_archers)): ?>
+                        <div class="sywat-calculated-status-box sywat-modal-row-spacing">
+                            <div>
+                                <div class="sywat-calculated-status-label">👥 Session Roster Intake:</div>
+                                <div class="sywat-label-subtext">
+                                    <?php 
+                                    $roster_items = array();
+                                    foreach ($session_archers as $idx => $sa) {
+                                        $num = $idx + 1;
+                                        $roster_items[] = '<strong>' . $num . '. ' . esc_html($sa['name']) . '</strong> ($' . number_format(floatval($sa['fee']), 2) . ')';
+                                    }
+                                    echo implode(' &bull; ', $roster_items);
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="sywat-intake-summary">
+                                <div class="sywat-calculated-status-value">Total Due: $<?php echo number_format($session_total, 2); ?></div>
+                                <?php if ($is_capped): ?>
+                                    <span class="sywat-family-badge">🟢 Family Cap Applied ($75.00 Max)</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
                     <!-- Action Footer with Dual Save Options -->
                     <div class="sywat-modal-form-actions-split">
