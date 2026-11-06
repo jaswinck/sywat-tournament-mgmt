@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -298,16 +298,19 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                                     <th>Host / Location</th>
                                     <th>Event Type</th>
                                     <th class="sywat-col-center">Lines</th>
+                                    <th>Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ( $valid_list as $vt ): ?>
+                                    <?php $line_cnt = count( $vt['line_slots'] ); ?>
                                     <tr>
                                         <td><strong><?php echo esc_html( $vt['tournament_name'] ); ?></strong></td>
                                         <td><?php echo esc_html( $vt['start_date_formatted'] . ( $vt['start_date_formatted'] !== $vt['end_date_formatted'] ? ' to ' . $vt['end_date_formatted'] : '' ) ); ?></td>
                                         <td><?php echo esc_html( ! empty( $vt['official_shop_name'] ) ? $vt['official_shop_name'] : $vt['location_display'] ); ?></td>
                                         <td><span class="sywat-badge"><?php echo esc_html( $vt['event_type'] ); ?></span></td>
-                                        <td class="sywat-col-center"><?php echo count( $vt['line_slots'] ); ?> Slots</td>
+                                        <td class="sywat-col-center"><?php echo $line_cnt . ' ' . ( $line_cnt === 1 ? 'Line' : 'Lines' ); ?></td>
+                                        <td><small><?php echo esc_html( ! empty( $vt['notes'] ) ? $vt['notes'] : '—' ); ?></small></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
