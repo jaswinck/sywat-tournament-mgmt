@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.5.0
+ * Version: 6.5.1
  */
 
 function escapeHtmlDesk(str) {
@@ -55,7 +55,7 @@ function toggleUnpaidBanner(isChecked) {
 }
 
 /**
- * Searches TFAA sync cache supporting sywatDeskTfaaShooters array, tfaaData object structures, and partial name typing.
+ * Searches TFAA sync cache supporting tfaaData object structures, desk shooters array, and partial name typing.
  */
 function findTfaaMatch(typedName) {
     if (!typedName) return null;
@@ -64,22 +64,9 @@ function findTfaaMatch(typedName) {
 
     let rawMatches = [];
 
-    // 1. Primary Check: window.sywatDeskTfaaShooters array used on Desk view
-    if (Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
-        const exactList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase() === clean);
-        if (exactList.length > 0) {
-            rawMatches = exactList;
-        } else {
-            const partialList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase().includes(clean));
-            if (partialList.length > 0) {
-                rawMatches = partialList;
-            }
-        }
-    }
-
-    // 2. Secondary Check: window.tfaaData object cache
-    if (rawMatches.length === 0 && window.tfaaData) {
-        if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
+    // 1. Primary Check: Search official TFAA sync cache (window.tfaaData)
+    if (window.tfaaData && window.tfaaData.exact) {
+        if (window.tfaaData.exact[clean]) {
             const entry = window.tfaaData.exact[clean];
             rawMatches = Array.isArray(entry) ? entry : [entry];
         }
@@ -103,6 +90,19 @@ function findTfaaMatch(typedName) {
                     const arr = Array.isArray(entry) ? entry : [entry];
                     rawMatches = rawMatches.concat(arr);
                 }
+            }
+        }
+    }
+
+    // 2. Secondary Fallback: Check window.sywatDeskTfaaShooters array if not in tfaaData
+    if (rawMatches.length === 0 && Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
+        const exactList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase() === clean);
+        if (exactList.length > 0) {
+            rawMatches = exactList;
+        } else {
+            const partialList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase().includes(clean));
+            if (partialList.length > 0) {
+                rawMatches = partialList;
             }
         }
     }
@@ -228,9 +228,9 @@ function handleDeskTfaaAutocomplete(input) {
     if (query.length < 2) return;
 
     let matches = [];
-    if (Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
-        matches = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
-    } else if (window.tfaaData && window.tfaaData.exact) {
+
+    // 1. Primary Check: Search official TFAA sync cache (window.tfaaData)
+    if (window.tfaaData && window.tfaaData.exact) {
         const keys = Object.keys(window.tfaaData.exact);
         for (let i = 0; i < keys.length; i++) {
             if (keys[i].toLowerCase().includes(query)) {
@@ -255,6 +255,11 @@ function handleDeskTfaaAutocomplete(input) {
                 if (matches.length >= 8) break;
             }
         }
+    }
+
+    // 2. Secondary Fallback: Check desk roster array if tfaaData had no results
+    if (matches.length === 0 && Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
+        matches = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
     }
 
     if (matches.length === 0) return;
@@ -491,7 +496,7 @@ function autoFillOnNameChange(prefix) {
 
         if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
         if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
-        if (styleEl && targetMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
+        if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
 
         handleStyleRestrictions(prefix);
     } else if (prefix === 'walkin') {
@@ -541,6 +546,7 @@ function closeWalkinModal() {
     const famSel = document.getElementById('walkin_family_group_id');
     if (famSel) famSel.value = '';
 
+    toggleFamilyBox('walkin');
     handleStyleRestrictions('walkin');
     evaluateTfaaStatus('walkin');
     closeAllDeskTfaaAutocompletes();
@@ -663,6 +669,7 @@ function initSywatCheckin() {
             autoFillOnNameChange('checkin');
         });
         autoFillOnNameChange('checkin');
+        toggleFamilyBox('checkin');
     }
 
     const searchInput = document.getElementById('sywat_search_input');
