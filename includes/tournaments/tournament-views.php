@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -60,11 +60,37 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $filter_shops       = $data['filter_shops'];
         $tfaa_count         = $data['tfaa_count'];
 
+        // Build lookup map from normalized shop name to Shop ID & District
+        $shop_lookup_map = array();
+        foreach ( $all_shops as $s_id => $s_data ) {
+            if ( is_array( $s_data ) ) {
+                $s_name = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                $s_dist = ! empty( $s_data['district'] ) ? $s_data['district'] : '';
+                if ( ! empty( $s_name ) ) {
+                    $shop_lookup_map[ strtolower( trim( $s_name ) ) ] = array(
+                        'id'       => $s_id,
+                        'district' => $s_dist,
+                    );
+                }
+            }
+        }
+
         // Build list of unique TFAA districts across scoped tournaments
         $filter_districts = array();
         foreach ( $scoped_tournaments as $t_info ) {
             $s_id   = sywat_get_tournament_shop_id( $t_info );
-            $d_name = ( ! empty( $s_id ) && isset( $all_shops[$s_id]['district'] ) && ! empty( $all_shops[$s_id]['district'] ) ) ? $all_shops[$s_id]['district'] : '';
+            $d_name = '';
+
+            if ( ! empty( $s_id ) && isset( $all_shops[$s_id]['district'] ) && ! empty( $all_shops[$s_id]['district'] ) ) {
+                $d_name = $all_shops[$s_id]['district'];
+            } else {
+                $target_name = ! empty( $t_info['shop_name'] ) ? $t_info['shop_name'] : ( ! empty( $t_info['official_shop_name'] ) ? $t_info['official_shop_name'] : ( ! empty( $t_info['location_display'] ) ? $t_info['location_display'] : '' ) );
+                $norm_target = strtolower( trim( $target_name ) );
+                if ( ! empty( $norm_target ) && isset( $shop_lookup_map[$norm_target] ) ) {
+                    $d_name = $shop_lookup_map[$norm_target]['district'];
+                }
+            }
+
             if ( ! empty( $d_name ) && ! in_array( $d_name, $filter_districts ) ) {
                 $filter_districts[] = $d_name;
             }
@@ -214,7 +240,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 $t_shop_name = 'Host Archery Shop';
                                             }
 
-                                            $t_district = ( ! empty( $t_shop_id ) && isset( $all_shops[$t_shop_id]['district'] ) && ! empty( $all_shops[$t_shop_id]['district'] ) ) ? $all_shops[$t_shop_id]['district'] : '';
+                                            // Resolve District via Direct Shop ID or Name Lookup Fallback
+                                            $t_district = '';
+                                            if ( ! empty( $t_shop_id ) && isset( $all_shops[$t_shop_id]['district'] ) && ! empty( $all_shops[$t_shop_id]['district'] ) ) {
+                                                $t_district = $all_shops[$t_shop_id]['district'];
+                                            } else {
+                                                $norm_target = strtolower( trim( $t_shop_name ) );
+                                                if ( ! empty( $norm_target ) && isset( $shop_lookup_map[$norm_target] ) ) {
+                                                    $t_district = $shop_lookup_map[$norm_target]['district'];
+                                                }
+                                            }
 
                                             $is_ccr = ( strcasecmp( trim( $t_shop_name ), 'Cinnamon Creek Ranch' ) === 0 || $t_shop_id === 'shop_ccr' );
 
