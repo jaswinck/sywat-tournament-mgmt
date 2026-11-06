@@ -3,16 +3,22 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 6.4.1
  */
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Handles desk POST actions including walk-in registration, check-in updates, line closure, and edits.
+ *
+ * @param array $data Aggregated Check-In Desk dataset passed by reference.
+ * @return string Alert HTML notice markup.
+ */
 function sywat_desk_handle_actions(&$data) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') return '';
 
     $is_valid_nonce = (isset($_POST['sywat_nonce']) && wp_verify_nonce($_POST['sywat_nonce'], 'sywat_desk_action'));
-    $action = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
+    $action         = isset($_POST['sywat_action']) ? $_POST['sywat_action'] : '';
 
     if ($action && !$is_valid_nonce && $action !== 'cancel') {
         return '<div class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
@@ -68,7 +74,6 @@ function sywat_desk_handle_actions(&$data) {
         $live_closed = array_values(array_unique($live_closed));
 
         update_option($closed_lines_key, $live_closed, false);
-        // Force sync active tournament for all staff
         update_option('sywat_current_tournament', $selected_tournament, false); 
         
         $data['closed_lines'] = $live_closed; 
@@ -105,7 +110,6 @@ function sywat_desk_handle_actions(&$data) {
         }
 
         update_option($closed_lines_key, $new_closed, false);
-        // Force sync active tournament for all staff
         update_option('sywat_current_tournament', $selected_tournament, false);
         
         $data['closed_lines'] = $new_closed;
@@ -113,10 +117,16 @@ function sywat_desk_handle_actions(&$data) {
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
 
-    // Add Walk-In
-    if ($action === 'add_walkin') {
-        $name_val  = trim(sanitize_text_field($_POST['walkin_name']));
-        $line_idx  = sanitize_text_field($_POST['walkin_line_index']);
+    // Add Walk-In (Supports standard completion and fast-loop "Save & Add Next")
+    if ($action === 'add_walkin' || $action === 'add_walkin_next') {
+        $name_val    = trim(sanitize_text_field($_POST['walkin_name']));
+        $group_name  = isset($_POST['walkin_group_name']) ? trim(sanitize_text_field($_POST['walkin_group_name'])) : '';
+        $group_phone = isset($_POST['walkin_group_phone']) ? trim(sanitize_text_field($_POST['walkin_group_phone'])) : '';
+        $line_idx    = sanitize_text_field($_POST['walkin_line_index']);
+        $pay_opt     = sanitize_text_field($_POST['walkin_pay_option']);
+        $division    = sanitize_text_field($_POST['walkin_division']);
+        $gender      = sanitize_text_field($_POST['walkin_gender']);
+        $style       = sanitize_text_field($_POST['walkin_style']);
 
         if (empty($name_val)) {
             return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
@@ -145,12 +155,10 @@ function sywat_desk_handle_actions(&$data) {
 
         $new_id    = uniqid('reg_');
         $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
-        $division  = sanitize_text_field($_POST['walkin_division']);
         $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
-        $pay_opt   = sanitize_text_field($_POST['walkin_pay_option']);
-        $style     = sanitize_text_field($_POST['walkin_style']);
 
-        $family_id = ''; $family_name = '';
+        $family_id   = ''; 
+        $family_name = '';
 
         if ($pay_opt === 'Family') {
             $sel_fam_id = isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '';
@@ -160,8 +168,9 @@ function sywat_desk_handle_actions(&$data) {
                 $family_id   = $sel_fam_id;
                 $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
             } else {
-                $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($name_val) . '_' . substr(md5(uniqid()), 0, 4);
-                $family_name = $name_val . ' (Family Cap)';
+                $fam_base_name = !empty($group_name) ? $group_name : $name_val;
+                $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($fam_base_name) . '_' . substr(md5(uniqid()), 0, 4);
+                $family_name = $fam_base_name . ' (Family Cap)';
             }
 
             $GLOBALS['sywat_added_family_prompt'] = array(
@@ -176,12 +185,13 @@ function sywat_desk_handle_actions(&$data) {
             'id'          => $new_id,
             'tournament'  => $selected_tournament,
             'name'        => $name_val,
+            'phone'       => $group_phone,
             'line_index'  => $line_idx,
             'line_name'   => $line_name,
             'distance'    => $distance,
             'type'        => 'Walk-In',
             'division'    => $division,
-            'gender'      => sanitize_text_field($_POST['walkin_gender']),
+            'gender'      => $gender,
             'style'       => $sanitize_style_for_division($style, $division),
             'paid'        => $calculate_paid_status($pay_opt, $division),
             'family_id'   => $family_id,
@@ -198,6 +208,21 @@ function sywat_desk_handle_actions(&$data) {
         if (!is_array($master_regs)) $master_regs = array();
         $master_regs[$new_id] = $new_reg;
         update_option('sywat_registrations_' . $t_slug, $master_regs, false);
+
+        // Fast-Loop Persistence: Return loop context to keep modal active
+        if ($action === 'add_walkin_next') {
+            $data['walkin_loop_context'] = array(
+                'primary_contact' => !empty($group_name) ? $group_name : $name_val,
+                'phone'           => $group_phone,
+                'line_idx'        => $line_idx,
+                'pay_option'      => $pay_opt,
+                'family_id'       => $family_id,
+                'last_added_name' => $name_val,
+            );
+            return '<div class="sywat-alert sywat-alert-success">✅ <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully! Enter next archer below.</div>';
+        }
+
+        return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully.</div>';
     }
 
     // Check-In
