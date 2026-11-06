@@ -96,6 +96,21 @@
     box-sizing: border-box !important;
 }
 
+/* Static Action Badges inside Vertical Action Stacks */
+.sywat-table-actions-vertical .sywat-badge {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 140px !important;
+    height: 28px !important;
+    box-sizing: border-box !important;
+    border-radius: 4px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
 /* ==========================================================================
    NEW: Isolated Modal Roster Buttons (Strict Block Width Lock)
    ========================================================================== */
