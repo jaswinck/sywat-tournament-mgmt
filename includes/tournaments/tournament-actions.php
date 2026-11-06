@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -27,6 +27,49 @@ if ( ! function_exists( 'sywat_format_imported_date' ) ) {
 
         $time = strtotime( $val );
         return ( $time !== false ) ? date( 'Y-m-d', $time ) : $val;
+    }
+}
+
+/**
+ * Formats line time tokens cleanly (e.g. "6" or "6:00" -> "6PM", "6:30" -> "6:30PM", "10:00" -> "10AM").
+ * Enforces Archery rule: 6 o'clock lines are ALWAYS PM (never 6AM).
+ *
+ * @param string $token Time string token.
+ * @return string Formatted time token.
+ */
+if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
+    function sywat_format_line_time_token( $token ) {
+        $token = trim( (string) $token );
+        if ( empty( $token ) ) return '';
+
+        if ( preg_match( '/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i', $token, $m ) ) {
+            $hour     = intval( $m[1] );
+            $mins     = isset( $m[2] ) ? $m[2] : '';
+            $meridiem = isset( $m[3] ) ? strtoupper( $m[3] ) : '';
+
+            if ( $mins === '00' ) {
+                $mins = '';
+            }
+
+            $min_str = ! empty( $mins ) ? ':' . $mins : '';
+
+            if ( empty( $meridiem ) ) {
+                if ( $hour === 6 || $hour === 12 || ( $hour >= 1 && $hour <= 5 ) ) {
+                    $meridiem = 'PM';
+                } else {
+                    $meridiem = 'AM';
+                }
+            }
+
+            // Enforce Archery rule: 6 o'clock is ALWAYS PM (6PM or 6:30PM)
+            if ( $hour === 6 ) {
+                $meridiem = 'PM';
+            }
+
+            return $hour . $min_str . $meridiem;
+        }
+
+        return strtoupper( $token );
     }
 }
 
@@ -117,24 +160,25 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
         $lower = strtolower( $line_str );
 
         // 1. Friday Line Check
+        $fri_match_str = '';
         if ( preg_match( '/fri(?:day)?[\s\-]*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i', $line_str, $m ) ) {
-            $time = strtoupper( str_replace( ' ', '', $m[1] ) );
-            if ( strpos( $time, 'AM' ) === false && strpos( $time, 'PM' ) === false ) {
-                $time .= 'PM';
-            }
-            $lines[] = array( 'day' => 'Friday', 'time' => $time, 'name' => 'Friday ' . $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            $fri_match_str = $m[0];
+            $time          = sywat_format_line_time_token( $m[1] );
+            $lines[]       = array( 'day' => 'Friday', 'time' => $time, 'name' => 'Friday ' . $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
         }
 
         // 2. Saturday & Sunday Checks
         $has_sat = ( strpos( $lower, 'sat' ) !== false );
         $has_sun = ( strpos( $lower, 'sun' ) !== false && strpos( $lower, 'no sunday' ) === false );
 
+        // Remove Friday clause to isolate Sat/Sun time tokens
+        $sat_sun_str = ! empty( $fri_match_str ) ? str_replace( $fri_match_str, '', $line_str ) : $line_str;
+
         $times = array();
-        if ( preg_match_all( '/\b(\d{1,2}(?::\d{2})?)\b/', $line_str, $time_matches ) ) {
+        if ( preg_match_all( '/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i', $sat_sun_str, $time_matches ) ) {
             foreach ( $time_matches[1] as $t ) {
-                $num = intval( explode( ':', $t )[0] );
-                $formatted = ( $num >= 6 && $num <= 11 ) ? $num . 'AM' : $num . 'PM';
-                if ( ! in_array( $formatted, $times ) ) {
+                $formatted = sywat_format_line_time_token( $t );
+                if ( ! empty( $formatted ) && ! in_array( $formatted, $times ) ) {
                     $times[] = $formatted;
                 }
             }
@@ -576,13 +620,14 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     $clean_day  = trim( sanitize_text_field( $day ) );
                     $clean_time = isset( $_POST['line_times'][$index] ) ? trim( sanitize_text_field( $_POST['line_times'][$index] ) ) : '';
                     if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
-                        $combo_key = strtolower( $clean_day . '_' . $clean_time );
+                        $formatted_time = sywat_format_line_time_token( $clean_time );
+                        $combo_key      = strtolower( $clean_day . '_' . $formatted_time );
                         if ( ! in_array( $combo_key, $seen_combos ) ) {
                             $seen_combos[] = $combo_key;
                             $new_lines[]   = array(
                                 'day'      => $clean_day,
-                                'time'     => $clean_time,
-                                'name'     => trim( $clean_day . ' ' . $clean_time ),
+                                'time'     => $formatted_time,
+                                'name'     => trim( $clean_day . ' ' . $formatted_time ),
                                 'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
                                 'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
                             );
@@ -594,14 +639,17 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 foreach ( $_POST['line_names'] as $index => $name ) {
                     $clean_name = trim( sanitize_text_field( $name ) );
                     if ( ! empty( $clean_name ) ) {
-                        $parts     = explode( ' ', $clean_name, 2 );
-                        $combo_key = strtolower( $clean_name );
+                        $parts          = explode( ' ', $clean_name, 2 );
+                        $formatted_time = isset( $parts[1] ) ? sywat_format_line_time_token( $parts[1] ) : '';
+                        $formatted_name = trim( $parts[0] . ' ' . $formatted_time );
+                        $combo_key      = strtolower( $formatted_name );
+
                         if ( ! in_array( $combo_key, $seen_combos ) ) {
                             $seen_combos[] = $combo_key;
                             $new_lines[]   = array(
                                 'day'      => $parts[0],
-                                'time'     => isset( $parts[1] ) ? $parts[1] : '',
-                                'name'     => $clean_name,
+                                'time'     => $formatted_time,
+                                'name'     => $formatted_name,
                                 'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
                                 'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
                             );
