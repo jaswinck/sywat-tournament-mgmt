@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -95,7 +95,7 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
 
 /**
  * Parses raw human line string into structured line slot arrays.
- * Enforces standardized day labels: "Friday", "Saturday", "Sunday".
+ * Enforces standardized day labels and named slot titles.
  *
  * @param string $line_str      Raw schedule string from import file or input.
  * @param int    $default_20yd  Default 20-yard line capacity.
@@ -107,10 +107,10 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
         $lines = array();
         if ( empty( trim( $line_str ) ) ) {
             return array(
-                array( 'day' => 'Saturday', 'start_time' => '10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
-                array( 'day' => 'Saturday', 'start_time' => '2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
-                array( 'day' => 'Sunday',   'start_time' => '10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
-                array( 'day' => 'Sunday',   'start_time' => '2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
             );
         }
 
@@ -122,7 +122,7 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
             if ( strpos( $time, 'AM' ) === false && strpos( $time, 'PM' ) === false ) {
                 $time .= 'PM';
             }
-            $lines[] = array( 'day' => 'Friday', 'start_time' => $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            $lines[] = array( 'day' => 'Friday', 'time' => $time, 'name' => 'Friday ' . $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
         }
 
         // 2. Saturday & Sunday Checks
@@ -146,13 +146,13 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
 
         if ( $has_sat ) {
             foreach ( $times as $t ) {
-                $lines[] = array( 'day' => 'Saturday', 'start_time' => $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+                $lines[] = array( 'day' => 'Saturday', 'time' => $t, 'name' => 'Saturday ' . $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
             }
         }
 
         if ( $has_sun ) {
             foreach ( $times as $t ) {
-                $lines[] = array( 'day' => 'Sunday', 'start_time' => $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+                $lines[] = array( 'day' => 'Sunday', 'time' => $t, 'name' => 'Sunday ' . $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
             }
         }
 
@@ -443,7 +443,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-info">🔍 <strong>Schedule Preview Generated:</strong> Found ' . $valid_cnt . ' valid tournament(s) and ' . $rejected_cnt . ' rejected/prohibited row(s). Please review the preview modal below to confirm creation.</div>';
         }
 
-        // Action: Confirm & Execute Bulk Schedule Creation
+        // Action: Confirm & Execute Bulk Schedule Creation (Hub OFF by Default)
         if ( $action === 'confirm_schedule_import' ) {
             check_admin_referer( 'sywat_confirm_schedule_nonce', 'sywat_confirm_schedule_nonce' );
 
@@ -475,15 +475,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     'created_at'           => current_time( 'mysql' ),
                 );
 
-                if ( ! in_array( $t_name, $active_tournaments ) ) {
-                    $active_tournaments[] = $t_name;
-                }
-
+                // Note: Tournaments start with Volunteer Hub OFF by default
                 $created_count++;
             }
 
             update_option( 'sywat_tournaments_list', $tournaments );
-            update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
             delete_transient( $transient_key );
 
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Schedule Imported Successfully!</strong> Created ' . intval( $created_count ) . ' new tournament(s) for season <strong>' . esc_html( $target_season ) . '</strong>.</div>';
@@ -634,11 +630,6 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
                 if ( in_array( $old_name, $active_tournaments ) ) {
                     $active_tournaments = array_diff( $active_tournaments, array( $old_name ) );
-                    $active_tournaments[] = $t_name;
-                }
-            } else {
-                if ( ! in_array( $t_name, $active_tournaments ) ) {
-                    $active_tournaments[] = $t_name;
                 }
             }
 
