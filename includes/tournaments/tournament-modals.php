@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -30,8 +30,9 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
         $open_tourn_modal = isset( $_REQUEST['open_add_tournament'] ) || isset( $_REQUEST['edit_tournament_modal'] );
         $edit_t_target    = isset( $_REQUEST['edit_tournament_modal'] ) ? sanitize_text_field( $_REQUEST['edit_tournament_modal'] ) : '';
+        $is_edit_mode     = ! empty( $edit_t_target );
         
-        $edit_t_data      = ( ! empty( $edit_t_target ) && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
+        $edit_t_data      = ( $is_edit_mode && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
         $edit_t_lines     = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
         if ( empty( $edit_t_lines ) || ! is_array( $edit_t_lines ) ) {
             $edit_t_lines = $default_lines;
@@ -41,6 +42,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $edit_t_season = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start  = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end    = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
+
+        // Display titles for read-only edit fields
+        $shop_display_name   = isset( $all_shops[$edit_t_shop]['name'] ) ? $all_shops[$edit_t_shop]['name'] : ( isset( $edit_t_data['shop_name'] ) ? $edit_t_data['shop_name'] : 'Host Archery Shop' );
+        $season_display_name = isset( $seasons[$edit_t_season]['name'] ) ? $seasons[$edit_t_season]['name'] : $edit_t_season;
 
         // Calculate existing tournament counts per shop for auto-naming logic
         $shop_counts = array();
@@ -54,7 +59,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 <!-- STANDARDIZED MODAL HEADER -->
                 <div class="sywat-modal-header no-print">
                     <div>
-                        <h3>🎯 <?php echo ! empty( $edit_t_target ) ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
+                        <h3>🎯 <?php echo $is_edit_mode ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
                         <div class="sywat-subtitle">Set up tournament details, dates, and shooting line capacity limits.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
@@ -70,7 +75,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
-                                <?php if ( $can_manage_seasons ): ?>
+                                <?php if ( $is_edit_mode ): ?>
+                                    <input type="hidden" name="shop_id" value="<?php echo esc_attr( $edit_t_shop ); ?>">
+                                    <input type="text" value="<?php echo esc_attr( $shop_display_name ); ?>" readonly class="sywat-input-disabled-calc">
+                                <?php elseif ( $can_manage_seasons ): ?>
                                     <select name="shop_id" id="sywat_modal_shop_id" onchange="sywatAutoGenerateTournamentName()" required>
                                         <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
                                         <?php foreach ( $all_shops as $s_id => $s_name ): ?>
@@ -85,27 +93,32 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     </select>
                                 <?php else: ?>
                                     <input type="hidden" name="shop_id" id="sywat_modal_shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>">
-                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly>
+                                    <input type="text" value="<?php echo esc_attr( isset($all_shops[$user_shop_id]['name']) ? $all_shops[$user_shop_id]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
                             </div>
 
                             <div class="sywat-field-group">
                                 <label>Competition Season *</label>
-                                <select name="season_slug" required>
-                                    <?php foreach ( $seasons as $s_slug => $s_item ): ?>
-                                        <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $edit_t_season, $s_slug ); ?>>
-                                            <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( ucfirst($s_item['status']) ); ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <?php if ( $is_edit_mode ): ?>
+                                    <input type="hidden" name="season_slug" value="<?php echo esc_attr( $edit_t_season ); ?>">
+                                    <input type="text" value="<?php echo esc_attr( $season_display_name ); ?>" readonly class="sywat-input-disabled-calc">
+                                <?php else: ?>
+                                    <select name="season_slug" required>
+                                        <?php foreach ( $seasons as $s_slug => $s_item ): ?>
+                                            <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $edit_t_season, $s_slug ); ?>>
+                                                <?php echo esc_html( $s_item['name'] ); ?> (<?php echo esc_html( ucfirst($s_item['status']) ); ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
                             </div>
                         </div>
 
                         <!-- ROW 2: NAME (LEFT) | DATES (RIGHT) -->
                         <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
-                                <label>Tournament Name * <span class="sywat-label-subtext">(Auto-generated, editable)</span></label>
-                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" required>
+                                <label>Tournament Name * <?php if ( ! $is_edit_mode ): ?><span class="sywat-label-subtext">(Auto-generated, editable)</span><?php endif; ?></label>
+                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" <?php echo ( $is_edit_mode && ! $can_manage_seasons ) ? 'readonly class="sywat-input-disabled-calc"' : 'required'; ?>>
                             </div>
 
                             <div class="sywat-form-grid-2 sywat-grid-compact">
@@ -141,16 +154,25 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                 <tbody>
                                     <?php foreach ( $edit_t_lines as $i => $l ): ?>
                                         <?php 
-                                            $day_val  = isset($l['day']) ? $l['day'] : '';
-                                            $time_val = isset($l['time']) ? $l['time'] : '';
-                                            if ( empty($day_val) && !empty($l['name']) ) {
-                                                $parts    = explode(' ', trim($l['name']), 2);
-                                                $day_val  = $parts[0];
-                                                $time_val = isset($parts[1]) ? $parts[1] : '';
+                                            $day_val  = isset( $l['day'] ) ? $l['day'] : '';
+                                            $time_val = isset( $l['time'] ) ? $l['time'] : ( isset( $l['start_time'] ) ? $l['start_time'] : '' );
+
+                                            if ( ( empty( $day_val ) || empty( $time_val ) ) && ! empty( $l['name'] ) ) {
+                                                $parts = explode( ' ', trim( $l['name'] ), 2 );
+                                                if ( empty( $day_val ) ) {
+                                                    $day_val = $parts[0];
+                                                }
+                                                if ( empty( $time_val ) && isset( $parts[1] ) ) {
+                                                    $time_val = $parts[1];
+                                                }
                                             }
 
-                                            $cap_20yd  = isset($l['cap_20yd']) ? $l['cap_20yd'] : 20;
-                                            $cap_cub   = isset($l['cap_cub']) ? $l['cap_cub'] : 5;
+                                            if ( function_exists( 'sywat_format_line_time_token' ) && ! empty( $time_val ) ) {
+                                                $time_val = sywat_format_line_time_token( $time_val );
+                                            }
+
+                                            $cap_20yd = isset( $l['cap_20yd'] ) ? $l['cap_20yd'] : 20;
+                                            $cap_cub  = isset( $l['cap_cub'] ) ? $l['cap_cub'] : 5;
                                         ?>
                                         <tr>
                                             <td>
