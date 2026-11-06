@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.1.2
+ * Version: 6.1.3
  */
 
 if (!defined('ABSPATH')) exit;
@@ -206,12 +206,14 @@ function sywat_desk_render_capacity_tracker($data) {
                         </div>
                         
                         <div class="sywat-tracker-card-actions">
-                            <form method="post">
-                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-                                <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
-                                <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
-                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
-                            </form>
+                            <?php if (!$is_closed_line): ?>
+                                <form method="post">
+                                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
+                                    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($idx); ?>">
+                                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
+                                    <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
+                                </form>
+                            <?php endif; ?>
 
                             <?php if ($is_admin): ?>
                                 <?php if ($is_closed_line): ?>
@@ -291,6 +293,7 @@ function sywat_desk_render_archers_table($data) {
                     <tbody>
                         <?php foreach ($tourn_registrations as $reg): ?>
                             <?php 
+                                $is_waitlist    = isset($reg['status']) && strcasecmp(trim($reg['status']), 'Waitlist') === 0;
                                 $reg_type       = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
                                 $badge_class    = ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
                                 $balance_due    = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
@@ -300,14 +303,14 @@ function sywat_desk_render_archers_table($data) {
                                 $is_family_due  = (isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family');
                                 
                                 $resolved_l_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
-                                $reg_line_name  = isset($lines[$resolved_l_idx]['name']) ? trim($lines[$resolved_l_idx]['name']) : (isset($reg['line_name']) ? trim($reg['line_name']) : '');
+                                $reg_line_name  = isset($lines[$resolved_l_idx]['name']) ? trim($lines[$resolved_l_idx]['name']) : (isset($reg['line_name']) ? trim($reg['line_name']) : 'N/A');
 
                                 $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines, true) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines, true));
                             ?>
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
                                     <div class="sywat-archer-name"><?php echo esc_html($reg['name']); ?></div>
-                                    <?php if ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—'): ?>
+                                    <?php if (!$is_waitlist && ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—')): ?>
                                         <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
                                             <div class="sywat-owe-badge-wrap">
                                                 <span class="sywat-badge sywat-badge-full">
@@ -326,22 +329,29 @@ function sywat_desk_render_archers_table($data) {
                                     <?php endif; ?>
                                 </td>
                                 <td class="sywat-col-center">
-                                    <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
+                                    <?php if ($is_waitlist): ?>
+                                        <span class="sywat-badge sywat-waitlist-pill">🕒 Waitlist</span>
+                                    <?php else: ?>
+                                        <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
+                                    <?php endif; ?>
                                 </td>
-                                <td><?php echo esc_html(isset($reg['line_name']) ? $reg['line_name'] : 'N/A'); ?></td>
+                                <td><?php echo esc_html($reg_line_name); ?></td>
                                 <td><?php echo esc_html($div_disp); ?></td>
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['gender']) ? $reg['gender'] : 'N/A'); ?></td>
                                 <td><?php echo esc_html($style_disp); ?></td>
-                                <td class="sywat-col-paid"><?php echo esc_html($paid_disp); ?></td>
+                                <td class="sywat-col-paid"><?php echo esc_html($is_waitlist ? 'Waitlist' : $paid_disp); ?></td>
                                 <td class="sywat-col-center"><?php echo esc_html(isset($reg['distance']) ? $reg['distance'] : 'N/A'); ?></td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <?php if ($is_line_closed): ?>
+                                        <?php if ($is_waitlist): ?>
+                                            <!-- Waitlist Archer Action Pill -->
+                                            <span class="sywat-badge sywat-waitlist-pill">🕒 Waitlisted</span>
+                                        <?php elseif ($is_line_closed): ?>
                                             <?php if (!empty($reg['checked_in'])): ?>
                                                 <!-- Static Badge on Closed Lines (Removes Undo Form/Link) -->
                                                 <span class="sywat-badge sywat-badge-open">✓ Checked In</span>
                                             <?php else: ?>
-                                                <!-- Static Badge for Unchecked/Waitlist on Closed Lines -->
+                                                <!-- Static Badge for Unchecked on Closed Lines -->
                                                 <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                             <?php endif; ?>
                                         <?php else: ?>
