@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -402,6 +402,13 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         // Action: Purge Entire Line
         if ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
             return sywat_handle_purge_line( $tournaments, $registrations );
+        }
+
+        // Action: Deactivate All Volunteer Hubs
+        if ( $action === 'deactivate_all_hubs' ) {
+            update_option( 'sywat_active_tournaments', array() );
+            $active_tournaments = array();
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">⚪ <strong>All Volunteer Hubs Deactivated!</strong> Reset active status across all tournaments.</div>';
         }
 
         // Action: Save Season Configuration
