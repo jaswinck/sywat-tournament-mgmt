@@ -44,6 +44,8 @@
 .sywat-tracker-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
 .sywat-tracker-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
 .sywat-tracker-card-title { color: #0f172a; font-size: 14px; font-weight: 700; }
+.sywat-tracker-header-badges { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.sywat-tracker-header-badges .sywat-badge { margin: 0 !important; }
 .sywat-tracker-card-stats { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
 .sywat-tracker-card-actions { margin-top: 4px; border-top: 1px dashed #cbd5e1; padding-top: 8px; display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .sywat-tracker-card-actions form { margin: 0; flex: 1; min-width: 110px; }
