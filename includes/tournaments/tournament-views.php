@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -139,13 +139,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <form method="get" class="sywat-filter-inline-form">
                                     <input type="hidden" name="page" value="sywat-manage-tournaments">
                                     <select name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
-                                        <option value="">🏆 All Seasons</option>
+                                        <option value="">All Seasons</option>
                                         <?php foreach ( $seasons as $s_slug => $s_data ): ?>
                                             <?php 
                                             $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
                                             ?>
                                             <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
-                                                🏆 <?php echo esc_html( $s_name ); ?>
+                                                <?php echo esc_html( $s_name ); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -167,7 +167,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
                                     <option value="all">All Districts</option>
                                     <?php foreach ( $filter_districts as $dist ): ?>
-                                        <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>">🗺️ <?php echo esc_html( $dist ); ?></option>
+                                        <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             <?php endif; ?>
