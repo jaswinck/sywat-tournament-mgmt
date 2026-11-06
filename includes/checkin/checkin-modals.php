@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.4.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -323,7 +323,7 @@ function sywat_desk_render_modals($data) {
             </div>
             <div class="sywat-modal-body">
                 <?php if (!empty($last_added_name)): ?>
-                    <div class="sywat-alert sywat-alert-success" style="margin-bottom: 14px;">
+                    <div class="sywat-alert sywat-alert-success sywat-modal-row-spacing">
                         ✅ <strong><?php echo esc_html($last_added_name); ?></strong> registered and checked in successfully! Enter next archer below.
                     </div>
                 <?php endif; ?>
@@ -337,9 +337,10 @@ function sywat_desk_render_modals($data) {
                     <!-- Persistent Group Intake Header -->
                     <div class="sywat-intake-group-wrapper">
                         <div class="sywat-form-grid-2">
-                            <div class="sywat-field-group">
+                            <div class="sywat-field-group sywat-field-relative">
                                 <label for="walkin_group_name">Primary Contact / Group Name:</label>
-                                <input type="text" name="walkin_group_name" id="walkin_group_name" value="<?php echo esc_attr($saved_contact); ?>" placeholder="e.g. John Smith" autocomplete="off">
+                                <input type="text" name="walkin_group_name" id="walkin_group_name" value="<?php echo esc_attr($saved_contact); ?>" placeholder="e.g. John Smith" autocomplete="off" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this); if(window.handleWalkinGroupInput) window.handleWalkinGroupInput(this);">
+                                <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
                             </div>
 
                             <div class="sywat-field-group">
@@ -348,7 +349,7 @@ function sywat_desk_render_modals($data) {
                             </div>
                         </div>
 
-                        <div class="sywat-form-grid-2" style="margin-top: 10px;">
+                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
                                 <label for="walkin_line_index">Default Shooting Line:</label>
                                 <select name="walkin_line_index" id="walkin_line_index" required onchange="updateWalkinFamilyOptions(this.value)">
@@ -371,7 +372,7 @@ function sywat_desk_render_modals($data) {
                             </div>
                         </div>
 
-                        <div class="sywat-field-group <?php echo ($saved_pay_option === 'Family') ? '' : 'sywat-hidden'; ?>" id="walkin_family_box" style="margin-top: 10px;">
+                        <div class="sywat-field-group sywat-modal-row-spacing <?php echo ($saved_pay_option === 'Family') ? '' : 'sywat-hidden'; ?>" id="walkin_family_box">
                             <label for="walkin_family_group_id">Line Family Group:</label>
                             <select name="walkin_family_group_id" id="walkin_family_group_id">
                                 <option value="">[ + Start New Family Group for This Line ]</option>
@@ -387,14 +388,15 @@ function sywat_desk_render_modals($data) {
                         <h2>🏹 Archer Details</h2>
                     </div>
 
-                    <div class="sywat-field-group sywat-field-relative" style="margin-bottom: 12px;">
+                    <div class="sywat-field-group sywat-field-relative">
                         <label for="walkin_name_input">Archer Full Name *</label>
-                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold">
+                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this);">
                         <div id="walkin_tfaa_badge"></div>
                         <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
+                        <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
                     </div>
 
-                    <div class="sywat-form-grid-3">
+                    <div class="sywat-form-grid-3 sywat-modal-row-spacing">
                         <div class="sywat-field-group">
                             <label for="walkin_division">Division *</label>
                             <select name="walkin_division" id="walkin_division" required onchange="handleStyleRestrictions('walkin'); evaluateTfaaStatus('walkin');">
