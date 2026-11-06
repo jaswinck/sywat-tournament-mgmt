@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.4.2
+ * Version: 6.4.3
  */
 
 function escapeHtmlDesk(str) {
@@ -55,45 +55,53 @@ function toggleUnpaidBanner(isChecked) {
 }
 
 /**
- * Searches TFAA sync cache supporting both Array and Object structures, and partial name typing.
+ * Searches TFAA sync cache supporting sywatDeskTfaaShooters array, tfaaData object structures, and partial name typing.
  */
 function findTfaaMatch(typedName) {
-    if (!typedName || !window.tfaaData || !window.tfaaData.exact) return null;
+    if (!typedName) return null;
     const clean = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!clean || clean.length < 2) return null;
 
     let rawMatches = [];
 
-    // 1. Exact key lookup
-    if (window.tfaaData.exact[clean]) {
-        const entry = window.tfaaData.exact[clean];
-        if (Array.isArray(entry)) rawMatches = entry;
-        else if (entry && typeof entry === 'object') rawMatches = [entry];
-    }
-
-    // 2. First/Last key lookup
-    if (rawMatches.length === 0 && window.tfaaData.fl) {
-        const parts = clean.split(' ');
-        if (parts.length > 1) {
-            const flKey = parts[0] + '___' + parts[parts.length - 1];
-            if (window.tfaaData.fl[flKey]) {
-                const entry = window.tfaaData.fl[flKey];
-                if (Array.isArray(entry)) rawMatches = entry;
-                else if (entry && typeof entry === 'object') rawMatches = [entry];
+    // 1. Primary Check: window.sywatDeskTfaaShooters array used on Desk view
+    if (Array.isArray(window.sywatDeskTfaaShooters) && window.sywatDeskTfaaShooters.length > 0) {
+        const exactList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase() === clean);
+        if (exactList.length > 0) {
+            rawMatches = exactList;
+        } else {
+            const partialList = window.sywatDeskTfaaShooters.filter(s => s.name && s.name.trim().toLowerCase().includes(clean));
+            if (partialList.length > 0) {
+                rawMatches = partialList;
             }
         }
     }
 
-    // 3. Partial substring lookup across keys
-    if (rawMatches.length === 0) {
-        const keys = Object.keys(window.tfaaData.exact);
-        for (let i = 0; i < keys.length; i++) {
-            if (keys[i].toLowerCase().includes(clean)) {
-                const entry = window.tfaaData.exact[keys[i]];
-                if (Array.isArray(entry)) {
-                    rawMatches = rawMatches.concat(entry);
-                } else if (entry && typeof entry === 'object') {
-                    rawMatches.push(entry);
+    // 2. Secondary Check: window.tfaaData object cache
+    if (rawMatches.length === 0 && window.tfaaData) {
+        if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
+            const entry = window.tfaaData.exact[clean];
+            rawMatches = Array.isArray(entry) ? entry : [entry];
+        }
+
+        if (rawMatches.length === 0 && window.tfaaData.fl) {
+            const parts = clean.split(' ');
+            if (parts.length > 1) {
+                const flKey = parts[0] + '___' + parts[parts.length - 1];
+                if (window.tfaaData.fl[flKey]) {
+                    const entry = window.tfaaData.fl[flKey];
+                    rawMatches = Array.isArray(entry) ? entry : [entry];
+                }
+            }
+        }
+
+        if (rawMatches.length === 0 && window.tfaaData.exact) {
+            const keys = Object.keys(window.tfaaData.exact);
+            for (let i = 0; i < keys.length; i++) {
+                if (keys[i].toLowerCase().includes(clean)) {
+                    const entry = window.tfaaData.exact[keys[i]];
+                    const arr = Array.isArray(entry) ? entry : [entry];
+                    rawMatches = rawMatches.concat(arr);
                 }
             }
         }
@@ -109,7 +117,14 @@ function findTfaaMatch(typedName) {
         });
     }
 
-    return rawMatches;
+    return rawMatches.map(m => ({
+        name: m.full_name || m.name || '',
+        full_name: m.full_name || m.name || '',
+        division: m.division || '',
+        gender: m.gender || '',
+        style: m.style || '',
+        phone: m.phone || m.phone_number || ''
+    }));
 }
 
 function findShopHistoryMatch(typedName) {
@@ -275,7 +290,6 @@ function handleDeskTfaaAutocomplete(input) {
             }
 
             if (isPrimaryContact) {
-                // Primary Contact Selection Flow
                 const phoneEl      = form ? form.querySelector('#walkin_group_phone, input[name="walkin_group_phone"]') : null;
                 const archerNameEl = form ? form.querySelector('#walkin_name_input, input[name="walkin_name"]') : null;
 
@@ -302,7 +316,6 @@ function handleDeskTfaaAutocomplete(input) {
 
                 autoFillOnNameChange('walkin');
             } else {
-                // Standard Archer Selection Flow
                 if (form) {
                     const divEl   = form.querySelector('select[name="walkin_division"], select[name="checkin_division"], select[name="edit_division"]');
                     const genEl   = form.querySelector('select[name="walkin_gender"], select[name="checkin_gender"], select[name="edit_gender"]');
@@ -453,7 +466,21 @@ function autoFillOnNameChange(prefix) {
     const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
     if (!nameInput) return;
 
-    const typedName = nameInput.value;
+    const typedName = nameInput.value.trim();
+    if (!typedName) {
+        if (prefix === 'walkin') {
+            const divEl   = document.getElementById('walkin_division');
+            const genEl   = document.getElementById('walkin_gender');
+            const styleEl = document.getElementById('walkin_style');
+            if (divEl) divEl.value = '';
+            if (genEl) genEl.value = '';
+            if (styleEl) styleEl.value = '';
+            handleStyleRestrictions('walkin');
+        }
+        evaluateTfaaStatus(prefix);
+        return;
+    }
+
     const tfaaMatches = findTfaaMatch(typedName);
 
     if (tfaaMatches && tfaaMatches.length > 0) {
@@ -464,7 +491,7 @@ function autoFillOnNameChange(prefix) {
 
         if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
         if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
-        if (styleEl && targetMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
+        if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
 
         handleStyleRestrictions(prefix);
     } else if (prefix === 'walkin') {
@@ -481,14 +508,6 @@ function autoFillOnNameChange(prefix) {
             if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
 
             handleStyleRestrictions(prefix);
-        } else {
-            const divEl   = document.getElementById('walkin_division');
-            const genEl   = document.getElementById('walkin_gender');
-            const styleEl = document.getElementById('walkin_style');
-            if (divEl) divEl.value = '';
-            if (genEl) genEl.value = '';
-            if (styleEl) styleEl.value = '';
-            handleStyleRestrictions('walkin');
         }
     }
 
