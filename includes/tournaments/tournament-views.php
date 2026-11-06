@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -269,7 +269,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <td>
                                                 <strong class="sywat-tourn-title"><?php echo esc_html( $t_name ); ?></strong>
                                                 <div class="sywat-tourn-season">🏆 <?php echo esc_html( $t_season_name ); ?></div>
-                                                <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?><?php if ( ! empty( $t_district ) ): ?> <span class="sywat-label-subtext">(🗺️ <?php echo esc_html( $t_district ); ?>)</span><?php endif; ?></div>
+                                                <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?><?php if ( ! empty( $t_district ) ): ?> <span class="sywat-label-subtext">(<?php echo esc_html( $t_district ); ?>)</span><?php endif; ?></div>
                                                 <div class="sywat-tourn-dates">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
                                                 
                                                 <!-- Volunteer Hub Toggle Chip -->
