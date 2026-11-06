@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.2.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -201,11 +201,12 @@ function sywatApplyTournamentFilters() {
     const rows = document.querySelectorAll('.sywat-tournament-row');
 
     rows.forEach(row => {
-        const name = (row.getAttribute('data-name') || '').toLowerCase();
-        const shop = (row.getAttribute('data-shop') || '').toLowerCase();
+        const name     = (row.getAttribute('data-name') || '').toLowerCase();
+        const shop     = (row.getAttribute('data-shop') || '').toLowerCase();
+        const fullText = row.textContent.toLowerCase();
 
-        const shopMatch   = (shopFilter === 'all' || shop === shopFilter);
-        const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter));
+        const shopMatch   = (shopFilter === 'all' || shop === shopFilter || shop.includes(shopFilter));
+        const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter) || fullText.includes(searchFilter));
 
         if (shopMatch && searchMatch) {
             row.style.display = '';
