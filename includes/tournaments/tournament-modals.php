@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -268,7 +268,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                         <h3>🔍 Schedule Import Dry-Run Preview</h3>
                         <div class="sywat-subtitle">Target Season: <strong><?php echo esc_html( isset( $seasons[$target_season]['name'] ) ? $seasons[$target_season]['name'] : $target_season ); ?></strong></div>
                     </div>
-                    <form method="post" action="?tab=manage" style="margin:0; display:inline;">
+                    <form method="post" action="?tab=manage" class="sywat-form-inline">
                         <input type="hidden" name="sywat_action" value="cancel_schedule_import">
                         <button type="submit" class="sywat-modal-close" title="Close Preview">&times;</button>
                     </form>
@@ -277,7 +277,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                     <?php if ( ! empty( $rejected_list ) ): ?>
                         <div class="sywat-alert sywat-alert-danger sywat-modal-row-spacing">
                             <strong>⚠️ <?php echo count( $rejected_list ); ?> Row(s) Rejected / Prohibited:</strong>
-                            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                            <ul class="sywat-rejected-list">
                                 <?php foreach ( $rejected_list as $rej ): ?>
                                     <li><strong>Row <?php echo intval( $rej['row_num'] ); ?>:</strong> "<?php echo esc_html( $rej['shop_name'] ); ?>" — <em><?php echo esc_html( $rej['reason'] ); ?></em></li>
                                 <?php endforeach; ?>
