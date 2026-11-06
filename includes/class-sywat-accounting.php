@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-accounting.php
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 6.2.1
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -12,7 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // Helper: Embed Zelle QR Code from plugin assets/images/zelle-qr-code.png as Base64 for print/PDF reliability
 if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
     function sywat_get_zelle_qr_base64() {
-        // 1. Check local plugin asset path: assets/images/zelle-qr-code.png
         $plugin_img_path = plugin_dir_path( dirname( __FILE__ ) ) . 'assets/images/zelle-qr-code.png';
         if ( ! file_exists( $plugin_img_path ) ) {
             $plugin_img_path = plugin_dir_path( __FILE__ ) . 'assets/images/zelle-qr-code.png';
@@ -24,7 +23,6 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
             return 'data:image/' . $type . ';base64,' . base64_encode( $data );
         }
 
-        // 2. Fallback: Check if custom option or Attachment ID is set in WordPress settings
         $raw_qr = get_option( 'sywat_zelle_qr_url', '' );
 
         if ( is_numeric( $raw_qr ) ) {
@@ -53,17 +51,6 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
 
 /**
  * Calculates the exact balance and family cap status for a group of archers sharing a family_id on a line.
- * 
- * Rules:
- * - Adult / Senior / SS / MS = $30.00 standard rate
- * - Cub / Youth / Young Adult = $25.00 standard rate
- * - 1 or 2 Archers: Billed at standard individual rates (Sum < $75.00). Not eligible for $75 family cap.
- * - 3+ Archers: Billed at capped $75.00 family rate (Sum >= $75.00).
- * 
- * @param string     $family_id        The unique family identifier.
- * @param string|int $line_idx         The line index or line name context ('all' for entire event).
- * @param array      $all_registrations Master list of registrations.
- * @return array Calculated billing breakdown.
  */
 if ( ! function_exists( 'sywat_calculate_family_group_balance' ) ) {
     function sywat_calculate_family_group_balance( $family_id, $line_idx, $all_registrations ) {
@@ -85,7 +72,6 @@ if ( ! function_exists( 'sywat_calculate_family_group_balance' ) ) {
         foreach ( $all_registrations as $reg ) {
             $reg_fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
             
-            // Fallback family identifier matching if family_id field is empty
             if ( empty( $reg_fam_id ) && isset( $reg['paid'] ) && $reg['paid'] === 'Family' ) {
                 $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
                 $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
@@ -94,7 +80,6 @@ if ( ! function_exists( 'sywat_calculate_family_group_balance' ) ) {
             }
 
             if ( $reg_fam_id === $family_id ) {
-                // Line match check when a specific line context is provided
                 if ( $line_idx !== 'all' && isset( $reg['line_index'] ) && (string)$reg['line_index'] !== (string)$line_idx ) {
                     continue;
                 }
@@ -128,11 +113,17 @@ if ( ! function_exists( 'sywat_calculate_family_group_balance' ) ) {
 
 if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
     function sywat_calculate_accounting_totals($regs_list) {
-        $g1_youth = 0; $g2_adult = 0; $g4_fg = 0; $g5_noshow = 0;
+        $g1_youth = 0; $g2_adult = 0; $g4_fg = 0; $g5_noshow = 0; $g6_waitlist = 0;
         $family_archers = 0; $family_groups = array();
         $youth_divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
 
         foreach ($regs_list as $r) {
+            $is_waitlist = isset($r['status']) && strcasecmp(trim($r['status']), 'Waitlist') === 0;
+            if ($is_waitlist) {
+                $g6_waitlist++;
+                continue;
+            }
+
             $is_checked_in = ! empty( $r['checked_in'] );
             $is_no_show_div = (isset($r['division']) && $r['division'] === 'No Show');
 
@@ -184,7 +175,6 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
             if (count($members) >= 3 && $group_raw_sum >= 75) {
                 $unique_capped_families++;
             } else {
-                // Solo or 2-shooter entries fallback to individual Youth/Adult billing buckets
                 foreach ($members as $m) {
                     $m_div = isset($m['division']) ? $m['division'] : '';
                     if (in_array($m_div, $youth_divs) || (isset($m['rate_type']) && strtolower($m['rate_type']) === 'youth')) {
@@ -199,7 +189,7 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
         $unique_families    = $unique_capped_families;
         $total_transactions = $g1_youth + $g2_adult + $unique_families + $g4_fg;
         $total_archers      = count($regs_list);
-        $total_checked_in   = $total_archers - $g5_noshow;
+        $total_checked_in   = $total_archers - $g5_noshow - $g6_waitlist;
 
         $tot_g1 = $g1_youth * 25;
         $tot_g2 = $g2_adult * 30;
@@ -221,6 +211,7 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
             'group4_fg'          => $g4_fg,
             'tot_fg'             => $tot_fg,
             'group5_noshow'      => $g5_noshow,
+            'group6_waitlist'    => $g6_waitlist,
             'total_transactions' => $total_transactions,
             'total_archers'      => $total_archers,
             'total_checked_in'   => $total_checked_in,
@@ -242,7 +233,6 @@ if ( ! function_exists( 'sywat_render_invoice_modal' ) ) {
         $t_dates = get_option('sywat_dates_' . sanitize_title($selected_tournament), '');
         $tourn_dates_str = !empty($t_dates) ? $t_dates : $selected_tournament;
 
-        // Fetch Shop Info dynamically
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         $all_shops   = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
         $shop_id     = 'shop_ccr';
@@ -408,7 +398,8 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                     • <strong>Adult / Senior / SS / MS:</strong> <?php echo $acct['group2_adult']; ?> Paid Transactions<br>
                     • <strong>Family Category:</strong> <?php echo $acct['group3_families']; ?> Unique Paid Families (<?php echo $acct['family_archers']; ?> Checked-In Archers)<br>
                     • <strong>Field Governor:</strong> <?php echo $acct['group4_fg']; ?> Transactions (Free)<br>
-                    • <strong>No Show:</strong> <?php echo $acct['group5_noshow']; ?> Archers (Not Checked In)<br>
+                    • <strong>Waitlist:</strong> <?php echo $acct['group6_waitlist']; ?> Archers (Pending Line Slot)<br>
+                    • <strong>No Show:</strong> <?php echo $acct['group5_noshow']; ?> Archers (Unchecked Pre-Reg)<br>
                     <div style="margin-top: 3px; border-top: 1px dashed #94a3b8; padding-top: 3px; font-weight: bold; color: #1e3a8a;">
                         Total Processed Transactions: <?php echo $acct['total_transactions']; ?> &nbsp;|&nbsp; Checked-In Archers: <?php echo $acct['total_checked_in']; ?> / <?php echo $acct['total_archers']; ?> Total Roster
                     </div>
@@ -446,7 +437,14 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
 
                                     $is_no_show     = ! $is_waitlist && ! $is_checked_in && ( $is_line_closed || $raw_div === 'No Show' );
 
-                                    if ( $is_no_show ) {
+                                    if ( $is_waitlist ) {
+                                        $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
+                                        $gender_disp   = 'M | F';
+                                        $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
+                                        $paid_cat      = '<span style="color:#d97706; font-weight:bold;">🕒 Waitlist</span>';
+                                        $print_score   = '—';
+                                        $print_x       = '—';
+                                    } elseif ( $is_no_show ) {
                                         $division_disp = 'No Show';
                                         $gender_disp   = 'No Show';
                                         $style_disp    = 'No Show';
@@ -478,7 +476,6 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                             }
                                         }
                                     } else {
-                                        // Unchecked archer on an open line (Blank fill-in fields for pre-printed scoring)
                                         $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
                                         $gender_disp   = 'M | F';
                                         $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
