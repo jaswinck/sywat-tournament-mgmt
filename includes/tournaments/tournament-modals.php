@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -201,10 +201,17 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
         $seasons        = isset( $data['seasons'] ) ? $data['seasons'] : array();
         $current_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
 
-        // Check for pending dry-run preview transient
-        $transient_key  = 'sywat_pending_schedule_import_' . get_current_user_id();
-        $processed      = get_transient( $transient_key );
-        $show_preview   = ( isset( $_GET['import_preview'] ) && $_GET['import_preview'] === '1' && ! empty( $processed ) );
+        // Handle Cancel Request
+        if ( isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'cancel_schedule_import' ) {
+            delete_transient( 'sywat_pending_schedule_import_' . get_current_user_id() );
+        }
+
+        // Retrieve active dry-run preview transient
+        $transient_key = 'sywat_pending_schedule_import_' . get_current_user_id();
+        $processed     = get_transient( $transient_key );
+
+        // Automatically trigger preview overlay whenever transient exists
+        $show_preview  = ! empty( $processed ) && ( ! empty( $processed['valid_tournaments'] ) || ! empty( $processed['rejected_rows'] ) );
 
         $valid_list    = ( $show_preview && isset( $processed['valid_tournaments'] ) ) ? $processed['valid_tournaments'] : array();
         $rejected_list = ( $show_preview && isset( $processed['rejected_rows'] ) ) ? $processed['rejected_rows'] : array();
@@ -253,7 +260,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
         </div>
 
         <?php if ( $show_preview ): ?>
-        <!-- DRY-RUN PREVIEW MODAL OVERLAY -->
+        <!-- DRY-RUN PREVIEW MODAL OVERLAY (AUTOMATIC DISPLAY) -->
         <div class="sywat-modal-backdrop active" id="sywat_import_preview_modal">
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
@@ -261,13 +268,16 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                         <h3>🔍 Schedule Import Dry-Run Preview</h3>
                         <div class="sywat-subtitle">Target Season: <strong><?php echo esc_html( isset( $seasons[$target_season]['name'] ) ? $seasons[$target_season]['name'] : $target_season ); ?></strong></div>
                     </div>
-                    <a href="<?php echo esc_url( remove_query_arg( 'import_preview' ) ); ?>" class="sywat-modal-close">&times;</a>
+                    <form method="post" action="?tab=manage" style="margin:0; display:inline;">
+                        <input type="hidden" name="sywat_action" value="cancel_schedule_import">
+                        <button type="submit" class="sywat-modal-close" title="Close Preview">&times;</button>
+                    </form>
                 </div>
                 <div class="sywat-modal-body">
                     <?php if ( ! empty( $rejected_list ) ): ?>
                         <div class="sywat-alert sywat-alert-danger sywat-modal-row-spacing">
                             <strong>⚠️ <?php echo count( $rejected_list ); ?> Row(s) Rejected / Prohibited:</strong>
-                            <ul>
+                            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
                                 <?php foreach ( $rejected_list as $rej ): ?>
                                     <li><strong>Row <?php echo intval( $rej['row_num'] ); ?>:</strong> "<?php echo esc_html( $rej['shop_name'] ); ?>" — <em><?php echo esc_html( $rej['reason'] ); ?></em></li>
                                 <?php endforeach; ?>
@@ -308,8 +318,9 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                     <form method="post" action="?tab=manage">
                         <?php wp_nonce_field( 'sywat_confirm_schedule_nonce', 'sywat_confirm_schedule_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="confirm_schedule_import">
-                        <a href="<?php echo esc_url( remove_query_arg( 'import_preview' ) ); ?>" class="sywat-btn sywat-btn-secondary">Cancel</a>
-                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">🚀 Confirm & Create <?php echo count( $valid_list ); ?> Tournaments</button>
+                        
+                        <button type="submit" name="sywat_action" value="cancel_schedule_import" class="sywat-btn sywat-btn-secondary">Cancel</button>
+                        <button type="submit" name="sywat_action" value="confirm_schedule_import" class="sywat-btn sywat-btn-success sywat-btn-icon-save">🚀 Confirm & Create <?php echo count( $valid_list ); ?> Tournaments</button>
                     </form>
                 </div>
             </div>
