@@ -2,8 +2,8 @@
 /**
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
- * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and TFAA sync.
- * Version:     5.0.0
+ * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
+ * Version:     6.1.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '5.0.0' );
+define( 'SYWAT_PLUGIN_VERSION', '6.1.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -59,5 +59,4 @@ require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';         
 // Load Front-End Operations Apps
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';      // Check-In Desk App ([sywat_desk])
 require_once SYWAT_PLUGIN_DIR . 'includes/scores/class-sywat-scores.php';         // Batch Score Entry App ([sywat_scores])
-require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-tfaa-sync.php';            // TFAA Membership Verification & Sync
 require_once SYWAT_PLUGIN_DIR . 'includes/results/class-sywat-results.php';      // Public Standings & Results ([sywat_results])
