@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -129,18 +129,42 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             <input type="hidden" name="modal_action" value="manage">
                             <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
 
+                            <!-- Read-Only Active Tournament Field -->
+                            <div class="sywat-filter-field">
+                                <label for="sywat_active_tournament_display">Active Tournament</label>
+                                <input type="text" id="sywat_active_tournament_display" value="<?php echo esc_attr( $selected_tournament ); ?>" readonly class="sywat-input-disabled-calc">
+                            </div>
+
+                            <!-- Filter by Line Dropdown (Formatted Schedule Titles) -->
                             <div class="sywat-filter-field">
                                 <label for="filter_line_idx">Filter by Line</label>
                                 <select name="filter_line_idx" id="filter_line_idx" onchange="this.form.submit()">
                                     <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>(All Lines)</option>
                                     <?php foreach ( $available_lines as $idx => $line ): ?>
+                                        <?php 
+                                            $line_disp_name = '';
+                                            if ( ! empty( $line['name'] ) ) {
+                                                $line_disp_name = $line['name'];
+                                            } else {
+                                                $d_str = isset( $line['day'] ) ? $line['day'] : '';
+                                                $t_str = isset( $line['time'] ) ? $line['time'] : ( isset( $line['start_time'] ) ? $line['start_time'] : '' );
+                                                $line_disp_name = trim( $d_str . ' ' . $t_str );
+                                            }
+                                            if ( empty( $line_disp_name ) ) {
+                                                $line_disp_name = 'Line ' . ( (int) $idx + 1 );
+                                            }
+                                            $line_disp_name = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $line_disp_name );
+                                            $line_disp_name = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $line_disp_name );
+                                            $line_disp_name = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $line_disp_name );
+                                        ?>
                                         <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$filter_line_idx, (string)$idx ); ?>>
-                                            <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                            <?php echo esc_html( $line_disp_name ); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
 
+                            <!-- Search Archer Name Input -->
                             <div class="sywat-filter-field">
                                 <label for="search_shooter">Search Archer Name</label>
                                 <div class="sywat-search-input-group">
@@ -204,7 +228,20 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                 }
                                             }
 
-                                            $line_disp = isset( $available_lines[$lidx]['name'] ) ? $available_lines[$lidx]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
+                                            $line_disp = '';
+                                            if ( isset( $available_lines[$lidx]['name'] ) && ! empty( $available_lines[$lidx]['name'] ) ) {
+                                                $line_disp = $available_lines[$lidx]['name'];
+                                            } elseif ( isset( $available_lines[$lidx] ) ) {
+                                                $d_str = isset( $available_lines[$lidx]['day'] ) ? $available_lines[$lidx]['day'] : '';
+                                                $t_str = isset( $available_lines[$lidx]['time'] ) ? $available_lines[$lidx]['time'] : ( isset( $available_lines[$lidx]['start_time'] ) ? $available_lines[$lidx]['start_time'] : '' );
+                                                $line_disp = trim( $d_str . ' ' . $t_str );
+                                            }
+                                            if ( empty( $line_disp ) ) {
+                                                $line_disp = ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1';
+                                            }
+                                            $line_disp = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $line_disp );
+                                            $line_disp = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $line_disp );
+                                            $line_disp = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $line_disp );
                                         ?>
                                         <tr class="sywat-manage-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                             <td>
