@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Actions & Sanitization Engine
  * Path: includes/roster/roster-actions.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
