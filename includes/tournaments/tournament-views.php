@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,7 +17,34 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
         ob_start();
 
-        // Fetch central data bundle from data engine helper
+        // 1. Initial Permission & Role Data for POST Handling
+        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'manage_options' );
+        $user_shop_id       = function_exists( 'sywat_get_user_shop_id' ) ? sywat_get_user_shop_id() : '';
+
+        // Mutable Data Collections for Action Handling
+        $tournaments        = get_option( 'sywat_tournaments_list', array() );
+        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
+        $registrations      = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : array();
+
+        $notice     = '';
+        $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( $_REQUEST['tab'] ) : 'manage';
+
+        // 2. Execute POST Actions FIRST (Before rendering data load)
+        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) )
+                       || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_import_schedule_nonce'], 'sywat_import_schedule_nonce' ) )
+                       || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_confirm_schedule_nonce'], 'sywat_confirm_schedule_nonce' ) );
+
+        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+
+        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'cancel' ) {
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
+        } elseif ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
+            if ( function_exists( 'sywat_handle_tournament_post_actions' ) ) {
+                $notice = sywat_handle_tournament_post_actions( $tournaments, $active_tournaments, $registrations, $can_manage_seasons, $user_shop_id );
+            }
+        }
+
+        // 3. Fetch fresh master portal data bundle AFTER actions mutate database
         $data = sywat_get_master_portal_data();
 
         $can_manage_seasons = $data['can_manage_seasons'];
@@ -32,24 +59,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $scoped_tournaments = $data['scoped_tournaments'];
         $filter_shops       = $data['filter_shops'];
         $tfaa_count         = $data['tfaa_count'];
-
-        $notice     = '';
-        $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( $_REQUEST['tab'] ) : 'manage';
-
-        // POST Action Handling
-        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) )
-                       || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_import_schedule_nonce'], 'sywat_import_schedule_nonce' ) )
-                       || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_confirm_schedule_nonce'], 'sywat_confirm_schedule_nonce' ) );
-
-        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
-
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'cancel' ) {
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
-        } elseif ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
-            if ( function_exists( 'sywat_handle_tournament_post_actions' ) ) {
-                $notice = sywat_handle_tournament_post_actions( $tournaments, $active_tournaments, $registrations, $can_manage_seasons, $user_shop_id );
-            }
-        }
         ?>
 
         <div class="sywat-wrap">
