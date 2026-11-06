@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.5.6
+ * Version: 6.6.0
  */
 
 function escapeHtmlDesk(str) {
@@ -60,7 +60,7 @@ function toggleUnpaidBanner(isChecked) {
 }
 
 /**
- * Universal TFAA Match Engine querying both window.tfaaData object cache and desk array caches.
+ * Universal Shooter Match Engine querying 18-month historical results dataset and desk caches.
  */
 function getAllTfaaMatches(typedName) {
     if (!typedName) return [];
@@ -69,7 +69,30 @@ function getAllTfaaMatches(typedName) {
 
     let rawMatches = [];
 
-    // 1. Primary Check: Master TFAA database cache (window.tfaaData)
+    // 1. Primary Check: 18-Month Historical Shooters Array (window.sywatDeskTfaaShooters)
+    let shooterArray = [];
+    if (Array.isArray(window.sywatDeskTfaaShooters)) {
+        shooterArray = shooterArray.concat(window.sywatDeskTfaaShooters);
+    }
+    if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
+        shooterArray = shooterArray.concat(sywatTfaaShooters);
+    }
+    if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
+        shooterArray = shooterArray.concat(window.sywatRegData.tfaaShooters);
+    }
+    if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
+        shooterArray = shooterArray.concat(window.sywatDeskData.tfaaShooters);
+    }
+
+    if (shooterArray.length > 0) {
+        const arrMatches = shooterArray.filter(s => {
+            const sName = cleanDeskName(s.name || s.full_name || '');
+            return sName && (sName.includes(clean) || clean.includes(sName));
+        });
+        rawMatches = rawMatches.concat(arrMatches);
+    }
+
+    // 2. Fallback Check: window.tfaaData cache if present
     if (window.tfaaData) {
         if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
             const entry = window.tfaaData.exact[clean];
@@ -102,27 +125,7 @@ function getAllTfaaMatches(typedName) {
         }
     }
 
-    // 2. Secondary Check: Desk array caches (window.sywatDeskTfaaShooters / sywatTfaaShooters)
-    let shooterArray = [];
-    if (Array.isArray(window.sywatDeskTfaaShooters)) {
-        shooterArray = shooterArray.concat(window.sywatDeskTfaaShooters);
-    }
-    if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
-        shooterArray = shooterArray.concat(sywatTfaaShooters);
-    }
-    if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
-        shooterArray = shooterArray.concat(window.sywatDeskData.tfaaShooters);
-    }
-
-    if (shooterArray.length > 0) {
-        const arrMatches = shooterArray.filter(s => {
-            const sName = cleanDeskName(s.name || s.full_name || '');
-            return sName && (sName.includes(clean) || clean.includes(sName));
-        });
-        rawMatches = rawMatches.concat(arrMatches);
-    }
-
-    // Deduplicate matches
+    // Deduplicate distinct (Name + Division + Gender + Style) entries for multi-style archers
     const seen = new Set();
     const uniqueMatches = [];
 
@@ -140,9 +143,9 @@ function getAllTfaaMatches(typedName) {
             uniqueMatches.push({
                 name: nameStr,
                 full_name: nameStr,
-                division: m.division || '',
-                gender: m.gender || '',
-                style: m.style || '',
+                division: divStr,
+                gender: genStr,
+                style: styStr,
                 phone: m.phone || m.phone_number || ''
             });
         }
@@ -185,7 +188,7 @@ function findShopHistoryMatch(typedName) {
 }
 
 /**
- * Smart option matcher translating TFAA style codes, full titles, and gender letters to standard select values.
+ * Smart option matcher translating style codes, full titles, and gender letters to standard select values.
  */
 function matchDeskTfaaSelect(value, selectEl) {
     if (!value || !selectEl) return;
@@ -394,7 +397,7 @@ function evaluateTfaaStatus(prefix) {
 
     if (!tfaaMatches || !Array.isArray(tfaaMatches) || tfaaMatches.length === 0) {
         badgeEl.className = 'sywat-badge-none';
-        badgeEl.innerHTML = '⚪ No TFAA History (Current Season)';
+        badgeEl.innerHTML = '⚪ No History Found (18-Mo Window)';
         return;
     }
 
@@ -465,7 +468,7 @@ function evaluateTfaaStatus(prefix) {
         
         const alertTitle = document.createElement('div');
         alertTitle.className = 'sywat-multi-style-title';
-        alertTitle.innerHTML = '⚠️ <strong>Multiple TFAA member records found. Click a member to load:</strong>';
+        alertTitle.innerHTML = '⚠️ <strong>Multiple shooter profiles found. Click a profile to load:</strong>';
         
         alertBox.appendChild(alertTitle);
         alertBox.appendChild(buttonContainer);
@@ -484,14 +487,14 @@ function evaluateTfaaStatus(prefix) {
         badgeText = '🟢 TFAA Validated: ' + knownStyles.join(', ');
     } else if (isCategoryMatch && !isNameMatch) {
         badgeEl.className = 'sywat-badge-known';
-        badgeText = '⚠️ TFAA Name Mismatch (TFAA Lists: ' + knownStyles.join(', ') + ')';
+        badgeText = '⚠️ Name Mismatch (Known Styles: ' + knownStyles.join(', ') + ')';
     } else {
         badgeEl.className = 'sywat-badge-known';
-        badgeText = '⚠️ TFAA Style Mismatch (TFAA Lists: ' + knownStyles.join(', ') + ')';
+        badgeText = '⚠️ Style Mismatch (Known Styles: ' + knownStyles.join(', ') + ')';
     }
 
     if (!isNameMatch && officialName !== '') {
-        badgeText += '<br><span class="sywat-badge-subtext">↳ Official TFAA Name: <strong>' + escapeHtmlDesk(officialName) + '</strong></span>';
+        badgeText += '<br><span class="sywat-badge-subtext">↳ Official Member Name: <strong>' + escapeHtmlDesk(officialName) + '</strong></span>';
         badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
     }
 
