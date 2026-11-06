@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
  * Author: SYWAT Archery
- * Version: 6.4.4
+ * Version: 6.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -35,11 +35,11 @@ function sywat_desk_handle_actions(&$data) {
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
     $existing_families         = $data['existing_families'];
 
-    $calculate_paid_status = function($pay_option, $division) {
-        if ($pay_option === 'Family') return 'Family';
-        if ($pay_option === 'Field Governor') return 'Field Governor';
-        $youth_divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
-        return in_array($division, $youth_divs) ? 'Youth' : 'Adult';
+    $youth_divs = array('Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)');
+
+    $calculate_individual_fee = function($division) use ($youth_divs) {
+        if ($division === 'No Show') return 0;
+        return in_array($division, $youth_divs) ? 25.00 : 30.00;
     };
 
     $sanitize_style_for_division = function($style, $division) {
@@ -117,16 +117,16 @@ function sywat_desk_handle_actions(&$data) {
         return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
     }
 
-    // Add Walk-In (Supports standard completion and fast-loop "Save & Add Next")
+    // Add Walk-In (Fully Automated Fee & Family Cap Engine)
     if ($action === 'add_walkin' || $action === 'add_walkin_next') {
-        $name_val    = trim(sanitize_text_field($_POST['walkin_name']));
-        $group_name  = isset($_POST['walkin_group_name']) ? trim(sanitize_text_field($_POST['walkin_group_name'])) : '';
-        $group_phone = isset($_POST['walkin_group_phone']) ? trim(sanitize_text_field($_POST['walkin_group_phone'])) : '';
-        $line_idx    = sanitize_text_field($_POST['walkin_line_index']);
-        $pay_opt     = sanitize_text_field($_POST['walkin_pay_option']);
-        $division    = sanitize_text_field($_POST['walkin_division']);
-        $gender      = sanitize_text_field($_POST['walkin_gender']);
-        $style       = sanitize_text_field($_POST['walkin_style']);
+        $name_val      = trim(sanitize_text_field($_POST['walkin_name']));
+        $group_name    = isset($_POST['walkin_group_name']) ? trim(sanitize_text_field($_POST['walkin_group_name'])) : '';
+        $group_phone   = isset($_POST['walkin_group_phone']) ? trim(sanitize_text_field($_POST['walkin_group_phone'])) : '';
+        $line_idx      = sanitize_text_field($_POST['walkin_line_index']);
+        $division      = sanitize_text_field($_POST['walkin_division']);
+        $gender        = sanitize_text_field($_POST['walkin_gender']);
+        $style         = sanitize_text_field($_POST['walkin_style']);
+        $is_courtesy   = !empty($_POST['walkin_is_courtesy']);
 
         if (empty($name_val)) {
             return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
@@ -157,28 +157,51 @@ function sywat_desk_handle_actions(&$data) {
         $line_name = isset($lines[$line_idx]['name']) ? $lines[$line_idx]['name'] : 'N/A';
         $distance  = ($division === 'Cub (8 - 11)') ? 'Cub' : '20yd';
 
-        $family_id   = ''; 
+        // Family Group Resolution
+        $sel_fam_id  = isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '';
+        $family_id   = '';
         $family_name = '';
 
-        if ($pay_opt === 'Family') {
-            $sel_fam_id = isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '';
+        if (!empty($sel_fam_id)) {
+            $family_id   = $sel_fam_id;
             $checkin_families = isset($existing_families_by_line[$line_idx]) ? $existing_families_by_line[$line_idx] : $existing_families;
+            $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : (!empty($group_name) ? $group_name . ' (Family Cap)' : 'Family Group');
+        } elseif (!empty($group_name)) {
+            $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($group_name) . '_' . substr(md5(uniqid()), 0, 4);
+            $family_name = $group_name . ' (Family Cap)';
+        }
 
-            if (!empty($sel_fam_id)) {
-                $family_id   = $sel_fam_id;
-                $family_name = isset($checkin_families[$sel_fam_id]) ? $checkin_families[$sel_fam_id] : 'Family Group';
-            } else {
-                $fam_base_name = !empty($group_name) ? $group_name : $name_val;
-                $family_id   = 'fam_' . $active_t_slug . '_l' . sanitize_title($line_idx) . '_' . sanitize_title($fam_base_name) . '_' . substr(md5(uniqid()), 0, 4);
-                $family_name = $fam_base_name . ' (Family Cap)';
+        // Gather all existing archers in this family group on this line
+        $family_archers = array();
+        if (!empty($family_id)) {
+            foreach ($registrations as $r) {
+                if (isset($r['tournament'], $r['line_index']) &&
+                    strcasecmp($r['tournament'], $selected_tournament) === 0 &&
+                    (string)$r['line_index'] === (string)$line_idx &&
+                    !empty($r['family_id']) && $r['family_id'] === $family_id) {
+                    $family_archers[] = $r;
+                }
             }
+        }
 
-            $GLOBALS['sywat_added_family_prompt'] = array(
-                'archer_name' => $name_val,
-                'family_id'   => $family_id,
-                'family_name' => $family_name,
-                'line_idx'    => $line_idx
-            );
+        // Calculate total group archer count and standard cost including the new archer
+        $total_group_count = count($family_archers) + 1;
+        $total_group_cost  = $calculate_individual_fee($division);
+
+        foreach ($family_archers as $fa) {
+            $total_group_cost += $calculate_individual_fee(isset($fa['division']) ? $fa['division'] : '');
+        }
+
+        // Auto-Cap Logic: If group total >= $75 or archer count >= 3, apply Family status
+        $is_family_capped = (!empty($family_id) && ($total_group_cost >= 75.00 || $total_group_count >= 3));
+
+        // Determine paid status for new archer
+        if ($is_courtesy) {
+            $paid_status = 'Field Governor';
+        } elseif ($is_family_capped) {
+            $paid_status = 'Family';
+        } else {
+            $paid_status = in_array($division, $youth_divs) ? 'Youth' : 'Adult';
         }
 
         $new_reg = array(
@@ -193,7 +216,7 @@ function sywat_desk_handle_actions(&$data) {
             'division'    => $division,
             'gender'      => $gender,
             'style'       => $sanitize_style_for_division($style, $division),
-            'paid'        => $calculate_paid_status($pay_opt, $division),
+            'paid'        => $paid_status,
             'family_id'   => $family_id,
             'family_name' => $family_name,
             'balance_due' => 0,
@@ -209,23 +232,67 @@ function sywat_desk_handle_actions(&$data) {
         $master_regs[$new_id] = $new_reg;
         update_option('sywat_registrations_' . $t_slug, $master_regs, false);
 
-        // Fast-Loop Context Persistence
+        // Retroactively update existing family archers if cap threshold was reached on this registration
+        if ($is_family_capped && !empty($family_archers)) {
+            foreach ($registrations as &$r) {
+                if (isset($r['tournament'], $r['line_index']) &&
+                    strcasecmp($r['tournament'], $selected_tournament) === 0 &&
+                    (string)$r['line_index'] === (string)$line_idx &&
+                    !empty($r['family_id']) && $r['family_id'] === $family_id) {
+                    if ($r['paid'] !== 'Field Governor') {
+                        $r['paid'] = 'Family';
+                        update_option('sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false);
+                        if (isset($master_regs[$r['id']])) {
+                            $master_regs[$r['id']]['paid'] = 'Family';
+                        }
+                    }
+                }
+            }
+            unset($r);
+            update_option('sywat_registrations_' . $t_slug, $master_regs, false);
+        }
+
+        // Fast-Loop Context Persistence: Accumulate session archers and total balance
+        $prev_session_archers = array();
+        if (isset($_POST['walkin_session_archers_json']) && !empty($_POST['walkin_session_archers_json'])) {
+            $decoded = json_decode(stripslashes($_POST['walkin_session_archers_json']), true);
+            if (is_array($decoded)) $prev_session_archers = $decoded;
+        }
+
+        $calc_fee = $is_courtesy ? 0.00 : $calculate_individual_fee($division);
+        $prev_session_archers[] = array(
+            'name'     => $name_val,
+            'division' => $division,
+            'fee'      => $calc_fee,
+            'capped'   => $is_family_capped
+        );
+
+        // Recalculate session total
+        $raw_sum = 0;
+        foreach ($prev_session_archers as $sa) {
+            $raw_sum += floatval($sa['fee']);
+        }
+        $session_total = ($is_family_capped || $raw_sum >= 75.00) ? 75.00 : $raw_sum;
+
         if ($action === 'add_walkin_next') {
             $loop_context = array(
                 'primary_contact' => !empty($group_name) ? $group_name : $name_val,
                 'phone'           => $group_phone,
                 'line_idx'        => $line_idx,
-                'pay_option'      => $pay_opt,
                 'family_id'       => $family_id,
                 'last_added_name' => $name_val,
+                'session_archers' => $prev_session_archers,
+                'session_total'   => $session_total,
+                'is_capped'       => $is_family_capped
             );
             $data['walkin_loop_context']          = $loop_context;
             $GLOBALS['sywat_walkin_loop_context'] = $loop_context;
 
-            return '<div class="sywat-alert sywat-alert-success">✅ <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully! Enter next archer below.</div>';
+            $cap_msg = $is_family_capped ? ' 🟢 (Family Cap Applied - $75.00 Max)' : '';
+            return '<div class="sywat-alert sywat-alert-success">✅ <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully! Running Total: $' . number_format($session_total, 2) . $cap_msg . '. Enter next archer below.</div>';
         }
 
-        return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully.</div>';
+        return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html($name_val) . '</strong> registered and checked in successfully. Total Due: $' . number_format($session_total, 2) . '</div>';
     }
 
     // Check-In
@@ -252,7 +319,7 @@ function sywat_desk_handle_actions(&$data) {
                 $reg['division']    = $division;
                 $reg['gender']      = sanitize_text_field($_POST['checkin_gender']);
                 $reg['style']       = $sanitize_style_for_division($style, $division);
-                $reg['paid']        = $calculate_paid_status($pay_opt, $division);
+                $reg['paid']        = ($pay_opt === 'Family') ? 'Family' : (($pay_opt === 'Field Governor') ? 'Field Governor' : (in_array($division, $youth_divs) ? 'Youth' : 'Adult'));
                 $reg['checked_in']  = 1;
                 $reg['balance_due'] = 0;
                 
@@ -364,7 +431,7 @@ function sywat_desk_handle_actions(&$data) {
             $reg['division']    = $division;
             $reg['gender']      = sanitize_text_field($_POST['edit_gender']);
             $reg['style']       = $sanitize_style_for_division($style, $division);
-            $reg['paid']        = $calculate_paid_status($pay_opt, $division);
+            $reg['paid']        = ($pay_opt === 'Family') ? 'Family' : (($pay_opt === 'Field Governor') ? 'Field Governor' : (in_array($division, $youth_divs) ? 'Youth' : 'Adult'));
             $reg['balance_due'] = isset($_POST['edit_balance_due']) ? floatval($_POST['edit_balance_due']) : 0;
             
             if ($reg['paid'] === 'Family') {
