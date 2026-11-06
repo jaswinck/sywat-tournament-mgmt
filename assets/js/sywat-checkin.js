@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.4.1
+ * Version: 6.4.2
  */
 
 function escapeHtmlDesk(str) {
@@ -260,7 +260,10 @@ function handleDeskTfaaAutocomplete(input) {
         item.addEventListener('mousedown', function(e) {
             e.preventDefault();
             const isPrimaryContact = (input.id === 'walkin_group_name' || input.name === 'walkin_group_name');
+            const prevVal = input.getAttribute('data-prev-val') || input.value;
+
             input.value = m.name;
+            input.setAttribute('data-prev-val', m.name);
             closeAllDeskTfaaAutocompletes();
 
             const form = input.closest('form');
@@ -276,7 +279,6 @@ function handleDeskTfaaAutocomplete(input) {
                 const phoneEl      = form ? form.querySelector('#walkin_group_phone, input[name="walkin_group_phone"]') : null;
                 const archerNameEl = form ? form.querySelector('#walkin_name_input, input[name="walkin_name"]') : null;
 
-                // 1. Auto-fill Phone Number if available
                 if (phoneEl && (m.phone || m.phone_number)) {
                     phoneEl.value = m.phone || m.phone_number;
                 } else if (phoneEl) {
@@ -286,12 +288,10 @@ function handleDeskTfaaAutocomplete(input) {
                     }
                 }
 
-                // 2. Auto-fill Archer Name if empty or previously matching
-                if (archerNameEl && (!archerNameEl.value || archerNameEl.value === m.name)) {
+                if (archerNameEl && (!archerNameEl.value || archerNameEl.value === prevVal || archerNameEl.value === input.value)) {
                     archerNameEl.value = m.name;
                 }
 
-                // 3. Auto-select Division, Gender, Style for Walk-In archer
                 const divEl   = form ? form.querySelector('select[name="walkin_division"]') : null;
                 const genEl   = form ? form.querySelector('select[name="walkin_gender"]') : null;
                 const styleEl = form ? form.querySelector('select[name="walkin_style"]') : null;
@@ -464,7 +464,7 @@ function autoFillOnNameChange(prefix) {
 
         if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
         if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
-        if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
+        if (styleEl && targetMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
 
         handleStyleRestrictions(prefix);
     } else if (prefix === 'walkin') {
@@ -500,7 +500,10 @@ function closeWalkinModal() {
     if (modal) modal.classList.remove('active');
 
     const contactInput = document.getElementById('walkin_group_name');
-    if (contactInput) contactInput.value = '';
+    if (contactInput) {
+        contactInput.value = '';
+        contactInput.setAttribute('data-prev-val', '');
+    }
 
     const phoneInput = document.getElementById('walkin_group_phone');
     if (phoneInput) phoneInput.value = '';
@@ -535,6 +538,11 @@ function openWalkinModal() {
     const lineSel = document.getElementById('walkin_line_index');
     if (lineSel) {
         updateWalkinFamilyOptions(lineSel.value);
+    }
+
+    const contactInput = document.getElementById('walkin_group_name');
+    if (contactInput) {
+        contactInput.setAttribute('data-prev-val', contactInput.value || '');
     }
 
     const walkinNameInput = document.getElementById('walkin_name_input');
@@ -609,18 +617,31 @@ function handleStyleRestrictions(type) {
     }
 }
 
+function handleWalkinGroupInput(input) {
+    if (!input) return;
+    const archerNameInput = document.getElementById('walkin_name_input');
+    const prevVal = input.getAttribute('data-prev-val') || '';
+    
+    if (archerNameInput) {
+        if (!archerNameInput.value || archerNameInput.value === prevVal) {
+            archerNameInput.value = input.value;
+            autoFillOnNameChange('walkin');
+        }
+    }
+    input.setAttribute('data-prev-val', input.value);
+}
+
+window.handleWalkinGroupInput = handleWalkinGroupInput;
+
 /**
  * Initializes Check-In Desk event listeners and pre-fills active forms.
  */
 function initSywatCheckin() {
     const walkinGroupName = document.getElementById('walkin_group_name');
     if (walkinGroupName) {
+        walkinGroupName.setAttribute('data-prev-val', walkinGroupName.value || '');
         walkinGroupName.addEventListener('input', function() {
-            const archerNameInput = document.getElementById('walkin_name_input');
-            if (archerNameInput && (!archerNameInput.value || archerNameInput.value === this.value.substring(0, this.value.length - 1))) {
-                archerNameInput.value = this.value;
-                autoFillOnNameChange('walkin');
-            }
+            handleWalkinGroupInput(this);
         });
     }
 
