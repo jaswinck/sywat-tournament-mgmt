@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.6.0
+ * Version: 6.6.1
  */
 
 function escapeHtmlDesk(str) {
@@ -61,6 +61,7 @@ function toggleUnpaidBanner(isChecked) {
 
 /**
  * Universal Shooter Match Engine querying 18-month historical results dataset and desk caches.
+ * Enforces strict profile completeness (must have valid Name, Division, and Style).
  */
 function getAllTfaaMatches(typedName) {
     if (!typedName) return [];
@@ -92,51 +93,22 @@ function getAllTfaaMatches(typedName) {
         rawMatches = rawMatches.concat(arrMatches);
     }
 
-    // 2. Fallback Check: window.tfaaData cache if present
-    if (window.tfaaData) {
-        if (window.tfaaData.exact && window.tfaaData.exact[clean]) {
-            const entry = window.tfaaData.exact[clean];
-            const arr = Array.isArray(entry) ? entry : [entry];
-            rawMatches = rawMatches.concat(arr);
-        }
-
-        if (window.tfaaData.fl) {
-            const parts = clean.split(' ');
-            if (parts.length > 1) {
-                const flKey = parts[0] + '___' + parts[parts.length - 1];
-                if (window.tfaaData.fl[flKey]) {
-                    const entry = window.tfaaData.fl[flKey];
-                    const arr = Array.isArray(entry) ? entry : [entry];
-                    rawMatches = rawMatches.concat(arr);
-                }
-            }
-        }
-
-        if (window.tfaaData.exact) {
-            const keys = Object.keys(window.tfaaData.exact);
-            for (let i = 0; i < keys.length; i++) {
-                const kClean = cleanDeskName(keys[i]);
-                if (kClean.includes(clean) || clean.includes(kClean)) {
-                    const entry = window.tfaaData.exact[keys[i]];
-                    const arr = Array.isArray(entry) ? entry : [entry];
-                    rawMatches = rawMatches.concat(arr);
-                }
-            }
-        }
-    }
-
-    // Deduplicate distinct (Name + Division + Gender + Style) entries for multi-style archers
+    // Deduplicate distinct complete (Name + Division + Gender + Style) entries
     const seen = new Set();
     const uniqueMatches = [];
 
     for (let m of rawMatches) {
         if (!m) continue;
         const nameStr = (m.full_name || m.name || '').trim();
-        if (!nameStr) continue;
         const divStr  = (m.division || '').trim();
         const styStr  = (m.style || '').trim();
         const genStr  = (m.gender || '').trim();
-        
+
+        // Must have valid name, division, and style to be a complete profile
+        if (!nameStr || !styStr || styStr.toLowerCase() === 'no show' || !divStr || divStr.toLowerCase() === 'no show') {
+            continue;
+        }
+
         const dedupKey = (cleanDeskName(nameStr) + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
         if (!seen.has(dedupKey)) {
             seen.add(dedupKey);
@@ -220,7 +192,7 @@ function matchDeskTfaaSelect(value, selectEl) {
         'genesis': 'genesis'
     };
 
-    const cleanBase = clean.split(' –')[0].trim();
+    const cleanBase = clean.split(' –')[0].split(' - ')[0].trim();
     let mappedTarget = styleMap[clean] || styleMap[cleanBase] || '';
 
     // 1. Direct or mapped target matching
@@ -286,7 +258,14 @@ function handleDeskTfaaAutocomplete(input) {
     matches.forEach(m => {
         const item = document.createElement('div');
         item.className = 'sywat-desk-tfaa-item';
-        item.innerHTML = `<strong>${escapeHtmlDesk(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtmlDesk(m.division || '')}</span>`;
+
+        let badgeText = m.division || '';
+        if (m.style) {
+            const shortSty = m.style.split(' – ')[0].split(' - ')[0];
+            badgeText += badgeText ? ' (' + shortSty + ')' : shortSty;
+        }
+
+        item.innerHTML = `<strong>${escapeHtmlDesk(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtmlDesk(badgeText)}</span>`;
 
         item.addEventListener('mousedown', function(e) {
             e.preventDefault();
@@ -415,7 +394,7 @@ function evaluateTfaaStatus(prefix) {
     tfaaMatches.forEach(cat => {
         const catName = cat.full_name || cat.name || '';
         if (cat.style) {
-            let shortSty = cat.style.split(' – ')[0];
+            let shortSty = cat.style.split(' – ')[0].split(' - ')[0];
             if (!knownStyles.includes(shortSty)) knownStyles.push(shortSty);
         }
 
@@ -430,8 +409,8 @@ function evaluateTfaaStatus(prefix) {
         const divMatch   = (cDiv === uDiv) || (cDiv && uDiv && (cDiv.includes(uDiv.split(' (')[0].trim()) || uDiv.includes(cDiv.split(' (')[0].trim())));
         const genMatch   = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
         
-        const cStylePrefix = cSty.split(' –')[0].trim();
-        const uStylePrefix = uSty.split(' –')[0].trim();
+        const cStylePrefix = cSty.split(' –')[0].split(' -')[0].trim();
+        const uStylePrefix = uSty.split(' –')[0].split(' -')[0].trim();
         const styleMatch   = (cSty === uSty) || (cStylePrefix === uStylePrefix) || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
         if (divMatch && genMatch && styleMatch) {
@@ -441,8 +420,8 @@ function evaluateTfaaStatus(prefix) {
         }
 
         const divShort = cat.division ? cat.division.split(' ')[0] : '';
-        const genShort = cat.gender ? cat.gender.charAt(0) : '';
-        const styShort = cat.style ? cat.style.split(' – ')[0] : '';
+        const genShort = cat.gender ? (cat.gender.toLowerCase().startsWith('f') ? 'F' : 'M') : '';
+        const styShort = cat.style ? cat.style.split(' – ')[0].split(' - ')[0] : '';
 
         const pillBtn = document.createElement('button');
         pillBtn.type = 'button';
@@ -485,9 +464,12 @@ function evaluateTfaaStatus(prefix) {
     if (isCategoryMatch && isNameMatch) {
         badgeEl.className = 'sywat-badge-verified';
         badgeText = '🟢 TFAA Validated: ' + knownStyles.join(', ');
-    } else if (isCategoryMatch && !isNameMatch) {
+    } else if (!isNameMatch && officialName !== '') {
         badgeEl.className = 'sywat-badge-known';
         badgeText = '⚠️ Name Mismatch (Known Styles: ' + knownStyles.join(', ') + ')';
+    } else if (!currStyle || currStyle.toLowerCase() === 'no show') {
+        badgeEl.className = 'sywat-badge-known';
+        badgeText = '🔵 Member Profile Available (Known Styles: ' + knownStyles.join(', ') + ')';
     } else {
         badgeEl.className = 'sywat-badge-known';
         badgeText = '⚠️ Style Mismatch (Known Styles: ' + knownStyles.join(', ') + ')';
