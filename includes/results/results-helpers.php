@@ -3,14 +3,14 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.7.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Fetches distinct historical archer profiles across Indoor and Outdoor cycles (18-Month Rolling Window).
- * Queries custom scores tables and tournament registration options, returning distinct (Name, Division, Gender, Style) combinations.
+ * Queries custom scores tables and tournament registration options, returning ONLY complete (Name, Division, Gender, Style) profiles.
  *
  * @return array List of shooter objects for JS localization.
  */
@@ -36,8 +36,8 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
                 FROM {$scores_table}
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 18 MONTH)
                   AND name IS NOT NULL AND name != ''
-                  AND division != 'No Show'
-                  AND style != 'No Show'
+                  AND division IS NOT NULL AND division != '' AND division != 'No Show'
+                  AND style IS NOT NULL AND style != '' AND style != 'No Show'
                 GROUP BY LOWER(TRIM(name)), LOWER(TRIM(division)), LOWER(TRIM(gender)), LOWER(TRIM(style))
                 ORDER BY last_shot DESC
             ";
@@ -73,7 +73,8 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
                     $style    = isset( $reg['style'] ) ? trim( $reg['style'] ) : '';
                     $phone    = isset( $reg['phone'] ) ? trim( $reg['phone'] ) : '';
 
-                    if ( empty( $name ) || $division === 'No Show' || $style === 'No Show' ) continue;
+                    // Require complete profiles only (must have name, division, and style)
+                    if ( empty( $name ) || empty( $style ) || empty( $division ) || $division === 'No Show' || $style === 'No Show' ) continue;
 
                     $key = strtolower( $name . '___' . $division . '___' . $gender . '___' . $style );
                     if ( ! isset( $seen_keys[$key] ) ) {
