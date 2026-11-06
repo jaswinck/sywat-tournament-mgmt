@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.1
+ * Version: 6.4.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -29,8 +29,23 @@ function sywat_desk_render_modals($data) {
     $existing_families         = $data['existing_families'];
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
     
-    // Fast-Loop Context Persistence
-    $walkin_context            = isset($data['walkin_loop_context']) ? $data['walkin_loop_context'] : array();
+    // Fast-Loop Context Persistence with 3-tier fail-safe checking
+    $walkin_context = array();
+    if (!empty($data['walkin_loop_context'])) {
+        $walkin_context = $data['walkin_loop_context'];
+    } elseif (!empty($GLOBALS['sywat_walkin_loop_context'])) {
+        $walkin_context = $GLOBALS['sywat_walkin_loop_context'];
+    } elseif (isset($_POST['sywat_action']) && $_POST['sywat_action'] === 'add_walkin_next') {
+        $walkin_context = array(
+            'primary_contact' => isset($_POST['walkin_group_name']) ? sanitize_text_field($_POST['walkin_group_name']) : '',
+            'phone'           => isset($_POST['walkin_group_phone']) ? sanitize_text_field($_POST['walkin_group_phone']) : '',
+            'line_idx'        => isset($_POST['walkin_line_index']) ? sanitize_text_field($_POST['walkin_line_index']) : $selected_line_idx,
+            'pay_option'      => isset($_POST['walkin_pay_option']) ? sanitize_text_field($_POST['walkin_pay_option']) : 'Individual',
+            'family_id'       => isset($_POST['walkin_family_group_id']) ? sanitize_text_field($_POST['walkin_family_group_id']) : '',
+            'last_added_name' => isset($_POST['walkin_name']) ? sanitize_text_field($_POST['walkin_name']) : '',
+        );
+    }
+
     $is_walkin_active          = !empty($walkin_context);
     $saved_contact             = isset($walkin_context['primary_contact']) ? $walkin_context['primary_contact'] : '';
     $saved_phone               = isset($walkin_context['phone']) ? $walkin_context['phone'] : '';
@@ -376,9 +391,16 @@ function sywat_desk_render_modals($data) {
                             <label for="walkin_family_group_id">Line Family Group:</label>
                             <select name="walkin_family_group_id" id="walkin_family_group_id">
                                 <option value="">[ + Start New Family Group for This Line ]</option>
-                                <?php foreach ($existing_families as $fid => $flabel): ?>
-                                    <option value="<?php echo esc_attr($fid); ?>" <?php selected($saved_fam_id, $fid); ?>><?php echo esc_html($flabel); ?></option>
-                                <?php endforeach; ?>
+                                <?php 
+                                $fam_found = false;
+                                foreach ($existing_families as $fid => $flabel) {
+                                    if ($fid === $saved_fam_id) $fam_found = true;
+                                    echo '<option value="' . esc_attr($fid) . '" ' . selected($saved_fam_id, $fid, false) . '>' . esc_html($flabel) . '</option>';
+                                }
+                                if (!empty($saved_fam_id) && !$fam_found) {
+                                    echo '<option value="' . esc_attr($saved_fam_id) . '" selected>' . esc_html($saved_contact . ' (Family Cap)') . '</option>';
+                                }
+                                ?>
                             </select>
                         </div>
                     </div>
