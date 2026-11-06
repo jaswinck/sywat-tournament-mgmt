@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -123,13 +123,13 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <div class="sywat-field-group">
                                     <label for="edit_pay_option">Paid Option</label>
                                     <select name="edit_pay_option" id="edit_pay_option" required onchange="updatePaidStatusDisplay('edit');">
-                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual</option>
-                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family</option>
-                                        <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor</option>
+                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual Rate ($25 / $30)</option>
+                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family Group ($75 Cap for 3+ Archers)</option>
+                                        <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor (Free)</option>
                                     </select>
                                 </div>
 
-                                <div class="sywat-field-group" id="edit_family_group_box" <?php if ( $curr_pay_opt !== 'Family' ) echo 'style="display:none;"'; ?>>
+                                <div class="sywat-field-group <?php if ( $curr_pay_opt !== 'Family' ) echo 'sywat-hidden'; ?>" id="edit_family_group_box">
                                     <label for="edit_family_group_id">Assign to Line Family Group</label>
                                     <select name="edit_family_group_id" id="edit_family_group_id">
                                         <option value="">[ + Start New Family Group for This Line ]</option>
