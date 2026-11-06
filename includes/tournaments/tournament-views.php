@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.8.0
+ * Version: 6.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,6 +59,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $scoped_tournaments = $data['scoped_tournaments'];
         $filter_shops       = $data['filter_shops'];
         $tfaa_count         = $data['tfaa_count'];
+
+        // Build list of unique TFAA districts across scoped tournaments
+        $filter_districts = array();
+        foreach ( $scoped_tournaments as $t_info ) {
+            $s_id   = sywat_get_tournament_shop_id( $t_info );
+            $d_name = ( ! empty( $s_id ) && isset( $all_shops[$s_id]['district'] ) && ! empty( $all_shops[$s_id]['district'] ) ) ? $all_shops[$s_id]['district'] : '';
+            if ( ! empty( $d_name ) && ! in_array( $d_name, $filter_districts ) ) {
+                $filter_districts[] = $d_name;
+            }
+        }
+        sort( $filter_districts );
         ?>
 
         <div class="sywat-wrap">
@@ -125,6 +136,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <h2>Configured Events</h2>
 
                         <div class="sywat-table-header-controls">
+                            <!-- District Dropdown Filter -->
+                            <?php if ( count( $filter_districts ) > 0 ): ?>
+                                <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
+                                    <option value="all">All Districts</option>
+                                    <?php foreach ( $filter_districts as $dist ): ?>
+                                        <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>">🗺️ <?php echo esc_html( $dist ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+
+                            <!-- Shop Dropdown Filter -->
                             <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
                                 <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
                                     <option value="all">All Shops</option>
@@ -137,6 +159,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
+
+                            <!-- Option 1: Deactivate All Hubs Form -->
+                            <?php if ( $can_manage_seasons ): ?>
+                                <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
+                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                    <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
+                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">⚪ Deactivate All Hubs</button>
+                                </form>
+                            <?php endif; ?>
 
                             <!-- Push Standings Form -->
                             <?php if ( $can_manage_seasons ): ?>
@@ -169,7 +200,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $t_season_slug = sywat_get_tournament_season_slug( $t_data );
                                             $t_season_name = isset( $seasons[$t_season_slug]['name'] ) ? $seasons[$t_season_slug]['name'] : 'Active Season';
                                             
-                                            // Dynamic Host Shop Name Resolution
+                                            // Dynamic Host Shop Name & District Resolution
                                             $t_shop_name = '';
                                             if ( is_array( $t_data ) && ! empty( $t_data['shop_name'] ) ) {
                                                 $t_shop_name = $t_data['shop_name'];
@@ -182,6 +213,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             } else {
                                                 $t_shop_name = 'Host Archery Shop';
                                             }
+
+                                            $t_district = ( ! empty( $t_shop_id ) && isset( $all_shops[$t_shop_id]['district'] ) && ! empty( $all_shops[$t_shop_id]['district'] ) ) ? $all_shops[$t_shop_id]['district'] : '';
 
                                             $is_ccr = ( strcasecmp( trim( $t_shop_name ), 'Cinnamon Creek Ranch' ) === 0 || $t_shop_id === 'shop_ccr' );
 
@@ -196,12 +229,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $reg_count     = sywat_get_tournament_count( $t_name, $registrations );
                                             $is_active_hub = in_array( $t_name, $active_tournaments );
                                         ?>
-                                        <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>">
+                                        <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>" data-district="<?php echo esc_attr(strtolower($t_district)); ?>">
                                             <!-- Column 1: Metadata & Volunteer Hub Toggle -->
                                             <td>
                                                 <strong class="sywat-tourn-title"><?php echo esc_html( $t_name ); ?></strong>
                                                 <div class="sywat-tourn-season">🏆 <?php echo esc_html( $t_season_name ); ?></div>
-                                                <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                                <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?><?php if ( ! empty( $t_district ) ): ?> <span class="sywat-label-subtext">(🗺️ <?php echo esc_html( $t_district ); ?>)</span><?php endif; ?></div>
                                                 <div class="sywat-tourn-dates">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
                                                 
                                                 <!-- Volunteer Hub Toggle Chip -->
