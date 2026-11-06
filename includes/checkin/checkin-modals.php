@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.3.1
  */
 
 if (!defined('ABSPATH')) exit;
