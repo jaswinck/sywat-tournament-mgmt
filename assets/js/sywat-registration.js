@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 6.1.0
+ * Version: 6.2.0
  */
 
 (function() {
@@ -387,7 +387,8 @@
 
         Object.keys(lineMap).forEach(lIdx => {
             const grp = lineMap[lIdx];
-            const isCapped = (grp.rawTotal >= 75 || grp.count >= 3);
+            // Enforce Family Cap: Requires 3+ archers AND a raw total of $75 or higher
+            const isCapped = (grp.count >= 3 && grp.rawTotal >= 75.00);
             if (isCapped) {
                 anyCapped = true;
                 cappedLinesCount++;
