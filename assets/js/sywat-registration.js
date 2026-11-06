@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 6.3.0
+ * Version: 6.4.0
  */
 
 (function() {
@@ -9,9 +9,6 @@
 
     let archerRowCount = 1;
 
-    /**
-     * Data Accessors (Supports wp_localize_script and legacy inline globals)
-     */
     function getTfaaShooters() {
         if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
             return window.sywatRegData.tfaaShooters;
@@ -32,9 +29,6 @@
         return {};
     }
 
-    /**
-     * HTML Escaping Utility
-     */
     function escapeHtml(str) {
         if (!str) return '';
         return String(str)
@@ -44,9 +38,6 @@
             .replace(/"/g, '&quot;');
     }
 
-    /**
-     * Auto-fill Phone Number from Shooter Cache
-     */
     window.checkAndFillPhone = function(archerName) {
         if (!archerName) return;
         const phoneCache = getPhoneCache();
@@ -59,9 +50,6 @@
         }
     };
 
-    /**
-     * Input Handler: Primary Caller Name
-     */
     window.handleCallerNameInput = function(callerInput) {
         const firstArcherInput = document.getElementById('sywat_first_archer_name') || document.querySelector('.sywat-archer-name-input');
         if (!firstArcherInput) return;
@@ -74,9 +62,6 @@
         window.checkAndFillPhone(callerInput.value);
     };
 
-    /**
-     * Input Handler: Archer Name Field
-     */
     window.handleArcherNameInput = function(archerInput) {
         const callerInput = document.getElementById('sywat_group_name');
         if (callerInput && archerInput.id === 'sywat_first_archer_name') {
@@ -91,9 +76,6 @@
         window.checkAndFillPhone(archerInput.value);
     };
 
-    /**
-     * Change Handler: Division Dropdown
-     */
     window.handleDivisionChange = function(divSelect) {
         if (!divSelect) return;
         divSelect.dataset.userChosen = 'true';
@@ -114,9 +96,6 @@
         window.recalculateGroupTotal();
     };
 
-    /**
-     * Change Handler: Target Distance Dropdown
-     */
     window.handleDistanceChange = function(distSelect) {
         const row = distSelect.closest('.sywat-archer-input-row');
         if (!row) return;
@@ -133,9 +112,6 @@
         window.recalculateGroupTotal();
     };
 
-    /**
-     * Fuzzy Division Matcher for Historical Shooter Records
-     */
     window.matchTfaaDivision = function(tfaaDiv, selectEl) {
         if (!tfaaDiv || !selectEl) return;
         const cleanTfaa = tfaaDiv.trim().toLowerCase();
@@ -164,7 +140,7 @@
     };
 
     /**
-     * Historical Archer Autocomplete Dropdown Generator
+     * Registration Autocomplete: Auto-fills Name and Age Division ONLY.
      */
     window.handleTfaaAutocomplete = function(input) {
         const query = input.value.trim().toLowerCase();
@@ -175,19 +151,19 @@
             return;
         }
 
-        const matches = shooters.filter(s => s.name && s.name.toLowerCase().includes(query)).slice(0, 8);
-        const exactMatch = shooters.find(s => s.name && s.name.trim().toLowerCase() === query);
-        const targetMatch = exactMatch || (matches.length === 1 ? matches[0] : null);
+        // Filter unique names for intake autocomplete
+        const seenNames = new Set();
+        const matches = [];
 
-        if (targetMatch && targetMatch.division) {
-            const row = input.closest('.sywat-archer-input-row');
-            if (row) {
-                const divSelect = row.querySelector('.sywat-division-select');
-                if (divSelect && (!divSelect.dataset.userChosen || query === targetMatch.name.toLowerCase())) {
-                    window.matchTfaaDivision(targetMatch.division, divSelect);
+        shooters.forEach(s => {
+            if (s.name && s.name.toLowerCase().includes(query)) {
+                const norm = s.name.trim().toLowerCase();
+                if (!seenNames.has(norm)) {
+                    seenNames.add(norm);
+                    matches.push(s);
                 }
             }
-        }
+        });
 
         if (matches.length === 0) return;
 
@@ -199,17 +175,11 @@
         const dropdown = document.createElement('div');
         dropdown.className = 'sywat-tfaa-autocomplete-dropdown';
 
-        matches.forEach(m => {
+        matches.slice(0, 8).forEach(m => {
             const item = document.createElement('div');
             item.className = 'sywat-tfaa-item';
 
-            let badgeText = m.division || '';
-            if (m.style) {
-                const shortSty = m.style.split(' – ')[0].split(' - ')[0];
-                badgeText += badgeText ? ' (' + shortSty + ')' : shortSty;
-            }
-
-            item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtml(badgeText)}</span>`;
+            item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtml(m.division || '')}</span>`;
 
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
@@ -238,16 +208,10 @@
         parent.appendChild(dropdown);
     };
 
-    /**
-     * Close All Active Autocomplete Dropdowns
-     */
     window.closeAllTfaaAutocompletes = function() {
         document.querySelectorAll('.sywat-tfaa-autocomplete-dropdown').forEach(el => el.remove());
     };
 
-    /**
-     * Phone Number Formatting Utility (XXX-XXX-XXXX)
-     */
     window.formatPhoneNumber = function(input) {
         let digits = input.value.replace(/\D/g, '');
         if (digits.length > 10) digits = digits.substring(0, 10);
@@ -261,9 +225,6 @@
         }
     };
 
-    /**
-     * Bulk Update Shooting Line Overrides
-     */
     window.updateAllArcherLines = function(selectedLineIdx) {
         if (selectedLineIdx !== undefined && selectedLineIdx !== null && selectedLineIdx !== '') {
             sessionStorage.setItem('sywat_last_line_idx', selectedLineIdx);
@@ -275,9 +236,6 @@
         window.recalculateGroupTotal();
     };
 
-    /**
-     * Dynamic Row Management: Add Archer Row
-     */
     window.addArcherRow = function() {
         const container = document.getElementById('sywat_archer_rows_container');
         if (!container) return;
@@ -343,9 +301,6 @@
         window.recalculateGroupTotal();
     };
 
-    /**
-     * Dynamic Row Management: Remove Archer Row
-     */
     window.removeArcherRow = function(btn) {
         const rows = document.querySelectorAll('.sywat-archer-input-row');
         if (rows.length <= 1) {
@@ -356,9 +311,6 @@
         window.recalculateGroupTotal();
     };
 
-    /**
-     * Group Total & Family Capping Recalculations Engine
-     */
     window.recalculateGroupTotal = function() {
         const rows = document.querySelectorAll('.sywat-archer-input-row');
         const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
@@ -394,7 +346,6 @@
 
         Object.keys(lineMap).forEach(lIdx => {
             const grp = lineMap[lIdx];
-            // Enforce Family Cap: Requires 3+ archers AND a raw total of $75 or higher
             const isCapped = (grp.count >= 3 && grp.rawTotal >= 75.00);
             if (isCapped) {
                 anyCapped = true;
@@ -426,14 +377,10 @@
         if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
     };
 
-    /**
-     * Auto-dismiss Alert Banners (Excludes interactive action forms/prompts)
-     */
     window.initAutoDismissAlerts = function() {
         setTimeout(function() {
             const alerts = document.querySelectorAll('.sywat-alert, #sywat-notice, .sywat-modal-notice');
             alerts.forEach(function(alert) {
-                // Do not auto-dismiss alerts containing interactive form actions or overflow warning prompts
                 if (alert.querySelector('form') || alert.querySelector('button') || (alert.textContent && alert.textContent.includes('OVERFLOW'))) {
                     return;
                 }
@@ -443,9 +390,6 @@
         }, 5000);
     };
 
-    /**
-     * Global Event Listeners
-     */
     document.addEventListener('input', function(e) {
         if (e.target && e.target.name && e.target.name.includes('[name]')) {
             window.handleTfaaAutocomplete(e.target);
