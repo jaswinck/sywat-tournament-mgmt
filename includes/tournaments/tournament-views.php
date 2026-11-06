@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,7 +168,22 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $t_shop_id     = sywat_get_tournament_shop_id( $t_data );
                                             $t_season_slug = sywat_get_tournament_season_slug( $t_data );
                                             $t_season_name = isset( $seasons[$t_season_slug]['name'] ) ? $seasons[$t_season_slug]['name'] : 'Active Season';
-                                            $t_shop_name   = isset( $all_shops[$t_shop_id]['name'] ) ? $all_shops[$t_shop_id]['name'] : 'Cinnamon Creek Ranch';
+                                            
+                                            // Dynamic Host Shop Name Resolution
+                                            $t_shop_name = '';
+                                            if ( is_array( $t_data ) && ! empty( $t_data['shop_name'] ) ) {
+                                                $t_shop_name = $t_data['shop_name'];
+                                            } elseif ( is_array( $t_data ) && ! empty( $t_data['official_shop_name'] ) ) {
+                                                $t_shop_name = $t_data['official_shop_name'];
+                                            } elseif ( is_array( $t_data ) && ! empty( $t_data['location_display'] ) ) {
+                                                $t_shop_name = $t_data['location_display'];
+                                            } elseif ( ! empty( $t_shop_id ) && isset( $all_shops[$t_shop_id]['name'] ) ) {
+                                                $t_shop_name = $all_shops[$t_shop_id]['name'];
+                                            } else {
+                                                $t_shop_name = 'Host Archery Shop';
+                                            }
+
+                                            $is_ccr = ( strcasecmp( trim( $t_shop_name ), 'Cinnamon Creek Ranch' ) === 0 || $t_shop_id === 'shop_ccr' );
 
                                             $s_date        = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
                                             $e_date        = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
@@ -191,7 +206,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 
                                                 <!-- Volunteer Hub Toggle Chip -->
                                                 <div class="sywat-table-action-form">
-                                                    <?php if ( $t_shop_id === 'shop_ccr' ): ?>
+                                                    <?php if ( $is_ccr ): ?>
                                                         <form method="post" class="sywat-table-action-form">
                                                             <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                             <input type="hidden" name="sywat_action" value="toggle_active_tournament">
