@@ -1,6 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
+   Version: 6.2.0
    ========================================================================== */
 
 /* 1. Modal Container & Backdrop Engine */
@@ -46,8 +47,8 @@
 /* Modal Sizing Modifiers */
 .sywat-modal-sm { width: min(94vw, 480px); }
 .sywat-modal-md { width: min(94vw, 620px); }
-.sywat-modal-lg { width: min(94vw, 780px); max-width: 780px; }
-.sywat-modal-xl { width: min(94vw, 900px); max-width: 900px; }
+.sywat-modal-lg { width: min(96vw, 920px); max-width: 920px; }
+.sywat-modal-xl { width: min(96vw, 1150px); max-width: 1150px; }
 
 /* Capacity Overflow Overlay Overrides */
 .sywat-modal-overflow-backdrop {
@@ -118,6 +119,12 @@
     padding: 20px; 
     overflow-y: auto;
     flex: 1 1 auto; 
+}
+
+.sywat-modal-body .sywat-table-responsive {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 .sywat-modal-body .sywat-form-grid-2,
