@@ -4,7 +4,7 @@
  * Path: includes/class-sywat-accounting.php
  * Description: Host vs. TFAA 50/50 fee split math, family cap calculations, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -370,6 +370,11 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
         });
 
         $acct = sywat_calculate_accounting_totals($filtered_registrations);
+
+        $active_t_slug    = sanitize_title( $selected_tournament );
+        $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
+        $raw_closed       = get_option( $closed_lines_key, array() );
+        $closed_lines     = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
         ?>
 
         <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
@@ -431,46 +436,67 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                         <tbody>
                             <?php $num = 1; foreach ( $filtered_registrations as $reg ): ?>
                                 <?php 
-                                    $is_checked_in = ! empty( $reg['checked_in'] );
-                                    $is_no_show    = ( isset( $reg['division'] ) && $reg['division'] === 'No Show' );
+                                    $is_checked_in  = ! empty( $reg['checked_in'] );
+                                    $is_waitlist    = isset( $reg['status'] ) && strcasecmp( trim( $reg['status'] ), 'Waitlist' ) === 0;
+                                    $raw_div        = ! empty( $reg['division'] ) ? $reg['division'] : '—';
+                                    
+                                    $resolved_l_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $available_lines ) : ( isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0' );
+                                    $reg_line_name  = ( isset( $reg['line_name'] ) && ! empty( trim( $reg['line_name'] ) ) ) ? trim( $reg['line_name'] ) : ( isset( $available_lines[$resolved_l_idx]['name'] ) ? trim( $available_lines[$resolved_l_idx]['name'] ) : '' );
+                                    $is_line_closed = in_array( (string)$resolved_l_idx, $closed_lines, true ) || ( $reg_line_name !== '' && in_array( $reg_line_name, $closed_lines, true ) );
+
+                                    $is_no_show     = ! $is_waitlist && ! $is_checked_in && ( $is_line_closed || $raw_div === 'No Show' );
 
                                     if ( $is_no_show ) {
                                         $division_disp = 'No Show';
                                         $gender_disp   = 'No Show';
                                         $style_disp    = 'No Show';
-                                        $print_score   = '';
-                                        $print_x       = '';
+                                        $paid_cat      = 'No Show';
+                                        $print_score   = '—';
+                                        $print_x       = '—';
                                     } elseif ( $is_checked_in ) {
                                         $division_disp = ! empty( $reg['division'] ) ? esc_html( $reg['division'] ) : '';
                                         $gender_disp   = ! empty( $reg['gender'] ) ? esc_html( $reg['gender'] ) : '';
                                         $style_disp    = ! empty( $reg['style'] ) ? esc_html( $reg['style'] ) : '';
                                         $print_score   = ( isset( $reg['score'] ) && $reg['score'] !== '' ) ? esc_html( $reg['score'] ) : '';
                                         $print_x       = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' ) ? esc_html( $reg['x_count'] ) : '';
+
+                                        $due_amt = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
+                                        if ( $due_amt > 0 ) {
+                                            $paid_cat = '<span style="color:#dc3545;">DUE: $' . number_format( $due_amt, 2 ) . '</span>';
+                                        } else {
+                                            $paid_cat = ! empty( $reg['paid'] ) ? esc_html( $reg['paid'] ) : 'Youth / Adult / Fam';
+                                            if ( $reg['paid'] === 'Family' ) {
+                                                $fam_id_str = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
+                                                $fam_calc   = function_exists( 'sywat_calculate_family_group_balance' ) ? sywat_calculate_family_group_balance( $fam_id_str, 'all', $registrations ) : null;
+                                                
+                                                if ( $fam_calc && empty( $fam_calc['is_family_capped'] ) ) {
+                                                    $is_youth = ( stripos( $division_disp, 'Cub' ) !== false || stripos( $division_disp, 'Youth' ) !== false || stripos( $division_disp, 'Young Adult' ) !== false );
+                                                    $paid_cat = $is_youth ? 'Youth' : 'Adult';
+                                                } elseif ( $fam_id_str ) {
+                                                    $paid_cat .= '<br><span style="font-size:7px; color:#646970; word-break:break-all; font-weight:normal;">(' . esc_html( $fam_id_str ) . ')</span>';
+                                                }
+                                            }
+                                        }
                                     } else {
+                                        // Unchecked archer on an open line (Blank fill-in fields for pre-printed scoring)
                                         $division_disp = 'A | S | SS | MS<br>C | Y | YA | PRO';
                                         $gender_disp   = 'M | F';
                                         $style_disp    = 'FS | FSL | BB | FLS-R | BHFS | MBH | TRAD | BBR | BBC | LB | GENESIS';
                                         $print_score   = '';
                                         $print_x       = '';
-                                    }
 
-                                    $due_amt = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                                    if ($due_amt > 0) {
-                                        $paid_cat = '<span style="color:#dc3545;">DUE: $' . number_format($due_amt, 2) . '</span>';
-                                    } else {
-                                        $paid_cat = ! empty( $reg['paid'] ) ? esc_html($reg['paid']) : 'Youth / Adult / Fam';
-                                        if ( $reg['paid'] === 'Family' ) {
-                                            $fam_id_str = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
-                                            if ( $fam_id_str ) {
-                                                $paid_cat .= '<br><span style="font-size:7px; color:#646970; word-break:break-all; font-weight:normal;">(' . esc_html( $fam_id_str ) . ')</span>';
-                                            }
+                                        $due_amt = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
+                                        if ( $due_amt > 0 ) {
+                                            $paid_cat = '<span style="color:#dc3545;">DUE: $' . number_format( $due_amt, 2 ) . '</span>';
+                                        } else {
+                                            $paid_cat = ! empty( $reg['paid'] ) ? esc_html( $reg['paid'] ) : 'Youth / Adult / Fam';
                                         }
                                     }
                                 ?>
                                 <tr>
                                     <td><strong><?php echo $num++; ?></strong></td>
                                     <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
-                                    <td style="font-size: 9px;"><?php echo esc_html( isset( $reg['line_name'] ) ? $reg['line_name'] : '' ); ?></td>
+                                    <td style="font-size: 9px;"><?php echo esc_html( $reg_line_name ); ?></td>
                                     <td style="font-size: 9px; line-height: 1.1; white-space: nowrap;"><?php echo $division_disp; ?></td>
                                     <td style="font-size: 9px;"><?php echo $gender_disp; ?></td>
                                     <td style="font-size: 9px; line-height: 1.1;"><?php echo $style_disp; ?></td>
