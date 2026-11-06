@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.4.3
+ * Version: 6.5.0
  */
 
 function escapeHtmlDesk(str) {
@@ -14,7 +14,7 @@ function updateWalkinFamilyOptions(lineIdx) {
     if (!famSelect) return;
 
     const currentVal = famSelect.value;
-    famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+    famSelect.innerHTML = '<option value="">[ Auto-Create Group for Primary Contact ]</option>';
 
     const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
 
@@ -491,7 +491,7 @@ function autoFillOnNameChange(prefix) {
 
         if (divEl && targetMatch.division) matchDeskTfaaSelect(targetMatch.division, divEl);
         if (genEl && targetMatch.gender) matchDeskTfaaSelect(targetMatch.gender, genEl);
-        if (styleEl && targetMatch.style) matchDeskTfaaSelect(targetMatch.style, styleEl);
+        if (styleEl && targetMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
 
         handleStyleRestrictions(prefix);
     } else if (prefix === 'walkin') {
@@ -500,12 +500,10 @@ function autoFillOnNameChange(prefix) {
             const divEl   = document.getElementById(prefix + '_division');
             const genEl   = document.getElementById(prefix + '_gender');
             const styleEl = document.getElementById(prefix + '_style');
-            const payEl   = document.getElementById(prefix + '_pay_option');
 
             if (divEl && shopMatch.division) matchDeskTfaaSelect(shopMatch.division, divEl);
             if (genEl && shopMatch.gender) matchDeskTfaaSelect(shopMatch.gender, genEl);
             if (styleEl && shopMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
-            if (payEl && shopMatch.paid) payEl.value = shopMatch.paid;
 
             handleStyleRestrictions(prefix);
         }
@@ -537,13 +535,12 @@ function closeWalkinModal() {
     const styleEl = document.getElementById('walkin_style');
     if (styleEl) styleEl.value = '';
 
-    const payEl = document.getElementById('walkin_pay_option');
-    if (payEl) payEl.value = 'Individual';
+    const jsonInput = document.querySelector('input[name="walkin_session_archers_json"]');
+    if (jsonInput) jsonInput.value = '';
 
     const famSel = document.getElementById('walkin_family_group_id');
     if (famSel) famSel.value = '';
 
-    toggleFamilyBox('walkin');
     handleStyleRestrictions('walkin');
     evaluateTfaaStatus('walkin');
     closeAllDeskTfaaAutocompletes();
@@ -569,14 +566,9 @@ function openWalkinModal() {
 }
 
 function toggleFamilyBox(type) {
-    const payOpt = document.getElementById(type + '_pay_option');
-    const box    = document.getElementById(type + '_family_box');
-    if (payOpt && box) {
-        if (payOpt.value === 'Family') {
-            box.classList.remove('sywat-hidden');
-        } else {
-            box.classList.add('sywat-hidden');
-        }
+    const box = document.getElementById(type + '_family_box');
+    if (box) {
+        box.classList.remove('sywat-hidden');
     }
 }
 
@@ -587,12 +579,6 @@ function continueFamilyLoop(familyId, lineIdx) {
     if (lineSelect && lineIdx !== undefined) {
         lineSelect.value = lineIdx;
         updateWalkinFamilyOptions(lineIdx);
-    }
-
-    const payOptSelect = document.getElementById('walkin_pay_option');
-    if (payOptSelect) {
-        payOptSelect.value = 'Family';
-        toggleFamilyBox('walkin');
     }
 
     const familySelect = document.getElementById('walkin_family_group_id');
@@ -677,7 +663,6 @@ function initSywatCheckin() {
             autoFillOnNameChange('checkin');
         });
         autoFillOnNameChange('checkin');
-        toggleFamilyBox('checkin');
     }
 
     const searchInput = document.getElementById('sywat_search_input');
