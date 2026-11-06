@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 6.7.0
+ * Version: 6.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -232,6 +232,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                                 $day_str   = isset( $line['day'] ) ? $line['day'] : '';
                                                                 $time_str  = isset( $line['time'] ) ? $line['time'] : ( isset( $line['start_time'] ) ? $line['start_time'] : '' );
                                                                 $line_title = ! empty( $line['name'] ) ? $line['name'] : ( ( ! empty( $day_str ) && ! empty( $time_str ) ) ? trim( $day_str . ' ' . $time_str ) : 'Line ' . ($idx + 1) );
+
+                                                                // View Normalization for Line Times (6AM/6:00AM -> 6PM, 6:00PM -> 6PM)
+                                                                $line_title = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $line_title );
+                                                                $line_title = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $line_title );
+                                                                $line_title = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $line_title );
 
                                                                 $c_20 = sywat_count_registered( $t_name, $idx, '20yd', $registrations );
                                                                 $m_20 = sywat_get_line_max_cap( $line, '20yd' );
