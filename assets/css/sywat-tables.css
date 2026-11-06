@@ -201,6 +201,46 @@
 .sywat-col-roster-dist   { width: 14%; text-align: center; }
 .sywat-col-roster-action { width: 18%; text-align: center !important; }
 
+/* ==========================================================================
+   Phone & Group Registration Intake Row Alignment
+   ========================================================================== */
+.sywat-archer-header-row,
+.sywat-archer-input-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin-bottom: 8px;
+    box-sizing: border-box !important;
+}
+
+.sywat-archer-header-row {
+    font-weight: 700;
+    font-size: 12px;
+    color: #1e293b;
+    padding: 6px 0;
+    border-bottom: 1px solid #cbd5e1;
+    margin-bottom: 10px;
+}
+
+.sywat-col-archer-name   { flex: 3 !important; min-width: 0; }
+.sywat-col-archer-dist   { flex: 1.5 !important; min-width: 0; }
+.sywat-col-archer-div    { flex: 2.5 !important; min-width: 0; }
+.sywat-col-archer-line   { flex: 2 !important; min-width: 0; }
+.sywat-col-archer-action { flex: 0 0 36px !important; text-align: center !important; display: flex; justify-content: center; }
+
+.sywat-archer-input-row .sywat-field-group {
+    margin-bottom: 0 !important;
+    width: 100% !important;
+}
+
+.sywat-archer-input-row input,
+.sywat-archer-input-row select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
 /* Line Slot Capacity Stack & Compact Waitlist Pill */
 .sywat-lines-grid {
     display: flex;
