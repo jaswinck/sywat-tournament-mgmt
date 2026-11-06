@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
  * Author: SYWAT Archery
- * Version: 6.3.2
+ * Version: 6.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -28,6 +28,16 @@ function sywat_desk_render_modals($data) {
     $legacy_div_map            = $data['legacy_div_map'];
     $existing_families         = $data['existing_families'];
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
+    
+    // Fast-Loop Context Persistence
+    $walkin_context            = isset($data['walkin_loop_context']) ? $data['walkin_loop_context'] : array();
+    $is_walkin_active          = !empty($walkin_context);
+    $saved_contact             = isset($walkin_context['primary_contact']) ? $walkin_context['primary_contact'] : '';
+    $saved_phone               = isset($walkin_context['phone']) ? $walkin_context['phone'] : '';
+    $saved_line_idx            = isset($walkin_context['line_idx']) ? $walkin_context['line_idx'] : $selected_line_idx;
+    $saved_pay_option          = isset($walkin_context['pay_option']) ? $walkin_context['pay_option'] : 'Individual';
+    $saved_fam_id              = isset($walkin_context['family_id']) ? $walkin_context['family_id'] : '';
+    $last_added_name           = isset($walkin_context['last_added_name']) ? $walkin_context['last_added_name'] : '';
 
     ?>
     <!-- CHECK-IN MODAL (PRE-REG) -->
@@ -301,9 +311,9 @@ function sywat_desk_render_modals($data) {
     </div>
     <?php endif; ?>
 
-    <!-- ADD WALK-IN MODAL (STANDARDIZED SYWAT TABLE & HEADER LAYOUT) -->
-    <div id="walkinModal" class="sywat-modal-backdrop">
-        <div class="sywat-modal-content sywat-modal-xl">
+    <!-- ADD WALK-IN MODAL (FAST-LOOP "SAVE & ADD NEXT" WORKFLOW) -->
+    <div id="walkinModal" class="sywat-modal-backdrop <?php echo $is_walkin_active ? 'active' : ''; ?>">
+        <div class="sywat-modal-content sywat-modal-md">
             <div class="sywat-modal-header no-print">
                 <div>
                     <h3>📋 Add Walk-In Registration</h3>
@@ -312,31 +322,39 @@ function sywat_desk_render_modals($data) {
                 <button type="button" class="sywat-modal-close" onclick="closeWalkinModal()">&times;</button>
             </div>
             <div class="sywat-modal-body">
+                <?php if (!empty($last_added_name)): ?>
+                    <div class="sywat-alert sywat-alert-success" style="margin-bottom: 14px;">
+                        ✅ <strong><?php echo esc_html($last_added_name); ?></strong> registered and checked in successfully! Enter next archer below.
+                    </div>
+                <?php endif; ?>
+
                 <form method="post" id="sywat_walkin_form">
                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
                     <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
                     <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
 
-                    <!-- Shared Group Header Controls -->
+                    <!-- Persistent Group Intake Header -->
                     <div class="sywat-intake-group-wrapper">
-                        <div class="sywat-form-grid-4">
+                        <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
-                                <label for="walkin_group_name">Primary Contact:</label>
-                                <input type="text" name="walkin_group_name" id="walkin_group_name" placeholder="e.g. John Smith" autocomplete="off" oninput="if(window.handleWalkinGroupInput) window.handleWalkinGroupInput(this);">
+                                <label for="walkin_group_name">Primary Contact / Group Name:</label>
+                                <input type="text" name="walkin_group_name" id="walkin_group_name" value="<?php echo esc_attr($saved_contact); ?>" placeholder="e.g. John Smith" autocomplete="off">
                             </div>
 
                             <div class="sywat-field-group">
                                 <label for="walkin_group_phone">Phone Number:</label>
-                                <input type="text" name="walkin_group_phone" id="walkin_group_phone" placeholder="XXX-XXX-XXXX" autocomplete="off" onkeyup="if(window.formatPhoneNumber) window.formatPhoneNumber(this)">
+                                <input type="text" name="walkin_group_phone" id="walkin_group_phone" value="<?php echo esc_attr($saved_phone); ?>" placeholder="XXX-XXX-XXXX" autocomplete="off" onkeyup="if(window.formatPhoneNumber) window.formatPhoneNumber(this)">
                             </div>
+                        </div>
 
+                        <div class="sywat-form-grid-2" style="margin-top: 10px;">
                             <div class="sywat-field-group">
                                 <label for="walkin_line_index">Default Shooting Line:</label>
-                                <select name="walkin_line_index" id="walkin_line_index" required onchange="if(window.updateAllWalkinArcherLines) window.updateAllWalkinArcherLines(this.value)">
+                                <select name="walkin_line_index" id="walkin_line_index" required onchange="updateWalkinFamilyOptions(this.value)">
                                     <?php foreach ($lines as $idx => $line): ?>
                                         <?php $is_c = in_array((string)$idx, $closed_lines); ?>
-                                        <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
+                                        <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$saved_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
                                             <?php echo esc_html($line['name']) . ($is_c ? ' (Closed)' : ''); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -345,105 +363,80 @@ function sywat_desk_render_modals($data) {
 
                             <div class="sywat-field-group">
                                 <label for="walkin_pay_option">Paid Option:</label>
-                                <select name="walkin_pay_option" id="walkin_pay_option" required onchange="if(window.recalculateWalkinTotal) window.recalculateWalkinTotal()">
-                                    <option value="Individual">Individual Rate ($25 / $30)</option>
-                                    <option value="Family">Family Group ($75 Cap)</option>
-                                    <option value="Field Governor">Field Governor (Free)</option>
+                                <select name="walkin_pay_option" id="walkin_pay_option" required onchange="toggleFamilyBox('walkin')">
+                                    <option value="Individual" <?php selected($saved_pay_option, 'Individual'); ?>>Individual Rate ($25 / $30)</option>
+                                    <option value="Family" <?php selected($saved_pay_option, 'Family'); ?>>Family Group ($75 Cap)</option>
+                                    <option value="Field Governor" <?php selected($saved_pay_option, 'Field Governor'); ?>>Field Governor (Free)</option>
                                 </select>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Dynamic Multi-Archer Intake Table Section -->
-                    <div class="sywat-intake-card">
-                        <div class="sywat-table-header-bar">
-                            <h2>👥 Walk-In Archer Roster</h2>
-                            <div class="sywat-table-header-controls">
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="if(window.addWalkinArcherRow) window.addWalkinArcherRow();">Add Archer</button>
-                            </div>
-                        </div>
-
-                        <div class="sywat-table-responsive">
-                            <table class="sywat-table" id="sywat_walkin_table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 4%;">#</th>
-                                        <th style="width: 26%;">Archer Full Name *</th>
-                                        <th style="width: 20%;">Division *</th>
-                                        <th style="width: 14%;">Gender *</th>
-                                        <th style="width: 18%;">Style *</th>
-                                        <th style="width: 14%;">Shooting Line</th>
-                                        <th style="width: 4%; text-align: center;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sywat_walkin_archer_rows_container">
-                                    <!-- Initial Archer Row 0 -->
-                                    <tr class="sywat-walkin-archer-row" data-row-idx="0">
-                                        <td><strong>1</strong></td>
-                                        <td>
-                                            <div class="sywat-field-group sywat-field-relative">
-                                                <input type="text" name="archers[0][name]" class="sywat-archer-name-input walkin-archer-name" placeholder="Full Name *" autocomplete="off" required oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this); if(window.recalculateWalkinTotal) window.recalculateWalkinTotal();">
-                                                <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <select name="archers[0][division]" class="sywat-division-select walkin-archer-div" required onchange="if(window.handleDivisionChange) window.handleDivisionChange(this); if(window.recalculateWalkinTotal) window.recalculateWalkinTotal();">
-                                                <option value="" disabled selected hidden>Select Division</option>
-                                                <?php foreach ($divs as $d): ?>
-                                                    <?php if ($d === 'No Show') continue; ?>
-                                                    <option value="<?php echo esc_attr($d); ?>"><?php echo esc_html($d); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select name="archers[0][gender]" class="sywat-gender-select walkin-archer-gender" required onchange="if(window.recalculateWalkinTotal) window.recalculateWalkinTotal();">
-                                                <option value="" disabled selected hidden>Gender</option>
-                                                <?php foreach ($genders as $g): ?>
-                                                    <?php if ($g === 'No Show') continue; ?>
-                                                    <option value="<?php echo esc_attr($g); ?>"><?php echo esc_html($g); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select name="archers[0][style]" class="sywat-style-select walkin-archer-style" required onchange="if(window.recalculateWalkinTotal) window.recalculateWalkinTotal();">
-                                                <option value="" disabled selected hidden>Select Style</option>
-                                                <?php foreach ($sywat_styles as $s): ?>
-                                                    <?php if ($s === 'No Show') continue; ?>
-                                                    <option value="<?php echo esc_attr($s); ?>"><?php echo esc_html($s); ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select name="archers[0][line_idx]" class="sywat-line-override-select walkin-line-select" onchange="if(window.recalculateWalkinTotal) window.recalculateWalkinTotal();">
-                                                <?php foreach ($lines as $idx => $line): ?>
-                                                    <?php $is_c = in_array((string)$idx, $closed_lines); ?>
-                                                    <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$selected_line_idx, (string)$idx); ?><?php echo $is_c ? ' disabled' : ''; ?>>
-                                                        <?php echo esc_html($line['name']); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="if(window.removeWalkinArcherRow) window.removeWalkinArcherRow(this);" title="Remove Archer"></button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Intake Footer & Totals Summary Bar -->
-                        <div class="sywat-intake-footer-bar">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="if(window.addWalkinArcherRow) window.addWalkinArcherRow();">Add Archer</button>
-                            <div class="sywat-intake-summary">
-                                <span class="sywat-intake-total-text">Total Walk-In Due: <span id="sywat_walkin_total_disp" class="sywat-intake-total-val">$0.00</span></span>
-                                <span id="sywat_walkin_cap_badge" class="sywat-family-badge sywat-hidden">🟢 Family Cap Applied</span>
-                            </div>
+                        <div class="sywat-field-group <?php echo ($saved_pay_option === 'Family') ? '' : 'sywat-hidden'; ?>" id="walkin_family_box" style="margin-top: 10px;">
+                            <label for="walkin_family_group_id">Line Family Group:</label>
+                            <select name="walkin_family_group_id" id="walkin_family_group_id">
+                                <option value="">[ + Start New Family Group for This Line ]</option>
+                                <?php foreach ($existing_families as $fid => $flabel): ?>
+                                    <option value="<?php echo esc_attr($fid); ?>" <?php selected($saved_fam_id, $fid); ?>><?php echo esc_html($flabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
 
-                    <div class="sywat-modal-form-actions">
+                    <!-- Archer Intake Section -->
+                    <div class="sywat-modal-section-header">
+                        <h2>🏹 Archer Details</h2>
+                    </div>
+
+                    <div class="sywat-field-group sywat-field-relative" style="margin-bottom: 12px;">
+                        <label for="walkin_name_input">Archer Full Name *</label>
+                        <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold">
+                        <div id="walkin_tfaa_badge"></div>
+                        <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
+                    </div>
+
+                    <div class="sywat-form-grid-3">
+                        <div class="sywat-field-group">
+                            <label for="walkin_division">Division *</label>
+                            <select name="walkin_division" id="walkin_division" required onchange="handleStyleRestrictions('walkin'); evaluateTfaaStatus('walkin');">
+                                <option value="" disabled selected hidden>Select Division</option>
+                                <?php foreach ($divs as $d): ?>
+                                    <?php if ($d === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($d); ?>"><?php echo esc_html($d); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="sywat-field-group">
+                            <label for="walkin_gender">Gender *</label>
+                            <select name="walkin_gender" id="walkin_gender" required onchange="evaluateTfaaStatus('walkin')">
+                                <option value="" disabled selected hidden>Select Gender</option>
+                                <?php foreach ($genders as $g): ?>
+                                    <?php if ($g === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($g); ?>"><?php echo esc_html($g); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="sywat-field-group">
+                            <label for="walkin_style">Style *</label>
+                            <select name="walkin_style" id="walkin_style" required onchange="evaluateTfaaStatus('walkin')">
+                                <option value="" disabled selected hidden>Select Style</option>
+                                <?php foreach ($sywat_styles as $s): ?>
+                                    <?php if ($s === 'No Show') continue; ?>
+                                    <option value="<?php echo esc_attr($s); ?>"><?php echo esc_html($s); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Action Footer with Dual Save Options -->
+                    <div class="sywat-modal-form-actions-split">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeWalkinModal()">Cancel</button>
-                        <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Register & Check In</button>
+                        
+                        <div class="sywat-modal-form-actions-right">
+                            <button type="submit" name="sywat_action" value="add_walkin_next" class="sywat-btn sywat-btn-success sywat-btn-icon-add">Save & Add Next Archer</button>
+                            <button type="submit" name="sywat_action" value="add_walkin" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Register & Complete</button>
+                        </div>
                     </div>
                 </form>
             </div>
