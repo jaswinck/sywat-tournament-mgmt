@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
-   Version: 6.3.1
+   Version: 6.4.0
    ========================================================================== */
 
 /* 1. Modal Container & Backdrop Engine */
@@ -127,6 +127,7 @@
     -webkit-overflow-scrolling: touch;
 }
 
+.sywat-modal-body .sywat-form-grid-1,
 .sywat-modal-body .sywat-form-grid-2,
 .sywat-modal-body .sywat-form-grid-3,
 .sywat-modal-body .sywat-form-grid-4 {
