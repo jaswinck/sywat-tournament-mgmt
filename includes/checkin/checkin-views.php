@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.2.3
+ * Version: 6.3.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -171,7 +171,7 @@ function sywat_desk_render_capacity_tracker($data) {
                         $line      = $item['line'];
                         $line_name = isset($line['name']) ? trim($line['name']) : '';
                         
-                        $booked_20yd = 0; $booked_cub = 0; $total_reg_line = 0; $checked_in_line = 0;
+                        $booked_20yd = 0; $booked_cub = 0; $total_reg_line = 0; $checked_in_line = 0; $waitlist_line = 0;
 
                         foreach ($registrations as $reg) {
                             if (isset($reg['tournament']) && $reg['tournament'] === $selected_tournament) {
@@ -179,10 +179,15 @@ function sywat_desk_render_capacity_tracker($data) {
                                 $match_name  = isset($reg['line_name']) && $line_name !== '' && trim($reg['line_name']) === $line_name;
 
                                 if ($match_index || $match_name) {
-                                    $total_reg_line++;
-                                    if (!empty($reg['checked_in'])) $checked_in_line++;
-                                    if (isset($reg['distance']) && $reg['distance'] === '20yd') $booked_20yd++;
-                                    if (isset($reg['distance']) && $reg['distance'] === 'Cub') $booked_cub++;
+                                    $is_wait = isset($reg['status']) && strcasecmp(trim($reg['status']), 'Waitlist') === 0;
+                                    if ($is_wait) {
+                                        $waitlist_line++;
+                                    } else {
+                                        $total_reg_line++;
+                                        if (!empty($reg['checked_in'])) $checked_in_line++;
+                                        if (isset($reg['distance']) && $reg['distance'] === '20yd') $booked_20yd++;
+                                        if (isset($reg['distance']) && $reg['distance'] === 'Cub') $booked_cub++;
+                                    }
                                 }
                             }
                         }
@@ -199,13 +204,18 @@ function sywat_desk_render_capacity_tracker($data) {
                         <div>
                             <div class="sywat-tracker-card-header">
                                 <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']); ?></strong>
-                                <div class="sywat-tracker-header-badges">
-                                    <?php if ($is_closed_line): ?>
-                                        <span class="sywat-badge sywat-badge-full">CLOSED</span>
+                                <div class="sywat-tracker-header-badges" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                    <div style="display: flex; gap: 4px; align-items: center;">
+                                        <?php if ($is_closed_line): ?>
+                                            <span class="sywat-badge sywat-badge-full">CLOSED</span>
+                                        <?php endif; ?>
+                                        <span class="sywat-badge sywat-badge-prereg">
+                                            <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
+                                        </span>
+                                    </div>
+                                    <?php if ($waitlist_line > 0): ?>
+                                        <span class="sywat-badge sywat-waitlist-pill">🕒 <?php echo $waitlist_line; ?> Waitlisted</span>
                                     <?php endif; ?>
-                                    <span class="sywat-badge sywat-badge-prereg">
-                                        <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
-                                    </span>
                                 </div>
                             </div>
                             <div class="sywat-tracker-card-stats">
