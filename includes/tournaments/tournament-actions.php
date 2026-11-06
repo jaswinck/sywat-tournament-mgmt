@@ -1,17 +1,250 @@
 <?php
 /**
- * Sub-Module: Action Handlers for Tournaments and Seasons
+ * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Parses raw human line string into structured line slot arrays.
+ * Enforces standardized day labels: "Friday", "Saturday", "Sunday".
+ *
+ * @param string $line_str      Raw schedule string from import file or input.
+ * @param int    $default_20yd  Default 20-yard line capacity.
+ * @param int    $default_cub   Default Cub line capacity.
+ * @return array                Array of structured line slot definitions.
+ */
+if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
+    function sywat_parse_imported_line_schedule( $line_str, $default_20yd = 28, $default_cub = 4 ) {
+        $lines = array();
+        if ( empty( trim( $line_str ) ) ) {
+            return array(
+                array( 'day' => 'Saturday', 'start_time' => '10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Saturday', 'start_time' => '2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'start_time' => '10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'start_time' => '2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+            );
+        }
+
+        $lower = strtolower( $line_str );
+
+        // 1. Friday Line Check
+        if ( preg_match( '/fri(?:day)?[\s\-]*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i', $line_str, $m ) ) {
+            $time = strtoupper( str_replace( ' ', '', $m[1] ) );
+            if ( strpos( $time, 'AM' ) === false && strpos( $time, 'PM' ) === false ) {
+                $time .= 'PM';
+            }
+            $lines[] = array( 'day' => 'Friday', 'start_time' => $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+        }
+
+        // 2. Saturday & Sunday Checks
+        $has_sat = ( strpos( $lower, 'sat' ) !== false );
+        $has_sun = ( strpos( $lower, 'sun' ) !== false && strpos( $lower, 'no sunday' ) === false );
+
+        $times = array();
+        if ( preg_match_all( '/\b(\d{1,2}(?::\d{2})?)\b/', $line_str, $time_matches ) ) {
+            foreach ( $time_matches[1] as $t ) {
+                $num = intval( explode( ':', $t )[0] );
+                $formatted = ( $num >= 6 && $num <= 11 ) ? $num . 'AM' : $num . 'PM';
+                if ( ! in_array( $formatted, $times ) ) {
+                    $times[] = $formatted;
+                }
+            }
+        }
+
+        if ( empty( $times ) ) {
+            $times = array( '10AM', '2PM' );
+        }
+
+        if ( $has_sat ) {
+            foreach ( $times as $t ) {
+                $lines[] = array( 'day' => 'Saturday', 'start_time' => $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            }
+        }
+
+        if ( $has_sun ) {
+            foreach ( $times as $t ) {
+                $lines[] = array( 'day' => 'Sunday', 'start_time' => $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            }
+        }
+
+        return $lines;
+    }
+}
+
+/**
+ * Validates uploaded schedule rows against master Shop Directory & prohibits database duplicates.
+ *
+ * @param array  $raw_rows       Imported raw spreadsheet rows.
+ * @param string $target_season  Slug of target season.
+ * @return array                 Structured array containing valid tournaments and rejected rows.
+ */
+if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
+    function sywat_process_schedule_import_rows( $raw_rows, $target_season ) {
+        $all_shops   = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
+        $known_shops = array();
+
+        foreach ( $all_shops as $s_id => $s_data ) {
+            if ( ! empty( $s_data['shop_name'] ) ) {
+                $known_shops[ strtolower( trim( $s_data['shop_name'] ) ) ] = $s_data['shop_name'];
+            }
+        }
+
+        $all_existing_tournaments = get_option( 'sywat_tournaments_list', array() );
+        $valid_tournaments        = array();
+        $rejected_rows            = array();
+        $shop_counters            = array();
+        $holiday_keywords         = array( 'thanksgiving', 'thanskgiving', 'christmas', 'new years', 'no sywat\'s', 'no sywats' );
+
+        foreach ( $raw_rows as $index => $row ) {
+            $start_date     = trim( isset( $row['start_date'] ) ? $row['start_date'] : '' );
+            $raw_host_city  = trim( isset( $row['host_shop_city'] ) ? $row['host_shop_city'] : '' );
+            $event_type     = trim( isset( $row['event_type'] ) ? $row['event_type'] : 'SYWAT' );
+            $national_title = trim( isset( $row['national_event_title'] ) ? $row['national_event_title'] : '' );
+            $notes          = trim( isset( $row['notes'] ) ? $row['notes'] : '' );
+
+            // Silent Skip: Holiday placeholders or blank rows
+            if ( empty( $start_date ) || in_array( strtolower( $raw_host_city ), $holiday_keywords ) ) {
+                continue;
+            }
+
+            $start_date_formatted = date( 'Y-m-d', strtotime( $start_date ) );
+            $end_date_formatted   = ! empty( $row['end_date'] ) ? date( 'Y-m-d', strtotime( $row['end_date'] ) ) : $start_date_formatted;
+
+            // -------------------------------------------------------------
+            // DUPLICATE GUARD: Prohibit duplicate event on same date & shop
+            // -------------------------------------------------------------
+            $is_duplicate   = false;
+            $duplicate_name = '';
+
+            foreach ( $all_existing_tournaments as $t_key => $ex ) {
+                $ex_season = isset( $ex['season'] ) ? $ex['season'] : ( isset( $ex['season_slug'] ) ? $ex['season_slug'] : '' );
+                if ( $ex_season !== $target_season ) {
+                    continue;
+                }
+
+                $ex_shop  = ! empty( $ex['shop_name'] ) ? strtolower( trim( $ex['shop_name'] ) ) : ( ! empty( $ex['official_shop_name'] ) ? strtolower( trim( $ex['official_shop_name'] ) ) : '' );
+                $ex_start = ! empty( $ex['start_date'] ) ? $ex['start_date'] : '';
+
+                // Match local shop name & start date
+                if ( ! empty( $raw_host_city ) && isset( $known_shops[ strtolower( $raw_host_city ) ] ) ) {
+                    if ( strtolower( $known_shops[ strtolower( $raw_host_city ) ] ) === $ex_shop && $start_date_formatted === $ex_start ) {
+                        $is_duplicate   = true;
+                        $duplicate_name = isset( $ex['name'] ) ? $ex['name'] : $t_key;
+                        break;
+                    }
+                }
+
+                // Match National Event Title & start date
+                if ( strcasecmp( $event_type, 'National' ) === 0 && ! empty( $national_title ) ) {
+                    $ex_title = isset( $ex['name'] ) ? $ex['name'] : $t_key;
+                    if ( strtolower( trim( $ex_title ) ) === strtolower( trim( $national_title ) ) && $start_date_formatted === $ex_start ) {
+                        $is_duplicate   = true;
+                        $duplicate_name = $ex_title;
+                        break;
+                    }
+                }
+            }
+
+            if ( $is_duplicate ) {
+                $rejected_rows[] = array(
+                    'row_num'   => $index + 2,
+                    'shop_name' => $raw_host_city,
+                    'reason'    => 'DUPLICATE PROHIBITED: "' . $duplicate_name . '" already exists on ' . $start_date_formatted . ' in season ' . $target_season . '.',
+                );
+                continue;
+            }
+
+            // Branch 1: National / External Events
+            if ( strcasecmp( $event_type, 'National' ) === 0 ) {
+                $final_title = ! empty( $national_title ) ? $national_title : $raw_host_city;
+                $valid_tournaments[] = array(
+                    'tournament_name'      => $final_title,
+                    'official_shop_name'   => '',
+                    'location_display'     => $raw_host_city,
+                    'start_date_formatted' => $start_date_formatted,
+                    'end_date_formatted'   => $end_date_formatted,
+                    'event_type'           => 'National',
+                    'line_slots'           => array(),
+                    'registration_enabled' => false,
+                    'notes'                => $notes,
+                );
+                continue;
+            }
+
+            // Branch 2: TFAA State Championship
+            if ( strcasecmp( $event_type, 'TFAA State' ) === 0 ) {
+                $norm_shop = strtolower( $raw_host_city );
+                $official_shop = isset( $known_shops[$norm_shop] ) ? $known_shops[$norm_shop] : $raw_host_city;
+                $valid_tournaments[] = array(
+                    'tournament_name'      => 'TFAA State Indoor Championship',
+                    'official_shop_name'   => $official_shop,
+                    'location_display'     => $official_shop,
+                    'start_date_formatted' => $start_date_formatted,
+                    'end_date_formatted'   => $end_date_formatted,
+                    'event_type'           => 'TFAA State',
+                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '' ),
+                    'registration_enabled' => true,
+                    'notes'                => $notes,
+                );
+                continue;
+            }
+
+            // Branch 3: Standard SYWAT Circuit Shoots
+            $norm_shop = strtolower( $raw_host_city );
+            if ( isset( $known_shops[$norm_shop] ) ) {
+                $official_shop = $known_shops[$norm_shop];
+                if ( ! isset( $shop_counters[$official_shop] ) ) {
+                    $shop_counters[$official_shop] = 1;
+                }
+
+                $tournament_name = $official_shop . '-' . $shop_counters[$official_shop];
+                $shop_counters[$official_shop]++;
+
+                $valid_tournaments[] = array(
+                    'tournament_name'      => $tournament_name,
+                    'official_shop_name'   => $official_shop,
+                    'location_display'     => $official_shop,
+                    'start_date_formatted' => $start_date_formatted,
+                    'end_date_formatted'   => $end_date_formatted,
+                    'event_type'           => 'SYWAT',
+                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '' ),
+                    'registration_enabled' => true,
+                    'notes'                => $notes,
+                );
+            } else {
+                $rejected_rows[] = array(
+                    'row_num'   => $index + 2,
+                    'shop_name' => $raw_host_city,
+                    'reason'    => 'Host Shop Name not found in master Shop Directory.',
+                );
+            }
+        }
+
+        return array(
+            'valid_tournaments' => $valid_tournaments,
+            'rejected_rows'     => $rejected_rows,
+        );
+    }
+}
+
+/**
+ * Master Controller Function for Tournament & Season POST Actions.
+ *
+ * @param array  $tournaments         Reference to tournaments array.
+ * @param array  $active_tournaments  Reference to active tournaments array.
+ * @param array  $registrations       Reference to registrations array.
+ * @param bool   $can_manage_seasons  Capability flag for season configuration.
+ * @param string $user_shop_id        Shop ID of current logged in user.
+ * @return string                     HTML alert notice markup.
+ */
 if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
     function sywat_handle_tournament_post_actions( &$tournaments, &$active_tournaments, &$registrations, $can_manage_seasons, $user_shop_id ) {
         $notice = '';
-        $action = isset($_POST['sywat_action']) ? sanitize_text_field($_POST['sywat_action']) : '';
+        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
 
         // Action: Register Shooter Intake Form
         if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
@@ -79,7 +312,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 foreach ( $seasons as $k => &$s ) {
                     $s['status'] = 'archived';
                 }
-                unset($s);
+                unset( $s );
             }
 
             $seasons[$s_slug] = array(
@@ -97,11 +330,98 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully!</div>';
         }
 
+        // Action: Upload & Stage Bulk Schedule File
+        if ( $action === 'import_schedule_file' ) {
+            check_admin_referer( 'sywat_import_schedule_nonce', 'sywat_import_schedule_nonce' );
+
+            if ( empty( $_FILES['schedule_file']['tmp_name'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid schedule file (.csv or .xlsx) to upload.</div>';
+            }
+
+            $target_season = isset( $_POST['import_target_season'] ) ? sanitize_text_field( $_POST['import_target_season'] ) : '2026-2027 Indoor';
+            $file_path     = $_FILES['schedule_file']['tmp_name'];
+            $raw_rows      = array();
+
+            if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+                $header = fgetcsv( $handle, 1000, ',' );
+                while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
+                    if ( count( $data ) >= 3 ) {
+                        $raw_rows[] = array(
+                            'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
+                            'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
+                            'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
+                            'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
+                            'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
+                            'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
+                            'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
+                        );
+                    }
+                }
+                fclose( $handle );
+            }
+
+            $processed = sywat_process_schedule_import_rows( $raw_rows, $target_season );
+            $processed['target_season'] = $target_season;
+
+            set_transient( 'sywat_pending_schedule_import_' . get_current_user_id(), $processed, 3600 );
+
+            $valid_cnt    = count( $processed['valid_tournaments'] );
+            $rejected_cnt = count( $processed['rejected_rows'] );
+
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-info">🔍 <strong>Schedule Preview Generated:</strong> Found ' . $valid_cnt . ' valid tournament(s) and ' . $rejected_cnt . ' rejected/prohibited row(s). Please review the preview modal below to confirm creation.</div>';
+        }
+
+        // Action: Confirm & Execute Bulk Schedule Creation
+        if ( $action === 'confirm_schedule_import' ) {
+            check_admin_referer( 'sywat_confirm_schedule_nonce', 'sywat_confirm_schedule_nonce' );
+
+            $transient_key = 'sywat_pending_schedule_import_' . get_current_user_id();
+            $processed     = get_transient( $transient_key );
+
+            if ( ! $processed || empty( $processed['valid_tournaments'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import session expired or no valid tournaments found. Please try uploading the file again.</div>';
+            }
+
+            $target_season = isset( $processed['target_season'] ) ? $processed['target_season'] : '2026-2027 Indoor';
+            $created_count = 0;
+
+            foreach ( $processed['valid_tournaments'] as $t ) {
+                $t_name = $t['tournament_name'];
+
+                $tournaments[$t_name] = array(
+                    'name'                 => $t_name,
+                    'season'               => $target_season,
+                    'shop_name'            => $t['official_shop_name'],
+                    'location_display'     => $t['location_display'],
+                    'start_date'           => $t['start_date_formatted'],
+                    'end_date'             => $t['end_date_formatted'],
+                    'event_type'           => $t['event_type'],
+                    'notes'                => sanitize_textarea_field( $t['notes'] ),
+                    'lines'                => $t['line_slots'],
+                    'registration_enabled' => $t['registration_enabled'],
+                    'scores_published'     => false,
+                    'created_at'           => current_time( 'mysql' ),
+                );
+
+                if ( ! in_array( $t_name, $active_tournaments ) ) {
+                    $active_tournaments[] = $t_name;
+                }
+
+                $created_count++;
+            }
+
+            update_option( 'sywat_tournaments_list', $tournaments );
+            update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
+            delete_transient( $transient_key );
+
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Schedule Imported Successfully!</strong> Created ' . intval( $created_count ) . ' new tournament(s) for season <strong>' . esc_html( $target_season ) . '</strong>.</div>';
+        }
+
         // Action: Sync TFAA Cache
         if ( $action === 'sync_tfaa_now' && function_exists( 'sywat_sync_tfaa_standings' ) ) {
             $res = sywat_sync_tfaa_standings();
             $notice = ! empty( $res['success'] ) 
-                ? '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 <strong>TFAA Standings Synced!</strong> Successfully cached ' . intval($res['count']) . ' active shooters from TFAA.</div>'
+                ? '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 <strong>TFAA Standings Synced!</strong> Successfully cached ' . intval( $res['count'] ) . ' active shooters from TFAA.</div>'
                 : '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
         }
 
@@ -238,7 +558,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                         update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
                     }
                 }
-                unset($reg);
+                unset( $reg );
 
                 if ( in_array( $old_name, $active_tournaments ) ) {
                     $active_tournaments = array_diff( $active_tournaments, array( $old_name ) );
@@ -282,7 +602,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 update_option( 'sywat_active_tournaments', array_values( $active_tournaments ) );
 
                 $del_slug = sanitize_title( $del_tournament );
-                delete_option('sywat_dates_' . $del_slug);
+                delete_option( 'sywat_dates_' . $del_slug );
 
                 foreach ( $registrations as $reg ) {
                     if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $del_tournament ) === 0 ) {
