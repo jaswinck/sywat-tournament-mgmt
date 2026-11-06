@@ -3,10 +3,97 @@
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
  * Author: SYWAT Archery
- * Version: 2.6.3
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Fetches distinct historical archer profiles across Indoor and Outdoor cycles (18-Month Rolling Window).
+ * Queries custom scores tables and tournament registration options, returning distinct (Name, Division, Gender, Style) combinations.
+ *
+ * @return array List of shooter objects for JS localization.
+ */
+if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
+    function sywat_get_historical_shooters() {
+        global $wpdb;
+
+        $shooters  = array();
+        $seen_keys = array();
+
+        // 1. Primary Query: Scores table (wp_sywat_scores) with 18-month rolling window
+        $scores_table = $wpdb->prefix . 'sywat_scores';
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$scores_table}'" ) === $scores_table ) {
+            $query = "
+                SELECT 
+                    TRIM(name) AS name,
+                    TRIM(name) AS full_name,
+                    TRIM(division) AS division,
+                    TRIM(gender) AS gender,
+                    TRIM(style) AS style,
+                    MAX(phone) AS phone,
+                    MAX(created_at) AS last_shot
+                FROM {$scores_table}
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 18 MONTH)
+                  AND name IS NOT NULL AND name != ''
+                  AND division != 'No Show'
+                  AND style != 'No Show'
+                GROUP BY LOWER(TRIM(name)), LOWER(TRIM(division)), LOWER(TRIM(gender)), LOWER(TRIM(style))
+                ORDER BY last_shot DESC
+            ";
+            $db_results = $wpdb->get_results( $query, ARRAY_A );
+            if ( is_array( $db_results ) ) {
+                foreach ( $db_results as $r ) {
+                    $key = strtolower( trim( $r['name'] ) . '___' . trim( $r['division'] ) . '___' . trim( $r['gender'] ) . '___' . trim( $r['style'] ) );
+                    $seen_keys[$key] = true;
+                    $shooters[] = array(
+                        'name'      => trim( $r['name'] ),
+                        'full_name' => trim( $r['full_name'] ),
+                        'division'  => trim( $r['division'] ),
+                        'gender'    => trim( $r['gender'] ),
+                        'style'     => trim( $r['style'] ),
+                        'phone'     => isset( $r['phone'] ) ? trim( $r['phone'] ) : '',
+                    );
+                }
+            }
+        }
+
+        // 2. Secondary Query: Tournament options store (sywat_t_%)
+        $opt_results = $wpdb->get_results(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'"
+        );
+
+        if ( is_array( $opt_results ) ) {
+            foreach ( $opt_results as $row ) {
+                $reg = maybe_unserialize( $row->option_value );
+                if ( is_array( $reg ) && ! empty( $reg['name'] ) ) {
+                    $name     = trim( $reg['name'] );
+                    $division = isset( $reg['division'] ) ? trim( $reg['division'] ) : '';
+                    $gender   = isset( $reg['gender'] ) ? trim( $reg['gender'] ) : '';
+                    $style    = isset( $reg['style'] ) ? trim( $reg['style'] ) : '';
+                    $phone    = isset( $reg['phone'] ) ? trim( $reg['phone'] ) : '';
+
+                    if ( empty( $name ) || $division === 'No Show' || $style === 'No Show' ) continue;
+
+                    $key = strtolower( $name . '___' . $division . '___' . $gender . '___' . $style );
+                    if ( ! isset( $seen_keys[$key] ) ) {
+                        $seen_keys[$key] = true;
+                        $shooters[] = array(
+                            'name'      => $name,
+                            'full_name' => $name,
+                            'division'  => $division,
+                            'gender'    => $gender,
+                            'style'     => $style,
+                            'phone'     => $phone,
+                        );
+                    }
+                }
+            }
+        }
+
+        return $shooters;
+    }
+}
 
 /**
  * Cleanly formats Division, Gender, and Style into a single unified category header.
