@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
  * Author: SYWAT Archery
- * Version: 6.3.1
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -13,20 +13,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
     function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '', $tournaments = array() ) {
-        
-        // Build list of tournaments for switcher dropdown
-        $tourn_options = array();
-        if ( is_array( $tournaments ) && ! empty( $tournaments ) ) {
-            foreach ( $tournaments as $t_key => $t_val ) {
-                $t_name = is_string( $t_key ) ? $t_key : ( is_string( $t_val ) ? $t_val : '' );
-                if ( ! empty( $t_name ) ) {
-                    $tourn_options[$t_name] = $t_name;
-                }
-            }
-        }
-        if ( empty( $tourn_options ) && ! empty( $selected_tournament ) ) {
-            $tourn_options[$selected_tournament] = $selected_tournament;
-        }
 
         // STRICT FILTER: Build Line-Scoped & Smart-Named Family Groups array for JS dynamic dropdowns & labels
         $existing_families_by_line = array();
@@ -124,14 +110,12 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         <div class="sywat-modal-backdrop active no-print" id="sywat_roster_modal">
             <div class="sywat-modal-content sywat-modal-xl">
                 
-                <!-- Standard Pinned Header (Inline) -->
+                <!-- Standard Pinned Header -->
                 <div class="sywat-modal-header">
-                    <h3 style="display: flex; align-items: baseline; gap: 8px; margin: 0;">
-                        👥 Registered Archer Roster 
-                        <span class="sywat-subtitle" style="margin: 0; font-size: 14px; font-weight: 500; color: #64748b;">
-                            (<?php echo esc_html( $selected_tournament ); ?>)
-                        </span>
-                    </h3>
+                    <div>
+                        <h3>👥 Registered Archer Roster</h3>
+                        <div class="sywat-subtitle">(<?php echo esc_html( $selected_tournament ); ?>)</div>
+                    </div>
                     <button type="button" class="sywat-modal-close" onclick="window.location.href='?tab=manage'">&times;</button>
                 </div>
 
@@ -139,21 +123,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                 <div class="sywat-modal-body">
                     
                     <!-- Shaded Filter & Search Controls Form -->
-                    <div class="sywat-intake-group-wrapper sywat-filter-toolbar" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px;">
-                        <form method="get" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; flex: 1; margin: 0;">
+                    <div class="sywat-roster-filter-bar">
+                        <form method="get" class="sywat-roster-filter-form">
                             <input type="hidden" name="tab" value="manage">
                             <input type="hidden" name="modal_action" value="manage">
-
-                            <div class="sywat-filter-field">
-                                <label for="view_tournament">Active Tournament</label>
-                                <select name="view_tournament" id="view_tournament" onchange="this.form.submit()">
-                                    <?php foreach ( $tourn_options as $t_name ): ?>
-                                        <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
-                                            <?php echo esc_html( $t_name ); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
+                            <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
 
                             <div class="sywat-filter-field">
                                 <label for="filter_line_idx">Filter by Line</label>
@@ -167,25 +141,25 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-filter-field" style="flex: 1; min-width: 220px;">
+                            <div class="sywat-filter-field">
                                 <label for="search_shooter">Search Archer Name</label>
                                 <div class="sywat-search-input-group">
-                                    <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off" style="height: 32px;">
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" style="height: 32px;" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
+                                    <input type="text" name="search_shooter" id="search_shooter" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Type archer name..." autocomplete="off">
+                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('search_shooter').value=''; document.getElementById('search_shooter').dispatchEvent(new Event('input'));">Clear</button>
                                 </div>
                             </div>
                         </form>
 
                         <?php if ( $filter_line_idx !== 'all' && ! empty( $filtered_registrations ) ): ?>
                             <div class="sywat-filter-field">
-                                <form method="post" onsubmit="return confirm('Are you sure you want to clear ALL archers from this line?');" style="margin:0;">
+                                <form method="post" onsubmit="return confirm('Are you sure you want to clear ALL archers from this line?');">
                                     <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                     <input type="hidden" name="sywat_action" value="purge_line">
                                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                     <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                     <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                     <input type="hidden" name="redirect_action" value="manage">
-                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" style="height: 32px;">Clear Line Roster</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Clear Line Roster</button>
                                 </form>
                             </div>
                         <?php endif; ?>
@@ -193,7 +167,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
 
                     <!-- Archer Roster Table -->
                     <?php if ( empty( $filtered_registrations ) ): ?>
-                        <p class="sywat-label-subtext" style="padding: 20px 0; text-align: center;">No archers found matching your filter criteria.</p>
+                        <p class="sywat-label-subtext">No archers found matching your filter criteria.</p>
                     <?php else: ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table sywat-roster-table">
@@ -236,7 +210,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             <td>
                                                 <strong><?php echo esc_html( $reg['name'] ); ?></strong>
                                                 <?php if (!empty($fam_label)): ?>
-                                                    <div style="margin-top: 4px;">
+                                                    <div>
                                                         <span class="sywat-chip-family">🟢 <?php echo esc_html($fam_label); ?></span>
                                                     </div>
                                                 <?php endif; ?>
