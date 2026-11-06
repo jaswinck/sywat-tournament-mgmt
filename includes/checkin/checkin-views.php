@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.2.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -318,11 +318,26 @@ function sywat_desk_render_archers_table($data) {
                             <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
                                 <td>
                                     <div class="sywat-archer-name"><?php echo esc_html($reg['name']); ?></div>
-                                    <?php if (!$is_waitlist && ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—')): ?>
+                                    <?php if (!$is_waitlist && ($balance_due > 0 || empty($reg['paid']) || $paid_disp === '—' || $is_family_due)): ?>
                                         <?php if (!empty($reg['paid']) && strtolower($reg['paid']) === 'yes') { /* Paid, show no owe badge */ } else { ?>
                                             <div class="sywat-owe-badge-wrap">
                                                 <span class="sywat-badge sywat-badge-full">
-                                                    <?php if ($is_family_due): ?>
+                                                    <?php 
+                                                        $fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
+                                                        if ( empty( $fam_id ) && $is_family_due ) {
+                                                            $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
+                                                            $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
+                                                            $reg_l_idx  = isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0';
+                                                            $fam_id     = 'line_' . $reg_l_idx . '_last_' . $last_name;
+                                                        }
+
+                                                        $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) ) 
+                                                            ? sywat_calculate_family_group_balance( $fam_id, 'all', $tourn_registrations ) 
+                                                            : null;
+
+                                                        $is_true_family_cap = ( $fam_calc && ! empty( $fam_calc['is_family_capped'] ) );
+                                                    ?>
+                                                    <?php if ( $is_true_family_cap ): ?>
                                                         ⚠️ OWE: FAMILY
                                                     <?php else: ?>
                                                         <?php 
