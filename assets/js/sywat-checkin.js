@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Version: 6.5.1
+ * Version: 6.5.2
  */
 
 function escapeHtmlDesk(str) {
@@ -388,7 +388,7 @@ function evaluateTfaaStatus(prefix) {
     const currGen   = document.getElementById(prefix + '_gender')?.value || '';
     const currStyle = document.getElementById(prefix + '_style')?.value || '';
 
-    let isExactMatch = false;
+    let isCategoryMatch = false;
     let knownStyles = [];
 
     let buttonContainer = document.createElement('div');
@@ -416,7 +416,7 @@ function evaluateTfaaStatus(prefix) {
         const styleMatch   = (cSty === uSty) || (cStylePrefix === uStylePrefix) || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
         if (divMatch && genMatch && styleMatch) {
-            isExactMatch = true;
+            isCategoryMatch = true;
         }
 
         const divShort = cat.division ? cat.division.split(' ')[0] : '';
@@ -450,16 +450,21 @@ function evaluateTfaaStatus(prefix) {
     let cleanTyped = typedName.trim().toLowerCase().replace(/\s+/g, ' ');
     let cleanOfficial = officialName.trim().toLowerCase().replace(/\s+/g, ' ');
 
+    let isNameMatch = (cleanTyped === cleanOfficial);
+
     let badgeText = '';
-    if (isExactMatch) {
+    if (isCategoryMatch && isNameMatch) {
         badgeEl.className = 'sywat-badge-verified';
         badgeText = '🟢 TFAA Validated: ' + knownStyles.join(', ');
+    } else if (isCategoryMatch && !isNameMatch) {
+        badgeEl.className = 'sywat-badge-known';
+        badgeText = '⚠️ TFAA Name Mismatch (TFAA Lists: ' + knownStyles.join(', ') + ')';
     } else {
         badgeEl.className = 'sywat-badge-known';
         badgeText = '⚠️ TFAA Style Mismatch (TFAA Lists: ' + knownStyles.join(', ') + ')';
     }
 
-    if (cleanTyped !== cleanOfficial && officialName !== '') {
+    if (!isNameMatch && officialName !== '') {
         badgeText += '<br><span class="sywat-badge-subtext">↳ Official TFAA Name: <strong>' + officialName + '</strong></span>';
         badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
     }
@@ -508,7 +513,7 @@ function autoFillOnNameChange(prefix) {
 
             if (divEl && shopMatch.division) matchDeskTfaaSelect(shopMatch.division, divEl);
             if (genEl && shopMatch.gender) matchDeskTfaaSelect(shopMatch.gender, genEl);
-            if (styleEl && shopMatch.style) matchDeskTfaaSelect(styleEl, styleEl);
+            if (styleEl && shopMatch.style) matchDeskTfaaSelect(shopMatch.style, styleEl);
 
             handleStyleRestrictions(prefix);
         }
@@ -546,7 +551,6 @@ function closeWalkinModal() {
     const famSel = document.getElementById('walkin_family_group_id');
     if (famSel) famSel.value = '';
 
-    toggleFamilyBox('walkin');
     handleStyleRestrictions('walkin');
     evaluateTfaaStatus('walkin');
     closeAllDeskTfaaAutocompletes();
@@ -669,7 +673,6 @@ function initSywatCheckin() {
             autoFillOnNameChange('checkin');
         });
         autoFillOnNameChange('checkin');
-        toggleFamilyBox('checkin');
     }
 
     const searchInput = document.getElementById('sywat_search_input');
