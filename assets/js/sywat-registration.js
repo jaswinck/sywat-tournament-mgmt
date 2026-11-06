@@ -1,7 +1,7 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 (function() {
@@ -134,7 +134,7 @@
     };
 
     /**
-     * Fuzzy Division Matcher for TFAA Cache Records
+     * Fuzzy Division Matcher for Historical Shooter Records
      */
     window.matchTfaaDivision = function(tfaaDiv, selectEl) {
         if (!tfaaDiv || !selectEl) return;
@@ -164,7 +164,7 @@
     };
 
     /**
-     * TFAA Autocomplete Dropdown Generator
+     * Historical Archer Autocomplete Dropdown Generator
      */
     window.handleTfaaAutocomplete = function(input) {
         const query = input.value.trim().toLowerCase();
@@ -202,7 +202,14 @@
         matches.forEach(m => {
             const item = document.createElement('div');
             item.className = 'sywat-tfaa-item';
-            item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtml(m.division || '')}</span>`;
+
+            let badgeText = m.division || '';
+            if (m.style) {
+                const shortSty = m.style.split(' – ')[0].split(' - ')[0];
+                badgeText += badgeText ? ' (' + shortSty + ')' : shortSty;
+            }
+
+            item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtml(badgeText)}</span>`;
 
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
@@ -232,7 +239,7 @@
     };
 
     /**
-     * Close All Active TFAA Autocomplete Dropdowns
+     * Close All Active Autocomplete Dropdowns
      */
     window.closeAllTfaaAutocompletes = function() {
         document.querySelectorAll('.sywat-tfaa-autocomplete-dropdown').forEach(el => el.remove());
