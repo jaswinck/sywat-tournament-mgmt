@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.3.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -205,14 +205,9 @@ function sywat_desk_render_capacity_tracker($data) {
                             <div class="sywat-tracker-card-header">
                                 <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']); ?></strong>
                                 <div class="sywat-tracker-header-badges" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                                    <div style="display: flex; gap: 4px; align-items: center;">
-                                        <?php if ($is_closed_line): ?>
-                                            <span class="sywat-badge sywat-badge-full">CLOSED</span>
-                                        <?php endif; ?>
-                                        <span class="sywat-badge sywat-badge-prereg">
-                                            <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
-                                        </span>
-                                    </div>
+                                    <span class="sywat-badge sywat-badge-prereg">
+                                        <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
+                                    </span>
                                     <?php if ($waitlist_line > 0): ?>
                                         <span class="sywat-badge sywat-waitlist-pill">🕒 <?php echo $waitlist_line; ?> Waitlisted</span>
                                     <?php endif; ?>
