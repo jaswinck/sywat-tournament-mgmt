@@ -3,13 +3,15 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Render the Add / Edit Tournament Modal
+ *
+ * @param array $data Central data bundle from data engine.
  */
 if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
     function sywat_render_add_edit_tournament_modal( $data ) {
@@ -190,7 +192,137 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 }
 
 /**
+ * Render Bulk Schedule Upload & Dry-Run Preview Overlays
+ *
+ * @param array $data Central data bundle from data engine.
+ */
+if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
+    function sywat_render_import_schedule_modal( $data ) {
+        $seasons        = isset( $data['seasons'] ) ? $data['seasons'] : array();
+        $current_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
+
+        // Check for pending dry-run preview transient
+        $transient_key  = 'sywat_pending_schedule_import_' . get_current_user_id();
+        $processed      = get_transient( $transient_key );
+        $show_preview   = ( isset( $_GET['import_preview'] ) && $_GET['import_preview'] === '1' && ! empty( $processed ) );
+
+        $valid_list    = ( $show_preview && isset( $processed['valid_tournaments'] ) ) ? $processed['valid_tournaments'] : array();
+        $rejected_list = ( $show_preview && isset( $processed['rejected_rows'] ) ) ? $processed['rejected_rows'] : array();
+        $target_season = ( $show_preview && isset( $processed['target_season'] ) ) ? $processed['target_season'] : $current_season;
+        ?>
+        <!-- BULK SCHEDULE IMPORT UPLOAD MODAL -->
+        <div class="sywat-modal-backdrop" id="sywat_import_schedule_modal">
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <div>
+                        <h3>📁 Bulk Import Season Schedule</h3>
+                        <div class="sywat-subtitle">Upload a 7-column Excel (.xlsx) or CSV file to build the season schedule and line templates in one click.</div>
+                    </div>
+                    <button type="button" class="sywat-modal-close" onclick="closeImportScheduleModal()">&times;</button>
+                </div>
+                <form method="post" action="?tab=manage" enctype="multipart/form-data">
+                    <div class="sywat-modal-body">
+                        <?php wp_nonce_field( 'sywat_import_schedule_nonce', 'sywat_import_schedule_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="import_schedule_file">
+
+                        <div class="sywat-form-grid-1">
+                            <div class="sywat-field-group">
+                                <label>Target Competition Season *</label>
+                                <select name="import_target_season" required>
+                                    <?php foreach ( $seasons as $s_slug => $s_item ): ?>
+                                        <?php $s_name = is_array( $s_item ) && isset( $s_item['name'] ) ? $s_item['name'] : $s_slug; ?>
+                                        <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $target_season ); ?>>
+                                            <?php echo esc_html( $s_name ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="sywat-field-group sywat-modal-row-spacing">
+                                <label>Select Schedule Spreadsheet File (.xlsx, .csv) *</label>
+                                <input type="file" name="schedule_file" accept=".xlsx, .xls, .csv, .txt" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sywat-modal-footer">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeImportScheduleModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-import">🔍 Preview & Validate Schedule</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <?php if ( $show_preview ): ?>
+        <!-- DRY-RUN PREVIEW MODAL OVERLAY -->
+        <div class="sywat-modal-backdrop active" id="sywat_import_preview_modal">
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <div>
+                        <h3>🔍 Schedule Import Dry-Run Preview</h3>
+                        <div class="sywat-subtitle">Target Season: <strong><?php echo esc_html( isset( $seasons[$target_season]['name'] ) ? $seasons[$target_season]['name'] : $target_season ); ?></strong></div>
+                    </div>
+                    <a href="<?php echo esc_url( remove_query_arg( 'import_preview' ) ); ?>" class="sywat-modal-close">&times;</a>
+                </div>
+                <div class="sywat-modal-body">
+                    <?php if ( ! empty( $rejected_list ) ): ?>
+                        <div class="sywat-alert sywat-alert-danger sywat-modal-row-spacing">
+                            <strong>⚠️ <?php echo count( $rejected_list ); ?> Row(s) Rejected / Prohibited:</strong>
+                            <ul>
+                                <?php foreach ( $rejected_list as $rej ): ?>
+                                    <li><strong>Row <?php echo intval( $rej['row_num'] ); ?>:</strong> "<?php echo esc_html( $rej['shop_name'] ); ?>" — <em><?php echo esc_html( $rej['reason'] ); ?></em></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="sywat-table-header-bar">
+                        <h2>🟢 Valid Tournaments Ready to Create (<?php echo count( $valid_list ); ?>)</h2>
+                    </div>
+
+                    <div class="sywat-table-responsive">
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th>Tournament Title</th>
+                                    <th>Dates</th>
+                                    <th>Host / Location</th>
+                                    <th>Event Type</th>
+                                    <th class="sywat-col-center">Lines</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $valid_list as $vt ): ?>
+                                    <tr>
+                                        <td><strong><?php echo esc_html( $vt['tournament_name'] ); ?></strong></td>
+                                        <td><?php echo esc_html( $vt['start_date_formatted'] . ( $vt['start_date_formatted'] !== $vt['end_date_formatted'] ? ' to ' . $vt['end_date_formatted'] : '' ) ); ?></td>
+                                        <td><?php echo esc_html( ! empty( $vt['official_shop_name'] ) ? $vt['official_shop_name'] : $vt['location_display'] ); ?></td>
+                                        <td><span class="sywat-badge"><?php echo esc_html( $vt['event_type'] ); ?></span></td>
+                                        <td class="sywat-col-center"><?php echo count( $vt['line_slots'] ); ?> Slots</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="sywat-modal-footer">
+                    <form method="post" action="?tab=manage">
+                        <?php wp_nonce_field( 'sywat_confirm_schedule_nonce', 'sywat_confirm_schedule_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="confirm_schedule_import">
+                        <a href="<?php echo esc_url( remove_query_arg( 'import_preview' ) ); ?>" class="sywat-btn sywat-btn-secondary">Cancel</a>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">🚀 Confirm & Create <?php echo count( $valid_list ); ?> Tournaments</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <?php
+    }
+}
+
+/**
  * Render Delegated Archer / Roster / Invoice Modal Container
+ *
+ * @param array $data Central data bundle from data engine.
  */
 if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
     function sywat_render_delegated_modal_container( $data ) {
