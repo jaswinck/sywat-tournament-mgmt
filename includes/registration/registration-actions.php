@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.3.1
+ * Version: 6.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -83,7 +83,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
+        // Tally requested slots per line/distance combo
         $line_dist_tallies = array();
+        // Tally per-line group stats for Family Cap evaluation (Requires 3+ archers AND raw total >= $75)
+        $line_group_stats  = array();
+
         foreach ($valid_archers as $archer) {
             $l_idx = $archer['line_idx'];
             $dist  = $archer['distance'];
@@ -97,6 +101,15 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 );
             }
             $line_dist_tallies[$key]['count']++;
+
+            if (!isset($line_group_stats[$l_idx])) {
+                $line_group_stats[$l_idx] = array(
+                    'count'   => 0,
+                    'raw_sum' => 0.00
+                );
+            }
+            $line_group_stats[$l_idx]['count']++;
+            $line_group_stats[$l_idx]['raw_sum'] += ($archer['paid_tier'] === 'Youth' ? 25.00 : 30.00);
         }
 
         $capacity_overflows = array();
@@ -270,8 +283,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $remaining_open_slots[$key]--;
             }
 
+            // Enforce Family Cap threshold: Only assign 'Family' rate if group on this line has >= 3 archers AND raw total >= $75.00
+            $is_family_eligible = (isset($line_group_stats[$l_idx]) && $line_group_stats[$l_idx]['count'] >= 3 && $line_group_stats[$l_idx]['raw_sum'] >= 75.00);
+
             $reg_status  = $is_waitlist ? 'Waitlist' : 'Pre-Reg';
-            $paid_status = $is_waitlist ? 'Waitlist' : $archer['paid_tier'];
+            $paid_status = $is_waitlist ? 'Waitlist' : ($is_family_eligible ? 'Family' : $archer['paid_tier']);
             $due_amount  = $is_waitlist ? 0.00 : ($archer['paid_tier'] === 'Youth' ? 25.00 : 30.00);
 
             $new_reg = array(
