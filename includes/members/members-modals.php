@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, batch spreadsheet upload, and 2-step audit preview overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, and protected test data purge overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
  * Version: 3.9.5
@@ -789,7 +789,7 @@ function sywat_members_render_modals( $data ) {
 
                     <div class="sywat-modal-actions sywat-mt-4">
                         <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportModal()">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-primary">🔍 Audit &amp; Preview File</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_import_submit_btn">🔍 Audit &amp; Preview File</button>
                     </div>
                 </form>
             </div>
@@ -813,6 +813,20 @@ function sywat_members_render_modals( $data ) {
                 $p_dep       = isset( $preview_data['dependents_count'] ) ? $preview_data['dependents_count'] : 0;
                 $p_noemail   = isset( $preview_data['unassigned_emails_count'] ) ? $preview_data['unassigned_emails_count'] : 0;
                 $households  = isset( $preview_data['households'] ) && is_array( $preview_data['households'] ) ? $preview_data['households'] : array();
+
+                // BULK IN-MEMORY DATABASE PRE-FETCH FOR FAST PREVIEW MATCHING
+                global $wpdb;
+                $existing_nfaa_set = array();
+                $nfaa_db_rows = $wpdb->get_col( "SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_nfaa_number' AND meta_value != ''" );
+                if ( ! empty( $nfaa_db_rows ) ) {
+                    $existing_nfaa_set = array_flip( array_map( 'trim', $nfaa_db_rows ) );
+                }
+
+                $existing_email_set = array();
+                $email_db_rows = $wpdb->get_col( "SELECT user_email FROM {$wpdb->users} WHERE user_email != ''" );
+                if ( ! empty( $email_db_rows ) ) {
+                    $existing_email_set = array_flip( array_map( 'strtolower', array_map( 'trim', $email_db_rows ) ) );
+                }
             ?>
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
@@ -875,20 +889,14 @@ function sywat_members_render_modals( $data ) {
                             <tbody>
                                 <?php foreach ( $households as $members ): ?>
                                     <?php 
-                                        usort( $members, function( $a, $b ) {
-                                            if ( empty( $a['dob'] ) ) return 1;
-                                            if ( empty( $b['dob'] ) ) return -1;
-                                            return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
-                                        } );
                                         $head = array_shift( $members );
                                         
                                         $existing_match = false;
-                                        if ( ! empty( $head['nfaa_number'] ) ) {
-                                            $match = get_users( array( 'meta_key' => 'sywat_nfaa_number', 'meta_value' => $head['nfaa_number'], 'number' => 1 ) );
-                                            if ( ! empty( $match ) ) $existing_match = true;
+                                        if ( ! empty( $head['nfaa_number'] ) && isset( $existing_nfaa_set[ $head['nfaa_number'] ] ) ) {
+                                            $existing_match = true;
                                         }
-                                        if ( ! $existing_match && ! empty( $head['email'] ) ) {
-                                            if ( get_user_by( 'email', $head['email'] ) ) $existing_match = true;
+                                        if ( ! $existing_match && ! empty( $head['email'] ) && isset( $existing_email_set[ strtolower( $head['email'] ) ] ) ) {
+                                            $existing_match = true;
                                         }
 
                                         $primary_email_disp = ! empty( $head['email'] ) ? $head['email'] : 'unassigned-' . ( ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : 'temp' ) . '@system.sywat.local';
@@ -957,8 +965,7 @@ function sywat_members_render_modals( $data ) {
                         </table>
                     </div>
 
-                    <!-- SINGLE FORM WRAPPER FOR PERFECT SIDE-BY-SIDE BUTTON FLEX ALIGNMENT -->
-                    <form method="post" action="?tab=members&subtab=directory">
+                    <form method="post" action="?tab=members&subtab=directory" id="sywat_commit_import_form">
                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
                         <input type="hidden" name="import_mode" value="commit">
@@ -966,12 +973,54 @@ function sywat_members_render_modals( $data ) {
 
                         <div class="sywat-modal-actions sywat-mt-4">
                             <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportPreviewModal()">Cancel Import</button>
-                            <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Ingest <?php echo intval( $p_clean ); ?> Archers into Database</button>
+                            <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_commit_submit_btn">🚀 Confirm &amp; Ingest <?php echo intval( $p_clean ); ?> Archers into Database</button>
                         </div>
                     </form>
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+
+    <!-- MODAL 9: PROTECTED BATCH TEST DATA PURGE MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_purge_test_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>🗑️ Purge Batch Test Data</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatClosePurgeModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_purge_test_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="purge_test_members">
+
+                    <div class="sywat-alert sywat-alert-danger">
+                        ⚠️ <strong>Protected Data Reset Tool:</strong> This action will permanently remove standard imported test members from the directory database.
+                    </div>
+
+                    <div class="sywat-member-info-banner sywat-mt-3">
+                        <div>🛡️ <strong>Automatically Protected Accounts (Will NOT Be Deleted):</strong></div>
+                        <ul class="sywat-mt-1 sywat-mb-0 sywat-pl-3">
+                            <li>System Administrators &amp; Webmasters</li>
+                            <li>Your Active Logged-In Account</li>
+                            <li>Shop &amp; Club Managers / Desk Staff</li>
+                            <li>Official Board Directors &amp; Field Governors</li>
+                        </ul>
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-4">
+                        <label class="sywat-checkbox-label">
+                            <input type="checkbox" id="sywat_purge_confirm_check" onchange="document.getElementById('sywat_purge_submit_btn').disabled = !this.checked;">
+                            I understand this will delete standard test members while preserving all protected officers and shop managers.
+                        </label>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatClosePurgeModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-danger" id="sywat_purge_submit_btn" disabled>🗑️ Execute Data Purge</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     <?php
 }
