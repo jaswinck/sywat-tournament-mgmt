@@ -5,7 +5,7 @@
  * Description: Renders modal overlay templates for quick member account creation and board position assignments.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.2.0
+ * Version: 3.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -104,19 +104,6 @@ function sywat_members_render_modals( $data ) {
                             <label>Zip Code</label>
                             <input type="text" name="zip" maxlength="10">
                         </div>
-                    </div>
-
-                    <!-- Household Primary Linkage -->
-                    <div class="sywat-field-group sywat-mt-3">
-                        <label>Primary Account Holder (Household Link)</label>
-                        <select name="primary_user_id">
-                            <option value="0" selected>-- Standalone / Primary Account Holder --</option>
-                            <?php foreach ( $all_members as $m_opt ): ?>
-                                <option value="<?php echo intval( $m_opt->ID ); ?>">
-                                    🏠 Link to: <?php echo esc_html( $m_opt->display_name ); ?> (<?php echo esc_html( $m_opt->user_email ); ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
                     </div>
 
                     <!-- MULTI-ROLE CHECKBOX GRID -->
