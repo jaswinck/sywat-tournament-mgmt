@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -72,6 +72,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             'management', 'staff_shooter', 'staff-shooter', 'non-shooting-member', 'non_shooting_member',
         );
 
+        $accom_labels = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+
         ob_start();
         ?>
         <div class="sywat-wrap">
@@ -80,14 +82,15 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             <?php if ( $view === 'edit_member' && $edit_user_obj ): ?>
                 <!-- VIEW 1: SINGLE-DASHBOARD HOUSEHOLD MEMBER PROFILE VIEW -->
                 <?php 
-                    $e_nfaa_id    = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
-                    $e_phone      = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
-                    $e_dob        = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
-                    $e_address_1  = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
-                    $e_address_2  = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
-                    $e_city       = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
-                    $e_state      = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
-                    $e_zip        = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
+                    $e_nfaa_id      = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
+                    $e_phone        = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
+                    $e_dob          = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
+                    $e_accom        = get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true );
+                    $e_address_1    = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
+                    $e_address_2    = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
+                    $e_city         = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
+                    $e_state        = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
+                    $e_zip          = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
 
                     $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
@@ -113,7 +116,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <div class="sywat-card-header-bar">
                         <div>
                             <h2>🏠 Household Dashboard: <?php echo esc_html( $edit_user_obj->display_name ); ?></h2>
-                            <div class="sywat-subtitle">Master Contact Email: <code><?php echo esc_html( $edit_user_obj->user_email ); ?></code> | Primary Phone: <strong><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?></strong></div>
+                            <div class="sywat-subtitle">Managing family roster &amp; archer profiles stored under this household.</div>
                         </div>
                         <div class="sywat-header-inline-controls no-print">
                             <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary">← Back to Directory</a>
@@ -140,6 +143,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>
                                         <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $e_nfaa_id ); ?></strong></div>
                                         <div class="sywat-meta-subtext">👤 Login: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
+                                        <?php if ( ! empty( $e_accom ) && $e_accom !== 'none' ): ?>
+                                            <div class="sywat-mt-1">
+                                                <span class="sywat-badge sywat-badge-prereg">♿ <?php echo esc_html( isset( $accom_labels[$e_accom] ) ? $accom_labels[$e_accom] : $e_accom ); ?></span>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="sywat-col-center">
                                         <span class="sywat-badge sywat-badge-open">👑 Head of Household</span>
@@ -166,6 +174,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <?php 
                                         $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
                                         $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
+                                        $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
                                         $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted' );
                                         $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
                                         $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
@@ -175,6 +184,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <td>
                                             <strong><?php echo esc_html( $dep['display_name'] ); ?></strong>
                                             <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $dep_n_id ); ?></strong></div>
+                                            <?php if ( ! empty( $dep_accom ) && $dep_accom !== 'none' ): ?>
+                                                <div class="sywat-mt-1">
+                                                    <span class="sywat-badge sywat-badge-prereg">♿ <?php echo esc_html( isset( $accom_labels[$dep_accom] ) ? $accom_labels[$dep_accom] : $dep_accom ); ?></span>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="sywat-col-center">
                                             <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
