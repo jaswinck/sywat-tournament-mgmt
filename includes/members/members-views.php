@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.8.2
+ * Version: 3.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -41,8 +41,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         $raw_members     = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
         $tfaa_role_slugs = function_exists( 'sywat_get_custom_roles_slugs' ) ? sywat_get_custom_roles_slugs() : array();
 
-        // Filter registered directory accounts matching TFAA officer/member roles or Administrator
-        $allowed_directory_roles = array_merge( (array) $tfaa_role_slugs, array( 'administrator' ) );
+        // Filter registered directory accounts matching TFAA officer/member roles, shop managers, or Administrator
+        $allowed_directory_roles = array_unique( array_merge( (array) $tfaa_role_slugs, array( 'administrator', 'sywat_shop_manager', 'sywat_shop_user' ) ) );
         $all_members = array();
         if ( is_array( $raw_members ) ) {
             foreach ( $raw_members as $m_user ) {
