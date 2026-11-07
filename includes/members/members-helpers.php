@@ -5,7 +5,7 @@
  * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.8.1
+ * Version: 3.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -265,17 +265,19 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
-            // Check system level roles
-            $is_shop_staff = ( in_array( 'sywat_shop_manager', $user_roles, true ) || in_array( 'sywat_shop_user', $user_roles, true ) );
-            $is_admin      = in_array( 'administrator', $user_roles, true );
-
-            if ( $is_shop_staff ) {
-                $system_account_label = 'Shop / Club';
-            } elseif ( $is_admin ) {
-                $system_account_label = 'System Admin';
+            // Detect system level roles for both pure and dual-role accounts
+            foreach ( $user_roles as $r ) {
+                $r_clean = strtolower( $r );
+                if ( strpos( $r_clean, 'shop' ) !== false || strpos( $r_clean, 'club' ) !== false ) {
+                    $system_account_label = 'Shop / Club';
+                    break;
+                } elseif ( strpos( $r_clean, 'admin' ) !== false ) {
+                    $system_account_label = 'System Admin';
+                    break;
+                }
             }
 
-            // Pure System/Staff Account without an active NFAA ID
+            // Pure System/Staff Account without an active NFAA ID or expiration date
             if ( empty( $expiration ) && empty( $nfaa_id ) ) {
                 if ( ! empty( $system_account_label ) ) {
                     return array(
