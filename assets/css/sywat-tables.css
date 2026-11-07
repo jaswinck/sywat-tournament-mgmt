@@ -1,6 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
+   Version: 6.5.0
    ========================================================================== */
 
 .sywat-table-responsive {
@@ -43,6 +44,27 @@
     height: 28px;
     padding: 2px 8px;
     font-size: 12px;
+}
+
+/* Row Hover & Member Table Link Styling */
+.sywat-member-row,
+.sywat-board-row {
+    transition: background-color 0.15s ease;
+}
+
+.sywat-member-row:hover,
+.sywat-board-row:hover {
+    background-color: #f8fafc;
+}
+
+.sywat-table-link {
+    color: #2271b1;
+    text-decoration: none;
+}
+
+.sywat-table-link:hover {
+    color: #135e96;
+    text-decoration: underline;
 }
 
 /* Inline Table Action Forms (Centered Alignment) */
@@ -112,7 +134,7 @@
 }
 
 /* ==========================================================================
-   NEW: Isolated Modal Roster Buttons (Strict Block Width Lock)
+   Isolated Modal Roster Buttons (Strict Block Width Lock)
    ========================================================================== */
 .sywat-modal-roster-actions {
     display: block !important;
@@ -160,6 +182,14 @@
 .sywat-table th.text-center, .sywat-table td.text-center, .sywat-table th.sywat-col-center, .sywat-table td.sywat-col-center, .sywat-col-center { text-align: center !important; }
 .sywat-table th.text-right, .sywat-table td.text-right, .sywat-table th.sywat-col-right, .sywat-table td.sywat-col-right, .sywat-col-right { text-align: right !important; }
 .sywat-table th.text-left, .sywat-table td.text-left, .sywat-table th.sywat-col-left, .sywat-table td.sywat-col-left, .sywat-col-left { text-align: left !important; }
+
+/* Percentage-Based Column Width Utilities */
+.sywat-col-w-10 { width: 10%; }
+.sywat-col-w-12 { width: 12%; }
+.sywat-col-w-14 { width: 14%; }
+.sywat-col-w-22 { width: 22%; }
+.sywat-col-w-24 { width: 24%; }
+.sywat-col-w-32 { width: 32%; }
 
 /* Table Column Width Utilities */
 .sywat-col-date       { width: 22%; }
@@ -322,6 +352,12 @@
 .sywat-text-open   { color: #008a20; font-weight: 600; }
 .sywat-text-closed { color: #d63638; font-weight: 600; }
 
+.sywat-badge-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
 .sywat-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -354,6 +390,12 @@
     background-color: #fef3c7;
     color: #b45309;
     border: 1px solid #fde68a;
+}
+
+.sywat-badge-muted {
+    background-color: #f1f5f9;
+    color: #646970;
+    border: 1px solid #cbd5e1;
 }
 
 .sywat-badge-family-cap {
