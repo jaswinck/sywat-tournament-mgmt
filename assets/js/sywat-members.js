@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import & Audit Preview Overlays), client-side phone formatting, password policy validation, dynamic shop visibility, search filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, and Protected Test Data Purge Overlays), client-side phone formatting, password policy validation, dynamic shop visibility, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 3.9.4
+ * Version: 3.9.5
  */
 
 /**
@@ -247,17 +247,39 @@ function sywatCloseImportPreviewModal() {
     }
 }
 
+// 10. Protected Batch Test Data Purge Modal
+function sywatOpenPurgeModal() {
+    const modal = document.getElementById('sywat_purge_test_modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function sywatClosePurgeModal() {
+    const modal = document.getElementById('sywat_purge_test_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
 /**
- * Filters the Member Directory table rows in real time based on user search input.
+ * Filters the Member Directory table rows in real time based on search input and active/expired status.
  */
 function sywatApplyMemberSearch() {
-    const input = document.getElementById('sywat_member_search_input');
-    const query = input ? input.value.toLowerCase().trim() : '';
-    const rows  = document.querySelectorAll('.sywat-member-row');
+    const input        = document.getElementById('sywat_member_search_input');
+    const statusSelect = document.getElementById('sywat_member_status_filter');
+    const query        = input ? input.value.toLowerCase().trim() : '';
+    const statusFilter = statusSelect ? statusSelect.value.toLowerCase().trim() : '';
+    const rows         = document.querySelectorAll('.sywat-member-row');
 
     rows.forEach(function(row) {
         const searchData = (row.getAttribute('data-search') || '').toLowerCase();
-        if (!query || searchData.indexOf(query) !== -1) {
+        const rowStatus  = (row.getAttribute('data-status') || '').toLowerCase();
+
+        const matchesQuery  = (!query || searchData.indexOf(query) !== -1);
+        const matchesStatus = (!statusFilter || rowStatus === statusFilter);
+
+        if (matchesQuery && matchesStatus) {
             row.classList.remove('sywat-hidden');
         } else {
             row.classList.add('sywat-hidden');
@@ -266,12 +288,16 @@ function sywatApplyMemberSearch() {
 }
 
 /**
- * Clears the member search input field and resets table row visibility.
+ * Clears the member search input field, resets the status filter dropdown, and resets row visibility.
  */
 function sywatResetMemberSearch() {
-    const input = document.getElementById('sywat_member_search_input');
+    const input        = document.getElementById('sywat_member_search_input');
+    const statusSelect = document.getElementById('sywat_member_status_filter');
     if (input) {
         input.value = '';
+    }
+    if (statusSelect) {
+        statusSelect.value = '';
     }
     sywatApplyMemberSearch();
 }
@@ -306,13 +332,14 @@ function sywatResetBoardSearch() {
 }
 
 /**
- * Handles DOM load initializations: shop visibility state check and system notice auto-dismissal.
+ * Handles DOM load initializations: shop visibility state check, notice auto-dismissal, and form submit spinners.
  */
 document.addEventListener("DOMContentLoaded", function() {
     sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
     sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container');
     sywatToggleShopVisibility('sywat_edit_member_full_form', 'sywat_edit_full_shop_container');
 
+    // Auto-dismiss alert notices
     const notice = document.getElementById('sywat-notice');
     if (notice) {
         setTimeout(function() {
@@ -323,5 +350,28 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }, 500);
         }, 5000);
+    }
+
+    // Form submit handlers for loading spinners & button locking
+    const importForm = document.getElementById('sywat_import_archers_form');
+    if (importForm) {
+        importForm.addEventListener('submit', function() {
+            const btn = document.getElementById('sywat_import_submit_btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⌛ Auditing Spreadsheet (Please Wait)...';
+            }
+        });
+    }
+
+    const commitForm = document.getElementById('sywat_commit_import_form');
+    if (commitForm) {
+        commitForm.addEventListener('submit', function() {
+            const btn = document.getElementById('sywat_commit_submit_btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⌛ Ingesting Archers into Database...';
+            }
+        });
     }
 });
