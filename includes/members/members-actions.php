@@ -2,7 +2,9 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
+ * Description: Nonce-verified POST action processor for member account creation, profile updates, DOB/NFAA meta saving, address management, household linkage, and board position assignment.
  * Author: SYWAT Archery
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -60,6 +62,16 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $submitted_roles  = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array( 'tfaa_member' );
             $shop_id          = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
 
+            // Extended Metadata Inputs (DOB, NFAA Expiration, Household Link & Address)
+            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
+            $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
+            $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
+            $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
+            $state           = isset( $_POST['state'] ) ? sanitize_text_field( $_POST['state'] ) : '';
+            $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
+            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
+
             if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
             }
@@ -108,6 +120,17 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_tfaa_number', $tfaa_id );
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
+            update_user_meta( $user_id, 'sywat_dob', $dob );
+            update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
+            update_user_meta( $user_id, 'sywat_address_1', $address_1 );
+            update_user_meta( $user_id, 'sywat_address_2', $address_2 );
+            update_user_meta( $user_id, 'sywat_city', $city );
+            update_user_meta( $user_id, 'sywat_state', $state );
+            update_user_meta( $user_id, 'sywat_zip', $zip );
+
+            if ( $primary_user_id > 0 ) {
+                update_user_meta( $user_id, 'sywat_primary_user_id', $primary_user_id );
+            }
 
             if ( ! empty( $shop_id ) ) {
                 update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
@@ -129,6 +152,16 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $new_pw          = $_POST['new_password'];
             $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
+            // Extended Metadata Inputs (DOB, NFAA Expiration, Household Link & Address)
+            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
+            $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
+            $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
+            $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
+            $state           = isset( $_POST['state'] ) ? sanitize_text_field( $_POST['state'] ) : '';
+            $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
+            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
+
             if ( $user_id > 0 && get_userdata( $user_id ) ) {
                 if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
                     $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
@@ -148,6 +181,19 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
+                update_user_meta( $user_id, 'sywat_dob', $dob );
+                update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
+                update_user_meta( $user_id, 'sywat_address_1', $address_1 );
+                update_user_meta( $user_id, 'sywat_address_2', $address_2 );
+                update_user_meta( $user_id, 'sywat_city', $city );
+                update_user_meta( $user_id, 'sywat_state', $state );
+                update_user_meta( $user_id, 'sywat_zip', $zip );
+
+                if ( $primary_user_id > 0 && $primary_user_id !== $user_id ) {
+                    update_user_meta( $user_id, 'sywat_primary_user_id', $primary_user_id );
+                } else {
+                    delete_user_meta( $user_id, 'sywat_primary_user_id' );
+                }
 
                 if ( ! empty( $shop_id ) ) {
                     update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
