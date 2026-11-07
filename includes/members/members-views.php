@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers and support for Gender/Pro status flags.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.9.1
+ * Version: 3.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -76,7 +76,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         );
 
         $accom_labels  = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
-        $gender_labels = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'male' => 'Male', 'female' => 'Female' );
+        $gender_labels = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
 
         ob_start();
         ?>
@@ -108,7 +108,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                     $e_gender_clean = ! empty( $e_gender ) && isset( $gender_labels[strtolower( $e_gender )] ) 
                         ? $gender_labels[strtolower( $e_gender )] 
-                        : 'Male';
+                        : '⚠️ Unassigned';
 
                     $linked_dependents = function_exists( 'sywat_get_linked_household_members' ) 
                         ? sywat_get_linked_household_members( $edit_user_obj->ID ) 
@@ -197,7 +197,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
                                             $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
                                             $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
-                                            $dep_gender = isset( $dep['gender'] ) && isset( $gender_labels[strtolower( $dep['gender'] )] ) ? $gender_labels[strtolower( $dep['gender'] )] : 'Male';
+                                            $dep_gender = isset( $dep['gender'] ) && isset( $gender_labels[strtolower( $dep['gender'] )] ) ? $gender_labels[strtolower( $dep['gender'] )] : '⚠️ Unassigned';
                                             $dep_is_pro = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes';
                                             $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
                                             $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
@@ -359,7 +359,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <div class="sywat-subtitle">Overview of registered TFAA members, contact details, household links, and member status.</div>
                             </div>
                             <div class="sywat-header-inline-controls">
-                                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">Add Member</button>
+                                <?php if ( current_user_can( 'administrator' ) ): ?>
+                                    <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatOpenImportModal()">📥 Import Archers</button>
+                                <?php endif; ?>
+                                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">+ Add Member</button>
                             </div>
                         </div>
 
