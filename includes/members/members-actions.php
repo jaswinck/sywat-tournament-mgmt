@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, address management, and board position assignment.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, accommodations selection, state dropdown management, and board position assignment.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices.
  * Author: SYWAT Archery
- * Version: 3.3.0
+ * Version: 3.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,10 +59,11 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $last_name       = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
             $email           = sanitize_email( $_POST['email'] );
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
             $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
             $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
 
-            // HOUSEHOLD DEPENDENT SUB-PROFILE CREATION (Bypasses WP_User creation completely)
+            // HOUSEHOLD DEPENDENT SUB-PROFILE CREATION
             if ( $primary_user_id > 0 ) {
                 if ( empty( $first_name ) || empty( $last_name ) || empty( $dob ) ) {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Date of Birth for the family member.</div>';
@@ -74,12 +75,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'email'           => $email,
                     'phone'           => isset( $_POST['phone'] ) ? sanitize_text_field( $_POST['phone'] ) : '',
                     'dob'             => $dob,
+                    'accommodations'  => $accommodations,
                     'nfaa_number'     => $nfaa_number,
                     'nfaa_expiration' => $nfaa_expiration,
                     'address_1'       => isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '',
                     'address_2'       => isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '',
                     'city'            => isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '',
-                    'state'           => isset( $_POST['state'] ) ? sanitize_text_field( $_POST['state'] ) : '',
+                    'state'           => isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '',
                     'zip'             => isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '',
                 );
 
@@ -103,7 +105,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $address_1 = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
             $address_2 = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
             $city      = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
-            $state     = isset( $_POST['state'] ) ? sanitize_text_field( $_POST['state'] ) : '';
+            $state     = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
             $zip       = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
 
             if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
@@ -149,7 +151,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 }
             }
 
-            // Generate permanent hidden internal System ID via helper
             $system_id = function_exists( 'sywat_get_user_system_id' ) ? sywat_get_user_system_id( $user_id ) : '';
 
             update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
@@ -157,6 +158,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
             update_user_meta( $user_id, 'sywat_dob', $dob );
+            update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
             update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
             update_user_meta( $user_id, 'sywat_address_1', $address_1 );
             update_user_meta( $user_id, 'sywat_address_2', $address_2 );
@@ -186,12 +188,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'email'           => sanitize_email( $_POST['email'] ),
                     'phone'           => sanitize_text_field( $_POST['phone'] ),
                     'dob'             => sanitize_text_field( $_POST['dob'] ),
+                    'accommodations'  => isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none',
                     'nfaa_number'     => sanitize_text_field( $_POST['nfaa_number'] ),
                     'nfaa_expiration' => sanitize_text_field( $_POST['nfaa_expiration'] ),
                     'address_1'       => sanitize_text_field( $_POST['address_1'] ),
                     'address_2'       => sanitize_text_field( $_POST['address_2'] ),
                     'city'            => sanitize_text_field( $_POST['city'] ),
-                    'state'           => sanitize_text_field( $_POST['state'] ),
+                    'state'           => strtoupper( sanitize_text_field( $_POST['state'] ) ),
                     'zip'             => sanitize_text_field( $_POST['zip'] ),
                 );
 
@@ -216,12 +219,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
             $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
             $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
             $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
             $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
             $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
-            $state           = isset( $_POST['state'] ) ? sanitize_text_field( $_POST['state'] ) : '';
+            $state           = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
             $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
 
             if ( $user_id > 0 && get_userdata( $user_id ) ) {
@@ -250,6 +254,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
                 update_user_meta( $user_id, 'sywat_dob', $dob );
+                update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
                 update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
                 update_user_meta( $user_id, 'sywat_address_1', $address_1 );
                 update_user_meta( $user_id, 'sywat_address_2', $address_2 );
