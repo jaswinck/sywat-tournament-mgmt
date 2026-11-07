@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.8.1
+ * Version: 3.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -397,17 +397,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                     
                                                     $r_name = isset( $wp_role_names[$r_slug] ) ? $wp_role_names[$r_slug] : ucfirst( str_replace( '_', ' ', $r_slug ) );
                                                     $r_name = trim( str_replace( array( 'TFAA ', 'SYWAT ' ), '', $r_name ) );
-                                                    $r_slug_clean = strtolower( $r_slug );
+                                                    $r_clean = strtolower( $r_slug );
 
-                                                    // Color Hierarchy Classes
+                                                    // Robust String Matching for Color Hierarchy Classes
                                                     $badge_cls = 'sywat-badge-muted'; // Default TFAA Member
-                                                    if ( in_array( $r_slug_clean, array( 'administrator', 'tfaa_webmaster' ), true ) ) {
-                                                        $badge_cls = 'sywat-badge-closed'; // Crimson/Dark Gold
-                                                    } elseif ( in_array( $r_slug_clean, array( 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director' ), true ) ) {
+                                                    if ( strpos( $r_clean, 'admin' ) !== false || strpos( $r_clean, 'webmaster' ) !== false ) {
+                                                        $badge_cls = 'sywat-badge-closed'; // Dark Gold / Crimson
+                                                    } elseif ( strpos( $r_clean, 'president' ) !== false || strpos( $r_clean, 'treasurer' ) !== false || strpos( $r_clean, 'secretary' ) !== false || strpos( $r_clean, 'director' ) !== false ) {
                                                         $badge_cls = 'sywat-badge-open'; // Navy Blue
-                                                    } elseif ( $r_slug_clean === 'tfaa_field_governor' ) {
+                                                    } elseif ( strpos( $r_clean, 'governor' ) !== false ) {
                                                         $badge_cls = 'sywat-badge-registered'; // Purple
-                                                    } elseif ( in_array( $r_slug_clean, array( 'sywat_shop_manager', 'sywat_shop_user' ), true ) ) {
+                                                    } elseif ( strpos( $r_clean, 'shop' ) !== false || strpos( $r_clean, 'club' ) !== false ) {
                                                         $badge_cls = 'sywat-badge-checkedin'; // Teal Emerald
                                                     }
 
