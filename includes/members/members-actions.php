@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and historical batch spreadsheet importer execution.
- * Compliance: Zero visual HTML layout templates. Returns standardized alert notices.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and 2-step batch spreadsheet importer execution.
+ * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and audit preview cards.
  * Author: SYWAT Archery
- * Version: 3.9.2
+ * Version: 3.9.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -52,14 +52,30 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
 
-        // 0. BATCH HISTORICAL ARCHERS SPREADSHEET IMPORT HANDLER
+        // 0. 2-STEP BATCH HISTORICAL ARCHERS SPREADSHEET IMPORT HANDLER
         if ( $action === 'import_archers_spreadsheet' ) {
             if ( ! current_user_can( 'administrator' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data imports.</div>';
             }
 
-            if ( empty( $_FILES['archers_file'] ) ) {
+            $import_mode = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'preview';
+
+            // Ensure PHP session is active for caching temp upload file
+            if ( ! session_id() && ! headers_sent() ) {
+                @session_start();
+            }
+
+            $file_data = ! empty( $_FILES['archers_file'] ) ? $_FILES['archers_file'] : array();
+
+            if ( $import_mode === 'preview' && ( empty( $file_data['tmp_name'] ) || ! is_uploaded_file( $file_data['tmp_name'] ) ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a spreadsheet file (.xlsx or .csv) to import.</div>';
+            }
+
+            // Cache uploaded file reference in session for 2-step confirmation
+            if ( ! empty( $file_data['tmp_name'] ) ) {
+                $_SESSION['sywat_import_file'] = $file_data;
+            } elseif ( $import_mode === 'commit' && ! empty( $_SESSION['sywat_import_file'] ) ) {
+                $file_data = $_SESSION['sywat_import_file'];
             }
 
             $importer_path = plugin_dir_path( __FILE__ ) . 'import/archers-importer.php';
@@ -68,7 +84,11 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
 
             if ( function_exists( 'sywat_import_archers_spreadsheet' ) ) {
-                return sywat_import_archers_spreadsheet( $_FILES['archers_file'] );
+                $result = sywat_import_archers_spreadsheet( $file_data, $import_mode );
+                if ( $import_mode === 'commit' ) {
+                    unset( $_SESSION['sywat_import_file'] );
+                }
+                return $result;
             } else {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer Importer Module Engine is missing or unavailable.</div>';
             }
