@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), gender options dictionary, adult Pro status maps, US state resolution, accommodations maps, and household sub-profile management utilities.
+ * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), gender options dictionary (with 'unassigned' default), adult Pro status maps, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.9.1
+ * Version: 3.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -18,8 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! function_exists( 'sywat_get_gender_options' ) ) {
     function sywat_get_gender_options() {
         return array(
-            'male'   => 'Male',
-            'female' => 'Female',
+            'unassigned' => '-- Select Gender --',
+            'male'       => 'Male',
+            'female'     => 'Female',
         );
     }
 }
@@ -389,7 +390,7 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
                         'display_name'    => $lu->display_name,
                         'email'           => $lu->user_email,
                         'phone'           => get_user_meta( $lu->ID, 'sywat_phone', true ),
-                        'gender'          => ! empty( $legacy_gender ) ? strtolower( $legacy_gender ) : 'male',
+                        'gender'          => ! empty( $legacy_gender ) ? strtolower( $legacy_gender ) : 'unassigned',
                         'is_pro'          => ( $legacy_pro === 'yes' ) ? 'yes' : 'no',
                         'dob'             => get_user_meta( $lu->ID, 'sywat_dob', true ),
                         'accommodations'  => get_user_meta( $lu->ID, 'sywat_accommodations', true ),
@@ -409,7 +410,7 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
         // Standardize fallback defaults for dependent records
         foreach ( $dependents as $idx => $d ) {
             if ( ! isset( $d['gender'] ) || empty( $d['gender'] ) ) {
-                $dependents[$idx]['gender'] = 'male';
+                $dependents[$idx]['gender'] = 'unassigned';
             }
             if ( ! isset( $d['is_pro'] ) || empty( $d['is_pro'] ) ) {
                 $dependents[$idx]['is_pro'] = 'no';
@@ -473,7 +474,7 @@ if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
             return new WP_Error( 'missing_fields', 'First Name, Last Name, and Date of Birth are required.' );
         }
 
-        $gender = sanitize_text_field( isset( $dep_data['gender'] ) ? strtolower( $dep_data['gender'] ) : 'male' );
+        $gender = sanitize_text_field( isset( $dep_data['gender'] ) ? strtolower( $dep_data['gender'] ) : 'unassigned' );
         $is_pro = isset( $dep_data['is_pro'] ) && $dep_data['is_pro'] === 'yes' ? 'yes' : 'no';
 
         $system_id  = sywat_generate_unique_system_id();
@@ -492,7 +493,7 @@ if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
             'display_name'    => $first_name . ' ' . $last_name,
             'email'           => sanitize_email( isset( $dep_data['email'] ) ? $dep_data['email'] : $primary_user->user_email ),
             'phone'           => sanitize_text_field( isset( $dep_data['phone'] ) ? $dep_data['phone'] : get_user_meta( $primary_user_id, 'sywat_phone', true ) ),
-            'gender'          => in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male',
+            'gender'          => in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned',
             'is_pro'          => $is_pro,
             'dob'             => $dob,
             'accommodations'  => sanitize_text_field( isset( $dep_data['accommodations'] ) ? $dep_data['accommodations'] : 'none' ),
@@ -546,7 +547,7 @@ if ( ! function_exists( 'sywat_update_household_dependent' ) ) {
 
         $first_name = isset( $dep_data['first_name'] ) ? ucfirst( strtolower( sanitize_text_field( $dep_data['first_name'] ) ) ) : $current['first_name'];
         $last_name  = isset( $dep_data['last_name'] ) ? ucfirst( strtolower( sanitize_text_field( $dep_data['last_name'] ) ) ) : $current['last_name'];
-        $gender     = isset( $dep_data['gender'] ) ? strtolower( sanitize_text_field( $dep_data['gender'] ) ) : ( isset( $current['gender'] ) ? $current['gender'] : 'male' );
+        $gender     = isset( $dep_data['gender'] ) ? strtolower( sanitize_text_field( $dep_data['gender'] ) ) : ( isset( $current['gender'] ) ? $current['gender'] : 'unassigned' );
         $is_pro     = isset( $dep_data['is_pro'] ) ? ( $dep_data['is_pro'] === 'yes' ? 'yes' : 'no' ) : ( isset( $current['is_pro'] ) ? $current['is_pro'] : 'no' );
 
         $dependents[$found_index]['first_name']      = $first_name;
@@ -554,7 +555,7 @@ if ( ! function_exists( 'sywat_update_household_dependent' ) ) {
         $dependents[$found_index]['display_name']    = $first_name . ' ' . $last_name;
         $dependents[$found_index]['email']           = isset( $dep_data['email'] ) ? sanitize_email( $dep_data['email'] ) : $current['email'];
         $dependents[$found_index]['phone']           = isset( $dep_data['phone'] ) ? sanitize_text_field( $dep_data['phone'] ) : $current['phone'];
-        $dependents[$found_index]['gender']          = in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male';
+        $dependents[$found_index]['gender']          = in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned';
         $dependents[$found_index]['is_pro']          = $is_pro;
         $dependents[$found_index]['dob']             = isset( $dep_data['dob'] ) ? sanitize_text_field( $dep_data['dob'] ) : $current['dob'];
         $dependents[$found_index]['accommodations']  = isset( $dep_data['accommodations'] ) ? sanitize_text_field( $dep_data['accommodations'] ) : ( isset( $current['accommodations'] ) ? $current['accommodations'] : 'none' );
@@ -684,7 +685,7 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
             return $new_user_id;
         }
 
-        $dep_gender = isset( $dep['gender'] ) ? strtolower( $dep['gender'] ) : 'male';
+        $dep_gender = isset( $dep['gender'] ) ? strtolower( $dep['gender'] ) : 'unassigned';
         $dep_pro    = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes' ? 'yes' : 'no';
 
         update_user_meta( $new_user_id, 'sywat_system_id', $system_id );
