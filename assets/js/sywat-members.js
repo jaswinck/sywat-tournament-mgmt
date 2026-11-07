@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Spreadsheet Import), client-side phone formatting, password policy validation, dynamic shop visibility, search filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import & Audit Preview Overlays), client-side phone formatting, password policy validation, dynamic shop visibility, search filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 3.9.2
+ * Version: 3.9.4
  */
 
 /**
@@ -227,6 +227,21 @@ function sywatOpenImportModal() {
 
 function sywatCloseImportModal() {
     const modal = document.getElementById('sywat_import_archers_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// 9. Historical Archers Batch Import Audit Preview Modal
+function sywatOpenImportPreviewModal() {
+    const modal = document.getElementById('sywat_import_preview_modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function sywatCloseImportPreviewModal() {
+    const modal = document.getElementById('sywat_import_preview_modal');
     if (modal) {
         modal.classList.remove('active');
     }
