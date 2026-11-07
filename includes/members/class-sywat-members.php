@@ -5,7 +5,7 @@
  * Description: Main loader binding public/admin shortcode [sywat_members] and enqueuing sub-module assets.
  * Compliance: Registers script hooks for external JS asset loading.
  * Author: SYWAT Archery
- * Version: 3.0.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -26,7 +26,7 @@ if ( ! function_exists( 'sywat_enqueue_members_assets' ) ) {
 
         $js_url  = $plugin_root_url . 'assets/js/sywat-members.js';
         $js_path = $plugin_root_path . 'assets/js/sywat-members.js';
-        $version = file_exists( $js_path ) ? filemtime( $js_path ) : '3.0.0';
+        $version = file_exists( $js_path ) ? filemtime( $js_path ) : '3.2.0';
 
         wp_enqueue_script(
             'sywat-members-js',
