@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.8.3
+ * Version: 3.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -339,7 +339,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <div class="sywat-card-header-bar">
                             <div>
                                 <h2>👥 Member Directory</h2>
-                                <div class="sywat-subtitle">Overview of registered TFAA members, contact details, DOB age divisions, household links, and member status.</div>
+                                <div class="sywat-subtitle">Overview of registered TFAA members, contact details, household links, and member status.</div>
                             </div>
                             <div class="sywat-header-inline-controls">
                                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">Add Member</button>
@@ -362,7 +362,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <table class="sywat-table">
                                     <thead>
                                         <tr>
-                                            <th class="sywat-col-w-22">Member Name &amp; DOB</th>
+                                            <th class="sywat-col-w-22">Member Name</th>
                                             <th class="sywat-col-w-24">Assigned Role(s)</th>
                                             <th class="sywat-col-w-22">Email Address</th>
                                             <th class="sywat-col-center sywat-col-w-12">Phone</th>
@@ -383,7 +383,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                     ? sywat_get_member_nfaa_status( $m->ID ) 
                                                     : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
-                                                // DOB & Age Division Calculation
+                                                // DOB & Age Division Calculation (Retained for search data attribute)
                                                 $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
                                                     ? sywat_get_eligible_age_division( $m_dob ) 
                                                     : '';
@@ -424,10 +424,6 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $m->display_name ); ?></strong>
-                                                    <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $m_nfaa_id ); ?></strong></div>
-                                                    <?php if ( ! empty( $m_dob ) ): ?>
-                                                        <div class="sywat-meta-subtext">🎂 <?php echo esc_html( date( 'M j, Y', strtotime( $m_dob ) ) ); ?><?php echo ! empty( $age_div ) ? ' (' . esc_html( $age_div ) . ')' : ''; ?></div>
-                                                    <?php endif; ?>
                                                     <?php if ( $m_deps_count > 0 ): ?>
                                                         <div class="sywat-meta-subtext">🏠 Household: <?php echo intval( $m_deps_count ); ?> Linked Archer(s)</div>
                                                     <?php endif; ?>
