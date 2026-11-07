@@ -2,23 +2,23 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance batch processing engine for ingesting Archers.xlsx / CSV historical data. Performs SQL injection purging, DOB-based profile deduplication, 3-tier household grouping, system placeholder email resolution, and safe in-place database updates.
- * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices.
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Fixes array_combine mismatch errors and provides a pre-ingestion audit preview screen before database mutation.
+ * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and audit preview markups.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
     /**
-     * Process uploaded Archers spreadsheet (.xlsx or .csv) and ingest clean records into WordPress.
+     * Process uploaded Archers spreadsheet (.xlsx or .csv) with 2-step Audit Preview support.
      *
-     * @param array $file_array Uploaded $_FILES['archers_file'] array.
-     * @return string Alert notice markup summarizing batch execution metrics.
+     * @param array  $file_array Uploaded $_FILES['archers_file'] array.
+     * @param string $mode       Execution mode: 'preview' (audit only) or 'commit' (write to DB).
+     * @return string Alert or Audit Preview HTML markup.
      */
-    function sywat_import_archers_spreadsheet( $file_array ) {
-        // Capability & Nonce Verification
+    function sywat_import_archers_spreadsheet( $file_array, $mode = 'preview' ) {
         if ( ! current_user_can( 'administrator' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data imports.</div>';
         }
@@ -27,57 +27,44 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please upload a valid .xlsx or .csv spreadsheet file.</div>';
         }
 
-        // Elevate resource limits for heavy batch processing
         @set_time_limit( 600 );
         @ini_set( 'memory_limit', '512M' );
 
         $file_path = $file_array['tmp_name'];
-        $file_ext  = strtolower( pathinfo( $file_array['name'], PATHINFO_EXTENSION ) );
+        $file_name = sanitize_text_field( $file_array['name'] );
+        $file_ext  = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
         $rows      = array();
 
         // -------------------------------------------------------------------------
-        // PARSE SPREADSHEET CONTENT
+        // PARSE SPREADSHEET CONTENT WITH ARRAY MATCH SAFETY
         // -------------------------------------------------------------------------
-        if ( $file_ext === 'csv' ) {
-            if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
-                $header = fgetcsv( $handle, 2000, ',' );
-                while ( ( $data = fgetcsv( $handle, 2000, ',' ) ) !== false ) {
-                    if ( count( $data ) >= count( $header ) ) {
-                        $rows[] = array_combine( array_slice( $header, 0, count( $data ) ), $data );
+        if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+            $raw_header = fgetcsv( $handle, 4096, ',' );
+            if ( $raw_header ) {
+                $header       = array_map( 'trim', $raw_header );
+                $header_count = count( $header );
+
+                while ( ( $data = fgetcsv( $handle, 4096, ',' ) ) !== false ) {
+                    $data_count = count( $data );
+                    if ( $data_count === 0 || ( $data_count === 1 && empty( $data[0] ) ) ) {
+                        continue;
                     }
-                }
-                fclose( $handle );
-            }
-        } else {
-            // Attempt parsing via SimpleXLSX or PHP spreadsheet parser if available
-            if ( class_exists( 'SimpleXLSX' ) ) {
-                if ( $xlsx = SimpleXLSX::parse( $file_path ) ) {
-                    $sheet_rows = $xlsx->rows();
-                    if ( ! empty( $sheet_rows ) ) {
-                        $header = array_map( 'trim', array_shift( $sheet_rows ) );
-                        foreach ( $sheet_rows as $r ) {
-                            if ( count( $r ) >= count( $header ) ) {
-                                $rows[] = array_combine( array_slice( $header, 0, count( $r ) ), $r );
-                            }
-                        }
+
+                    // Pad or trim data array to strictly match header count
+                    if ( $data_count < $header_count ) {
+                        $data = array_pad( $data, $header_count, '' );
+                    } elseif ( $data_count > $header_count ) {
+                        $data = array_slice( $data, 0, $header_count );
                     }
-                }
-            } else {
-                // Native CSV fallback reading logic
-                if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
-                    $header = fgetcsv( $handle, 2000, ',' );
-                    while ( ( $data = fgetcsv( $handle, 2000, ',' ) ) !== false ) {
-                        if ( count( $data ) >= count( $header ) ) {
-                            $rows[] = array_combine( array_slice( $header, 0, count( $data ) ), $data );
-                        }
-                    }
-                    fclose( $handle );
+
+                    $rows[] = array_combine( $header, $data );
                 }
             }
+            fclose( $handle );
         }
 
         if ( empty( $rows ) ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to parse spreadsheet content or spreadsheet is empty.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to parse spreadsheet content or file is empty.</div>';
         }
 
         // Metrics Tracking
@@ -87,6 +74,7 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         $metric_created_primary = 0;
         $metric_created_dep     = 0;
         $metric_updated_user    = 0;
+        $metric_unassigned_email= 0;
 
         // -------------------------------------------------------------------------
         // STAGE 1: PURGE GARBAGE & SANITIZE INDIVIDUAL ROWS
@@ -102,7 +90,7 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             $raw_tfaa   = isset( $row['TFAA'] ) ? trim( $row['TFAA'] ) : '';
             $raw_exp    = isset( $row['Expires'] ) ? trim( $row['Expires'] ) : '';
 
-            // Rule 1.1: SQL Injection & Security Pen-Test Purge
+            // Security & Injection Purge
             if ( preg_match( '/(kEMlzpAX|select|sleep|DBMS_PIPE|XOR|waitfor|PG_SLEEP|@@)/i', $raw_archer . ' ' . $raw_email ) ) {
                 $metric_purged_rows++;
                 continue;
@@ -113,7 +101,7 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 continue;
             }
 
-            // Rule 1.2: Name Parsing (LastName, FirstName)
+            // Name Parsing
             $last_name  = '';
             $first_name = '';
             if ( strpos( $raw_archer, ',' ) !== false ) {
@@ -126,7 +114,7 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $last_name  = isset( $parts[1] ) ? ucfirst( strtolower( trim( $parts[1] ) ) ) : '';
             }
 
-            // Rule 1.3: Date & Phone Normalization
+            // Normalization
             $dob = ( ! empty( $raw_dob ) && $raw_dob !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_dob ) ) : '';
             $exp = ( ! empty( $raw_exp ) && $raw_exp !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_exp ) ) : '';
 
@@ -135,17 +123,14 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $phone = substr( $phone, 0, 3 ) . '-' . substr( $phone, 3, 3 ) . '-' . substr( $phone, 6 );
             }
 
-            // Rule 1.4: Gender & Pro Defaults
             $is_pro = ( strtolower( $raw_pro ) === 'yes' ) ? 'yes' : 'no';
-            $gender = 'unassigned'; // System Rule: Default to unassigned for staff verification
+            $gender = 'unassigned';
 
-            // Email Cleaning (Filter placeholder domains)
             $email = sanitize_email( $raw_email );
             if ( preg_match( '/(noemail|example\.com|test)/i', $email ) ) {
                 $email = '';
             }
 
-            // Clean numeric TFAA ID
             $tfaa_id = preg_replace( '/[^0-9]/', '', $raw_tfaa );
 
             $cleaned_records[] = array(
@@ -175,27 +160,18 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $metric_deduped_rows++;
                 $existing = $deduped_records[ $dedup_key ];
 
-                // Retain newest NFAA expiration date
                 if ( ! empty( $rec['nfaa_exp'] ) && ( empty( $existing['nfaa_exp'] ) || strtotime( $rec['nfaa_exp'] ) > strtotime( $existing['nfaa_exp'] ) ) ) {
                     $existing['nfaa_exp'] = $rec['nfaa_exp'];
                 }
-
-                // Retain valid NFAA ID
                 if ( empty( $existing['nfaa_number'] ) && ! empty( $rec['nfaa_number'] ) ) {
                     $existing['nfaa_number'] = $rec['nfaa_number'];
                 }
-
-                // Retain valid email
                 if ( empty( $existing['email'] ) && ! empty( $rec['email'] ) ) {
                     $existing['email'] = $rec['email'];
                 }
-
-                // Retain valid phone
                 if ( empty( $existing['phone'] ) && ! empty( $rec['phone'] ) ) {
                     $existing['phone'] = $rec['phone'];
                 }
-
-                // Retain Pro status
                 if ( $rec['is_pro'] === 'yes' ) {
                     $existing['is_pro'] = 'yes';
                 }
@@ -212,7 +188,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         foreach ( $deduped_records as $rec ) {
             $assigned_hh = false;
 
-            // Tier 1: Group by Shared Email
             if ( ! empty( $rec['email'] ) ) {
                 $group_key = 'email_' . strtolower( $rec['email'] );
                 $households[ $group_key ][] = $rec;
@@ -220,7 +195,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 continue;
             }
 
-            // Tier 2: Group by Last Name + Sequential NFAA IDs
             if ( ! empty( $rec['last_name'] ) && ! empty( $rec['nfaa_number'] ) ) {
                 foreach ( $households as $hk => $members ) {
                     foreach ( $members as $m ) {
@@ -236,7 +210,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 }
             }
 
-            // Tier 3: Group by Last Name + Matching Expiration Date
             if ( ! $assigned_hh && ! empty( $rec['last_name'] ) && ! empty( $rec['nfaa_exp'] ) ) {
                 foreach ( $households as $hk => $members ) {
                     foreach ( $members as $m ) {
@@ -249,27 +222,103 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 }
             }
 
-            // Standalone Household Unit
             if ( ! $assigned_hh ) {
                 $group_key = 'standalone_' . md5( $rec['first_name'] . $rec['last_name'] . $rec['dob'] );
                 $households[ $group_key ][] = $rec;
             }
         }
 
+        // Calculate expected metrics prior to database execution
+        foreach ( $households as $members ) {
+            $metric_created_primary++;
+            if ( count( $members ) > 1 ) {
+                $metric_created_dep += ( count( $members ) - 1 );
+            }
+            $head = $members[0];
+            if ( empty( $head['email'] ) ) {
+                $metric_unassigned_email++;
+            }
+        }
+
         // -------------------------------------------------------------------------
-        // STAGE 4 & 5: DATABASE INGESTION & IN-PLACE UPDATES
+        // MODE 1: AUDIT PREVIEW RENDER (IF MODE === 'preview')
         // -------------------------------------------------------------------------
+        if ( $mode === 'preview' ) {
+            ob_start();
+            ?>
+            <div id="sywat-notice" class="sywat-card sywat-mt-3 sywat-mb-4">
+                <div class="sywat-card-header-bar">
+                    <div>
+                        <h2>📊 Historical Archers Batch Import Audit Preview</h2>
+                        <div class="sywat-subtitle">File Analyzed: <strong><?php echo esc_html( $file_name ); ?></strong> — Review metrics before committing database changes.</div>
+                    </div>
+                </div>
+
+                <div class="sywat-form-grid-3 sywat-mt-3">
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Total Spreadsheet Rows</span>
+                        <h3><?php echo intval( $metric_total_rows ); ?></h3>
+                    </div>
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Clean Unique Archers</span>
+                        <h3><?php echo intval( count( $deduped_records ) ); ?></h3>
+                    </div>
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Purged Garbage Rows</span>
+                        <h3><?php echo intval( $metric_purged_rows ); ?></h3>
+                    </div>
+                </div>
+
+                <div class="sywat-form-grid-3 sywat-mt-3">
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Primary WP Accounts to Create</span>
+                        <h3><?php echo intval( $metric_created_primary ); ?></h3>
+                    </div>
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Household Dependents to Add</span>
+                        <h3><?php echo intval( $metric_created_dep ); ?></h3>
+                    </div>
+                    <div class="sywat-metric-box">
+                        <span class="sywat-meta-subtext">Missing Emails Flagged</span>
+                        <h3><?php echo intval( $metric_unassigned_email ); ?></h3>
+                    </div>
+                </div>
+
+                <div class="sywat-alert sywat-alert-info sywat-mt-4">
+                    🛡️ <strong>Safety Summary:</strong> All imported archers default to <code>gender = 'unassigned'</code> for desk review. Zero passwords or existing board roles will be overwritten. Missing emails will be assigned <code>@system.sywat.local</code>.
+                </div>
+
+                <div class="sywat-modal-actions sywat-mt-4">
+                    <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary">Cancel Import</a>
+                    <form method="post" action="?tab=members&subtab=directory" style="display:inline-block;">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                        <input type="hidden" name="import_mode" value="commit">
+                        <input type="hidden" name="temp_file_name" value="<?php echo esc_attr( $file_name ); ?>">
+                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Import <?php echo intval( count( $deduped_records ) ); ?> Archers into Database</button>
+                    </form>
+                </div>
+            </div>
+            <?php
+            return ob_get_clean();
+        }
+
+        // -------------------------------------------------------------------------
+        // MODE 2: COMMIT INGESTION TO WORDPRESS DATABASE
+        // -------------------------------------------------------------------------
+        $real_created_primary = 0;
+        $real_created_dep     = 0;
+        $real_updated_user    = 0;
+
         foreach ( $households as $group_key => $members ) {
-            // Sort members by age (oldest first to select Head of Household)
             usort( $members, function( $a, $b ) {
                 if ( empty( $a['dob'] ) ) return 1;
                 if ( empty( $b['dob'] ) ) return -1;
                 return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
             } );
 
-            $head = array_shift( $members ); // Oldest adult as Primary Account Holder
+            $head = array_shift( $members );
 
-            // Rule 4.3: Email Resolution for Standalone Primary Accounts missing email
             $primary_email = $head['email'];
             $is_unassigned_email = false;
 
@@ -279,7 +328,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $is_unassigned_email  = true;
             }
 
-            // De-duplication Check against existing WP database
             $existing_user_id = 0;
 
             if ( ! empty( $head['nfaa_number'] ) ) {
@@ -299,9 +347,8 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             $primary_user_id = 0;
 
             if ( $existing_user_id ) {
-                // Update Existing Primary User Record In-Place
                 $primary_user_id = $existing_user_id;
-                $metric_updated_user++;
+                $real_updated_user++;
 
                 wp_update_user( array(
                     'ID'           => $primary_user_id,
@@ -310,7 +357,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                     'display_name' => $head['first_name'] . ' ' . $head['last_name'],
                 ) );
             } else {
-                // Insert New Primary Account Holder into wp_users
                 $base_username = sanitize_user( $head['first_name'] . '.' . $head['last_name'], true );
                 $username      = $base_username;
                 $counter       = 1;
@@ -331,12 +377,11 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 ) );
 
                 if ( ! is_wp_error( $primary_user_id ) ) {
-                    $metric_created_primary++;
+                    $real_created_primary++;
                 }
             }
 
             if ( $primary_user_id && ! is_wp_error( $primary_user_id ) ) {
-                // Ensure System ID exists
                 if ( function_exists( 'sywat_get_user_system_id' ) ) {
                     sywat_get_user_system_id( $primary_user_id );
                 }
@@ -353,7 +398,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                     update_user_meta( $primary_user_id, 'sywat_email_unassigned', 'yes' );
                 }
 
-                // Process Household Dependents Sub-Profile Array
                 if ( ! empty( $members ) && function_exists( 'sywat_add_household_dependent' ) ) {
                     foreach ( $members as $dep ) {
                         $dep_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_email;
@@ -373,22 +417,19 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
 
                         $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
                         if ( ! is_wp_error( $res ) ) {
-                            $metric_created_dep++;
+                            $real_created_dep++;
                         }
                     }
                 }
             }
         }
 
-        // -------------------------------------------------------------------------
-        // RETURN METRIC SUMMARY ALERT BANNER
-        // -------------------------------------------------------------------------
         return sprintf(
             '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Batch Archer Import Complete!</strong> Processed <strong>%d</strong> total rows | Created <strong>%d</strong> Primary Accounts | Added <strong>%d</strong> Household Dependents | Updated <strong>%d</strong> Existing Database Profiles | Purged <strong>%d</strong> Injection/Garbage Rows (%d deduplicated).</div>',
             $metric_total_rows,
-            $metric_created_primary,
-            $metric_created_dep,
-            $metric_updated_user,
+            $real_created_primary,
+            $real_created_dep,
+            $real_updated_user,
             $metric_purged_rows,
             $metric_deduped_rows
         );
