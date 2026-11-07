@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, accommodations selection, state dropdown management, and board position assignment.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, and board position assignment.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices.
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,6 +59,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $last_name       = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
             $email           = sanitize_email( $_POST['email'] );
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'male';
+            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
             $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
             $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
             $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
@@ -74,6 +76,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'last_name'       => $last_name,
                     'email'           => $email,
                     'phone'           => isset( $_POST['phone'] ) ? sanitize_text_field( $_POST['phone'] ) : '',
+                    'gender'          => in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male',
+                    'is_pro'          => $is_pro,
                     'dob'             => $dob,
                     'accommodations'  => $accommodations,
                     'nfaa_number'     => $nfaa_number,
@@ -157,6 +161,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
+            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male' );
+            update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
             update_user_meta( $user_id, 'sywat_dob', $dob );
             update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
             update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
@@ -180,6 +186,9 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
+            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'male';
+            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
+
             // Update Dependent Sub-Profile
             if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
                 $dep_update = array(
@@ -187,6 +196,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'last_name'       => sanitize_text_field( $_POST['last_name'] ),
                     'email'           => sanitize_email( $_POST['email'] ),
                     'phone'           => sanitize_text_field( $_POST['phone'] ),
+                    'gender'          => in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male',
+                    'is_pro'          => $is_pro,
                     'dob'             => sanitize_text_field( $_POST['dob'] ),
                     'accommodations'  => isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none',
                     'nfaa_number'     => sanitize_text_field( $_POST['nfaa_number'] ),
@@ -253,6 +264,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
+                update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male' );
+                update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
                 update_user_meta( $user_id, 'sywat_dob', $dob );
                 update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
                 update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
