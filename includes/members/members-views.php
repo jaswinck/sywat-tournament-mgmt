@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers and support for Gender/Pro status flags.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.9.2
+ * Version: 3.9.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
