@@ -5,7 +5,7 @@
  * Description: Renders UI structures for Member Directory, Board Management, and Full-Page Shop-Style Member Profile Editor.
  * Compliance: Zero inline style attributes. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.2.0
+ * Version: 3.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -110,16 +110,6 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <input type="hidden" name="sywat_action" value="update_member">
                     <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
 
-                    <!-- Top Action Toolbar -->
-                    <div class="sywat-card-header-bar no-print">
-                        <div>
-                            <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary">← Back to Member Directory</a>
-                        </div>
-                        <div class="sywat-header-inline-controls">
-                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Member Profile</button>
-                        </div>
-                    </div>
-
                     <!-- CARD 1: PRIMARY ACCOUNT & CONTACT PROFILE -->
                     <div class="sywat-card">
                         <div class="sywat-card-header-bar">
@@ -127,10 +117,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <h2>👤 Member Profile: <?php echo esc_html( $edit_user_obj->display_name ); ?></h2>
                                 <div class="sywat-subtitle">TFAA Member ID: <strong><?php echo esc_html( ! empty( $e_tfaa ) ? $e_tfaa : 'Unassigned' ); ?></strong> | Username: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
                             </div>
-                            <div class="sywat-header-inline-controls">
-                                <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
-                                    <?php echo $nfaa_info['is_active'] ? '🟢 NFAA Active' : '⚪ NFAA Expired'; ?>
-                                </span>
+                            <!-- TOP RIGHT: BACK TO DIRECTORY BUTTON -->
+                            <div class="sywat-header-inline-controls no-print">
+                                <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary">← Back to Member Directory</a>
                             </div>
                         </div>
 
@@ -325,14 +314,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         </div>
                     </div>
 
-                    <!-- Bottom Action Toolbar -->
-                    <div class="sywat-card-header-bar no-print sywat-mt-3">
-                        <div>
-                            <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary">← Back to Member Directory</a>
-                        </div>
-                        <div class="sywat-header-inline-controls">
-                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Member Profile</button>
-                        </div>
+                    <!-- BOTTOM ACTION TOOLBAR: CANCEL + SAVE BUTTONS -->
+                    <div class="sywat-modal-actions no-print sywat-mt-4 sywat-mb-4">
+                        <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Member Profile</button>
                     </div>
                 </form>
 
