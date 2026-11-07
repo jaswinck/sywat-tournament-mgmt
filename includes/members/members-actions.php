@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and 2-step batch spreadsheet importer persistent file staging.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.4
+ * Version: 3.9.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -94,7 +94,134 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 1. CREATE NEW MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
+        // 1. SWAP HEAD OF HOUSEHOLD WITH A DEPENDENT SUB-PROFILE
+        if ( $action === 'swap_head_of_household' ) {
+            $primary_user_id  = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
+            $target_system_id = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
+
+            if ( $primary_user_id > 0 && ! empty( $target_system_id ) ) {
+                $primary_user = get_userdata( $primary_user_id );
+                $dep          = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
+                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $target_system_id ) 
+                    : null;
+
+                if ( $primary_user && $dep ) {
+                    // Package old primary head into a dependent payload
+                    $old_head_dep = array(
+                        'first_name'      => get_user_meta( $primary_user_id, 'first_name', true ) ? get_user_meta( $primary_user_id, 'first_name', true ) : $primary_user->first_name,
+                        'last_name'       => get_user_meta( $primary_user_id, 'last_name', true ) ? get_user_meta( $primary_user_id, 'last_name', true ) : $primary_user->last_name,
+                        'email'           => $primary_user->user_email,
+                        'phone'           => get_user_meta( $primary_user_id, 'sywat_phone', true ),
+                        'gender'          => get_user_meta( $primary_user_id, 'sywat_gender', true ),
+                        'is_pro'          => get_user_meta( $primary_user_id, 'sywat_is_pro', true ),
+                        'dob'             => get_user_meta( $primary_user_id, 'sywat_dob', true ),
+                        'accommodations'  => get_user_meta( $primary_user_id, 'sywat_accommodations', true ),
+                        'nfaa_number'     => get_user_meta( $primary_user_id, 'sywat_nfaa_number', true ),
+                        'nfaa_expiration' => get_user_meta( $primary_user_id, 'sywat_nfaa_expiration', true ),
+                        'address_1'       => get_user_meta( $primary_user_id, 'sywat_address_1', true ),
+                        'address_2'       => get_user_meta( $primary_user_id, 'sywat_address_2', true ),
+                        'city'            => get_user_meta( $primary_user_id, 'sywat_city', true ),
+                        'state'           => get_user_meta( $primary_user_id, 'sywat_state', true ),
+                        'zip'             => get_user_meta( $primary_user_id, 'sywat_zip', true ),
+                    );
+
+                    // Update WP User record with target dependent's details
+                    $new_first = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
+                    $new_last  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
+                    $new_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_user->user_email;
+
+                    wp_update_user( array(
+                        'ID'           => $primary_user_id,
+                        'first_name'   => $new_first,
+                        'last_name'    => $new_last,
+                        'display_name' => trim( $new_first . ' ' . $new_last ),
+                        'user_email'   => $new_email,
+                    ) );
+
+                    update_user_meta( $primary_user_id, 'sywat_nfaa_number', isset( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '' );
+                    update_user_meta( $primary_user_id, 'sywat_tfaa_number', isset( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '' );
+                    update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '' );
+                    update_user_meta( $primary_user_id, 'sywat_dob', isset( $dep['dob'] ) ? $dep['dob'] : '' );
+                    update_user_meta( $primary_user_id, 'sywat_gender', isset( $dep['gender'] ) ? $dep['gender'] : 'unassigned' );
+                    update_user_meta( $primary_user_id, 'sywat_is_pro', isset( $dep['is_pro'] ) ? $dep['is_pro'] : 'no' );
+                    if ( ! empty( $dep['phone'] ) ) {
+                        update_user_meta( $primary_user_id, 'sywat_phone', $dep['phone'] );
+                    }
+
+                    // Swap dependent sub-profile entry with the old primary user
+                    if ( function_exists( 'sywat_update_household_dependent' ) ) {
+                        sywat_update_household_dependent( $primary_user_id, $target_system_id, $old_head_dep );
+                    }
+
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">👑 <strong>' . esc_html( $new_first . ' ' . $new_last ) . '</strong> is now designated as the Head of Household!</div>';
+                }
+            }
+        }
+
+        // 2. PURGE TEST MEMBERS (PROTECTED BULK DATA RESET)
+        if ( $action === 'purge_test_members' ) {
+            if ( ! current_user_can( 'administrator' ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data purges.</div>';
+            }
+
+            require_once ABSPATH . 'wp-admin/includes/user.php';
+
+            $current_user_id = get_current_user_id();
+            $all_users       = get_users( array( 'fields' => 'all' ) );
+            $deleted_count   = 0;
+            $protected_count = 0;
+
+            foreach ( $all_users as $u ) {
+                $uid     = $u->ID;
+                $u_roles = (array) $u->roles;
+
+                // Protect active user
+                if ( $uid === $current_user_id ) {
+                    $protected_count++;
+                    continue;
+                }
+
+                // Protect Admin and Shop Managers / Users
+                if ( in_array( 'administrator', $u_roles, true ) || in_array( 'sywat_shop_manager', $u_roles, true ) || in_array( 'sywat_shop_user', $u_roles, true ) ) {
+                    $protected_count++;
+                    continue;
+                }
+
+                // Protect Board Members
+                $board_pos = get_user_meta( $uid, 'sywat_board_positions', true );
+                if ( ! empty( $board_pos ) && is_array( $board_pos ) ) {
+                    $protected_count++;
+                    continue;
+                }
+
+                // Protect Custom Officer Roles
+                $is_officer = false;
+                foreach ( $u_roles as $r_slug ) {
+                    $r_clean = strtolower( $r_slug );
+                    if ( preg_match( '/(president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
+                        $is_officer = true;
+                        break;
+                    }
+                }
+                if ( $is_officer ) {
+                    $protected_count++;
+                    continue;
+                }
+
+                // Execute safe deletion for standard member
+                if ( wp_delete_user( $uid ) ) {
+                    $deleted_count++;
+                }
+            }
+
+            return sprintf(
+                '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ <strong>Batch Test Data Purge Complete!</strong> Permanently deleted <strong>%d</strong> test member accounts. Retained and protected <strong>%d</strong> Officer, Shop Manager, and Administrator accounts.</div>',
+                $deleted_count,
+                $protected_count
+            );
+        }
+
+        // 3. CREATE NEW MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
         if ( $action === 'create_member' ) {
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $first_name      = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
@@ -222,7 +349,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Primary Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | NFAA ID: <strong>' . esc_html( $disp_nfaa ) . '</strong></div>';
         }
 
-        // 2. UPDATE EXISTING MEMBER PROFILE (OR DEPENDENT SUB-PROFILE)
+        // 4. UPDATE EXISTING MEMBER PROFILE (OR DEPENDENT SUB-PROFILE)
         if ( $action === 'update_member' ) {
             $user_id         = intval( $_POST['target_user_id'] );
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
@@ -341,7 +468,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 3. DELETE MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
+        // 5. DELETE MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
         if ( $action === 'delete_member' ) {
             $user_id         = intval( $_POST['target_user_id'] );
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
@@ -378,7 +505,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 4. PROMOTE DEPENDENT TO STANDALONE ACCOUNT (AGE 18)
+        // 6. PROMOTE DEPENDENT TO STANDALONE ACCOUNT (AGE 18)
         if ( $action === 'promote_dependent' ) {
             $primary_user_id = intval( $_POST['primary_user_id'] );
             $system_id       = sanitize_text_field( $_POST['target_system_id'] );
@@ -406,7 +533,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 5. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
+        // 7. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
         if ( $action === 'save_board_member' ) {
             $user_id   = intval( $_POST['board_user_id'] );
             $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
@@ -426,7 +553,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
         }
 
-        // 6. REMOVE BOARD MEMBER ASSIGNMENT
+        // 8. REMOVE BOARD MEMBER ASSIGNMENT
         if ( $action === 'remove_board_member' ) {
             $user_id = intval( $_POST['target_user_id'] );
             $user    = get_userdata( $user_id );
