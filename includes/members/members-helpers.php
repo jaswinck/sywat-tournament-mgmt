@@ -5,7 +5,7 @@
  * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.8.2
+ * Version: 3.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -160,8 +160,13 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
                 'sywat_shop_user', 'administrator'
             );
 
-        if ( is_array( $allowed_roles ) && ! in_array( 'administrator', $allowed_roles, true ) ) {
-            $allowed_roles[] = 'administrator';
+        if ( is_array( $allowed_roles ) ) {
+            $extra_roles = array( 'sywat_shop_manager', 'sywat_shop_user', 'administrator' );
+            foreach ( $extra_roles as $er ) {
+                if ( ! in_array( $er, $allowed_roles, true ) ) {
+                    $allowed_roles[] = $er;
+                }
+            }
         }
 
         return get_users( array(
