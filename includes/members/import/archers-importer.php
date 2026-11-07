@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Uses ZipArchive + SimpleXML for native XLSX parsing and fgetcsv for CSV fallback, with persistent storage in wp_upload_dir().
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, bulk in-memory SQL indexing, and persistent upload staging.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -20,7 +20,6 @@ if ( ! function_exists( 'sywat_structure_parsed_rows' ) ) {
     function sywat_structure_parsed_rows( $raw_matrix ) {
         if ( empty( $raw_matrix ) ) return array();
 
-        // Extract header from first non-empty row
         $header_row = array_shift( $raw_matrix );
         while ( empty( $header_row ) && ! empty( $raw_matrix ) ) {
             $header_row = array_shift( $raw_matrix );
@@ -87,7 +86,6 @@ if ( ! function_exists( 'sywat_parse_spreadsheet_rows' ) ) {
                     }
                 }
 
-                // Find worksheet XML
                 $sheet_content = $zip->getFromName( 'xl/worksheets/sheet1.xml' );
                 if ( $sheet_content === false ) {
                     for ( $i = 0; $i < $zip->numFiles; $i++ ) {
@@ -109,7 +107,6 @@ if ( ! function_exists( 'sywat_parse_spreadsheet_rows' ) ) {
                                 $r_ref      = (string) $cell['r'];
                                 $col_letter = preg_replace( '/[0-9]/', '', $r_ref );
 
-                                // Convert letter to 0-based index
                                 $col_idx = 0;
                                 $len     = strlen( $col_letter );
                                 for ( $i = 0; $i < $len; $i++ ) {
@@ -199,7 +196,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please upload a valid .xlsx or .csv spreadsheet file.</div>';
         }
 
-        // Parse Rows using Dual XLSX/CSV Engine
         $rows = sywat_parse_spreadsheet_rows( $file_path );
 
         if ( empty( $rows ) ) {
@@ -231,7 +227,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             $raw_tfaa   = isset( $row['TFAA'] ) ? trim( $row['TFAA'] ) : '';
             $raw_exp    = isset( $row['Expires'] ) ? trim( $row['Expires'] ) : '';
 
-            // Security & Injection Purge
             if ( preg_match( '/(kEMlzpAX|select|sleep|DBMS_PIPE|XOR|waitfor|PG_SLEEP|@@)/i', $raw_archer . ' ' . $raw_email ) ) {
                 $metric_purged_rows++;
                 continue;
@@ -242,7 +237,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 continue;
             }
 
-            // Name Parsing
             $last_name  = '';
             $first_name = '';
             if ( strpos( $raw_archer, ',' ) !== false ) {
@@ -255,7 +249,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $last_name  = isset( $parts[1] ) ? ucfirst( strtolower( trim( $parts[1] ) ) ) : '';
             }
 
-            // Normalization
             $dob = ( ! empty( $raw_dob ) && $raw_dob !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_dob ) ) : '';
             $exp = ( ! empty( $raw_exp ) && $raw_exp !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_exp ) ) : '';
 
@@ -369,7 +362,23 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             }
         }
 
-        // Calculate metrics
+        // Re-sort household members so real email owners become Head of Household ($head)
+        foreach ( $households as $hk => $members ) {
+            usort( $members, function( $a, $b ) {
+                $a_has = ! empty( $a['email'] ) && is_email( $a['email'] );
+                $b_has = ! empty( $b['email'] ) && is_email( $b['email'] );
+
+                if ( $a_has && ! $b_has ) return -1;
+                if ( ! $a_has && $b_has ) return 1;
+
+                if ( empty( $a['dob'] ) ) return 1;
+                if ( empty( $b['dob'] ) ) return -1;
+                return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
+            } );
+            $households[ $hk ] = $members;
+        }
+
+        // Metrics Calculation
         foreach ( $households as $members ) {
             $metric_created_primary++;
             if ( count( $members ) > 1 ) {
@@ -400,44 +409,56 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         }
 
         // -------------------------------------------------------------------------
-        // MODE 2: COMMIT INGESTION TO WORDPRESS DATABASE
+        // MODE 2: COMMIT INGESTION WITH BULK IN-MEMORY DATABASE MAPS
         // -------------------------------------------------------------------------
+        global $wpdb;
+
+        // Bulk Pre-fetch NFAA ID to User ID Map ($O(1) lookup)
+        $nfaa_map = array();
+        $nfaa_rows = $wpdb->get_results(
+            "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_nfaa_number' AND meta_value != ''"
+        );
+        if ( ! empty( $nfaa_rows ) ) {
+            foreach ( $nfaa_rows as $nr ) {
+                $nfaa_map[ trim( $nr->meta_value ) ] = intval( $nr->user_id );
+            }
+        }
+
+        // Bulk Pre-fetch Email to User ID Map ($O(1) lookup)
+        $email_map = array();
+        $email_rows = $wpdb->get_results(
+            "SELECT ID, user_email FROM {$wpdb->users} WHERE user_email != ''"
+        );
+        if ( ! empty( $email_rows ) ) {
+            foreach ( $email_rows as $er ) {
+                $email_map[ strtolower( trim( $er->user_email ) ) ] = intval( $er->ID );
+            }
+        }
+
         $real_created_primary = 0;
         $real_created_dep     = 0;
         $real_updated_user    = 0;
 
         foreach ( $households as $group_key => $members ) {
-            usort( $members, function( $a, $b ) {
-                if ( empty( $a['dob'] ) ) return 1;
-                if ( empty( $b['dob'] ) ) return -1;
-                return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
-            } );
-
             $head = array_shift( $members );
 
             $primary_email = $head['email'];
             $is_unassigned_email = false;
 
             if ( empty( $primary_email ) || ! is_email( $primary_email ) ) {
-                $nfaa_seed            = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
-                $primary_email        = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
-                $is_unassigned_email  = true;
+                $nfaa_seed           = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
+                $primary_email       = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
+                $is_unassigned_email = true;
             }
 
             $existing_user_id = 0;
 
-            if ( ! empty( $head['nfaa_number'] ) ) {
-                $nfaa_users = get_users( array( 'meta_key' => 'sywat_nfaa_number', 'meta_value' => $head['nfaa_number'], 'number' => 1 ) );
-                if ( ! empty( $nfaa_users ) ) {
-                    $existing_user_id = $nfaa_users[0]->ID;
-                }
+            if ( ! empty( $head['nfaa_number'] ) && isset( $nfaa_map[ $head['nfaa_number'] ] ) ) {
+                $existing_user_id = $nfaa_map[ $head['nfaa_number'] ];
             }
 
-            if ( ! $existing_user_id ) {
-                $user_by_email = get_user_by( 'email', $primary_email );
-                if ( $user_by_email ) {
-                    $existing_user_id = $user_by_email->ID;
-                }
+            if ( ! $existing_user_id && ! $is_unassigned_email && isset( $email_map[ strtolower( $primary_email ) ] ) ) {
+                $existing_user_id = $email_map[ strtolower( $primary_email ) ];
             }
 
             $primary_user_id = 0;
@@ -474,6 +495,12 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
 
                 if ( ! is_wp_error( $primary_user_id ) ) {
                     $real_created_primary++;
+                    if ( ! empty( $head['nfaa_number'] ) ) {
+                        $nfaa_map[ $head['nfaa_number'] ] = $primary_user_id;
+                    }
+                    if ( ! $is_unassigned_email ) {
+                        $email_map[ strtolower( $primary_email ) ] = $primary_user_id;
+                    }
                 }
             }
 
