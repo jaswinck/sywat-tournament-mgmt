@@ -2,13 +2,160 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Uses persistent upload storage in wp_upload_dir(), generates itemized shooter mapping tables, and automatically cleans up temporary files after execution.
- * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal content.
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Uses ZipArchive + SimpleXML for native XLSX parsing and fgetcsv for CSV fallback, with persistent storage in wp_upload_dir().
+ * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! function_exists( 'sywat_structure_parsed_rows' ) ) {
+    /**
+     * Structure raw matrix into associative rows keyed by header titles.
+     *
+     * @param array $raw_matrix Raw 2D array of rows and columns.
+     * @return array Associative array of rows.
+     */
+    function sywat_structure_parsed_rows( $raw_matrix ) {
+        if ( empty( $raw_matrix ) ) return array();
+
+        // Extract header from first non-empty row
+        $header_row = array_shift( $raw_matrix );
+        while ( empty( $header_row ) && ! empty( $raw_matrix ) ) {
+            $header_row = array_shift( $raw_matrix );
+        }
+
+        if ( empty( $header_row ) ) return array();
+
+        $header       = array_map( 'trim', $header_row );
+        $header_count = count( $header );
+        $structured   = array();
+
+        foreach ( $raw_matrix as $data ) {
+            $data_count = count( $data );
+            if ( $data_count === 0 || ( $data_count === 1 && empty( $data[0] ) ) ) {
+                continue;
+            }
+
+            if ( $data_count < $header_count ) {
+                $data = array_pad( $data, $header_count, '' );
+            } elseif ( $data_count > $header_count ) {
+                $data = array_slice( $data, 0, $header_count );
+            }
+
+            $structured[] = array_combine( $header, $data );
+        }
+
+        return $structured;
+    }
+}
+
+if ( ! function_exists( 'sywat_parse_spreadsheet_rows' ) ) {
+    /**
+     * DUAL XLSX & CSV PARSER ENGINE
+     * Parses native Excel (.xlsx) files using ZipArchive + SimpleXML, or CSV via fgetcsv.
+     *
+     * @param string $file_path Absolute server path to spreadsheet file.
+     * @return array Structured array of rows.
+     */
+    function sywat_parse_spreadsheet_rows( $file_path ) {
+        $rows = array();
+
+        // 1. NATIVE XLSX PARSER (ZipArchive + SimpleXML)
+        if ( class_exists( 'ZipArchive' ) ) {
+            $zip = new ZipArchive();
+            if ( $zip->open( $file_path ) === true ) {
+                $shared_strings = array();
+                $ss_content     = $zip->getFromName( 'xl/sharedStrings.xml' );
+                if ( $ss_content !== false ) {
+                    $ss_xml = @simplexml_load_string( $ss_content );
+                    if ( $ss_xml && isset( $ss_xml->si ) ) {
+                        foreach ( $ss_xml->si as $val ) {
+                            if ( isset( $val->t ) ) {
+                                $shared_strings[] = (string) $val->t;
+                            } elseif ( isset( $val->r ) ) {
+                                $t = '';
+                                foreach ( $val->r as $r ) {
+                                    $t .= (string) $r->t;
+                                }
+                                $shared_strings[] = $t;
+                            } else {
+                                $shared_strings[] = '';
+                            }
+                        }
+                    }
+                }
+
+                // Find worksheet XML
+                $sheet_content = $zip->getFromName( 'xl/worksheets/sheet1.xml' );
+                if ( $sheet_content === false ) {
+                    for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+                        $entry_name = $zip->getNameIndex( $i );
+                        if ( preg_match( '#xl/worksheets/sheet\d+\.xml#i', $entry_name ) ) {
+                            $sheet_content = $zip->getFromName( $entry_name );
+                            break;
+                        }
+                    }
+                }
+
+                if ( $sheet_content !== false ) {
+                    $sheet_xml = @simplexml_load_string( $sheet_content );
+                    if ( $sheet_xml && isset( $sheet_xml->sheetData->row ) ) {
+                        foreach ( $sheet_xml->sheetData->row as $row_node ) {
+                            $row_data = array();
+
+                            foreach ( $row_node->c as $cell ) {
+                                $r_ref      = (string) $cell['r'];
+                                $col_letter = preg_replace( '/[0-9]/', '', $r_ref );
+
+                                // Convert letter to 0-based index
+                                $col_idx = 0;
+                                $len     = strlen( $col_letter );
+                                for ( $i = 0; $i < $len; $i++ ) {
+                                    $col_idx = $col_idx * 26 + ( ord( strtoupper( $col_letter[$i] ) ) - 64 );
+                                }
+                                $col_idx = max( 0, $col_idx - 1 );
+
+                                while ( count( $row_data ) < $col_idx ) {
+                                    $row_data[] = '';
+                                }
+
+                                $val  = (string) $cell->v;
+                                $type = (string) $cell['t'];
+
+                                if ( $type === 's' && isset( $shared_strings[ intval( $val ) ] ) ) {
+                                    $val = $shared_strings[ intval( $val ) ];
+                                } elseif ( $type === 'inlineStr' && isset( $cell->is->t ) ) {
+                                    $val = (string) $cell->is->t;
+                                }
+
+                                $row_data[ $col_idx ] = trim( $val );
+                            }
+                            $rows[] = $row_data;
+                        }
+                        $zip->close();
+
+                        if ( ! empty( $rows ) ) {
+                            return sywat_structure_parsed_rows( $rows );
+                        }
+                    }
+                }
+                $zip->close();
+            }
+        }
+
+        // 2. FALLBACK CSV PARSER (FGETCSV)
+        if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+            while ( ( $data = fgetcsv( $handle, 4096, ',' ) ) !== false ) {
+                $rows[] = $data;
+            }
+            fclose( $handle );
+        }
+
+        return sywat_structure_parsed_rows( $rows );
+    }
+}
 
 if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
     /**
@@ -29,11 +176,9 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         $file_path = '';
         $file_name = '';
 
-        // Resolve persistent file path or initial upload file
         if ( is_array( $file_input ) && ! empty( $file_input['tmp_name'] ) && is_uploaded_file( $file_input['tmp_name'] ) ) {
             $file_name = sanitize_text_field( $file_input['name'] );
 
-            // Store in secure persistent WP upload directory for Step 2 confirmation
             $wp_upload_dir = wp_upload_dir();
             $target_dir    = trailingslashit( $wp_upload_dir['basedir'] ) . 'sywat-temp/';
 
@@ -54,35 +199,8 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please upload a valid .xlsx or .csv spreadsheet file.</div>';
         }
 
-        $rows = array();
-
-        // -------------------------------------------------------------------------
-        // PARSE SPREADSHEET CONTENT WITH ARRAY MATCH SAFETY
-        // -------------------------------------------------------------------------
-        if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
-            $raw_header = fgetcsv( $handle, 4096, ',' );
-            if ( $raw_header ) {
-                $header       = array_map( 'trim', $raw_header );
-                $header_count = count( $header );
-
-                while ( ( $data = fgetcsv( $handle, 4096, ',' ) ) !== false ) {
-                    $data_count = count( $data );
-                    if ( $data_count === 0 || ( $data_count === 1 && empty( $data[0] ) ) ) {
-                        continue;
-                    }
-
-                    // Pad or trim data array to strictly match header count
-                    if ( $data_count < $header_count ) {
-                        $data = array_pad( $data, $header_count, '' );
-                    } elseif ( $data_count > $header_count ) {
-                        $data = array_slice( $data, 0, $header_count );
-                    }
-
-                    $rows[] = array_combine( $header, $data );
-                }
-            }
-            fclose( $handle );
-        }
+        // Parse Rows using Dual XLSX/CSV Engine
+        $rows = sywat_parse_spreadsheet_rows( $file_path );
 
         if ( empty( $rows ) ) {
             if ( file_exists( $file_path ) ) {
@@ -315,7 +433,7 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 }
             }
 
-            if ( ! $existing_user_id && ! $is_unassigned_email ) {
+            if ( ! $existing_user_id ) {
                 $user_by_email = get_user_by( 'email', $primary_email );
                 if ( $user_by_email ) {
                     $existing_user_id = $user_by_email->ID;
@@ -402,7 +520,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             }
         }
 
-        // Clean up temporary persistent file from disk after database commitment
         if ( file_exists( $file_path ) ) {
             @unlink( $file_path );
         }
