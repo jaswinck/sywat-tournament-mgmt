@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and 2-step batch spreadsheet importer execution.
- * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and audit preview cards.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and 2-step batch spreadsheet importer persistent file staging.
+ * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.3
+ * Version: 3.9.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -60,37 +60,37 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
             $import_mode = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'preview';
 
-            // Ensure PHP session is active for caching temp upload file
-            if ( ! session_id() && ! headers_sent() ) {
-                @session_start();
-            }
-
-            $file_data = ! empty( $_FILES['archers_file'] ) ? $_FILES['archers_file'] : array();
-
-            if ( $import_mode === 'preview' && ( empty( $file_data['tmp_name'] ) || ! is_uploaded_file( $file_data['tmp_name'] ) ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a spreadsheet file (.xlsx or .csv) to import.</div>';
-            }
-
-            // Cache uploaded file reference in session for 2-step confirmation
-            if ( ! empty( $file_data['tmp_name'] ) ) {
-                $_SESSION['sywat_import_file'] = $file_data;
-            } elseif ( $import_mode === 'commit' && ! empty( $_SESSION['sywat_import_file'] ) ) {
-                $file_data = $_SESSION['sywat_import_file'];
-            }
-
             $importer_path = plugin_dir_path( __FILE__ ) . 'import/archers-importer.php';
             if ( file_exists( $importer_path ) ) {
                 require_once $importer_path;
             }
 
-            if ( function_exists( 'sywat_import_archers_spreadsheet' ) ) {
-                $result = sywat_import_archers_spreadsheet( $file_data, $import_mode );
-                if ( $import_mode === 'commit' ) {
-                    unset( $_SESSION['sywat_import_file'] );
-                }
-                return $result;
-            } else {
+            if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer Importer Module Engine is missing or unavailable.</div>';
+            }
+
+            if ( $import_mode === 'preview' ) {
+                if ( empty( $_FILES['archers_file'] ) || empty( $_FILES['archers_file']['tmp_name'] ) ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a spreadsheet file (.xlsx or .csv) to import.</div>';
+                }
+
+                $preview_result = sywat_import_archers_spreadsheet( $_FILES['archers_file'], 'preview' );
+                if ( is_string( $preview_result ) ) {
+                    return $preview_result;
+                }
+
+                if ( is_array( $preview_result ) ) {
+                    $GLOBALS['sywat_import_preview_data'] = $preview_result;
+                    return '<div class="sywat-alert sywat-alert-info">🔍 <strong>File Audited:</strong> Review the batch archer mapping details in the pop-up modal below.</div>';
+                }
+            } elseif ( $import_mode === 'commit' ) {
+                $persistent_file = isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( $_POST['persistent_file_path'] ) : '';
+
+                if ( empty( $persistent_file ) || ! file_exists( $persistent_file ) ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Staged upload file missing or expired. Please upload the spreadsheet again.</div>';
+                }
+
+                return sywat_import_archers_spreadsheet( $persistent_file, 'commit' );
             }
         }
 
