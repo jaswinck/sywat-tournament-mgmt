@@ -114,6 +114,14 @@
     flex-shrink: 0;
 }
 
+.sywat-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+}
+
 /* 3. Scrollable Body & Field Grid Utilities */
 .sywat-modal-body { 
     padding: 20px; 
@@ -132,6 +140,81 @@
 .sywat-modal-body .sywat-form-grid-3,
 .sywat-modal-body .sywat-form-grid-4 {
     margin-bottom: 16px;
+}
+
+/* Role Grids & Selection Labels */
+.sywat-role-grid {
+    gap: 6px 12px;
+    background: #f8fafc;
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+.sywat-checkbox-label {
+    font-size: 12px;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.sywat-member-info-banner {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #334155;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Password Requirements Indicator Bar */
+.sywat-password-rules-box {
+    margin-top: 10px;
+    margin-bottom: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+.sywat-password-rules-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 11px;
+    color: #64748b;
+    align-items: center;
+}
+
+.sywat-password-rules-label {
+    font-weight: 700;
+    color: #475569;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 2px;
+}
+
+.sywat-rule-badge {
+    font-size: 11px;
+    transition: color 0.15s ease, font-weight 0.15s ease;
+}
+
+.sywat-rule-valid {
+    color: #166534 !important;
+    font-weight: 700 !important;
+}
+
+.sywat-rule-invalid {
+    color: #dc2626 !important;
+    font-weight: 400 !important;
 }
 
 /* Compact Modal Field Spacing Overrides */
