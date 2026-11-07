@@ -5,7 +5,7 @@
  * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 3.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -91,7 +91,6 @@ if ( ! function_exists( 'sywat_get_accommodations_list' ) ) {
 
 /**
  * Generate a unique, permanent internal System ID for an archer.
- * This ID is used for internal database indexing and score tracking across the system.
  *
  * @return string Unique internal System ID.
  */
@@ -217,7 +216,6 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
 
 /**
  * Calculate NFAA Age Division based on exact Date of Birth and Tournament Date.
- * Rule: Archer ages up on their exact birthday.
  *
  * @param string      $dob_string      Date of birth in YYYY-MM-DD format.
  * @param string|null $tournament_date Optional comparison date (defaults to today).
@@ -322,7 +320,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
 
         return array(
             'status'               => $is_active ? 'Active' : 'Expired',
-            'expiration'           => date( 'M j, Y', $exp_timestamp ),
+            'expiration'           => ( $exp_timestamp > 0 ) ? date( 'M j, Y', $exp_timestamp ) : '—',
             'raw_date'             => $expiration,
             'badge_class'          => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
             'is_active'            => $is_active,
@@ -333,7 +331,6 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
 
 /**
  * Retrieve all linked household dependent sub-profiles under a Primary Account Holder.
- * Automatically sorts dependent archers chronologically by Date of Birth (oldest first).
  *
  * @param int $primary_user_id WordPress User ID of Primary Account Holder.
  * @return array Sorted array of associative arrays representing dependent sub-profiles.
@@ -421,10 +418,9 @@ if ( ! function_exists( 'sywat_get_household_dependent_by_system_id' ) ) {
 
 /**
  * Add a new household dependent sub-profile under a Primary Account.
- * Bypasses wp_insert_user() completely so parents and children can share emails with zero errors.
  *
  * @param int   $primary_user_id WordPress User ID of Primary Account Holder.
- * @param array $dep_data        Sanitized input details (first_name, last_name, dob, accommodations, etc.).
+ * @param array $dep_data        Sanitized input details.
  * @return string|WP_Error System ID on success, or WP_Error on failure.
  */
 if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
@@ -593,7 +589,6 @@ if ( ! function_exists( 'sywat_get_user_address' ) ) {
 
 /**
  * Promote a dependent sub-profile to a standalone Primary Account Holder at age 18.
- * Preserves their permanent internal System ID and all historical tournament score records.
  *
  * @param int    $primary_user_id WordPress User ID of current Primary Account Holder.
  * @param string $system_id       Unique internal System ID of the dependent to promote.
