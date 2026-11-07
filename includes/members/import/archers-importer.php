@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, bulk in-memory SQL indexing, and persistent upload staging.
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, bulk in-memory SQL indexing, persistent upload staging, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
  * Author: SYWAT Archery
- * Version: 1.5.0
+ * Version: 1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -521,8 +521,52 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                     update_user_meta( $primary_user_id, 'sywat_email_unassigned', 'yes' );
                 }
 
-                if ( ! empty( $members ) && function_exists( 'sywat_add_household_dependent' ) ) {
+                // ---------------------------------------------------------------------
+                // STAGE 4: HOUSEHOLD DEPENDENT DEDUPLICATION & INGESTION
+                // ---------------------------------------------------------------------
+                if ( ! empty( $members ) ) {
+                    // Pre-fetch existing household dependents for this primary user
+                    $existing_deps = function_exists( 'sywat_get_linked_household_members' ) 
+                        ? sywat_get_linked_household_members( $primary_user_id ) 
+                        : array();
+
+                    // Build in-memory lookup map of existing dependent keys ($O(1) lookup)
+                    $existing_dep_map = array();
+                    if ( is_array( $existing_deps ) ) {
+                        foreach ( $existing_deps as $ex_d ) {
+                            $ex_first = isset( $ex_d['first_name'] ) ? strtolower( trim( $ex_d['first_name'] ) ) : '';
+                            $ex_last  = isset( $ex_d['last_name'] ) ? strtolower( trim( $ex_d['last_name'] ) ) : '';
+                            $ex_dob   = isset( $ex_d['dob'] ) ? trim( $ex_d['dob'] ) : '';
+                            $ex_nfaa  = isset( $ex_d['nfaa_number'] ) ? trim( $ex_d['nfaa_number'] ) : '';
+                            $sys_id   = isset( $ex_d['system_id'] ) ? $ex_d['system_id'] : true;
+
+                            if ( $ex_first && $ex_last ) {
+                                $key = $ex_first . '|' . $ex_last . '|' . $ex_dob;
+                                $existing_dep_map[ $key ] = $sys_id;
+                            }
+
+                            if ( ! empty( $ex_nfaa ) ) {
+                                $existing_dep_map[ 'nfaa_' . $ex_nfaa ] = $sys_id;
+                            }
+                        }
+                    }
+
                     foreach ( $members as $dep ) {
+                        $dep_first = strtolower( trim( $dep['first_name'] ) );
+                        $dep_last  = strtolower( trim( $dep['last_name'] ) );
+                        $dep_dob   = trim( $dep['dob'] );
+                        $dep_nfaa  = trim( $dep['nfaa_number'] );
+
+                        $match_key1 = $dep_first . '|' . $dep_last . '|' . $dep_dob;
+                        $match_key2 = ! empty( $dep_nfaa ) ? 'nfaa_' . $dep_nfaa : '';
+
+                        $existing_sys_id = null;
+                        if ( isset( $existing_dep_map[ $match_key1 ] ) ) {
+                            $existing_sys_id = $existing_dep_map[ $match_key1 ];
+                        } elseif ( $match_key2 && isset( $existing_dep_map[ $match_key2 ] ) ) {
+                            $existing_sys_id = $existing_dep_map[ $match_key2 ];
+                        }
+
                         $dep_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_email;
 
                         $dep_payload = array(
@@ -538,9 +582,15 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                             'nfaa_expiration' => $dep['nfaa_exp'],
                         );
 
-                        $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
-                        if ( ! is_wp_error( $res ) ) {
-                            $real_created_dep++;
+                        if ( $existing_sys_id && is_string( $existing_sys_id ) && function_exists( 'sywat_update_household_dependent' ) ) {
+                            // Update existing dependent entry instead of adding duplicate
+                            sywat_update_household_dependent( $primary_user_id, $existing_sys_id, $dep_payload );
+                        } elseif ( ! $existing_sys_id && function_exists( 'sywat_add_household_dependent' ) ) {
+                            // Create brand-new dependent entry
+                            $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
+                            if ( ! is_wp_error( $res ) ) {
+                                $real_created_dep++;
+                            }
                         }
                     }
                 }
