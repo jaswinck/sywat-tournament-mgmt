@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, and historical batch spreadsheet import execution.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, batch spreadsheet upload, and 2-step audit preview overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.9.2
+ * Version: 3.9.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -776,9 +776,10 @@ function sywat_members_render_modals( $data ) {
                 <form method="post" action="?tab=members&subtab=directory" enctype="multipart/form-data" id="sywat_import_archers_form">
                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                     <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                    <input type="hidden" name="import_mode" value="preview">
 
                     <div class="sywat-alert sywat-alert-info">
-                        📊 <strong>Automated Migration Engine:</strong> Purges SQL injection rows, deduplicates archers by DOB, groups families into households, and updates existing records in-place without touching user passwords.
+                        📊 <strong>Batch Archer Import:</strong> Upload an Archers spreadsheet (.xlsx / .csv). Records will be cleaned, deduplicated, and grouped into household units automatically before database ingestion.
                     </div>
 
                     <div class="sywat-field-group sywat-mt-3">
@@ -788,11 +789,187 @@ function sywat_members_render_modals( $data ) {
 
                     <div class="sywat-modal-actions sywat-mt-4">
                         <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportModal()">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Run Batch Import</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary">🔍 Audit &amp; Preview File</button>
                     </div>
                 </form>
             </div>
         </div>
+    </div>
+
+    <!-- MODAL 8: HISTORICAL ARCHERS BATCH IMPORT AUDIT PREVIEW OVERLAY -->
+    <?php
+    $preview_data       = isset( $GLOBALS['sywat_import_preview_data'] ) ? $GLOBALS['sywat_import_preview_data'] : null;
+    $open_preview_modal = ( $preview_data !== null );
+    ?>
+    <div class="sywat-modal-backdrop <?php echo $open_preview_modal ? 'active' : ''; ?>" id="sywat_import_preview_modal">
+        <?php if ( $preview_data ): ?>
+            <?php
+                $p_file_path = isset( $preview_data['file_path'] ) ? $preview_data['file_path'] : '';
+                $p_file_name = isset( $preview_data['file_name'] ) ? $preview_data['file_name'] : '';
+                $p_total     = isset( $preview_data['total_rows'] ) ? $preview_data['total_rows'] : 0;
+                $p_purged    = isset( $preview_data['purged_rows'] ) ? $preview_data['purged_rows'] : 0;
+                $p_clean     = isset( $preview_data['clean_unique_count'] ) ? $preview_data['clean_unique_count'] : 0;
+                $p_primary   = isset( $preview_data['primary_accounts_count'] ) ? $preview_data['primary_accounts_count'] : 0;
+                $p_dep       = isset( $preview_data['dependents_count'] ) ? $preview_data['dependents_count'] : 0;
+                $p_noemail   = isset( $preview_data['unassigned_emails_count'] ) ? $preview_data['unassigned_emails_count'] : 0;
+                $households  = isset( $preview_data['households'] ) && is_array( $preview_data['households'] ) ? $preview_data['households'] : array();
+            ?>
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <h3>📊 Archer Batch Import Audit Preview</h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseImportPreviewModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <div class="sywat-alert sywat-alert-info">
+                        File Analyzed: <strong><?php echo esc_html( $p_file_name ); ?></strong> — Review summary metrics and itemized archer mappings before committing database changes.
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Total Spreadsheet Rows</span>
+                            <h3><?php echo intval( $p_total ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Clean Unique Archers</span>
+                            <h3><?php echo intval( $p_clean ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Purged Garbage Rows</span>
+                            <h3><?php echo intval( $p_purged ); ?></h3>
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Primary WP Accounts (Households)</span>
+                            <h3><?php echo intval( $p_primary ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Household Dependents</span>
+                            <h3><?php echo intval( $p_dep ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Unassigned Emails Flagged</span>
+                            <h3><?php echo intval( $p_noemail ); ?></h3>
+                        </div>
+                    </div>
+
+                    <div class="sywat-card-header-bar sywat-mt-4">
+                        <div>
+                            <h3>👥 Itemized Household &amp; Archer Mapping List</h3>
+                            <div class="sywat-subtitle">Showing all mapped Primary Accounts and linked Family Dependents before database ingestion.</div>
+                        </div>
+                    </div>
+
+                    <div class="sywat-table-responsive sywat-mt-2">
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th class="sywat-col-w-28">Archer Name &amp; Role</th>
+                                    <th class="sywat-col-w-28">Assigned Email</th>
+                                    <th class="sywat-col-center sywat-col-w-16">NFAA ID &amp; Exp</th>
+                                    <th class="sywat-col-center sywat-col-w-14">DOB / Pro</th>
+                                    <th class="sywat-col-center sywat-col-w-14">DB Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $households as $members ): ?>
+                                    <?php 
+                                        usort( $members, function( $a, $b ) {
+                                            if ( empty( $a['dob'] ) ) return 1;
+                                            if ( empty( $b['dob'] ) ) return -1;
+                                            return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
+                                        } );
+                                        $head = array_shift( $members );
+                                        
+                                        $existing_match = false;
+                                        if ( ! empty( $head['nfaa_number'] ) ) {
+                                            $match = get_users( array( 'meta_key' => 'sywat_nfaa_number', 'meta_value' => $head['nfaa_number'], 'number' => 1 ) );
+                                            if ( ! empty( $match ) ) $existing_match = true;
+                                        }
+                                        if ( ! $existing_match && ! empty( $head['email'] ) ) {
+                                            if ( get_user_by( 'email', $head['email'] ) ) $existing_match = true;
+                                        }
+
+                                        $primary_email_disp = ! empty( $head['email'] ) ? $head['email'] : 'unassigned-' . ( ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : 'temp' ) . '@system.sywat.local';
+                                    ?>
+                                    <!-- ROW 1: PRIMARY ACCOUNT HOLDER (HEAD OF HOUSEHOLD) -->
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html( $head['first_name'] . ' ' . $head['last_name'] ); ?></strong>
+                                            <div class="sywat-meta-subtext">👑 Head of Household</div>
+                                        </td>
+                                        <td>
+                                            <code><?php echo esc_html( $primary_email_disp ); ?></code>
+                                            <?php if ( empty( $head['email'] ) ): ?>
+                                                <div class="sywat-meta-subtext">⚠️ Placeholder System Email</div>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <div>🆔 <strong><?php echo esc_html( ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : '—' ); ?></strong></div>
+                                            <div class="sywat-meta-subtext"><?php echo ! empty( $head['nfaa_exp'] ) ? esc_html( date( 'M Y', strtotime( $head['nfaa_exp'] ) ) ) : '—'; ?></div>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <div><?php echo ! empty( $head['dob'] ) ? esc_html( date( 'M j, Y', strtotime( $head['dob'] ) ) ) : '—'; ?></div>
+                                            <?php if ( $head['is_pro'] === 'yes' ): ?>
+                                                <span class="sywat-badge sywat-badge-pro sywat-mt-1">⭐ Pro</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <?php if ( $existing_match ): ?>
+                                                <span class="sywat-badge sywat-badge-checkedin">🔄 Update Profile</span>
+                                            <?php else: ?>
+                                                <span class="sywat-badge sywat-badge-open">🆕 New Account</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+
+                                    <!-- DEPENDENTS IN THIS HOUSEHOLD -->
+                                    <?php foreach ( $members as $dep ): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="sywat-ml-3">
+                                                    ↪️ <strong><?php echo esc_html( $dep['first_name'] . ' ' . $dep['last_name'] ); ?></strong>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="sywat-ml-3 sywat-meta-subtext">
+                                                    (Linked to Household Email)
+                                                </div>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <div>🆔 <strong><?php echo esc_html( ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '—' ); ?></strong></div>
+                                                <div class="sywat-meta-subtext"><?php echo ! empty( $dep['nfaa_exp'] ) ? esc_html( date( 'M Y', strtotime( $dep['nfaa_exp'] ) ) ) : '—'; ?></div>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <div><?php echo ! empty( $dep['dob'] ) ? esc_html( date( 'M j, Y', strtotime( $dep['dob'] ) ) ) : '—'; ?></div>
+                                                <?php if ( $dep['is_pro'] === 'yes' ): ?>
+                                                    <span class="sywat-badge sywat-badge-pro sywat-mt-1">⭐ Pro</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportPreviewModal()">Cancel Import</button>
+                        <form method="post" action="?tab=members&subtab=directory">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                            <input type="hidden" name="import_mode" value="commit">
+                            <input type="hidden" name="persistent_file_path" value="<?php echo esc_attr( $p_file_path ); ?>">
+                            <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Ingest <?php echo intval( $p_clean ); ?> Archers into Database</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
     <?php
 }
