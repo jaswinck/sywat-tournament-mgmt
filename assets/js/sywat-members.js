@@ -4,7 +4,7 @@
  * Description: Handles modal toggles, client-side phone formatting, password policy validation,
  *              dynamic shop visibility, search filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
- * Version: 3.2.0
+ * Version: 3.4.0
  */
 
 /**
@@ -71,7 +71,7 @@ function sywatToggleShopVisibility(formId, containerId) {
  * 
  * @param {string} pwId      DOM ID of the primary password input.
  * @param {string} confirmId DOM ID of the confirm password input.
- * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule', 'edit_full_rule', or 'dep_rule').
+ * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule', 'edit_full_rule', or 'promote_rule').
  */
 function sywatValidatePasswordRules(pwId, confirmId, prefix) {
     const pwInput = document.getElementById(pwId);
@@ -147,6 +147,8 @@ function sywatCloseEditMemberModal() {
     }
     const url = new URL(window.location.href);
     url.searchParams.delete('edit_member_id');
+    url.searchParams.delete('edit_system_id');
+    url.searchParams.delete('action_mode');
     window.history.replaceState({}, document.title, url.toString());
 }
 
