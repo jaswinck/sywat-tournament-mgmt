@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.6
+ * Version: 3.9.7
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -158,60 +158,80 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 2. PURGE TEST MEMBERS (PROTECTED BULK DATA RESET)
+        // 2. PURGE TEST MEMBERS (HIGH-PERFORMANCE PROTECTED BULK RESET)
         if ( $action === 'purge_test_members' ) {
             if ( ! current_user_can( 'administrator' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data purges.</div>';
             }
 
             require_once ABSPATH . 'wp-admin/includes/user.php';
+            global $wpdb;
 
             $current_user_id = get_current_user_id();
-            $all_users       = get_users( array( 'fields' => 'all' ) );
+            $protected_map   = array();
+
+            // Always protect active user account
+            if ( $current_user_id > 0 ) {
+                $protected_map[ $current_user_id ] = true;
+            }
+
+            // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officer roles ($O(1) hashtable)
+            $cap_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
+                    $wpdb->prefix . 'capabilities'
+                )
+            );
+
+            if ( ! empty( $cap_rows ) ) {
+                foreach ( $cap_rows as $cr ) {
+                    $uid  = intval( $cr->user_id );
+                    $caps = @maybe_unserialize( $cr->meta_value );
+                    if ( is_array( $caps ) ) {
+                        foreach ( array_keys( $caps ) as $role_slug ) {
+                            $r_clean = strtolower( $role_slug );
+                            if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
+                                $protected_map[ $uid ] = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bulk pre-fetch active Board Member assignments
+            $board_rows = $wpdb->get_col(
+                "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
+            );
+            if ( ! empty( $board_rows ) ) {
+                foreach ( $board_rows as $b_uid ) {
+                    $protected_map[ intval( $b_uid ) ] = true;
+                }
+            }
+
+            // Fetch user IDs only ($O(1) memory overhead)
+            $all_user_ids    = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
             $deleted_count   = 0;
             $protected_count = 0;
 
-            foreach ( $all_users as $u ) {
-                $uid     = $u->ID;
-                $u_roles = (array) $u->roles;
+            if ( ! empty( $all_user_ids ) ) {
+                // Wrap in MySQL transaction for ultra-fast atomic batch deletion
+                $wpdb->query( 'START TRANSACTION' );
 
-                // Protect active user
-                if ( $uid === $current_user_id ) {
-                    $protected_count++;
-                    continue;
-                }
+                foreach ( $all_user_ids as $uid_raw ) {
+                    $uid = intval( $uid_raw );
 
-                // Protect Admin and Shop Managers / Users
-                if ( in_array( 'administrator', $u_roles, true ) || in_array( 'sywat_shop_manager', $u_roles, true ) || in_array( 'sywat_shop_user', $u_roles, true ) ) {
-                    $protected_count++;
-                    continue;
-                }
+                    if ( isset( $protected_map[ $uid ] ) ) {
+                        $protected_count++;
+                        continue;
+                    }
 
-                // Protect Board Members
-                $board_pos = get_user_meta( $uid, 'sywat_board_positions', true );
-                if ( ! empty( $board_pos ) && is_array( $board_pos ) ) {
-                    $protected_count++;
-                    continue;
-                }
-
-                // Protect Custom Officer Roles
-                $is_officer = false;
-                foreach ( $u_roles as $r_slug ) {
-                    $r_clean = strtolower( $r_slug );
-                    if ( preg_match( '/(president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
-                        $is_officer = true;
-                        break;
+                    if ( wp_delete_user( $uid ) ) {
+                        $deleted_count++;
                     }
                 }
-                if ( $is_officer ) {
-                    $protected_count++;
-                    continue;
-                }
 
-                // Execute safe deletion for standard member
-                if ( wp_delete_user( $uid ) ) {
-                    $deleted_count++;
-                }
+                $wpdb->query( 'COMMIT' );
             }
 
             return sprintf(
@@ -351,7 +371,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 4. UPDATE EXISTING MEMBER PROFILE (OR DEPENDENT SUB-PROFILE)
         if ( $action === 'update_member' ) {
-            $user_id         = intval( $_POST['target_user_id'] );
+            $user_id         = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
@@ -470,7 +490,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 5. DELETE MEMBER ACCOUNT OR PERMANENTLY PURGE DEPENDENT SUB-PROFILE
         if ( $action === 'delete_member' ) {
-            $user_id         = intval( $_POST['target_user_id'] );
+            $user_id         = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
@@ -587,7 +607,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         // 9. REMOVE BOARD MEMBER ASSIGNMENT
         if ( $action === 'remove_board_member' ) {
-            $user_id = intval( $_POST['target_user_id'] );
+            $user_id = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
             $user    = get_userdata( $user_id );
 
             if ( $user ) {
