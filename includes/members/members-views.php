@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -157,11 +157,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <div class="sywat-meta-subtext">(<?php echo esc_html( $age_div ); ?>)</div>
                                     </td>
                                     <td class="sywat-col-center">
-                                        <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
-                                            <?php echo $nfaa_info['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
-                                        </span>
+                                        <?php if ( strpos( $nfaa_info['status'], 'Active' ) !== false ): ?>
+                                            <span class="sywat-badge sywat-badge-open">🟢 Active</span>
+                                        <?php elseif ( strpos( $nfaa_info['status'], 'Expired' ) !== false ): ?>
+                                            <span class="sywat-badge sywat-badge-muted">⚪ Expired</span>
+                                        <?php else: ?>
+                                            <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
+                                                🏢 <?php echo esc_html( $nfaa_info['status'] ); ?>
+                                            </span>
+                                        <?php endif; ?>
+
                                         <?php if ( ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
-                                            <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
+                                            <div class="sywat-meta-subtext"><?php echo ( $nfaa_info['expiration'] === 'System Account' ) ? 'System Account' : 'Exp: ' . esc_html( $nfaa_info['expiration'] ); ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="sywat-col-center">
@@ -198,11 +205,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
                                         </td>
                                         <td class="sywat-col-center">
-                                            <span class="sywat-badge <?php echo esc_attr( $dep_nfaa['badge_class'] ); ?>">
-                                                <?php echo $dep_nfaa['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
-                                            </span>
+                                            <?php if ( strpos( $dep_nfaa['status'], 'Active' ) !== false ): ?>
+                                                <span class="sywat-badge sywat-badge-open">🟢 Active</span>
+                                            <?php elseif ( strpos( $dep_nfaa['status'], 'Expired' ) !== false ): ?>
+                                                <span class="sywat-badge sywat-badge-muted">⚪ Expired</span>
+                                            <?php else: ?>
+                                                <span class="sywat-badge <?php echo esc_attr( $dep_nfaa['badge_class'] ); ?>">
+                                                    🏢 <?php echo esc_html( $dep_nfaa['status'] ); ?>
+                                                </span>
+                                            <?php endif; ?>
+
                                             <?php if ( ! empty( $dep_nfaa['expiration'] ) && $dep_nfaa['expiration'] !== '—' ): ?>
-                                                <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $dep_nfaa['expiration'] ); ?></div>
+                                                <div class="sywat-meta-subtext"><?php echo ( $dep_nfaa['expiration'] === 'System Account' ) ? 'System Account' : 'Exp: ' . esc_html( $dep_nfaa['expiration'] ); ?></div>
                                             <?php endif; ?>
                                         </td>
                                         <td class="sywat-col-center">
@@ -410,11 +424,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" class="sywat-table-link"><?php echo esc_html( $m->user_email ); ?></a></td>
                                                 <td class="sywat-col-center"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
                                                 <td class="sywat-col-center">
-                                                    <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
-                                                        <?php echo $nfaa_info['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
-                                                    </span>
+                                                    <?php if ( strpos( $nfaa_info['status'], 'Active' ) !== false ): ?>
+                                                        <span class="sywat-badge sywat-badge-open">🟢 Active</span>
+                                                    <?php elseif ( strpos( $nfaa_info['status'], 'Expired' ) !== false ): ?>
+                                                        <span class="sywat-badge sywat-badge-muted">⚪ Expired</span>
+                                                    <?php else: ?>
+                                                        <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
+                                                            🏢 <?php echo esc_html( $nfaa_info['status'] ); ?>
+                                                        </span>
+                                                    <?php endif; ?>
+
                                                     <?php if ( ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
-                                                        <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
+                                                        <div class="sywat-meta-subtext"><?php echo ( $nfaa_info['expiration'] === 'System Account' ) ? 'System Account' : 'Exp: ' . esc_html( $nfaa_info['expiration'] ); ?></div>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="sywat-col-center">
