@@ -4,7 +4,8 @@
  * Description: Handles modal toggles, client-side phone formatting, password policy validation,
  *              dynamic shop visibility, search filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
- * Version: 3.4.0
+ * Author: SYWAT Archery
+ * Version: 3.5.0
  */
 
 /**
@@ -71,7 +72,7 @@ function sywatToggleShopVisibility(formId, containerId) {
  * 
  * @param {string} pwId      DOM ID of the primary password input.
  * @param {string} confirmId DOM ID of the confirm password input.
- * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule', 'edit_full_rule', or 'promote_rule').
+ * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule', 'edit_prim_rule', or 'promote_rule').
  */
 function sywatValidatePasswordRules(pwId, confirmId, prefix) {
     const pwInput = document.getElementById(pwId);
@@ -117,8 +118,10 @@ function sywatUpdateRuleStatus(elementId, isValid, text) {
 }
 
 /**
- * Opens the "Add New Member" modal window.
+ * Modal Window Control Handlers (Open / Close Overlay Operations)
  */
+
+// 1. Add Standalone Primary Member Modal
 function sywatOpenAddMemberModal() {
     const modal = document.getElementById('sywat_add_member_modal');
     if (modal) {
@@ -127,9 +130,6 @@ function sywatOpenAddMemberModal() {
     sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
 }
 
-/**
- * Closes the "Add New Member" modal window.
- */
 function sywatCloseAddMemberModal() {
     const modal = document.getElementById('sywat_add_member_modal');
     if (modal) {
@@ -137,9 +137,49 @@ function sywatCloseAddMemberModal() {
     }
 }
 
-/**
- * Closes the "Edit Member" modal window and cleans up edit parameters from the browser URL.
- */
+// 2. Edit Head of Household Primary Profile Modal
+function sywatOpenEditPrimaryModal() {
+    const modal = document.getElementById('sywat_edit_primary_modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+    sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container');
+}
+
+function sywatCloseEditPrimaryModal() {
+    const modal = document.getElementById('sywat_edit_primary_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// 3. Add Family Member Sub-Profile Modal
+function sywatOpenAddDependentModal() {
+    const modal = document.getElementById('sywat_add_dependent_modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function sywatCloseAddDependentModal() {
+    const modal = document.getElementById('sywat_add_dependent_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// 4. Edit Family Member Sub-Profile Modal
+function sywatCloseEditDependentModal() {
+    const modal = document.getElementById('sywat_edit_dependent_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('edit_system_id');
+    window.history.replaceState({}, document.title, url.toString());
+}
+
+// 5. Legacy Edit Standalone Member Profile Modal Cleanup
 function sywatCloseEditMemberModal() {
     const modal = document.getElementById('sywat_edit_member_modal');
     if (modal) {
@@ -152,9 +192,7 @@ function sywatCloseEditMemberModal() {
     window.history.replaceState({}, document.title, url.toString());
 }
 
-/**
- * Opens the "Assign Board Member" modal window.
- */
+// 6. Assign Board Member Modal
 function sywatOpenAddBoardModal() {
     const modal = document.getElementById('sywat_add_board_modal');
     if (modal) {
@@ -162,9 +200,6 @@ function sywatOpenAddBoardModal() {
     }
 }
 
-/**
- * Closes the "Assign Board Member" modal window.
- */
 function sywatCloseAddBoardModal() {
     const modal = document.getElementById('sywat_add_board_modal');
     if (modal) {
@@ -172,9 +207,7 @@ function sywatCloseAddBoardModal() {
     }
 }
 
-/**
- * Closes the "Edit Board Member" modal window and cleans up edit parameters from the browser URL.
- */
+// 7. Edit Board Member Modal
 function sywatCloseEditBoardModal() {
     const modal = document.getElementById('sywat_edit_board_modal');
     if (modal) {
@@ -248,6 +281,7 @@ function sywatResetBoardSearch() {
  */
 document.addEventListener("DOMContentLoaded", function() {
     sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
+    sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container');
     sywatToggleShopVisibility('sywat_edit_member_full_form', 'sywat_edit_full_shop_container');
 
     const notice = document.getElementById('sywat-notice');
