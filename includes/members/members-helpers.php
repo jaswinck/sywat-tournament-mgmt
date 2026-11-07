@@ -2,15 +2,76 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Data getters, DOB age division calculators, NFAA expiration status matchers, and household linkage utilities.
+ * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, and household sub-profile linkage utilities.
+ * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
+ * Generate a unique, permanent internal System ID for an archer.
+ * This ID is used for internal database indexing and score tracking across the system.
+ *
+ * @return string Unique internal System ID.
+ */
+if ( ! function_exists( 'sywat_generate_unique_system_id' ) ) {
+    function sywat_generate_unique_system_id() {
+        $random_id = (string) mt_rand( 100000, 999999 );
+        while ( ! empty( get_users( array( 'meta_key' => 'sywat_system_id', 'meta_value' => $random_id, 'number' => 1 ) ) ) ) {
+            $random_id = (string) mt_rand( 100000, 999999 );
+        }
+        return $random_id;
+    }
+}
+
+/**
+ * Retrieve or generate an archer's permanent internal System ID.
+ *
+ * @param int $user_id WordPress User ID.
+ * @return string Internal System ID.
+ */
+if ( ! function_exists( 'sywat_get_user_system_id' ) ) {
+    function sywat_get_user_system_id( $user_id ) {
+        $user_id   = intval( $user_id );
+        $system_id = get_user_meta( $user_id, 'sywat_system_id', true );
+        
+        if ( empty( $system_id ) && $user_id > 0 ) {
+            // Check legacy 'sywat_tfaa_number' as fallback or generate new
+            $legacy_id = get_user_meta( $user_id, 'sywat_tfaa_number', true );
+            $system_id = ! empty( $legacy_id ) ? $legacy_id : sywat_generate_unique_system_id();
+            update_user_meta( $user_id, 'sywat_system_id', $system_id );
+        }
+        
+        return $system_id;
+    }
+}
+
+/**
+ * Retrieve an archer's official NFAA ID number for display on rosters and tables.
+ *
+ * @param int $user_id WordPress User ID.
+ * @return string NFAA ID number or 'Unassigned' if not set.
+ */
+if ( ! function_exists( 'sywat_get_user_nfaa_id' ) ) {
+    function sywat_get_user_nfaa_id( $user_id ) {
+        $user_id = intval( $user_id );
+        $nfaa_id = get_user_meta( $user_id, 'sywat_nfaa_number', true );
+        
+        if ( empty( $nfaa_id ) ) {
+            // Legacy fallback check
+            $nfaa_id = get_user_meta( $user_id, 'sywat_tfaa_number', true );
+        }
+        
+        return ! empty( $nfaa_id ) ? $nfaa_id : 'Unassigned';
+    }
+}
+
+/**
  * Retrieve registered TFAA members matching custom system roles and administrators.
+ *
+ * @return array List of WP_User objects.
  */
 if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
     function sywat_get_all_tfaa_members() {
@@ -37,6 +98,8 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
 
 /**
  * Retrieve all assigned TFAA Board Members.
+ *
+ * @return array List of WP_User objects with board assignments.
  */
 if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
     function sywat_get_all_board_members() {
@@ -51,6 +114,9 @@ if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
 
 /**
  * Format user board positions into readable labels.
+ *
+ * @param int $user_id WordPress User ID.
+ * @return array Associative array of position keys to human-readable titles.
  */
 if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
     function sywat_get_user_board_position_labels( $user_id ) {
@@ -76,7 +142,7 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
  * Calculate NFAA Age Division based on exact Date of Birth and Tournament Date.
  * Rule: Archer ages up on their exact birthday.
  *
- * @param string      $dob_string      Date of birth in YYYY-MM-DD or readable format.
+ * @param string      $dob_string      Date of birth in YYYY-MM-DD format.
  * @param string|null $tournament_date Optional comparison date (defaults to today).
  * @return string Eligible NFAA Age Division name.
  */
@@ -108,7 +174,7 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
  * Evaluate NFAA Membership Expiration Status for a given user.
  *
  * @param int $user_id WordPress User ID.
- * @return array Status payload with 'status', 'expiration', and CSS 'badge_class'.
+ * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', and 'is_active'.
  */
 if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
     function sywat_get_member_nfaa_status( $user_id ) {
@@ -119,9 +185,10 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
             $is_active   = ( $legacy_flag === 'yes' );
             return array(
-                'status'      => $is_active ? 'Active' : 'Expired',
+                'status'      => 'Expired',
                 'expiration'  => '—',
-                'badge_class' => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
+                'raw_date'    => '',
+                'badge_class' => 'sywat-badge-muted',
                 'is_active'   => $is_active,
             );
         }
@@ -177,5 +244,52 @@ if ( ! function_exists( 'sywat_get_user_address' ) ) {
             'state'     => get_user_meta( $user_id, 'sywat_state', true ),
             'zip'       => get_user_meta( $user_id, 'sywat_zip', true ),
         );
+    }
+}
+
+/**
+ * Promote a dependent family member to a standalone Primary Account Holder.
+ * Preserves their permanent internal System ID and all historical tournament score records.
+ *
+ * @param int    $dependent_user_id WordPress User ID of the dependent to promote.
+ * @param string $new_email         Unique email address for their new standalone account.
+ * @param string $new_password      Initial password for their new standalone account.
+ * @return bool|WP_Error True on success, WP_Error on failure.
+ */
+if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
+    function sywat_promote_dependent_to_primary( $dependent_user_id, $new_email, $new_password ) {
+        $dependent_user_id = intval( $dependent_user_id );
+        $user              = get_userdata( $dependent_user_id );
+
+        if ( ! $user ) {
+            return new WP_Error( 'invalid_user', 'Member account not found.' );
+        }
+
+        if ( email_exists( $new_email ) && strtolower( $user->user_email ) !== strtolower( $new_email ) ) {
+            return new WP_Error( 'email_exists', 'This email address is already registered to another account.' );
+        }
+
+        // 1. Update core WP User details
+        $update_data = array(
+            'ID'         => $dependent_user_id,
+            'user_email' => sanitize_email( $new_email ),
+        );
+
+        if ( ! empty( $new_password ) ) {
+            $update_data['user_pass'] = $new_password;
+        }
+
+        $res = wp_update_user( $update_data );
+        if ( is_wp_error( $res ) ) {
+            return $res;
+        }
+
+        // 2. Remove household primary linkage (making them standalone primary)
+        delete_user_meta( $dependent_user_id, 'sywat_primary_user_id' );
+
+        // 3. Ensure internal System ID is preserved (fail-safe check)
+        sywat_get_user_system_id( $dependent_user_id );
+
+        return true;
     }
 }
