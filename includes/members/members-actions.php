@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, and board position assignment.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, accommodations selection, state dropdown management, board position assignment, and historical batch spreadsheet importer execution.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices.
  * Author: SYWAT Archery
- * Version: 3.9.1
+ * Version: 3.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -52,6 +52,28 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
         $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
 
+        // 0. BATCH HISTORICAL ARCHERS SPREADSHEET IMPORT HANDLER
+        if ( $action === 'import_archers_spreadsheet' ) {
+            if ( ! current_user_can( 'administrator' ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data imports.</div>';
+            }
+
+            if ( empty( $_FILES['archers_file'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a spreadsheet file (.xlsx or .csv) to import.</div>';
+            }
+
+            $importer_path = plugin_dir_path( __FILE__ ) . 'import/archers-importer.php';
+            if ( file_exists( $importer_path ) ) {
+                require_once $importer_path;
+            }
+
+            if ( function_exists( 'sywat_import_archers_spreadsheet' ) ) {
+                return sywat_import_archers_spreadsheet( $_FILES['archers_file'] );
+            } else {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer Importer Module Engine is missing or unavailable.</div>';
+            }
+        }
+
         // 1. CREATE NEW MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
         if ( $action === 'create_member' ) {
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
@@ -59,7 +81,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $last_name       = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
             $email           = sanitize_email( $_POST['email'] );
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
-            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'male';
+            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
             $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
             $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
             $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
@@ -76,7 +98,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'last_name'       => $last_name,
                     'email'           => $email,
                     'phone'           => isset( $_POST['phone'] ) ? sanitize_text_field( $_POST['phone'] ) : '',
-                    'gender'          => in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male',
+                    'gender'          => in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned',
                     'is_pro'          => $is_pro,
                     'dob'             => $dob,
                     'accommodations'  => $accommodations,
@@ -161,7 +183,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
-            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male' );
+            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
             update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
             update_user_meta( $user_id, 'sywat_dob', $dob );
             update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
@@ -186,7 +208,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
-            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'male';
+            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
             $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
 
             // Update Dependent Sub-Profile
@@ -196,7 +218,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'last_name'       => sanitize_text_field( $_POST['last_name'] ),
                     'email'           => sanitize_email( $_POST['email'] ),
                     'phone'           => sanitize_text_field( $_POST['phone'] ),
-                    'gender'          => in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male',
+                    'gender'          => in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned',
                     'is_pro'          => $is_pro,
                     'dob'             => sanitize_text_field( $_POST['dob'] ),
                     'accommodations'  => isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none',
@@ -264,7 +286,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
-                update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female' ), true ) ? $gender : 'male' );
+                update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
                 update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
                 update_user_meta( $user_id, 'sywat_dob', $dob );
                 update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
