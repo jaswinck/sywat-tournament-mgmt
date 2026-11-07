@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, and household sub-profile linkage utilities.
+ * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.2.0
+ * Version: 3.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -171,25 +171,42 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
 }
 
 /**
- * Evaluate NFAA Membership Expiration Status for a given user.
+ * Evaluate NFAA Membership Expiration Status for a given user or expiration date string.
  *
- * @param int $user_id WordPress User ID.
+ * @param int|string $user_id_or_date WordPress User ID or YYYY-MM-DD date string.
  * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', and 'is_active'.
  */
 if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
-    function sywat_get_member_nfaa_status( $user_id ) {
-        $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
-        
+    function sywat_get_member_nfaa_status( $user_id_or_date ) {
+        $expiration = '';
+        $is_active  = false;
+
+        if ( is_numeric( $user_id_or_date ) && intval( $user_id_or_date ) > 0 ) {
+            $user_id    = intval( $user_id_or_date );
+            $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
+            
+            if ( empty( $expiration ) ) {
+                $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
+                $is_active   = ( $legacy_flag === 'yes' );
+                return array(
+                    'status'      => 'Expired',
+                    'expiration'  => '—',
+                    'raw_date'    => '',
+                    'badge_class' => 'sywat-badge-muted',
+                    'is_active'   => $is_active,
+                );
+            }
+        } elseif ( is_string( $user_id_or_date ) ) {
+            $expiration = sanitize_text_field( $user_id_or_date );
+        }
+
         if ( empty( $expiration ) ) {
-            // Fallback for legacy 'sywat_is_nfaa_member' meta flag
-            $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
-            $is_active   = ( $legacy_flag === 'yes' );
             return array(
                 'status'      => 'Expired',
                 'expiration'  => '—',
                 'raw_date'    => '',
                 'badge_class' => 'sywat-badge-muted',
-                'is_active'   => $is_active,
+                'is_active'   => false,
             );
         }
 
@@ -208,10 +225,10 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
 }
 
 /**
- * Retrieve all linked dependent/family members under a Primary Account.
+ * Retrieve all linked household dependent sub-profiles under a Primary Account Holder.
  *
  * @param int $primary_user_id WordPress User ID of Primary Account Holder.
- * @return array Array of WP_User objects linked to this Primary ID.
+ * @return array Array of associative arrays representing dependent sub-profiles.
  */
 if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
     function sywat_get_linked_household_members( $primary_user_id ) {
@@ -220,12 +237,219 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
             return array();
         }
 
-        return get_users( array(
+        $dependents = get_user_meta( $primary_user_id, 'sywat_household_dependents', true );
+        if ( ! is_array( $dependents ) ) {
+            $dependents = array();
+        }
+
+        // Backwards Compatibility: Include legacy WP_User linked accounts if any exist
+        $legacy_users = get_users( array(
             'meta_key'   => 'sywat_primary_user_id',
             'meta_value' => $primary_user_id,
             'orderby'    => 'display_name',
             'order'      => 'ASC',
         ) );
+
+        if ( ! empty( $legacy_users ) ) {
+            $existing_system_ids = array_column( $dependents, 'system_id' );
+            foreach ( $legacy_users as $lu ) {
+                $lu_system_id = sywat_get_user_system_id( $lu->ID );
+                if ( ! in_array( $lu_system_id, $existing_system_ids, true ) ) {
+                    $dependents[] = array(
+                        'system_id'       => $lu_system_id,
+                        'wp_user_id'      => $lu->ID,
+                        'first_name'      => $lu->first_name,
+                        'last_name'       => $lu->last_name,
+                        'display_name'    => $lu->display_name,
+                        'email'           => $lu->user_email,
+                        'phone'           => get_user_meta( $lu->ID, 'sywat_phone', true ),
+                        'dob'             => get_user_meta( $lu->ID, 'sywat_dob', true ),
+                        'nfaa_number'     => get_user_meta( $lu->ID, 'sywat_nfaa_number', true ),
+                        'nfaa_expiration' => get_user_meta( $lu->ID, 'sywat_nfaa_expiration', true ),
+                        'address_1'       => get_user_meta( $lu->ID, 'sywat_address_1', true ),
+                        'address_2'       => get_user_meta( $lu->ID, 'sywat_address_2', true ),
+                        'city'            => get_user_meta( $lu->ID, 'sywat_city', true ),
+                        'state'           => get_user_meta( $lu->ID, 'sywat_state', true ),
+                        'zip'             => get_user_meta( $lu->ID, 'sywat_zip', true ),
+                        'is_legacy'       => true,
+                    );
+                }
+            }
+        }
+
+        return $dependents;
+    }
+}
+
+/**
+ * Retrieve a specific household dependent sub-profile by Primary User ID and System ID.
+ *
+ * @param int    $primary_user_id WordPress User ID of Primary Account Holder.
+ * @param string $system_id       Unique internal System ID of the dependent.
+ * @return array|null Associative array of sub-profile data or null if not found.
+ */
+if ( ! function_exists( 'sywat_get_household_dependent_by_system_id' ) ) {
+    function sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) {
+        $dependents = sywat_get_linked_household_members( $primary_user_id );
+        foreach ( $dependents as $dep ) {
+            if ( isset( $dep['system_id'] ) && (string) $dep['system_id'] === (string) $system_id ) {
+                return $dep;
+            }
+        }
+        return null;
+    }
+}
+
+/**
+ * Add a new household dependent sub-profile under a Primary Account.
+ * Bypasses wp_insert_user() completely so parents and children can share emails with zero errors.
+ *
+ * @param int   $primary_user_id WordPress User ID of Primary Account Holder.
+ * @param array $dep_data        Sanitized input details (first_name, last_name, dob, nfaa_number, etc.).
+ * @return string|WP_Error System ID on success, or WP_Error on failure.
+ */
+if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
+    function sywat_add_household_dependent( $primary_user_id, $dep_data ) {
+        $primary_user_id = intval( $primary_user_id );
+        $primary_user    = get_userdata( $primary_user_id );
+
+        if ( ! $primary_user ) {
+            return new WP_Error( 'invalid_primary', 'Primary Account Holder not found.' );
+        }
+
+        $first_name = ucfirst( strtolower( sanitize_text_field( isset( $dep_data['first_name'] ) ? $dep_data['first_name'] : '' ) ) );
+        $last_name  = ucfirst( strtolower( sanitize_text_field( isset( $dep_data['last_name'] ) ? $dep_data['last_name'] : $primary_user->last_name ) ) );
+        $dob        = sanitize_text_field( isset( $dep_data['dob'] ) ? $dep_data['dob'] : '' );
+
+        if ( empty( $first_name ) || empty( $last_name ) || empty( $dob ) ) {
+            return new WP_Error( 'missing_fields', 'First Name, Last Name, and Date of Birth are required.' );
+        }
+
+        $system_id  = sywat_generate_unique_system_id();
+        $dependents = get_user_meta( $primary_user_id, 'sywat_household_dependents', true );
+        if ( ! is_array( $dependents ) ) {
+            $dependents = array();
+        }
+
+        $p_address = sywat_get_user_address( $primary_user_id );
+
+        $new_dependent = array(
+            'system_id'       => $system_id,
+            'wp_user_id'      => 0,
+            'first_name'      => $first_name,
+            'last_name'       => $last_name,
+            'display_name'    => $first_name . ' ' . $last_name,
+            'email'           => sanitize_email( isset( $dep_data['email'] ) ? $dep_data['email'] : $primary_user->user_email ),
+            'phone'           => sanitize_text_field( isset( $dep_data['phone'] ) ? $dep_data['phone'] : get_user_meta( $primary_user_id, 'sywat_phone', true ) ),
+            'dob'             => $dob,
+            'nfaa_number'     => sanitize_text_field( isset( $dep_data['nfaa_number'] ) ? $dep_data['nfaa_number'] : '' ),
+            'nfaa_expiration' => sanitize_text_field( isset( $dep_data['nfaa_expiration'] ) ? $dep_data['nfaa_expiration'] : '' ),
+            'address_1'       => sanitize_text_field( isset( $dep_data['address_1'] ) ? $dep_data['address_1'] : $p_address['address_1'] ),
+            'address_2'       => sanitize_text_field( isset( $dep_data['address_2'] ) ? $dep_data['address_2'] : $p_address['address_2'] ),
+            'city'            => sanitize_text_field( isset( $dep_data['city'] ) ? $dep_data['city'] : $p_address['city'] ),
+            'state'           => sanitize_text_field( isset( $dep_data['state'] ) ? $dep_data['state'] : $p_address['state'] ),
+            'zip'             => sanitize_text_field( isset( $dep_data['zip'] ) ? $dep_data['zip'] : $p_address['zip'] ),
+            'is_legacy'       => false,
+        );
+
+        $dependents[] = $new_dependent;
+        update_user_meta( $primary_user_id, 'sywat_household_dependents', $dependents );
+
+        return $system_id;
+    }
+}
+
+/**
+ * Update an existing household dependent sub-profile.
+ *
+ * @param int    $primary_user_id WordPress User ID of Primary Account Holder.
+ * @param string $system_id       Unique internal System ID of the dependent.
+ * @param array  $dep_data        Updated field array.
+ * @return bool|WP_Error True on success, or WP_Error on failure.
+ */
+if ( ! function_exists( 'sywat_update_household_dependent' ) ) {
+    function sywat_update_household_dependent( $primary_user_id, $system_id, $dep_data ) {
+        $primary_user_id = intval( $primary_user_id );
+        $dependents      = get_user_meta( $primary_user_id, 'sywat_household_dependents', true );
+
+        if ( ! is_array( $dependents ) ) {
+            return new WP_Error( 'not_found', 'No household dependents registered.' );
+        }
+
+        $found_index = -1;
+        foreach ( $dependents as $idx => $dep ) {
+            if ( isset( $dep['system_id'] ) && (string) $dep['system_id'] === (string) $system_id ) {
+                $found_index = $idx;
+                break;
+            }
+        }
+
+        if ( $found_index === -1 ) {
+            return new WP_Error( 'dependent_not_found', 'Dependent sub-profile not found.' );
+        }
+
+        $current = $dependents[$found_index];
+
+        $first_name = isset( $dep_data['first_name'] ) ? ucfirst( strtolower( sanitize_text_field( $dep_data['first_name'] ) ) ) : $current['first_name'];
+        $last_name  = isset( $dep_data['last_name'] ) ? ucfirst( strtolower( sanitize_text_field( $dep_data['last_name'] ) ) ) : $current['last_name'];
+
+        $dependents[$found_index]['first_name']      = $first_name;
+        $dependents[$found_index]['last_name']       = $last_name;
+        $dependents[$found_index]['display_name']    = $first_name . ' ' . $last_name;
+        $dependents[$found_index]['email']           = isset( $dep_data['email'] ) ? sanitize_email( $dep_data['email'] ) : $current['email'];
+        $dependents[$found_index]['phone']           = isset( $dep_data['phone'] ) ? sanitize_text_field( $dep_data['phone'] ) : $current['phone'];
+        $dependents[$found_index]['dob']             = isset( $dep_data['dob'] ) ? sanitize_text_field( $dep_data['dob'] ) : $current['dob'];
+        $dependents[$found_index]['nfaa_number']     = isset( $dep_data['nfaa_number'] ) ? sanitize_text_field( $dep_data['nfaa_number'] ) : $current['nfaa_number'];
+        $dependents[$found_index]['nfaa_expiration'] = isset( $dep_data['nfaa_expiration'] ) ? sanitize_text_field( $dep_data['nfaa_expiration'] ) : $current['nfaa_expiration'];
+        $dependents[$found_index]['address_1']       = isset( $dep_data['address_1'] ) ? sanitize_text_field( $dep_data['address_1'] ) : $current['address_1'];
+        $dependents[$found_index]['address_2']       = isset( $dep_data['address_2'] ) ? sanitize_text_field( $dep_data['address_2'] ) : $current['address_2'];
+        $dependents[$found_index]['city']            = isset( $dep_data['city'] ) ? sanitize_text_field( $dep_data['city'] ) : $current['city'];
+        $dependents[$found_index]['state']           = isset( $dep_data['state'] ) ? sanitize_text_field( $dep_data['state'] ) : $current['state'];
+        $dependents[$found_index]['zip']             = isset( $dep_data['zip'] ) ? sanitize_text_field( $dep_data['zip'] ) : $current['zip'];
+
+        update_user_meta( $primary_user_id, 'sywat_household_dependents', $dependents );
+        return true;
+    }
+}
+
+/**
+ * Delete a household dependent sub-profile from a Primary Account.
+ *
+ * @param int    $primary_user_id WordPress User ID of Primary Account Holder.
+ * @param string $system_id       Unique internal System ID of the dependent.
+ * @return bool|WP_Error True on success, or WP_Error on failure.
+ */
+if ( ! function_exists( 'sywat_delete_household_dependent' ) ) {
+    function sywat_delete_household_dependent( $primary_user_id, $system_id ) {
+        $primary_user_id = intval( $primary_user_id );
+        $dependents      = get_user_meta( $primary_user_id, 'sywat_household_dependents', true );
+
+        if ( ! is_array( $dependents ) ) {
+            return new WP_Error( 'not_found', 'No household dependents found.' );
+        }
+
+        $filtered = array();
+        $deleted  = false;
+
+        foreach ( $dependents as $dep ) {
+            if ( isset( $dep['system_id'] ) && (string) $dep['system_id'] === (string) $system_id ) {
+                $deleted = true;
+                // If legacy WP account exists, delete WP user too
+                if ( ! empty( $dep['wp_user_id'] ) && intval( $dep['wp_user_id'] ) > 0 ) {
+                    require_once ABSPATH . 'wp-admin/includes/user.php';
+                    wp_delete_user( intval( $dep['wp_user_id'] ) );
+                }
+            } else {
+                $filtered[] = $dep;
+            }
+        }
+
+        if ( ! $deleted ) {
+            return new WP_Error( 'not_found', 'Dependent sub-profile not found.' );
+        }
+
+        update_user_meta( $primary_user_id, 'sywat_household_dependents', array_values( $filtered ) );
+        return true;
     }
 }
 
@@ -248,48 +472,78 @@ if ( ! function_exists( 'sywat_get_user_address' ) ) {
 }
 
 /**
- * Promote a dependent family member to a standalone Primary Account Holder.
+ * Promote a dependent sub-profile to a standalone Primary Account Holder at age 18.
  * Preserves their permanent internal System ID and all historical tournament score records.
  *
- * @param int    $dependent_user_id WordPress User ID of the dependent to promote.
- * @param string $new_email         Unique email address for their new standalone account.
- * @param string $new_password      Initial password for their new standalone account.
- * @return bool|WP_Error True on success, WP_Error on failure.
+ * @param int    $primary_user_id WordPress User ID of current Primary Account Holder.
+ * @param string $system_id       Unique internal System ID of the dependent to promote.
+ * @param string $new_email         Unique standalone email address.
+ * @param string $new_password      Initial password for standalone login.
+ * @return int|WP_Error New WP User ID on success, or WP_Error on failure.
  */
 if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
-    function sywat_promote_dependent_to_primary( $dependent_user_id, $new_email, $new_password ) {
-        $dependent_user_id = intval( $dependent_user_id );
-        $user              = get_userdata( $dependent_user_id );
+    function sywat_promote_dependent_to_primary( $primary_user_id, $system_id, $new_email, $new_password ) {
+        $dep = sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id );
 
-        if ( ! $user ) {
-            return new WP_Error( 'invalid_user', 'Member account not found.' );
+        if ( ! $dep ) {
+            return new WP_Error( 'invalid_dependent', 'Dependent sub-profile not found.' );
         }
 
-        if ( email_exists( $new_email ) && strtolower( $user->user_email ) !== strtolower( $new_email ) ) {
-            return new WP_Error( 'email_exists', 'This email address is already registered to another account.' );
+        $new_email = sanitize_email( $new_email );
+        if ( empty( $new_email ) || ! is_email( $new_email ) ) {
+            return new WP_Error( 'invalid_email', 'Please provide a valid email address.' );
         }
 
-        // 1. Update core WP User details
-        $update_data = array(
-            'ID'         => $dependent_user_id,
-            'user_email' => sanitize_email( $new_email ),
-        );
-
-        if ( ! empty( $new_password ) ) {
-            $update_data['user_pass'] = $new_password;
+        if ( email_exists( $new_email ) ) {
+            return new WP_Error( 'email_exists', 'An account with email address "' . esc_html( $new_email ) . '" already exists.' );
         }
 
-        $res = wp_update_user( $update_data );
-        if ( is_wp_error( $res ) ) {
-            return $res;
+        if ( empty( $new_password ) ) {
+            $new_password = wp_generate_password( 12, true );
         }
 
-        // 2. Remove household primary linkage (making them standalone primary)
-        delete_user_meta( $dependent_user_id, 'sywat_primary_user_id' );
+        $first_name    = $dep['first_name'];
+        $last_name     = $dep['last_name'];
+        $base_username = sanitize_user( $first_name . '.' . $last_name, true );
+        $username      = $base_username;
+        $counter       = 1;
 
-        // 3. Ensure internal System ID is preserved (fail-safe check)
-        sywat_get_user_system_id( $dependent_user_id );
+        while ( username_exists( $username ) ) {
+            $username = $base_username . $counter;
+            $counter++;
+        }
 
-        return true;
+        // 1. Create brand new standalone WP_User account
+        $new_user_id = wp_insert_user( array(
+            'user_login'   => $username,
+            'user_email'   => $new_email,
+            'user_pass'    => $new_password,
+            'first_name'   => $first_name,
+            'last_name'    => $last_name,
+            'display_name' => $first_name . ' ' . $last_name,
+            'role'         => 'tfaa_member',
+        ) );
+
+        if ( is_wp_error( $new_user_id ) ) {
+            return $new_user_id;
+        }
+
+        // 2. Attach existing permanent System ID and historical metadata to the new standalone account
+        update_user_meta( $new_user_id, 'sywat_system_id', $system_id );
+        update_user_meta( $new_user_id, 'sywat_dob', $dep['dob'] );
+        update_user_meta( $new_user_id, 'sywat_nfaa_number', $dep['nfaa_number'] );
+        update_user_meta( $new_user_id, 'sywat_tfaa_number', $dep['nfaa_number'] );
+        update_user_meta( $new_user_id, 'sywat_nfaa_expiration', $dep['nfaa_expiration'] );
+        update_user_meta( $new_user_id, 'sywat_phone', $dep['phone'] );
+        update_user_meta( $new_user_id, 'sywat_address_1', $dep['address_1'] );
+        update_user_meta( $new_user_id, 'sywat_address_2', $dep['address_2'] );
+        update_user_meta( $new_user_id, 'sywat_city', $dep['city'] );
+        update_user_meta( $new_user_id, 'sywat_state', $dep['state'] );
+        update_user_meta( $new_user_id, 'sywat_zip', $dep['zip'] );
+
+        // 3. Remove sub-profile from primary account's household array
+        sywat_delete_household_dependent( $primary_user_id, $system_id );
+
+        return $new_user_id;
     }
 }
