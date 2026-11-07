@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.5
+ * Version: 3.9.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -468,20 +468,25 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 5. DELETE MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
+        // 5. DELETE MEMBER ACCOUNT OR PERMANENTLY PURGE DEPENDENT SUB-PROFILE
         if ( $action === 'delete_member' ) {
             $user_id         = intval( $_POST['target_user_id'] );
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
-            // Delete Dependent Sub-Profile
+            // Delete Dependent Sub-Profile Permanently
             if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
+                $dep = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
+                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) 
+                    : null;
+                $dep_name = ( $dep && isset( $dep['first_name'] ) ) ? $dep['first_name'] . ' ' . $dep['last_name'] : 'Family member';
+
                 if ( function_exists( 'sywat_delete_household_dependent' ) ) {
                     $res = sywat_delete_household_dependent( $primary_user_id, $system_id );
                     if ( is_wp_error( $res ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Family member sub-profile removed from household.</div>';
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ Sub-profile "<strong>' . esc_html( $dep_name ) . '</strong>" permanently deleted from household.</div>';
                 }
             }
 
@@ -505,7 +510,34 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 6. PROMOTE DEPENDENT TO STANDALONE ACCOUNT (AGE 18)
+        // 6. UNLINK HOUSEHOLD DEPENDENT (DETACH FROM HOUSEHOLD WHILE PRESERVING RECORDS)
+        if ( $action === 'unlink_dependent' || $action === 'unlink_member' ) {
+            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
+            $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
+
+            if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
+                $dep = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
+                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) 
+                    : null;
+                $dep_name = ( $dep && isset( $dep['first_name'] ) ) ? $dep['first_name'] . ' ' . $dep['last_name'] : 'Family member';
+
+                if ( function_exists( 'sywat_unlink_household_dependent' ) ) {
+                    $res = sywat_unlink_household_dependent( $primary_user_id, $system_id );
+                    if ( is_wp_error( $res ) ) {
+                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+                    }
+                } elseif ( function_exists( 'sywat_delete_household_dependent' ) ) {
+                    // Fallback detachment logic
+                    $res = sywat_delete_household_dependent( $primary_user_id, $system_id );
+                    if ( is_wp_error( $res ) ) {
+                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+                    }
+                }
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>' . esc_html( $dep_name ) . '</strong> has been unlinked from this household.</div>';
+            }
+        }
+
+        // 7. PROMOTE DEPENDENT TO STANDALONE ACCOUNT (AGE 18)
         if ( $action === 'promote_dependent' ) {
             $primary_user_id = intval( $_POST['primary_user_id'] );
             $system_id       = sanitize_text_field( $_POST['target_system_id'] );
@@ -533,7 +565,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 7. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
+        // 8. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
         if ( $action === 'save_board_member' ) {
             $user_id   = intval( $_POST['board_user_id'] );
             $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
@@ -553,7 +585,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
         }
 
-        // 8. REMOVE BOARD MEMBER ASSIGNMENT
+        // 9. REMOVE BOARD MEMBER ASSIGNMENT
         if ( $action === 'remove_board_member' ) {
             $user_id = intval( $_POST['target_user_id'] );
             $user    = get_userdata( $user_id );
