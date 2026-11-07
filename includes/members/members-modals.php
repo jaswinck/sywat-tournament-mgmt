@@ -5,7 +5,7 @@
  * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, batch spreadsheet upload, and 2-step audit preview overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.9.4
+ * Version: 3.9.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -957,16 +957,18 @@ function sywat_members_render_modals( $data ) {
                         </table>
                     </div>
 
-                    <div class="sywat-modal-actions sywat-mt-4">
-                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportPreviewModal()">Cancel Import</button>
-                        <form method="post" action="?tab=members&subtab=directory">
-                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                            <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
-                            <input type="hidden" name="import_mode" value="commit">
-                            <input type="hidden" name="persistent_file_path" value="<?php echo esc_attr( $p_file_path ); ?>">
+                    <!-- SINGLE FORM WRAPPER FOR PERFECT SIDE-BY-SIDE BUTTON FLEX ALIGNMENT -->
+                    <form method="post" action="?tab=members&subtab=directory">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                        <input type="hidden" name="import_mode" value="commit">
+                        <input type="hidden" name="persistent_file_path" value="<?php echo esc_attr( $p_file_path ); ?>">
+
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportPreviewModal()">Cancel Import</button>
                             <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Ingest <?php echo intval( $p_clean ); ?> Archers into Database</button>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         <?php endif; ?>
