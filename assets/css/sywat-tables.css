@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 6.6.0
+   Version: 6.7.0
    ========================================================================== */
 
 .sywat-table-responsive {
@@ -398,6 +398,13 @@
     background-color: #ccfbf1;
     color: #0f766e;
     border: 1px solid #99f6e4;
+}
+
+.sywat-badge-pro {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    font-weight: 800;
 }
 
 .sywat-badge-full {
