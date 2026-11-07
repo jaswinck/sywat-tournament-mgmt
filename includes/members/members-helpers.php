@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, US state resolution, accommodations maps, and household sub-profile management utilities.
+ * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club Staff detection), US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -249,6 +249,7 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
 
 /**
  * Evaluate NFAA Membership Expiration Status for a given user or expiration date string.
+ * Accounts holding staff/admin roles without an active NFAA ID return a non-expiring Staff status.
  *
  * @param int|string $user_id_or_date WordPress User ID or YYYY-MM-DD date string.
  * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', and 'is_active'.
@@ -260,16 +261,41 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
 
         if ( is_numeric( $user_id_or_date ) && intval( $user_id_or_date ) > 0 ) {
             $user_id    = intval( $user_id_or_date );
+            $user_obj   = get_userdata( $user_id );
+            $user_roles = $user_obj ? (array) $user_obj->roles : array();
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
-            
-            if ( empty( $expiration ) ) {
+            $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
+
+            // Staff & Administrator accounts without an active NFAA ID
+            $is_shop_staff = ( in_array( 'sywat_shop_manager', $user_roles, true ) || in_array( 'sywat_shop_user', $user_roles, true ) );
+            $is_admin      = in_array( 'administrator', $user_roles, true );
+
+            if ( empty( $expiration ) && empty( $nfaa_id ) ) {
+                if ( $is_shop_staff ) {
+                    return array(
+                        'status'      => 'Shop / Club Staff',
+                        'expiration'  => 'System Account',
+                        'raw_date'    => '',
+                        'badge_class' => 'sywat-badge-prereg',
+                        'is_active'   => true,
+                    );
+                } elseif ( $is_admin ) {
+                    return array(
+                        'status'      => 'System Admin',
+                        'expiration'  => 'System Account',
+                        'raw_date'    => '',
+                        'badge_class' => 'sywat-badge-prereg',
+                        'is_active'   => true,
+                    );
+                }
+
                 $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
                 $is_active   = ( $legacy_flag === 'yes' );
                 return array(
-                    'status'      => 'Expired',
+                    'status'      => $is_active ? 'Active' : 'Expired',
                     'expiration'  => '—',
                     'raw_date'    => '',
-                    'badge_class' => 'sywat-badge-muted',
+                    'badge_class' => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
                     'is_active'   => $is_active,
                 );
             }
