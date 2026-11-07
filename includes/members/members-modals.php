@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, and board position assignments.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, and historical batch spreadsheet import execution.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.9.1
+ * Version: 3.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,14 +28,14 @@ function sywat_members_render_modals( $data ) {
     $all_shops                 = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
     $us_states                 = function_exists( 'sywat_get_us_states_list' ) ? sywat_get_us_states_list() : array();
     $accom_options             = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
-    $gender_options            = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'male' => 'Male', 'female' => 'Female' );
+    $gender_options            = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
 
     // Primary User Data Unpacking (if active)
     $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
-    $e_gender     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_gender', true ) : 'male';
+    $e_gender     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_gender', true ) : 'unassigned';
     $e_is_pro     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true ) : 'no';
     $e_dob        = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_dob', true ) : '';
     $e_accom      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true ) : 'none';
@@ -94,7 +94,7 @@ function sywat_members_render_modals( $data ) {
                             <label>Gender *</label>
                             <select name="gender" required>
                                 <?php foreach ( $gender_options as $g_key => $g_label ): ?>
-                                    <option value="<?php echo esc_attr( $g_key ); ?>"><?php echo esc_html( $g_label ); ?></option>
+                                    <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( $g_key, 'unassigned' ); ?>><?php echo esc_html( $g_label ); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -410,7 +410,7 @@ function sywat_members_render_modals( $data ) {
                                 <label>Gender *</label>
                                 <select name="gender" required>
                                     <?php foreach ( $gender_options as $g_key => $g_label ): ?>
-                                        <option value="<?php echo esc_attr( $g_key ); ?>"><?php echo esc_html( $g_label ); ?></option>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( $g_key, 'unassigned' ); ?>><?php echo esc_html( $g_label ); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -506,7 +506,7 @@ function sywat_members_render_modals( $data ) {
                 $d_lname   = isset( $edit_dep_subprofile['last_name'] ) ? $edit_dep_subprofile['last_name'] : '';
                 $d_email   = isset( $edit_dep_subprofile['email'] ) ? $edit_dep_subprofile['email'] : '';
                 $d_phone   = isset( $edit_dep_subprofile['phone'] ) ? $edit_dep_subprofile['phone'] : '';
-                $d_gender  = isset( $edit_dep_subprofile['gender'] ) ? $edit_dep_subprofile['gender'] : 'male';
+                $d_gender  = isset( $edit_dep_subprofile['gender'] ) ? $edit_dep_subprofile['gender'] : 'unassigned';
                 $d_is_pro  = isset( $edit_dep_subprofile['is_pro'] ) ? $edit_dep_subprofile['is_pro'] : 'no';
                 $d_dob     = isset( $edit_dep_subprofile['dob'] ) ? $edit_dep_subprofile['dob'] : '';
                 $d_accom   = isset( $edit_dep_subprofile['accommodations'] ) ? $edit_dep_subprofile['accommodations'] : 'none';
@@ -763,6 +763,36 @@ function sywat_members_render_modals( $data ) {
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+
+    <!-- MODAL 7: HISTORICAL ARCHERS BATCH SPREADSHEET IMPORTER MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_import_archers_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>📥 Import Historical Archers Spreadsheet</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseImportModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" enctype="multipart/form-data" id="sywat_import_archers_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+
+                    <div class="sywat-alert sywat-alert-info">
+                        📊 <strong>Automated Migration Engine:</strong> Purges SQL injection rows, deduplicates archers by DOB, groups families into households, and updates existing records in-place without touching user passwords.
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-3">
+                        <label>Select Archers Spreadsheet File (.xlsx / .csv) *</label>
+                        <input type="file" name="archers_file" accept=".xlsx, .xls, .csv" required>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Run Batch Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     <?php
 }
