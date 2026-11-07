@@ -3,24 +3,21 @@
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
  * Description: Nonce-verified POST action processor for member account creation, profile updates, DOB/NFAA meta saving, address management, household linkage, and board position assignment.
+ * Compliance: Zero visual HTML layout templates. Returns standardized alert notices.
  * Author: SYWAT Archery
- * Version: 3.1.0
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Safe fallback generator if not defined elsewhere in the plugin
-if ( ! function_exists( 'sywat_generate_unique_tfaa_id' ) ) {
-    function sywat_generate_unique_tfaa_id() {
-        $random_id = mt_rand( 10000, 99999 );
-        while ( ! empty( get_users( array( 'meta_key' => 'sywat_tfaa_number', 'meta_value' => $random_id, 'number' => 1 ) ) ) ) {
-            $random_id = mt_rand( 10000, 99999 );
-        }
-        return (string) $random_id;
-    }
-}
-
 if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
+    /**
+     * Validate password rules for new primary accounts or password resets.
+     *
+     * @param string $password         Password string.
+     * @param string $confirm_password Confirm password string.
+     * @return bool|string True if valid, or error message string.
+     */
     function sywat_validate_password_rules( $password, $confirm_password ) {
         if ( $password !== $confirm_password ) {
             return 'Passwords do not match. Please ensure both password fields are identical.';
@@ -42,28 +39,34 @@ if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
 }
 
 if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
+    /**
+     * Central POST handler for member actions.
+     *
+     * @return string Alert notice markup.
+     */
     function sywat_handle_member_post_actions() {
-        // Nonce Verification aligned with Tournament Portal Pattern
+        // Nonce Verification
         if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
         }
 
         $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
 
-        // 1. CREATE NEW MEMBER ACCOUNT
+        // 1. CREATE NEW MEMBER ACCOUNT (PRIMARY OR DEPENDENT)
         if ( $action === 'create_member' ) {
             $first_name       = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
             $last_name        = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
             $email            = sanitize_email( $_POST['email'] );
-            $password         = $_POST['password'];
+            $password         = isset( $_POST['password'] ) ? $_POST['password'] : '';
             $confirm_password = isset( $_POST['confirm_password'] ) ? $_POST['confirm_password'] : '';
             $phone            = sanitize_text_field( $_POST['phone'] );
             $is_nfaa          = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
             $submitted_roles  = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array( 'tfaa_member' );
             $shop_id          = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
 
-            // Extended Metadata Inputs (DOB, NFAA Expiration, Household Link & Address)
+            // Extended Metadata Inputs (DOB, NFAA Number & Expiration, Household Link & Address)
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
             $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
             $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
             $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
@@ -76,13 +79,19 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
             }
 
-            if ( email_exists( $email ) ) {
+            // Only check email duplication if this is NOT a dependent account
+            if ( email_exists( $email ) && $primary_user_id <= 0 ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">An account with email address "' . esc_html( $email ) . '" already exists.</div>';
             }
 
-            $pw_val = sywat_validate_password_rules( $password, $confirm_password );
-            if ( $pw_val !== true ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
+            // Auto-generate password for dependents if left blank
+            if ( empty( $password ) ) {
+                $password = wp_generate_password( 12, true );
+            } else {
+                $pw_val = sywat_validate_password_rules( $password, $confirm_password );
+                if ( $pw_val !== true ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
+                }
             }
 
             $base_username = sanitize_user( $first_name . '.' . $last_name, true );
@@ -94,7 +103,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 $counter++;
             }
 
-            $tfaa_id = sywat_generate_unique_tfaa_id();
             $user_id = wp_insert_user( array(
                 'user_login'   => $username,
                 'user_email'   => $email,
@@ -117,7 +125,12 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 }
             }
 
-            update_user_meta( $user_id, 'sywat_tfaa_number', $tfaa_id );
+            // Generate permanent hidden internal System ID via helper
+            $system_id = function_exists( 'sywat_get_user_system_id' ) ? sywat_get_user_system_id( $user_id ) : '';
+
+            // Update user metadata
+            update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
+            update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number ); // Legacy alias fallback
             update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
             update_user_meta( $user_id, 'sywat_phone', $phone );
             update_user_meta( $user_id, 'sywat_dob', $dob );
@@ -136,7 +149,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
             }
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | Member ID: <strong>' . esc_html( $tfaa_id ) . '</strong></div>';
+            $disp_nfaa = ! empty( $nfaa_number ) ? $nfaa_number : 'Unassigned';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | NFAA ID: <strong>' . esc_html( $disp_nfaa ) . '</strong></div>';
         }
 
         // 2. UPDATE EXISTING MEMBER PROFILE
@@ -149,11 +163,12 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $is_nfaa         = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
             $submitted_roles = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array();
             $shop_id         = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
-            $new_pw          = $_POST['new_password'];
+            $new_pw          = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
             $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
 
-            // Extended Metadata Inputs (DOB, NFAA Expiration, Household Link & Address)
+            // Extended Metadata Inputs (DOB, NFAA Number & Expiration, Household Link & Address)
             $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
             $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
             $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
             $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
@@ -179,6 +194,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'user_email'   => $email,
                 ) );
 
+                // Ensure hidden internal System ID exists
+                if ( function_exists( 'sywat_get_user_system_id' ) ) {
+                    sywat_get_user_system_id( $user_id );
+                }
+
+                update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
+                update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number ); // Legacy alias fallback
                 update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
                 update_user_meta( $user_id, 'sywat_phone', $phone );
                 update_user_meta( $user_id, 'sywat_dob', $dob );
@@ -216,7 +238,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     }
                 }
 
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile and roles updated successfully.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
             }
         }
 
@@ -243,7 +265,34 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 4. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
+        // 4. PROMOTE DEPENDENT TO STANDALONE ACCOUNT
+        if ( $action === 'promote_dependent' ) {
+            $user_id   = intval( $_POST['target_user_id'] );
+            $new_email = sanitize_email( $_POST['new_email'] );
+            $new_pw    = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
+            $conf_pw   = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
+
+            if ( empty( $new_email ) || ! is_email( $new_email ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid standalone email address for the member.</div>';
+            }
+
+            if ( ! empty( $new_pw ) ) {
+                $pw_val = sywat_validate_password_rules( $new_pw, $conf_pw );
+                if ( $pw_val !== true ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
+                }
+            }
+
+            if ( function_exists( 'sywat_promote_dependent_to_primary' ) ) {
+                $promoted = sywat_promote_dependent_to_primary( $user_id, $new_email, $new_pw );
+                if ( is_wp_error( $promoted ) ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $promoted->get_error_message() ) . '</div>';
+                }
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member promoted to standalone Primary Account Holder successfully.</div>';
+            }
+        }
+
+        // 5. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
         if ( $action === 'save_board_member' ) {
             $user_id   = intval( $_POST['board_user_id'] );
             $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
@@ -263,7 +312,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
         }
 
-        // 5. REMOVE BOARD MEMBER ASSIGNMENT
+        // 6. REMOVE BOARD MEMBER ASSIGNMENT
         if ( $action === 'remove_board_member' ) {
             $user_id = intval( $_POST['target_user_id'] );
             $user    = get_userdata( $user_id );
