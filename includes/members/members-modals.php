@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, and board position assignments.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, and board position assignments.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,12 +28,15 @@ function sywat_members_render_modals( $data ) {
     $all_shops                 = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
     $us_states                 = function_exists( 'sywat_get_us_states_list' ) ? sywat_get_us_states_list() : array();
     $accom_options             = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+    $gender_options            = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'male' => 'Male', 'female' => 'Female' );
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
 
     // Primary User Data Unpacking (if active)
     $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
+    $e_gender     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_gender', true ) : 'male';
+    $e_is_pro     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true ) : 'no';
     $e_dob        = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_dob', true ) : '';
     $e_accom      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true ) : 'none';
     $e_nfaa_id    = $edit_user_obj && function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : '';
@@ -88,9 +91,27 @@ function sywat_members_render_modals( $data ) {
 
                     <div class="sywat-form-grid-3 sywat-mt-3">
                         <div class="sywat-field-group">
-                            <label>Date of Birth * (For NFAA Age Divisions)</label>
+                            <label>Gender *</label>
+                            <select name="gender" required>
+                                <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                    <option value="<?php echo esc_attr( $g_key ); ?>"><?php echo esc_html( $g_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Pro Archer Status (18+)</label>
+                            <select name="is_pro">
+                                <option value="no" selected>No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Date of Birth * (For Age Divisions)</label>
                             <input type="date" name="dob" required>
                         </div>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
                         <div class="sywat-field-group">
                             <label>Accommodations Needed</label>
                             <select name="accommodations">
@@ -230,9 +251,27 @@ function sywat_members_render_modals( $data ) {
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
-                                <label>Date of Birth (Eligible Division: <strong><?php echo esc_html( $e_age_div ); ?></strong>)</label>
+                                <label>Gender *</label>
+                                <select name="gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( strtolower( $e_gender ), $g_key ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro">
+                                    <option value="no" <?php selected( $e_is_pro, 'no' ); ?>>No</option>
+                                    <option value="yes" <?php selected( $e_is_pro, 'yes' ); ?>>Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Date of Birth (Division: <strong><?php echo esc_html( $e_age_div ); ?></strong>)</label>
                                 <input type="date" name="dob" value="<?php echo esc_attr( $e_dob ); ?>">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Accommodations Needed</label>
                                 <select name="accommodations">
@@ -245,24 +284,24 @@ function sywat_members_render_modals( $data ) {
                                 <label>NFAA Membership ID</label>
                                 <input type="text" name="nfaa_number" value="<?php echo esc_attr( $e_nfaa_id !== 'Unassigned' ? $e_nfaa_id : '' ); ?>" placeholder="e.g. 123456">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>NFAA Membership Expiration Date</label>
                                 <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Street Address Line 1</label>
                                 <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>" placeholder="123 Main St">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Street Address Line 2</label>
                                 <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>" placeholder="Apt / Suite #">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>City</label>
                                 <input type="text" name="city" value="<?php echo esc_attr( $e_city ); ?>">
@@ -276,9 +315,6 @@ function sywat_members_render_modals( $data ) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Zip Code</label>
                                 <input type="text" name="zip" value="<?php echo esc_attr( $e_zip ); ?>" maxlength="10">
@@ -371,9 +407,27 @@ function sywat_members_render_modals( $data ) {
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
-                                <label>Date of Birth * (For NFAA Age Divisions)</label>
+                                <label>Gender *</label>
+                                <select name="gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>"><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro">
+                                    <option value="no" selected>No</option>
+                                    <option value="yes">Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Date of Birth * (For Age Divisions)</label>
                                 <input type="date" name="dob" required>
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Accommodations Needed</label>
                                 <select name="accommodations">
@@ -386,13 +440,13 @@ function sywat_members_render_modals( $data ) {
                                 <label>NFAA Membership ID (Optional)</label>
                                 <input type="text" name="nfaa_number" placeholder="e.g. 123456">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>NFAA Expiration Date (Optional)</label>
                                 <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Contact Email Address (Defaults to Primary Email)</label>
                                 <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
@@ -452,6 +506,8 @@ function sywat_members_render_modals( $data ) {
                 $d_lname   = isset( $edit_dep_subprofile['last_name'] ) ? $edit_dep_subprofile['last_name'] : '';
                 $d_email   = isset( $edit_dep_subprofile['email'] ) ? $edit_dep_subprofile['email'] : '';
                 $d_phone   = isset( $edit_dep_subprofile['phone'] ) ? $edit_dep_subprofile['phone'] : '';
+                $d_gender  = isset( $edit_dep_subprofile['gender'] ) ? $edit_dep_subprofile['gender'] : 'male';
+                $d_is_pro  = isset( $edit_dep_subprofile['is_pro'] ) ? $edit_dep_subprofile['is_pro'] : 'no';
                 $d_dob     = isset( $edit_dep_subprofile['dob'] ) ? $edit_dep_subprofile['dob'] : '';
                 $d_accom   = isset( $edit_dep_subprofile['accommodations'] ) ? $edit_dep_subprofile['accommodations'] : 'none';
                 $d_nfaa_n  = isset( $edit_dep_subprofile['nfaa_number'] ) ? $edit_dep_subprofile['nfaa_number'] : '';
@@ -489,9 +545,27 @@ function sywat_members_render_modals( $data ) {
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
+                                <label>Gender *</label>
+                                <select name="gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( strtolower( $d_gender ), $g_key ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro">
+                                    <option value="no" <?php selected( $d_is_pro, 'no' ); ?>>No</option>
+                                    <option value="yes" <?php selected( $d_is_pro, 'yes' ); ?>>Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
                                 <label>Date of Birth * (Age Division: <strong><?php echo esc_html( $d_age_div ); ?></strong>)</label>
                                 <input type="date" name="dob" value="<?php echo esc_attr( $d_dob ); ?>" required>
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Accommodations Needed</label>
                                 <select name="accommodations">
@@ -504,13 +578,13 @@ function sywat_members_render_modals( $data ) {
                                 <label>NFAA Membership ID</label>
                                 <input type="text" name="nfaa_number" value="<?php echo esc_attr( $d_nfaa_n ); ?>" placeholder="e.g. 123456">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>NFAA Membership Expiration Date</label>
                                 <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $d_nfaa_e ); ?>">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Contact Email Address</label>
                                 <input type="email" name="email" value="<?php echo esc_attr( $d_email ); ?>" required>
