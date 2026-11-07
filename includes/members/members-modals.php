@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, and protected test data purge overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, and protected test data purge overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.9.5
+ * Version: 3.9.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -498,7 +498,7 @@ function sywat_members_render_modals( $data ) {
         </div>
     <?php endif; ?>
 
-    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE & STANDALONE PROMOTION -->
+    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE PROMOTION -->
     <div class="sywat-modal-backdrop <?php echo $open_edit_dependent_modal ? 'active' : ''; ?>" id="sywat_edit_dependent_modal">
         <?php if ( $edit_user_obj && $edit_dep_subprofile ): ?>
             <?php 
@@ -519,10 +519,11 @@ function sywat_members_render_modals( $data ) {
                 $d_state   = isset( $edit_dep_subprofile['state'] ) ? $edit_dep_subprofile['state'] : '';
                 $d_zip     = isset( $edit_dep_subprofile['zip'] ) ? $edit_dep_subprofile['zip'] : '';
                 $d_age_div = ! empty( $d_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $d_dob ) : 'Adult';
+                $d_name    = trim( $d_fname . ' ' . $d_lname );
             ?>
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
-                    <h3>✏️ Edit Family Sub-Profile: <?php echo esc_html( $d_fname . ' ' . $d_lname ); ?></h3>
+                    <h3>✏️ Edit Family Sub-Profile: <?php echo esc_html( $d_name ); ?></h3>
                     <button type="button" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
@@ -634,8 +635,36 @@ function sywat_members_render_modals( $data ) {
 
                     <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-4">
 
+                    <!-- UNLINK & DELETE SUB-PROFILE ACTION BAR -->
+                    <div class="sywat-card-header-bar">
+                        <div>
+                            <h3>🔗 Manage Household Link &amp; Deletion</h3>
+                            <div class="sywat-subtitle">Unlink this archer to detach them from the household, or permanently purge duplicate entries.</div>
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="unlink_dependent">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-w-100">🔗 Unlink <?php echo esc_html( $d_fname ); ?> from Household</button>
+                        </form>
+
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="delete_member">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-w-100">🗑️ Permanently Delete <?php echo esc_html( $d_fname ); ?></button>
+                        </form>
+                    </div>
+
+                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-4">
+
                     <!-- PROMOTION ENGINE AT AGE 18 -->
-                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Promote <?php echo esc_js( $d_fname . ' ' . $d_lname ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
+                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Promote <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="promote_dependent">
                         <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
