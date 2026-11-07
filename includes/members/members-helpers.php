@@ -2,13 +2,92 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, and household sub-profile management utilities.
+ * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
  * Author: SYWAT Archery
- * Version: 3.3.0
+ * Version: 3.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Retrieve standardized 50 US States array formatted as 'ST' => 'ST - State Name'.
+ *
+ * @return array Associative array of 2-letter state codes to formatted labels.
+ */
+if ( ! function_exists( 'sywat_get_us_states_list' ) ) {
+    function sywat_get_us_states_list() {
+        return array(
+            'AL' => 'AL - Alabama',
+            'AK' => 'AK - Alaska',
+            'AZ' => 'AZ - Arizona',
+            'AR' => 'AR - Arkansas',
+            'CA' => 'CA - California',
+            'CO' => 'CO - Colorado',
+            'CT' => 'CT - Connecticut',
+            'DE' => 'DE - Delaware',
+            'FL' => 'FL - Florida',
+            'GA' => 'GA - Georgia',
+            'HI' => 'HI - Hawaii',
+            'ID' => 'ID - Idaho',
+            'IL' => 'IL - Illinois',
+            'IN' => 'IN - Indiana',
+            'IA' => 'IA - Iowa',
+            'KS' => 'KS - Kansas',
+            'KY' => 'KY - Kentucky',
+            'LA' => 'LA - Louisiana',
+            'ME' => 'ME - Maine',
+            'MD' => 'MD - Maryland',
+            'MA' => 'MA - Massachusetts',
+            'MI' => 'MI - Michigan',
+            'MN' => 'MN - Minnesota',
+            'MS' => 'MS - Mississippi',
+            'MO' => 'MO - Missouri',
+            'MT' => 'MT - Montana',
+            'NE' => 'NE - Nebraska',
+            'NV' => 'NV - Nevada',
+            'NH' => 'NH - New Hampshire',
+            'NJ' => 'NJ - New Jersey',
+            'NM' => 'NM - New Mexico',
+            'NY' => 'NY - New York',
+            'NC' => 'NC - North Carolina',
+            'ND' => 'ND - North Dakota',
+            'OH' => 'OH - Ohio',
+            'OK' => 'OK - Oklahoma',
+            'OR' => 'OR - Oregon',
+            'PA' => 'PA - Pennsylvania',
+            'RI' => 'RI - Rhode Island',
+            'SC' => 'SC - South Carolina',
+            'SD' => 'SD - South Dakota',
+            'TN' => 'TN - Tennessee',
+            'TX' => 'TX - Texas',
+            'UT' => 'UT - Utah',
+            'VT' => 'VT - Vermont',
+            'VA' => 'VA - Virginia',
+            'WA' => 'WA - Washington',
+            'WV' => 'WV - West Virginia',
+            'WI' => 'WI - Wisconsin',
+            'WY' => 'WY - Wyoming',
+        );
+    }
+}
+
+/**
+ * Retrieve standardized Archer Accommodation options map.
+ *
+ * @return array Associative array of accommodation keys to human-readable titles.
+ */
+if ( ! function_exists( 'sywat_get_accommodations_list' ) ) {
+    function sywat_get_accommodations_list() {
+        return array(
+            'none'           => 'None',
+            'wheelchair'     => 'Wheelchair',
+            'chair_needed'   => 'Chair Needed',
+            'sight_impaired' => 'Sight Impaired',
+            'other'          => 'Other',
+        );
+    }
+}
 
 /**
  * Generate a unique, permanent internal System ID for an archer.
@@ -38,7 +117,6 @@ if ( ! function_exists( 'sywat_get_user_system_id' ) ) {
         $system_id = get_user_meta( $user_id, 'sywat_system_id', true );
         
         if ( empty( $system_id ) && $user_id > 0 ) {
-            // Check legacy 'sywat_tfaa_number' as fallback or generate new
             $legacy_id = get_user_meta( $user_id, 'sywat_tfaa_number', true );
             $system_id = ! empty( $legacy_id ) ? $legacy_id : sywat_generate_unique_system_id();
             update_user_meta( $user_id, 'sywat_system_id', $system_id );
@@ -60,7 +138,6 @@ if ( ! function_exists( 'sywat_get_user_nfaa_id' ) ) {
         $nfaa_id = get_user_meta( $user_id, 'sywat_nfaa_number', true );
         
         if ( empty( $nfaa_id ) ) {
-            // Legacy fallback check
             $nfaa_id = get_user_meta( $user_id, 'sywat_tfaa_number', true );
         }
         
@@ -158,7 +235,7 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
             $age  = $dob->diff( $comp )->y;
 
             if ( $age < 12 )  return 'Cub';          // 0 - 11
-            if ( $age < 15 )  return 'Youth';        // 12 - 14 (Ages up on 15th birthday)
+            if ( $age < 15 )  return 'Youth';        // 12 - 14
             if ( $age < 18 )  return 'Young Adult';  // 15 - 17
             if ( $age < 50 )  return 'Adult';        // 18 - 49
             if ( $age < 60 )  return 'Senior';       // 50 - 59
@@ -226,9 +303,10 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
 
 /**
  * Retrieve all linked household dependent sub-profiles under a Primary Account Holder.
+ * Automatically sorts dependent archers chronologically by Date of Birth (oldest first).
  *
  * @param int $primary_user_id WordPress User ID of Primary Account Holder.
- * @return array Array of associative arrays representing dependent sub-profiles.
+ * @return array Sorted array of associative arrays representing dependent sub-profiles.
  */
 if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
     function sywat_get_linked_household_members( $primary_user_id ) {
@@ -264,6 +342,7 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
                         'email'           => $lu->user_email,
                         'phone'           => get_user_meta( $lu->ID, 'sywat_phone', true ),
                         'dob'             => get_user_meta( $lu->ID, 'sywat_dob', true ),
+                        'accommodations'  => get_user_meta( $lu->ID, 'sywat_accommodations', true ),
                         'nfaa_number'     => get_user_meta( $lu->ID, 'sywat_nfaa_number', true ),
                         'nfaa_expiration' => get_user_meta( $lu->ID, 'sywat_nfaa_expiration', true ),
                         'address_1'       => get_user_meta( $lu->ID, 'sywat_address_1', true ),
@@ -276,6 +355,16 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
                 }
             }
         }
+
+        // Sort Dependents chronologically by Date of Birth (oldest archers first)
+        usort( $dependents, function( $a, $b ) {
+            $dob_a = isset( $a['dob'] ) && ! empty( $a['dob'] ) ? strtotime( $a['dob'] ) : 0;
+            $dob_b = isset( $b['dob'] ) && ! empty( $b['dob'] ) ? strtotime( $b['dob'] ) : 0;
+            if ( $dob_a === $dob_b ) {
+                return 0;
+            }
+            return ( $dob_a < $dob_b ) ? -1 : 1;
+        } );
 
         return $dependents;
     }
@@ -305,7 +394,7 @@ if ( ! function_exists( 'sywat_get_household_dependent_by_system_id' ) ) {
  * Bypasses wp_insert_user() completely so parents and children can share emails with zero errors.
  *
  * @param int   $primary_user_id WordPress User ID of Primary Account Holder.
- * @param array $dep_data        Sanitized input details (first_name, last_name, dob, nfaa_number, etc.).
+ * @param array $dep_data        Sanitized input details (first_name, last_name, dob, accommodations, etc.).
  * @return string|WP_Error System ID on success, or WP_Error on failure.
  */
 if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
@@ -342,6 +431,7 @@ if ( ! function_exists( 'sywat_add_household_dependent' ) ) {
             'email'           => sanitize_email( isset( $dep_data['email'] ) ? $dep_data['email'] : $primary_user->user_email ),
             'phone'           => sanitize_text_field( isset( $dep_data['phone'] ) ? $dep_data['phone'] : get_user_meta( $primary_user_id, 'sywat_phone', true ) ),
             'dob'             => $dob,
+            'accommodations'  => sanitize_text_field( isset( $dep_data['accommodations'] ) ? $dep_data['accommodations'] : 'none' ),
             'nfaa_number'     => sanitize_text_field( isset( $dep_data['nfaa_number'] ) ? $dep_data['nfaa_number'] : '' ),
             'nfaa_expiration' => sanitize_text_field( isset( $dep_data['nfaa_expiration'] ) ? $dep_data['nfaa_expiration'] : '' ),
             'address_1'       => sanitize_text_field( isset( $dep_data['address_1'] ) ? $dep_data['address_1'] : $p_address['address_1'] ),
@@ -399,6 +489,7 @@ if ( ! function_exists( 'sywat_update_household_dependent' ) ) {
         $dependents[$found_index]['email']           = isset( $dep_data['email'] ) ? sanitize_email( $dep_data['email'] ) : $current['email'];
         $dependents[$found_index]['phone']           = isset( $dep_data['phone'] ) ? sanitize_text_field( $dep_data['phone'] ) : $current['phone'];
         $dependents[$found_index]['dob']             = isset( $dep_data['dob'] ) ? sanitize_text_field( $dep_data['dob'] ) : $current['dob'];
+        $dependents[$found_index]['accommodations']  = isset( $dep_data['accommodations'] ) ? sanitize_text_field( $dep_data['accommodations'] ) : ( isset( $current['accommodations'] ) ? $current['accommodations'] : 'none' );
         $dependents[$found_index]['nfaa_number']     = isset( $dep_data['nfaa_number'] ) ? sanitize_text_field( $dep_data['nfaa_number'] ) : $current['nfaa_number'];
         $dependents[$found_index]['nfaa_expiration'] = isset( $dep_data['nfaa_expiration'] ) ? sanitize_text_field( $dep_data['nfaa_expiration'] ) : $current['nfaa_expiration'];
         $dependents[$found_index]['address_1']       = isset( $dep_data['address_1'] ) ? sanitize_text_field( $dep_data['address_1'] ) : $current['address_1'];
@@ -434,7 +525,6 @@ if ( ! function_exists( 'sywat_delete_household_dependent' ) ) {
         foreach ( $dependents as $dep ) {
             if ( isset( $dep['system_id'] ) && (string) $dep['system_id'] === (string) $system_id ) {
                 $deleted = true;
-                // If legacy WP account exists, delete WP user too
                 if ( ! empty( $dep['wp_user_id'] ) && intval( $dep['wp_user_id'] ) > 0 ) {
                     require_once ABSPATH . 'wp-admin/includes/user.php';
                     wp_delete_user( intval( $dep['wp_user_id'] ) );
@@ -513,7 +603,6 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
             $counter++;
         }
 
-        // 1. Create brand new standalone WP_User account
         $new_user_id = wp_insert_user( array(
             'user_login'   => $username,
             'user_email'   => $new_email,
@@ -528,9 +617,9 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
             return $new_user_id;
         }
 
-        // 2. Attach existing permanent System ID and historical metadata to the new standalone account
         update_user_meta( $new_user_id, 'sywat_system_id', $system_id );
         update_user_meta( $new_user_id, 'sywat_dob', $dep['dob'] );
+        update_user_meta( $new_user_id, 'sywat_accommodations', isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none' );
         update_user_meta( $new_user_id, 'sywat_nfaa_number', $dep['nfaa_number'] );
         update_user_meta( $new_user_id, 'sywat_tfaa_number', $dep['nfaa_number'] );
         update_user_meta( $new_user_id, 'sywat_nfaa_expiration', $dep['nfaa_expiration'] );
@@ -541,7 +630,6 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
         update_user_meta( $new_user_id, 'sywat_state', $dep['state'] );
         update_user_meta( $new_user_id, 'sywat_zip', $dep['zip'] );
 
-        // 3. Remove sub-profile from primary account's household array
         sywat_delete_household_dependent( $primary_user_id, $system_id );
 
         return $new_user_id;
