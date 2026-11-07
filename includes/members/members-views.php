@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.9.0
+ * Version: 3.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -75,7 +75,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             'management', 'staff_shooter', 'staff-shooter', 'non-shooting-member', 'non_shooting_member',
         );
 
-        $accom_labels = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+        $accom_labels  = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+        $gender_labels = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'male' => 'Male', 'female' => 'Female' );
 
         ob_start();
         ?>
@@ -85,15 +86,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             <?php if ( $view === 'edit_member' && $edit_user_obj ): ?>
                 <!-- VIEW 1: SINGLE-DASHBOARD HOUSEHOLD MEMBER PROFILE VIEW -->
                 <?php 
-                    $e_nfaa_id      = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
-                    $e_phone        = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
-                    $e_dob          = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
-                    $e_accom        = get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true );
-                    $e_address_1    = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
-                    $e_address_2    = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
-                    $e_city         = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
-                    $e_state        = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
-                    $e_zip          = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
+                    $e_nfaa_id   = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
+                    $e_phone     = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
+                    $e_gender    = get_user_meta( $edit_user_obj->ID, 'sywat_gender', true );
+                    $e_is_pro    = get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true );
+                    $e_dob       = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
+                    $e_accom     = get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true );
+                    $e_address_1 = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
+                    $e_address_2 = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
+                    $e_city      = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
+                    $e_state     = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
+                    $e_zip       = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
 
                     $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
@@ -102,6 +105,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     $age_div = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
                         ? sywat_get_eligible_age_division( $e_dob ) 
                         : 'Adult';
+
+                    $e_gender_clean = ! empty( $e_gender ) && isset( $gender_labels[strtolower( $e_gender )] ) 
+                        ? $gender_labels[strtolower( $e_gender )] 
+                        : 'Male';
 
                     $linked_dependents = function_exists( 'sywat_get_linked_household_members' ) 
                         ? sywat_get_linked_household_members( $edit_user_obj->ID ) 
@@ -134,7 +141,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <tr>
                                     <th class="sywat-col-w-28">Archer Name &amp; ID</th>
                                     <th class="sywat-col-center sywat-col-w-18">Household Role</th>
-                                    <th class="sywat-col-center sywat-col-w-20">DOB / Age Division</th>
+                                    <th class="sywat-col-center sywat-col-w-20">Gender / DOB / Division</th>
                                     <th class="sywat-col-center sywat-col-w-18">Member Status</th>
                                     <th class="sywat-col-center sywat-col-w-16">Actions</th>
                                 </tr>
@@ -144,6 +151,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <tr>
                                     <td>
                                         <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>
+                                        <?php if ( $e_is_pro === 'yes' ): ?>
+                                            <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
+                                        <?php endif; ?>
                                         <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $e_nfaa_id ); ?></strong></div>
                                         <div class="sywat-meta-subtext">👤 Login: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
                                         <?php if ( ! empty( $e_accom ) && $e_accom !== 'none' ): ?>
@@ -156,6 +166,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <span class="sywat-badge sywat-badge-open">👑 Head of Household</span>
                                     </td>
                                     <td class="sywat-col-center">
+                                        <div><strong><?php echo esc_html( $e_gender_clean ); ?></strong></div>
                                         <?php echo ! empty( $e_dob ) ? esc_html( date( 'M j, Y', strtotime( $e_dob ) ) ) : '—'; ?>
                                         <div class="sywat-meta-subtext">(<?php echo esc_html( $age_div ); ?>)</div>
                                     </td>
@@ -186,6 +197,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
                                             $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
                                             $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
+                                            $dep_gender = isset( $dep['gender'] ) && isset( $gender_labels[strtolower( $dep['gender'] )] ) ? $gender_labels[strtolower( $dep['gender'] )] : 'Male';
+                                            $dep_is_pro = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes';
                                             $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
                                             $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
                                             $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
@@ -195,6 +208,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <tr>
                                             <td>
                                                 <strong><?php echo esc_html( $dep_name ); ?></strong>
+                                                <?php if ( $dep_is_pro ): ?>
+                                                    <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
+                                                <?php endif; ?>
                                                 <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $dep_n_id ); ?></strong></div>
                                                 <?php if ( ! empty( $dep_accom ) && $dep_accom !== 'none' ): ?>
                                                     <div class="sywat-mt-1">
@@ -206,6 +222,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
                                             </td>
                                             <td class="sywat-col-center">
+                                                <div><strong><?php echo esc_html( $dep_gender ); ?></strong></div>
                                                 <?php echo ! empty( $dep_dob ) ? esc_html( date( 'M j, Y', strtotime( $dep_dob ) ) ) : '—'; ?>
                                                 <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
                                             </td>
@@ -376,6 +393,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 if ( ! $m instanceof WP_User ) continue;
                                                 $m_nfaa_id = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $m->ID ) : 'Unassigned';
                                                 $m_phone   = get_user_meta( $m->ID, 'sywat_phone', true );
+                                                $m_gender  = get_user_meta( $m->ID, 'sywat_gender', true );
                                                 $m_dob     = get_user_meta( $m->ID, 'sywat_dob', true );
 
                                                 // Evaluated Member NFAA Status & Expiration
@@ -421,7 +439,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $m_deps       = function_exists( 'sywat_get_linked_household_members' ) ? sywat_get_linked_household_members( $m->ID ) : array();
                                                 $m_deps_count = is_array( $m_deps ) ? count( $m_deps ) : 0;
                                             ?>
-                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
+                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $m_gender . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                                     <?php if ( $m_deps_count > 0 ): ?>
