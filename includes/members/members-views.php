@@ -5,7 +5,7 @@
  * Description: Renders UI structures for Member Directory and Board Management tables.
  * Compliance: Zero inline style attributes. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.0.2
+ * Version: 3.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -165,7 +165,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <div class="sywat-card-header-bar">
                         <div>
                             <h2>👥 Member Directory</h2>
-                            <div class="sywat-subtitle">Overview of registered TFAA members, contact details, assigned roles, and NFAA membership status.</div>
+                            <div class="sywat-subtitle">Overview of registered TFAA members, contact details, DOB age divisions, household links, and member status.</div>
                         </div>
                         <div class="sywat-header-inline-controls">
                             <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">Add Member</button>
@@ -188,11 +188,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <table class="sywat-table">
                                 <thead>
                                     <tr>
-                                        <th class="sywat-col-w-22">Member Name</th>
+                                        <th class="sywat-col-w-22">Member Name &amp; DOB</th>
                                         <th class="sywat-col-w-24">Assigned Role(s)</th>
                                         <th class="sywat-col-w-22">Email Address</th>
                                         <th class="sywat-col-center sywat-col-w-12">Phone</th>
-                                        <th class="sywat-col-center sywat-col-w-10">NFAA Status</th>
+                                        <th class="sywat-col-center sywat-col-w-10">Member Status</th>
                                         <th class="sywat-col-center sywat-col-w-10">Actions</th>
                                     </tr>
                                 </thead>
@@ -201,9 +201,28 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <?php 
                                             $m_tfaa   = get_user_meta( $m->ID, 'sywat_tfaa_number', true );
                                             $m_phone  = get_user_meta( $m->ID, 'sywat_phone', true );
-                                            $m_nfaa   = get_user_meta( $m->ID, 'sywat_is_nfaa_member', true );
+                                            $m_dob    = get_user_meta( $m->ID, 'sywat_dob', true );
                                             $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
-                                            $is_nfaa_active = ( $m_nfaa === 'yes' );
+
+                                            // Evaluated Member NFAA Status & Expiration
+                                            $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
+                                                ? sywat_get_member_nfaa_status( $m->ID ) 
+                                                : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted' );
+
+                                            // DOB & Age Division Calculation
+                                            $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
+                                                ? sywat_get_eligible_age_division( $m_dob ) 
+                                                : '';
+
+                                            // Household Primary Link Check
+                                            $primary_id   = get_user_meta( $m->ID, 'sywat_primary_user_id', true );
+                                            $primary_name = '';
+                                            if ( $primary_id > 0 ) {
+                                                $p_obj = get_userdata( $primary_id );
+                                                if ( $p_obj ) {
+                                                    $primary_name = $p_obj->display_name;
+                                                }
+                                            }
 
                                             // Role Badges Formatting
                                             $m_roles     = (array) $m->roles;
@@ -223,10 +242,16 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $roles_html   = ! empty( $role_badges ) ? implode( ' ', $role_badges ) : '<span class="sywat-no-data-tag">No Role</span>';
                                             $roles_search = implode( ' ', $role_names );
                                         ?>
-                                        <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone . ' ' . $roles_search ) ); ?>">
+                                        <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . $nfaa_info['status'] . ' ' . $age_div . ' ' . $primary_name ) ); ?>">
                                             <td>
                                                 <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                                 <div class="sywat-meta-subtext">👤 <?php echo esc_html( $m->user_login ); ?></div>
+                                                <?php if ( ! empty( $m_dob ) ): ?>
+                                                    <div class="sywat-meta-subtext">🎂 <?php echo esc_html( date( 'M j, Y', strtotime( $m_dob ) ) ); ?><?php echo ! empty( $age_div ) ? ' (' . esc_html( $age_div ) . ')' : ''; ?></div>
+                                                <?php endif; ?>
+                                                <?php if ( ! empty( $primary_name ) ): ?>
+                                                    <div class="sywat-meta-subtext">🏠 Linked to <?php echo esc_html( $primary_name ); ?></div>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <div class="sywat-badge-group">
@@ -236,10 +261,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" class="sywat-table-link"><?php echo esc_html( $m->user_email ); ?></a></td>
                                             <td class="sywat-col-center"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
                                             <td class="sywat-col-center">
-                                                <?php if ( $is_nfaa_active ): ?>
-                                                    <span class="sywat-badge sywat-badge-open">🟢 NFAA Yes</span>
-                                                <?php else: ?>
-                                                    <span class="sywat-badge sywat-badge-muted">⚪ NFAA No</span>
+                                                <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
+                                                    <?php echo $nfaa_info['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
+                                                </span>
+                                                <?php if ( ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
+                                                    <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
                                                 <?php endif; ?>
                                             </td>
                                             <td class="sywat-col-center">
