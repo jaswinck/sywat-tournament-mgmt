@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters, protected test data purge triggers, and Head of Household swapping.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters, protected test data purge triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.9.5
+ * Version: 3.9.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -194,6 +194,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <?php if ( is_array( $linked_dependents ) ): ?>
                                     <?php foreach ( $linked_dependents as $dep ): ?>
                                         <?php 
+                                            $dep_fname  = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
+                                            $dep_lname  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
                                             $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
                                             $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
                                             $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
@@ -203,7 +205,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
                                             $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
                                             $dep_n_id   = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
-                                            $dep_name   = isset( $dep['display_name'] ) ? $dep['display_name'] : 'Unnamed';
+                                            $dep_name   = isset( $dep['display_name'] ) ? $dep['display_name'] : ( ! empty( $dep_fname ) ? trim( $dep_fname . ' ' . $dep_lname ) : 'Unnamed' );
+                                            $dep_first  = ! empty( $dep_fname ) ? $dep_fname : $dep_name;
                                         ?>
                                         <tr>
                                             <td>
@@ -239,12 +242,29 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <td class="sywat-col-center">
                                                 <div class="sywat-table-actions-vertical">
                                                     <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&edit_system_id=<?php echo esc_attr( $dep_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Sub-Profile</a>
+                                                    
                                                     <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Promote &quot;<?php echo esc_js( $dep_name ); ?>&quot; to Head of Household?');">
                                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                         <input type="hidden" name="sywat_action" value="swap_head_of_household">
                                                         <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
                                                         <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $dep_sys_id ); ?>">
                                                         <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">👑 Make Head</button>
+                                                    </form>
+
+                                                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Unlink <?php echo esc_js( $dep_name ); ?> from this household? Their record will be detached and preserved.');">
+                                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_action" value="unlink_dependent">
+                                                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                                                        <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $dep_sys_id ); ?>">
+                                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">🔗 Unlink <?php echo esc_html( $dep_first ); ?></button>
+                                                    </form>
+
+                                                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $dep_name ); ?>? This action cannot be undone.');">
+                                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_action" value="delete_member">
+                                                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                                                        <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $dep_sys_id ); ?>">
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-sm sywat-mt-1">🗑️ Delete <?php echo esc_html( $dep_first ); ?></button>
                                                     </form>
                                                 </div>
                                             </td>
