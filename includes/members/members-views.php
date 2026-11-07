@@ -5,7 +5,7 @@
  * Description: Renders UI structures for Member Directory, Board Management, and Full-Page Shop-Style Member Profile Editor.
  * Compliance: Zero inline style attributes. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.2.1
+ * Version: 3.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -77,7 +77,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             <?php if ( $view === 'edit_member' && $edit_user_obj ): ?>
                 <!-- DEDICATED SHOP-STYLE MEMBER PROFILE & HOUSEHOLD EDITOR -->
                 <?php 
-                    $e_tfaa             = get_user_meta( $edit_user_obj->ID, 'sywat_tfaa_number', true );
+                    $e_nfaa_id          = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
                     $e_phone            = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
                     $e_dob              = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
                     $e_expiration       = get_user_meta( $edit_user_obj->ID, 'sywat_nfaa_expiration', true );
@@ -102,7 +102,16 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         ? sywat_get_linked_household_members( $edit_user_obj->ID ) 
                         : array();
 
+                    $primary_account_name = '';
+                    if ( $e_primary_id > 0 ) {
+                        $p_user = get_userdata( $e_primary_id );
+                        if ( $p_user ) {
+                            $primary_account_name = $p_user->display_name;
+                        }
+                    }
+
                     $show_add_dependent_form = ( isset( $_GET['action_mode'] ) && $_GET['action_mode'] === 'add_dependent' );
+                    $show_promote_form       = ( isset( $_GET['action_mode'] ) && $_GET['action_mode'] === 'promote' );
                 ?>
 
                 <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_edit_member_full_form">
@@ -115,7 +124,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <div class="sywat-card-header-bar">
                             <div>
                                 <h2>👤 Member Profile: <?php echo esc_html( $edit_user_obj->display_name ); ?></h2>
-                                <div class="sywat-subtitle">TFAA Member ID: <strong><?php echo esc_html( ! empty( $e_tfaa ) ? $e_tfaa : 'Unassigned' ); ?></strong> | Username: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
+                                <div class="sywat-subtitle">NFAA ID: <strong><?php echo esc_html( $e_nfaa_id ); ?></strong> | Username: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
                             </div>
                             <!-- TOP RIGHT: BACK TO DIRECTORY BUTTON -->
                             <div class="sywat-header-inline-controls no-print">
@@ -145,10 +154,14 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             </div>
                         </div>
 
-                        <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Date of Birth (Eligible Division: <strong><?php echo esc_html( $age_div ); ?></strong>)</label>
                                 <input type="date" name="dob" value="<?php echo esc_attr( $e_dob ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership ID</label>
+                                <input type="text" name="nfaa_number" value="<?php echo esc_attr( $e_nfaa_id !== 'Unassigned' ? $e_nfaa_id : '' ); ?>" placeholder="e.g. 123456">
                             </div>
                             <div class="sywat-field-group">
                                 <label>NFAA Membership Expiration Date</label>
@@ -184,75 +197,71 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         </div>
                     </div>
 
-                    <!-- CARD 2: HOUSEHOLD & FAMILY DEPENDENTS -->
+                    <!-- CARD 2: HOUSEHOLD & FAMILY MEMBERS -->
                     <div class="sywat-card">
                         <div class="sywat-card-header-bar">
                             <div>
-                                <h2>🏠 Household &amp; Family Relationships</h2>
-                                <div class="sywat-subtitle">Manage primary account linkages and linked household family members.</div>
+                                <h2>🏠 Household &amp; Family Members</h2>
+                                <?php if ( ! empty( $primary_account_name ) ): ?>
+                                    <div class="sywat-subtitle">This archer is a linked family member under Head of Household: <strong><?php echo esc_html( $primary_account_name ); ?></strong></div>
+                                <?php else: ?>
+                                    <div class="sywat-subtitle">Primary Head of Household Account.</div>
+                                <?php endif; ?>
                             </div>
                             <div class="sywat-header-inline-controls">
                                 <?php if ( empty( $e_primary_id ) ): ?>
                                     <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&action_mode=add_dependent#sywat_add_dependent_section" class="sywat-btn sywat-btn-success sywat-btn-icon-add">+ Add Family Member</a>
+                                <?php else: ?>
+                                    <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $e_primary_id ); ?>" class="sywat-btn sywat-btn-secondary">View Primary Account Holder</a>
+                                    <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&action_mode=promote#sywat_promote_section" class="sywat-btn sywat-btn-primary">Promote to Standalone Account</a>
                                 <?php endif; ?>
                             </div>
                         </div>
 
-                        <div class="sywat-field-group sywat-mb-4">
-                            <label>Household Status / Primary Link</label>
-                            <select name="primary_user_id">
-                                <option value="0" <?php selected( empty( $e_primary_id ), true ); ?>>-- Standalone / Primary Head of Household --</option>
-                                <?php foreach ( $all_members as $m_opt ): ?>
-                                    <?php if ( $m_opt->ID === $edit_user_obj->ID ) continue; ?>
-                                    <option value="<?php echo intval( $m_opt->ID ); ?>" <?php selected( intval( $e_primary_id ), intval( $m_opt->ID ) ); ?>>
-                                        🏠 Dependent of: <?php echo esc_html( $m_opt->display_name ); ?> (<?php echo esc_html( $m_opt->user_email ); ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <?php if ( ! empty( $linked_dependents ) ): ?>
-                            <div class="sywat-table-responsive">
-                                <table class="sywat-table">
-                                    <thead>
-                                        <tr>
-                                            <th class="sywat-col-w-32">Family Member Name</th>
-                                            <th class="sywat-col-center sywat-col-w-22">DOB / Age Division</th>
-                                            <th class="sywat-col-center sywat-col-w-22">NFAA Status</th>
-                                            <th class="sywat-col-center sywat-col-w-24">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ( $linked_dependents as $dep ): ?>
-                                            <?php 
-                                                $dep_dob   = get_user_meta( $dep->ID, 'sywat_dob', true );
-                                                $dep_nfaa  = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep->ID ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted' );
-                                                $dep_div   = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
-                                            ?>
+                        <?php if ( empty( $e_primary_id ) ): ?>
+                            <?php if ( ! empty( $linked_dependents ) ): ?>
+                                <div class="sywat-table-responsive">
+                                    <table class="sywat-table">
+                                        <thead>
                                             <tr>
-                                                <td>
-                                                    <strong><?php echo esc_html( $dep->display_name ); ?></strong>
-                                                    <div class="sywat-meta-subtext">👤 <?php echo esc_html( $dep->user_login ); ?></div>
-                                                </td>
-                                                <td class="sywat-col-center">
-                                                    <?php echo ! empty( $dep_dob ) ? esc_html( date( 'M j, Y', strtotime( $dep_dob ) ) ) : '—'; ?>
-                                                    <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
-                                                </td>
-                                                <td class="sywat-col-center">
-                                                    <span class="sywat-badge <?php echo esc_attr( $dep_nfaa['badge_class'] ); ?>">
-                                                        <?php echo $dep_nfaa['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
-                                                    </span>
-                                                </td>
-                                                <td class="sywat-col-center">
-                                                    <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $dep->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
-                                                </td>
+                                                <th class="sywat-col-w-32">Family Member Name</th>
+                                                <th class="sywat-col-center sywat-col-w-22">DOB / Age Division</th>
+                                                <th class="sywat-col-center sywat-col-w-22">NFAA Status</th>
+                                                <th class="sywat-col-center sywat-col-w-24">Actions</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <p class="sywat-empty-state-notice">No linked household dependents registered under this primary account.</p>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ( $linked_dependents as $dep ): ?>
+                                                <?php 
+                                                    $dep_dob   = get_user_meta( $dep->ID, 'sywat_dob', true );
+                                                    $dep_nfaa  = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep->ID ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted' );
+                                                    $dep_div   = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <strong><?php echo esc_html( $dep->display_name ); ?></strong>
+                                                        <div class="sywat-meta-subtext">👤 <?php echo esc_html( $dep->user_login ); ?></div>
+                                                    </td>
+                                                    <td class="sywat-col-center">
+                                                        <?php echo ! empty( $dep_dob ) ? esc_html( date( 'M j, Y', strtotime( $dep_dob ) ) ) : '—'; ?>
+                                                        <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
+                                                    </td>
+                                                    <td class="sywat-col-center">
+                                                        <span class="sywat-badge <?php echo esc_attr( $dep_nfaa['badge_class'] ); ?>">
+                                                            <?php echo $dep_nfaa['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="sywat-col-center">
+                                                        <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $dep->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php else: ?>
+                                <p class="sywat-empty-state-notice">No linked family members registered under this household.</p>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
 
@@ -321,13 +330,13 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     </div>
                 </form>
 
-                <!-- INLINE CARD: QUICK ADD FAMILY DEPENDENT TO HOUSEHOLD -->
+                <!-- INLINE CARD: QUICK ADD FAMILY MEMBER TO HOUSEHOLD -->
                 <?php if ( $show_add_dependent_form ): ?>
                     <div class="sywat-card sywat-mt-3" id="sywat_add_dependent_section">
                         <div class="sywat-card-header-bar">
                             <div>
-                                <h2>➕ Add Family Member to Household: <?php echo esc_html( $edit_user_obj->last_name ); ?></h2>
-                                <div class="sywat-subtitle">Creates a new member account linked directly to <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>. Pre-populates family address and phone.</div>
+                                <h2>➕ Add Family Member to Household</h2>
+                                <div class="sywat-subtitle">Creates a new member account linked directly to <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>. Phone, Email, and Address are pre-filled below and can be updated as needed.</div>
                             </div>
                             <div class="sywat-header-inline-controls">
                                 <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
@@ -338,62 +347,118 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="create_member">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                            <input type="hidden" name="last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>">
-                            <input type="hidden" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>">
-                            <input type="hidden" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>">
-                            <input type="hidden" name="city" value="<?php echo esc_attr( $e_city ); ?>">
-                            <input type="hidden" name="state" value="<?php echo esc_attr( $e_state ); ?>">
-                            <input type="hidden" name="zip" value="<?php echo esc_attr( $e_zip ); ?>">
-                            <input type="hidden" name="phone" value="<?php echo esc_attr( $e_phone ); ?>">
 
                             <div class="sywat-form-grid-2">
                                 <div class="sywat-field-group">
                                     <label>First Name *</label>
-                                    <input type="text" name="first_name" required>
+                                    <input type="text" name="first_name" required placeholder="e.g. Timmy">
                                 </div>
                                 <div class="sywat-field-group">
                                     <label>Last Name *</label>
-                                    <input type="text" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" disabled>
+                                    <input type="text" name="last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" required>
                                 </div>
                             </div>
 
-                            <div class="sywat-form-grid-2 sywat-mt-3">
-                                <div class="sywat-field-group">
-                                    <label>Email Address *</label>
-                                    <input type="email" name="email" required>
-                                </div>
+                            <div class="sywat-form-grid-3 sywat-mt-3">
                                 <div class="sywat-field-group">
                                     <label>Date of Birth * (For NFAA Age Divisions)</label>
                                     <input type="date" name="dob" required>
                                 </div>
+                                <div class="sywat-field-group">
+                                    <label>NFAA Membership ID (Optional)</label>
+                                    <input type="text" name="nfaa_number" placeholder="e.g. 123456">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>NFAA Expiration Date (Optional)</label>
+                                    <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
+                                </div>
                             </div>
 
                             <div class="sywat-form-grid-2 sywat-mt-3">
                                 <div class="sywat-field-group">
-                                    <label>Initial Password *</label>
-                                    <input type="password" id="sywat_dep_pw" name="password" required oninput="sywatValidatePasswordRules('sywat_dep_pw', 'sywat_dep_pw_confirm', 'dep_rule')">
+                                    <label>Email Address * (Defaults to Primary Email)</label>
+                                    <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
                                 </div>
                                 <div class="sywat-field-group">
-                                    <label>Confirm Password *</label>
-                                    <input type="password" id="sywat_dep_pw_confirm" name="confirm_password" required oninput="sywatValidatePasswordRules('sywat_dep_pw', 'sywat_dep_pw_confirm', 'dep_rule')">
+                                    <label>Phone Number (Defaults to Primary Phone)</label>
+                                    <input type="text" name="phone" value="<?php echo esc_attr( $e_phone ); ?>" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12">
                                 </div>
                             </div>
 
-                            <!-- COMPACT INLINE PASSWORD REQUIREMENTS BAR -->
-                            <div class="sywat-password-rules-box">
-                                <div class="sywat-password-rules-bar">
-                                    <span class="sywat-password-rules-label">Rules:</span>
-                                    <span id="dep_rule_len" class="sywat-rule-badge">🔴 8+ Chars</span>
-                                    <span id="dep_rule_upper" class="sywat-rule-badge">🔴 1 Upper</span>
-                                    <span id="dep_rule_lower" class="sywat-rule-badge">🔴 1 Lower</span>
-                                    <span id="dep_rule_num" class="sywat-rule-badge">🔴 1 Num</span>
-                                    <span id="dep_rule_match" class="sywat-rule-badge">🔴 Passwords Match</span>
+                            <!-- Address Information (Pre-filled from Primary) -->
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>Street Address Line 1</label>
+                                    <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>Street Address Line 2</label>
+                                    <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>">
                                 </div>
                             </div>
 
-                            <div class="sywat-modal-actions">
+                            <div class="sywat-form-grid-3 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>City</label>
+                                    <input type="text" name="city" value="<?php echo esc_attr( $e_city ); ?>">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>State</label>
+                                    <input type="text" name="state" value="<?php echo esc_attr( $e_state ); ?>" maxlength="2">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>Zip Code</label>
+                                    <input type="text" name="zip" value="<?php echo esc_attr( $e_zip ); ?>" maxlength="10">
+                                </div>
+                            </div>
+
+                            <div class="sywat-modal-actions sywat-mt-4">
                                 <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
-                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save &amp; Link Household Member</button>
+                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save &amp; Link Family Member</button>
+                            </div>
+                        </form>
+                    </div>
+                <?php endif; ?>
+
+                <!-- INLINE CARD: PROMOTE DEPENDENT TO STANDALONE ACCOUNT -->
+                <?php if ( $show_promote_form && ! empty( $e_primary_id ) ): ?>
+                    <div class="sywat-card sywat-mt-3" id="sywat_promote_section">
+                        <div class="sywat-card-header-bar">
+                            <div>
+                                <h2>🎓 Promote Member to Standalone Primary Account</h2>
+                                <div class="sywat-subtitle">Promotes <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong> to an independent Head of Household account. Preserves permanent internal System ID and full score history.</div>
+                            </div>
+                            <div class="sywat-header-inline-controls">
+                                <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
+                            </div>
+                        </div>
+
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="promote_dependent">
+                            <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+
+                            <div class="sywat-form-grid-2">
+                                <div class="sywat-field-group">
+                                    <label>New Standalone Email Address *</label>
+                                    <input type="email" name="new_email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>New Password (Optional)</label>
+                                    <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to keep current..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
+                            </div>
+
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>Confirm New Password</label>
+                                    <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
+                            </div>
+
+                            <div class="sywat-modal-actions sywat-mt-4">
+                                <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Cancel</a>
+                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Promote Account</button>
                             </div>
                         </form>
                     </div>
@@ -529,10 +594,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <tbody>
                                         <?php foreach ( $all_members as $m ): ?>
                                             <?php 
-                                                $m_tfaa   = get_user_meta( $m->ID, 'sywat_tfaa_number', true );
-                                                $m_phone  = get_user_meta( $m->ID, 'sywat_phone', true );
-                                                $m_dob    = get_user_meta( $m->ID, 'sywat_dob', true );
-                                                $disp_id  = ! empty( $m_tfaa ) ? $m_tfaa : '—';
+                                                $m_nfaa_id = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $m->ID ) : 'Unassigned';
+                                                $m_phone   = get_user_meta( $m->ID, 'sywat_phone', true );
+                                                $m_dob     = get_user_meta( $m->ID, 'sywat_dob', true );
 
                                                 // Evaluated Member NFAA Status & Expiration
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
@@ -572,10 +636,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $roles_html   = ! empty( $role_badges ) ? implode( ' ', $role_badges ) : '<span class="sywat-no-data-tag">No Role</span>';
                                                 $roles_search = implode( ' ', $role_names );
                                             ?>
-                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $disp_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . $nfaa_info['status'] . ' ' . $age_div . ' ' . $primary_name ) ); ?>">
+                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . $nfaa_info['status'] . ' ' . $age_div . ' ' . $primary_name ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $m->display_name ); ?></strong>
-                                                    <div class="sywat-meta-subtext">👤 <?php echo esc_html( $m->user_login ); ?></div>
+                                                    <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $m_nfaa_id ); ?></strong></div>
                                                     <?php if ( ! empty( $m_dob ) ): ?>
                                                         <div class="sywat-meta-subtext">🎂 <?php echo esc_html( date( 'M j, Y', strtotime( $m_dob ) ) ); ?><?php echo ! empty( $age_div ) ? ' (' . esc_html( $age_div ) . ')' : ''; ?></div>
                                                     <?php endif; ?>
