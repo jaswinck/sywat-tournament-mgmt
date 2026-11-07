@@ -5,7 +5,7 @@
  * Description: Renders UI structures for Member Directory and Board Management tables.
  * Compliance: Zero inline style attributes. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.0.1
+ * Version: 3.0.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -112,7 +112,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <th class="sywat-col-w-32">Assigned Position(s)</th>
                                         <th class="sywat-col-w-22">Email Address</th>
                                         <th class="sywat-col-center sywat-col-w-14">Phone</th>
-                                        <th class="sywat-col-right sywat-col-w-10">Actions</th>
+                                        <th class="sywat-col-center sywat-col-w-10">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -138,8 +138,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             </td>
                                             <td><a href="mailto:<?php echo esc_attr( $bm->user_email ); ?>" class="sywat-table-link"><?php echo esc_html( $bm->user_email ); ?></a></td>
                                             <td class="sywat-col-center"><?php echo esc_html( ! empty( $bm_phone ) ? $bm_phone : '—' ); ?></td>
-                                            <td class="sywat-col-right">
-                                                <div class="sywat-table-actions">
+                                            <td class="sywat-col-center">
+                                                <div class="sywat-table-actions-vertical">
                                                     <a href="?tab=members&subtab=board&edit_board_id=<?php echo intval( $bm->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
                                                     <?php if ( function_exists( 'sywat_can_manage_board' ) && sywat_can_manage_board() ): ?>
                                                         <form method="post" action="?tab=members&subtab=board" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to remove &quot;<?php echo esc_js( $bm->display_name ); ?>&quot; from the Board of Directors?');">
@@ -193,7 +193,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <th class="sywat-col-w-22">Email Address</th>
                                         <th class="sywat-col-center sywat-col-w-12">Phone</th>
                                         <th class="sywat-col-center sywat-col-w-10">NFAA Status</th>
-                                        <th class="sywat-col-right sywat-col-w-10">Actions</th>
+                                        <th class="sywat-col-center sywat-col-w-10">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -242,8 +242,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                     <span class="sywat-badge sywat-badge-muted">⚪ NFAA No</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td class="sywat-col-right">
-                                                <div class="sywat-table-actions">
+                                            <td class="sywat-col-center">
+                                                <div class="sywat-table-actions-vertical">
                                                     <a href="?tab=members&subtab=directory&edit_member_id=<?php echo intval( $m->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</a>
                                                     <?php if ( get_current_user_id() !== $m->ID ): ?>
                                                         <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete member &quot;<?php echo esc_js( $m->display_name ); ?>&quot;? This action cannot be undone.');">
