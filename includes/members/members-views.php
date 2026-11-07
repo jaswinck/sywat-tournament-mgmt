@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 3.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -44,10 +44,13 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         // Filter registered directory accounts matching TFAA officer/member roles or Administrator
         $allowed_directory_roles = array_merge( (array) $tfaa_role_slugs, array( 'administrator' ) );
         $all_members = array();
-        foreach ( $raw_members as $m_user ) {
-            $u_roles = (array) $m_user->roles;
-            if ( ! empty( array_intersect( $allowed_directory_roles, $u_roles ) ) ) {
-                $all_members[] = $m_user;
+        if ( is_array( $raw_members ) ) {
+            foreach ( $raw_members as $m_user ) {
+                if ( ! $m_user instanceof WP_User ) continue;
+                $u_roles = (array) $m_user->roles;
+                if ( ! empty( array_intersect( $allowed_directory_roles, $u_roles ) ) ) {
+                    $all_members[] = $m_user;
+                }
             }
         }
 
@@ -94,7 +97,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                     $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
-                        : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '' );
+                        : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
                     $age_div = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
                         ? sywat_get_eligible_age_division( $e_dob ) 
@@ -162,8 +165,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
                                             <?php endif; ?>
 
-                                            <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
-                                                <?php echo $nfaa_info['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
+                                            <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
+                                                <?php echo ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
                                             </span>
                                         </div>
 
@@ -177,48 +180,51 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 </tr>
 
                                 <!-- ROWS 2+: HOUSEHOLD DEPENDENTS & LINKED ARCHERS -->
-                                <?php foreach ( $linked_dependents as $dep ): ?>
-                                    <?php 
-                                        $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
-                                        $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
-                                        $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
-                                        $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '' );
-                                        $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
-                                        $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
-                                        $dep_n_id   = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo esc_html( $dep['display_name'] ); ?></strong>
-                                            <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $dep_n_id ); ?></strong></div>
-                                            <?php if ( ! empty( $dep_accom ) && $dep_accom !== 'none' ): ?>
-                                                <div class="sywat-mt-1">
-                                                    <span class="sywat-badge sywat-badge-prereg">♿ <?php echo esc_html( isset( $accom_labels[$dep_accom] ) ? $accom_labels[$dep_accom] : $dep_accom ); ?></span>
+                                <?php if ( is_array( $linked_dependents ) ): ?>
+                                    <?php foreach ( $linked_dependents as $dep ): ?>
+                                        <?php 
+                                            $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
+                                            $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
+                                            $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
+                                            $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
+                                            $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
+                                            $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
+                                            $dep_n_id   = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
+                                            $dep_name   = isset( $dep['display_name'] ) ? $dep['display_name'] : 'Unnamed';
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?php echo esc_html( $dep_name ); ?></strong>
+                                                <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $dep_n_id ); ?></strong></div>
+                                                <?php if ( ! empty( $dep_accom ) && $dep_accom !== 'none' ): ?>
+                                                    <div class="sywat-mt-1">
+                                                        <span class="sywat-badge sywat-badge-prereg">♿ <?php echo esc_html( isset( $accom_labels[$dep_accom] ) ? $accom_labels[$dep_accom] : $dep_accom ); ?></span>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <?php echo ! empty( $dep_dob ) ? esc_html( date( 'M j, Y', strtotime( $dep_dob ) ) ) : '—'; ?>
+                                                <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <div class="sywat-badge-group-vertical">
+                                                    <span class="sywat-badge <?php echo esc_attr( isset( $dep_nfaa['badge_class'] ) ? $dep_nfaa['badge_class'] : 'sywat-badge-muted' ); ?>">
+                                                        <?php echo ( isset( $dep_nfaa['is_active'] ) && $dep_nfaa['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
+                                                    </span>
                                                 </div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="sywat-col-center">
-                                            <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
-                                        </td>
-                                        <td class="sywat-col-center">
-                                            <?php echo ! empty( $dep_dob ) ? esc_html( date( 'M j, Y', strtotime( $dep_dob ) ) ) : '—'; ?>
-                                            <div class="sywat-meta-subtext">(<?php echo esc_html( $dep_div ); ?>)</div>
-                                        </td>
-                                        <td class="sywat-col-center">
-                                            <div class="sywat-badge-group-vertical">
-                                                <span class="sywat-badge <?php echo esc_attr( $dep_nfaa['badge_class'] ); ?>">
-                                                    <?php echo $dep_nfaa['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
-                                                </span>
-                                            </div>
-                                            <?php if ( ! empty( $dep_nfaa['expiration'] ) && $dep_nfaa['expiration'] !== '—' ): ?>
-                                                <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $dep_nfaa['expiration'] ); ?></div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="sywat-col-center">
-                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&edit_system_id=<?php echo esc_attr( $dep_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Sub-Profile</a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                                                <?php if ( ! empty( $dep_nfaa['expiration'] ) && $dep_nfaa['expiration'] !== '—' ): ?>
+                                                    <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $dep_nfaa['expiration'] ); ?></div>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&edit_system_id=<?php echo esc_attr( $dep_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Sub-Profile</a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -268,7 +274,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             </div>
                         </div>
 
-                        <?php if ( empty( $board_members ) ): ?>
+                        <?php if ( empty( $board_members ) || ! is_array( $board_members ) ): ?>
                             <p class="sywat-empty-state-notice">No board members currently assigned. Click <strong>"+ Add Board Member"</strong> to assign positions.</p>
                         <?php else: ?>
                             <div class="sywat-table-responsive">
@@ -285,8 +291,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <tbody>
                                         <?php foreach ( $board_members as $bm ): ?>
                                             <?php 
+                                                if ( ! $bm instanceof WP_User ) continue;
                                                 $bm_phone   = get_user_meta( $bm->ID, 'sywat_phone', true );
-                                                $pos_labels = sywat_get_user_board_position_labels( $bm->ID );
+                                                $pos_labels = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $bm->ID ) : array();
                                                 $pos_search = implode( ' ', $pos_labels );
                                             ?>
                                             <tr class="sywat-board-row" data-search="<?php echo esc_attr( strtolower( $bm->display_name . ' ' . $bm->user_login . ' ' . $bm->user_email . ' ' . $pos_search . ' ' . $bm_phone ) ); ?>">
@@ -348,7 +355,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             </div>
                         </div>
 
-                        <?php if ( empty( $all_members ) ): ?>
+                        <?php if ( empty( $all_members ) || ! is_array( $all_members ) ): ?>
                             <p class="sywat-empty-state-notice">No TFAA members found in system database.</p>
                         <?php else: ?>
                             <div class="sywat-table-responsive">
@@ -366,6 +373,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <tbody>
                                         <?php foreach ( $all_members as $m ): ?>
                                             <?php 
+                                                if ( ! $m instanceof WP_User ) continue;
                                                 $m_nfaa_id = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $m->ID ) : 'Unassigned';
                                                 $m_phone   = get_user_meta( $m->ID, 'sywat_phone', true );
                                                 $m_dob     = get_user_meta( $m->ID, 'sywat_dob', true );
@@ -373,7 +381,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 // Evaluated Member NFAA Status & Expiration
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                                                     ? sywat_get_member_nfaa_status( $m->ID ) 
-                                                    : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '' );
+                                                    : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
                                                 // DOB & Age Division Calculation
                                                 $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
@@ -411,9 +419,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                                                 // Dependents count tag
                                                 $m_deps       = function_exists( 'sywat_get_linked_household_members' ) ? sywat_get_linked_household_members( $m->ID ) : array();
-                                                $m_deps_count = count( $m_deps );
+                                                $m_deps_count = is_array( $m_deps ) ? count( $m_deps ) : 0;
                                             ?>
-                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . $nfaa_info['status'] . ' ' . $age_div ) ); ?>">
+                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                                     <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $m_nfaa_id ); ?></strong></div>
@@ -437,8 +445,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
                                                         <?php endif; ?>
 
-                                                        <span class="sywat-badge <?php echo esc_attr( $nfaa_info['badge_class'] ); ?>">
-                                                            <?php echo $nfaa_info['is_active'] ? '🟢 Active' : '⚪ Expired'; ?>
+                                                        <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
+                                                            <?php echo ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
                                                         </span>
                                                     </div>
 
