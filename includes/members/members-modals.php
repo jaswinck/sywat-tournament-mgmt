@@ -5,7 +5,7 @@
  * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, and board position assignments.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
  * Author: SYWAT Archery
- * Version: 3.5.0
+ * Version: 3.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -26,6 +26,8 @@ function sywat_members_render_modals( $data ) {
     $open_edit_board_modal     = ( $edit_board_user_obj !== null );
     $open_edit_dependent_modal = ( $edit_dep_subprofile !== null );
     $all_shops                 = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+    $us_states                 = function_exists( 'sywat_get_us_states_list' ) ? sywat_get_us_states_list() : array();
+    $accom_options             = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
@@ -33,6 +35,7 @@ function sywat_members_render_modals( $data ) {
     // Primary User Data Unpacking (if active)
     $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
     $e_dob        = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_dob', true ) : '';
+    $e_accom      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true ) : 'none';
     $e_nfaa_id    = $edit_user_obj && function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : '';
     $e_expiration = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_nfaa_expiration', true ) : '';
     $e_address_1  = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true ) : '';
@@ -83,10 +86,18 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
-                    <div class="sywat-form-grid-2 sywat-mt-3">
+                    <div class="sywat-form-grid-3 sywat-mt-3">
                         <div class="sywat-field-group">
                             <label>Date of Birth * (For NFAA Age Divisions)</label>
                             <input type="date" name="dob" required>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Accommodations Needed</label>
+                            <select name="accommodations">
+                                <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                    <option value="<?php echo esc_attr( $a_key ); ?>"><?php echo esc_html( $a_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="sywat-field-group">
                             <label>NFAA Membership Expiration Date</label>
@@ -112,7 +123,12 @@ function sywat_members_render_modals( $data ) {
                         </div>
                         <div class="sywat-field-group">
                             <label>State</label>
-                            <input type="text" name="state" placeholder="TX" maxlength="2">
+                            <select name="state">
+                                <option value="">-- Select State --</option>
+                                <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                    <option value="<?php echo esc_attr( $s_code ); ?>"><?php echo esc_html( $s_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="sywat-field-group">
                             <label>Zip Code</label>
@@ -218,35 +234,51 @@ function sywat_members_render_modals( $data ) {
                                 <input type="date" name="dob" value="<?php echo esc_attr( $e_dob ); ?>">
                             </div>
                             <div class="sywat-field-group">
-                                <label>NFAA Membership ID</label>
-                                <input type="text" name="nfaa_number" value="<?php echo esc_attr( $e_nfaa_id !== 'Unassigned' ? $e_nfaa_id : '' ); ?>" placeholder="e.g. 123456">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>" <?php selected( $e_accom, $a_key ); ?>><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="sywat-field-group">
-                                <label>NFAA Membership Expiration Date</label>
-                                <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
+                                <label>NFAA Membership ID</label>
+                                <input type="text" name="nfaa_number" value="<?php echo esc_attr( $e_nfaa_id !== 'Unassigned' ? $e_nfaa_id : '' ); ?>" placeholder="e.g. 123456">
                             </div>
                         </div>
 
                         <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
-                                <label>Street Address Line 1</label>
-                                <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>" placeholder="123 Main St">
+                                <label>NFAA Membership Expiration Date</label>
+                                <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
                             </div>
                             <div class="sywat-field-group">
-                                <label>Street Address Line 2</label>
-                                <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>" placeholder="Apt / Suite #">
+                                <label>Street Address Line 1</label>
+                                <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>" placeholder="123 Main St">
                             </div>
                         </div>
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 2</label>
+                                <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>" placeholder="Apt / Suite #">
+                            </div>
                             <div class="sywat-field-group">
                                 <label>City</label>
                                 <input type="text" name="city" value="<?php echo esc_attr( $e_city ); ?>">
                             </div>
                             <div class="sywat-field-group">
                                 <label>State</label>
-                                <input type="text" name="state" value="<?php echo esc_attr( $e_state ); ?>" placeholder="TX" maxlength="2">
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $e_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Zip Code</label>
                                 <input type="text" name="zip" value="<?php echo esc_attr( $e_zip ); ?>" maxlength="10">
@@ -343,16 +375,24 @@ function sywat_members_render_modals( $data ) {
                                 <input type="date" name="dob" required>
                             </div>
                             <div class="sywat-field-group">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>"><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
                                 <label>NFAA Membership ID (Optional)</label>
                                 <input type="text" name="nfaa_number" placeholder="e.g. 123456">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>NFAA Expiration Date (Optional)</label>
                                 <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Contact Email Address (Defaults to Primary Email)</label>
                                 <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
@@ -381,7 +421,12 @@ function sywat_members_render_modals( $data ) {
                             </div>
                             <div class="sywat-field-group">
                                 <label>State</label>
-                                <input type="text" name="state" value="<?php echo esc_attr( $e_state ); ?>" maxlength="2">
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $e_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="sywat-field-group">
                                 <label>Zip Code</label>
@@ -408,6 +453,7 @@ function sywat_members_render_modals( $data ) {
                 $d_email   = isset( $edit_dep_subprofile['email'] ) ? $edit_dep_subprofile['email'] : '';
                 $d_phone   = isset( $edit_dep_subprofile['phone'] ) ? $edit_dep_subprofile['phone'] : '';
                 $d_dob     = isset( $edit_dep_subprofile['dob'] ) ? $edit_dep_subprofile['dob'] : '';
+                $d_accom   = isset( $edit_dep_subprofile['accommodations'] ) ? $edit_dep_subprofile['accommodations'] : 'none';
                 $d_nfaa_n  = isset( $edit_dep_subprofile['nfaa_number'] ) ? $edit_dep_subprofile['nfaa_number'] : '';
                 $d_nfaa_e  = isset( $edit_dep_subprofile['nfaa_expiration'] ) ? $edit_dep_subprofile['nfaa_expiration'] : '';
                 $d_sys_id  = isset( $edit_dep_subprofile['system_id'] ) ? $edit_dep_subprofile['system_id'] : '';
@@ -447,16 +493,24 @@ function sywat_members_render_modals( $data ) {
                                 <input type="date" name="dob" value="<?php echo esc_attr( $d_dob ); ?>" required>
                             </div>
                             <div class="sywat-field-group">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>" <?php selected( $d_accom, $a_key ); ?>><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
                                 <label>NFAA Membership ID</label>
                                 <input type="text" name="nfaa_number" value="<?php echo esc_attr( $d_nfaa_n ); ?>" placeholder="e.g. 123456">
                             </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>NFAA Membership Expiration Date</label>
                                 <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $d_nfaa_e ); ?>">
                             </div>
-                        </div>
-
-                        <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Contact Email Address</label>
                                 <input type="email" name="email" value="<?php echo esc_attr( $d_email ); ?>" required>
@@ -485,7 +539,12 @@ function sywat_members_render_modals( $data ) {
                             </div>
                             <div class="sywat-field-group">
                                 <label>State</label>
-                                <input type="text" name="state" value="<?php echo esc_attr( $d_state ); ?>" maxlength="2">
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $d_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="sywat-field-group">
                                 <label>Zip Code</label>
