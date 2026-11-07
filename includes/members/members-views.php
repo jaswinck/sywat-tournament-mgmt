@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers and support for Gender/Pro status flags.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters, protected test data purge triggers, and Head of Household swapping.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
  * Author: SYWAT Archery
- * Version: 3.9.4
+ * Version: 3.9.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -237,7 +237,16 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <?php endif; ?>
                                             </td>
                                             <td class="sywat-col-center">
-                                                <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&edit_system_id=<?php echo esc_attr( $dep_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Sub-Profile</a>
+                                                <div class="sywat-table-actions-vertical">
+                                                    <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>&edit_system_id=<?php echo esc_attr( $dep_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Sub-Profile</a>
+                                                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Promote &quot;<?php echo esc_js( $dep_name ); ?>&quot; to Head of Household?');">
+                                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_action" value="swap_head_of_household">
+                                                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                                                        <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $dep_sys_id ); ?>">
+                                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">👑 Make Head</button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -361,6 +370,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             <div class="sywat-header-inline-controls">
                                 <?php if ( current_user_can( 'administrator' ) ): ?>
                                     <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatOpenImportModal()">📥 Import Archers</button>
+                                    <button type="button" class="sywat-btn sywat-btn-danger" onclick="sywatOpenPurgeModal()">🗑️ Purge Test Data</button>
                                 <?php endif; ?>
                                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="sywatOpenAddMemberModal()">+ Add Member</button>
                             </div>
@@ -372,6 +382,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetMemberSearch()">Clear</button>
                                 </div>
+                                <select id="sywat_member_status_filter" onchange="sywatApplyMemberSearch()" class="sywat-select-filter sywat-ml-2">
+                                    <option value="">-- All Statuses --</option>
+                                    <option value="active">🟢 Active Only</option>
+                                    <option value="expired">⚪ Expired Only</option>
+                                </select>
                             </div>
                         </div>
 
@@ -403,6 +418,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                                                     ? sywat_get_member_nfaa_status( $m->ID ) 
                                                     : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
+
+                                                $status_key = ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired';
 
                                                 // DOB & Age Division Calculation (Retained for search data attribute)
                                                 $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
@@ -442,7 +459,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $m_deps       = function_exists( 'sywat_get_linked_household_members' ) ? sywat_get_linked_household_members( $m->ID ) : array();
                                                 $m_deps_count = is_array( $m_deps ) ? count( $m_deps ) : 0;
                                             ?>
-                                            <tr class="sywat-member-row" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $m_gender . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
+                                            <tr class="sywat-member-row" data-status="<?php echo esc_attr( $status_key ); ?>" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $m_gender . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $m->display_name ); ?></strong>
                                                     <?php if ( $m_deps_count > 0 ): ?>
