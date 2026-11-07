@@ -4,7 +4,7 @@
  * Description: Handles modal toggles, client-side phone formatting, password policy validation,
  *              dynamic shop visibility, search filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
- * Version: 3.0.0
+ * Version: 3.2.0
  */
 
 /**
@@ -71,7 +71,7 @@ function sywatToggleShopVisibility(formId, containerId) {
  * 
  * @param {string} pwId      DOM ID of the primary password input.
  * @param {string} confirmId DOM ID of the confirm password input.
- * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule' or 'edit_rule').
+ * @param {string} prefix    Prefix key for the rule status badge elements (e.g., 'add_rule', 'edit_full_rule', or 'dep_rule').
  */
 function sywatValidatePasswordRules(pwId, confirmId, prefix) {
     const pwInput = document.getElementById(pwId);
@@ -99,7 +99,7 @@ function sywatValidatePasswordRules(pwId, confirmId, prefix) {
  * 
  * @param {string}  elementId The DOM ID of the rule badge element.
  * @param {boolean} isValid   Whether the password requirement is met.
- * @param {string}  text      Label text for the rule rule.
+ * @param {string}  text      Label text for the rule badge.
  */
 function sywatUpdateRuleStatus(elementId, isValid, text) {
     const el = document.getElementById(elementId);
@@ -246,7 +246,7 @@ function sywatResetBoardSearch() {
  */
 document.addEventListener("DOMContentLoaded", function() {
     sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
-    sywatToggleShopVisibility('sywat_edit_member_form', 'sywat_edit_shop_container');
+    sywatToggleShopVisibility('sywat_edit_member_full_form', 'sywat_edit_full_shop_container');
 
     const notice = document.getElementById('sywat-notice');
     if (notice) {
