@@ -1,11 +1,11 @@
 <?php
 /**
- * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
+ * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine & AJAX Batch API
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, and household dependent deduplication guards.
- * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
+ * Description: High-performance 2-step audit preview, batch ingestion, and AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, and household dependent deduplication guards.
+ * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices, dedicated preview modal payloads, and JSON AJAX responses.
  * Author: SYWAT Archery
- * Version: 1.9.0
+ * Version: 2.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -682,3 +682,493 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         );
     }
 }
+
+if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
+    /**
+     * AJAX Endpoint: Chunked Archer Spreadsheet Ingestion Processor
+     * Processes staged spreadsheet households in batches of 100 while returning percentage updates to the client progress bar.
+     */
+    function sywat_ajax_import_archers_chunk() {
+        if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
+            wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page and try again.' ) );
+        }
+
+        if ( ! current_user_can( 'administrator' ) ) {
+            wp_send_json_error( array( 'message' => 'Access denied. Only administrators can execute batch data imports.' ) );
+        }
+
+        @set_time_limit( 300 );
+        @ini_set( 'memory_limit', '512M' );
+
+        $user_id         = get_current_user_id();
+        $persistent_file = isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( $_POST['persistent_file_path'] ) : '';
+        $offset          = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
+        $limit           = isset( $_POST['limit'] ) ? intval( $_POST['limit'] ) : 100;
+        $reset           = isset( $_POST['reset'] ) && $_POST['reset'] === 'yes';
+
+        $hh_transient    = 'sywat_imp_hh_' . $user_id;
+        $meta_transient  = 'sywat_imp_meta_' . $user_id;
+
+        // INITIALIZATION: Build household tree queue on offset 0 or reset
+        if ( $offset === 0 || $reset || get_transient( $hh_transient ) === false ) {
+            if ( empty( $persistent_file ) || ! file_exists( $persistent_file ) ) {
+                wp_send_json_error( array( 'message' => 'Staged spreadsheet upload file missing or expired. Please upload again.' ) );
+            }
+
+            $rows = sywat_parse_spreadsheet_rows( $persistent_file );
+            if ( empty( $rows ) ) {
+                wp_send_json_error( array( 'message' => 'Spreadsheet file is empty or unparseable.' ) );
+            }
+
+            $metric_total_rows   = count( $rows );
+            $metric_purged_rows  = 0;
+            $metric_deduped_rows = 0;
+
+            // STAGE 1: SANITIZE
+            $cleaned_records = array();
+            foreach ( $rows as $row ) {
+                $raw_archer = isset( $row['Archer'] ) ? trim( $row['Archer'] ) : '';
+                $raw_email  = isset( $row['Email'] ) ? trim( $row['Email'] ) : '';
+                $raw_phone  = isset( $row['Phone'] ) ? trim( $row['Phone'] ) : '';
+                $raw_dob    = isset( $row['DOB'] ) ? trim( $row['DOB'] ) : '';
+                $raw_pro    = isset( $row['Pro'] ) ? trim( $row['Pro'] ) : 'No';
+                $raw_tfaa   = isset( $row['TFAA'] ) ? trim( $row['TFAA'] ) : '';
+                $raw_exp    = isset( $row['Expires'] ) ? trim( $row['Expires'] ) : '';
+
+                if ( preg_match( '/(kEMlzpAX|select|sleep|DBMS_PIPE|XOR|waitfor|PG_SLEEP|@@)/i', $raw_archer . ' ' . $raw_email ) ) {
+                    $metric_purged_rows++;
+                    continue;
+                }
+
+                if ( empty( $raw_archer ) ) {
+                    $metric_purged_rows++;
+                    continue;
+                }
+
+                $last_name  = '';
+                $first_name = '';
+                if ( strpos( $raw_archer, ',' ) !== false ) {
+                    $parts      = explode( ',', $raw_archer, 2 );
+                    $last_name  = ucfirst( strtolower( trim( $parts[0] ) ) );
+                    $first_name = ucfirst( strtolower( trim( $parts[1] ) ) );
+                } else {
+                    $parts      = explode( ' ', $raw_archer, 2 );
+                    $first_name = ucfirst( strtolower( trim( $parts[0] ) ) );
+                    $last_name  = isset( $parts[1] ) ? ucfirst( strtolower( trim( $parts[1] ) ) ) : '';
+                }
+
+                $dob = ( ! empty( $raw_dob ) && $raw_dob !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_dob ) ) : '';
+                $exp = ( ! empty( $raw_exp ) && $raw_exp !== '0000-00-00' ) ? date( 'Y-m-d', strtotime( $raw_exp ) ) : '';
+
+                $phone = preg_replace( '/[^0-9]/', '', $raw_phone );
+                if ( strlen( $phone ) === 10 ) {
+                    $phone = substr( $phone, 0, 3 ) . '-' . substr( $phone, 3, 3 ) . '-' . substr( $phone, 6 );
+                }
+
+                $is_pro = ( strtolower( $raw_pro ) === 'yes' ) ? 'yes' : 'no';
+                $gender = 'unassigned';
+
+                $email = sanitize_email( $raw_email );
+                if ( preg_match( '/(noemail|example\.com|test)/i', $email ) ) {
+                    $email = '';
+                }
+
+                $tfaa_id = preg_replace( '/[^0-9]/', '', $raw_tfaa );
+
+                $cleaned_records[] = array(
+                    'first_name'  => $first_name,
+                    'last_name'   => $last_name,
+                    'email'       => $email,
+                    'phone'       => $phone,
+                    'dob'         => $dob,
+                    'gender'      => $gender,
+                    'is_pro'      => $is_pro,
+                    'nfaa_number' => $tfaa_id,
+                    'nfaa_exp'    => $exp,
+                );
+            }
+
+            // STAGE 2: DEDUPLICATE
+            $deduped_records = array();
+            foreach ( $cleaned_records as $rec ) {
+                $dedup_key = strtolower( $rec['first_name'] . '|' . $rec['last_name'] . '|' . $rec['dob'] );
+                if ( ! isset( $deduped_records[ $dedup_key ] ) ) {
+                    $deduped_records[ $dedup_key ] = $rec;
+                } else {
+                    $metric_deduped_rows++;
+                    $existing = $deduped_records[ $dedup_key ];
+                    if ( ! empty( $rec['nfaa_exp'] ) && ( empty( $existing['nfaa_exp'] ) || strtotime( $rec['nfaa_exp'] ) > strtotime( $existing['nfaa_exp'] ) ) ) {
+                        $existing['nfaa_exp'] = $rec['nfaa_exp'];
+                    }
+                    if ( empty( $existing['nfaa_number'] ) && ! empty( $rec['nfaa_number'] ) ) {
+                        $existing['nfaa_number'] = $rec['nfaa_number'];
+                    }
+                    if ( empty( $existing['email'] ) && ! empty( $rec['email'] ) ) {
+                        $existing['email'] = $rec['email'];
+                    }
+                    if ( empty( $existing['phone'] ) && ! empty( $rec['phone'] ) ) {
+                        $existing['phone'] = $rec['phone'];
+                    }
+                    if ( $rec['is_pro'] === 'yes' ) {
+                        $existing['is_pro'] = 'yes';
+                    }
+                    $deduped_records[ $dedup_key ] = $existing;
+                }
+            }
+
+            // STAGE 3: BUILD HOUSEHOLDS
+            $households    = array();
+            $last_name_map = array();
+            foreach ( $deduped_records as $rec ) {
+                $assigned_hh = false;
+                $ln_clean    = ! empty( $rec['last_name'] ) ? strtolower( $rec['last_name'] ) : '';
+
+                if ( ! empty( $rec['email'] ) ) {
+                    $group_key = 'email_' . strtolower( $rec['email'] );
+                    $households[ $group_key ][] = $rec;
+                    $assigned_hh = true;
+                    if ( $ln_clean ) {
+                        if ( ! isset( $last_name_map[ $ln_clean ] ) || ! in_array( $group_key, $last_name_map[ $ln_clean ], true ) ) {
+                            $last_name_map[ $ln_clean ][] = $group_key;
+                        }
+                    }
+                    continue;
+                }
+
+                if ( $ln_clean && ! empty( $rec['nfaa_number'] ) && isset( $last_name_map[ $ln_clean ] ) ) {
+                    foreach ( $last_name_map[ $ln_clean ] as $hk ) {
+                        if ( ! isset( $households[ $hk ] ) ) continue;
+                        foreach ( $households[ $hk ] as $m ) {
+                            if ( strtolower( $m['last_name'] ) === $ln_clean && ! empty( $m['nfaa_number'] ) ) {
+                                $diff = abs( intval( $m['nfaa_number'] ) - intval( $rec['nfaa_number'] ) );
+                                if ( $diff >= 1 && $diff <= 3 ) {
+                                    $households[ $hk ][] = $rec;
+                                    $assigned_hh = true;
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if ( ! $assigned_hh && $ln_clean && ! empty( $rec['nfaa_exp'] ) && isset( $last_name_map[ $ln_clean ] ) ) {
+                    foreach ( $last_name_map[ $ln_clean ] as $hk ) {
+                        if ( ! isset( $households[ $hk ] ) ) continue;
+                        foreach ( $households[ $hk ] as $m ) {
+                            if ( strtolower( $m['last_name'] ) === $ln_clean && $m['nfaa_exp'] === $rec['nfaa_exp'] ) {
+                                $households[ $hk ][] = $rec;
+                                $assigned_hh = true;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+
+                if ( ! $assigned_hh ) {
+                    $group_key = 'standalone_' . md5( $rec['first_name'] . $rec['last_name'] . $rec['dob'] );
+                    $households[ $group_key ][] = $rec;
+
+                    if ( $ln_clean ) {
+                        if ( ! isset( $last_name_map[ $ln_clean ] ) || ! in_array( $group_key, $last_name_map[ $ln_clean ], true ) ) {
+                            $last_name_map[ $ln_clean ][] = $group_key;
+                        }
+                    }
+                }
+            }
+
+            foreach ( $households as $hk => $members ) {
+                usort( $members, function( $a, $b ) {
+                    $a_has = ! empty( $a['email'] ) && is_email( $a['email'] );
+                    $b_has = ! empty( $b['email'] ) && is_email( $b['email'] );
+                    if ( $a_has && ! $b_has ) return -1;
+                    if ( ! $a_has && $b_has ) return 1;
+                    if ( empty( $a['dob'] ) ) return 1;
+                    if ( empty( $b['dob'] ) ) return -1;
+                    return strtotime( $a['dob'] ) - strtotime( $b['dob'] );
+                } );
+                $households[ $hk ] = $members;
+            }
+
+            $indexed_households = array_values( $households );
+
+            set_transient( $hh_transient, $indexed_households, HOUR_IN_SECONDS );
+            set_transient( $meta_transient, array(
+                'total_rows'       => $metric_total_rows,
+                'purged_rows'      => $metric_purged_rows,
+                'deduped_rows'     => $metric_deduped_rows,
+                'total_households' => count( $indexed_households ),
+                'created_primary'  => 0,
+                'created_dep'      => 0,
+                'updated_user'     => 0,
+            ), HOUR_IN_SECONDS );
+        }
+
+        $all_households = get_transient( $hh_transient );
+        $meta           = get_transient( $meta_transient );
+
+        if ( ! is_array( $all_households ) || ! is_array( $meta ) ) {
+            wp_send_json_error( array( 'message' => 'Import state session expired. Please re-upload the spreadsheet file.' ) );
+        }
+
+        $total_households = count( $all_households );
+        if ( $total_households === 0 || $offset >= $total_households ) {
+            delete_transient( $hh_transient );
+            delete_transient( $meta_transient );
+            if ( file_exists( $persistent_file ) ) {
+                @unlink( $persistent_file );
+            }
+            wp_cache_flush();
+
+            wp_send_json_success( array(
+                'finished'         => true,
+                'next_offset'      => $total_households,
+                'total_households' => $total_households,
+                'created_primary'  => intval( $meta['created_primary'] ),
+                'created_dep'      => intval( $meta['created_dep'] ),
+                'updated_user'     => intval( $meta['updated_user'] ),
+                'percent'          => 100,
+                'message'          => sprintf( '🚀 Archer Import Complete! Created %d primary accounts, added %d dependents, and updated %d existing profiles.', $meta['created_primary'], $meta['created_dep'], $meta['updated_user'] ),
+            ) );
+        }
+
+        global $wpdb, $wp_hasher, $sywat_precomputed_hash;
+
+        $batch_households = array_slice( $all_households, $offset, $limit );
+
+        wp_suspend_cache_invalidation( true );
+        remove_all_actions( 'user_register' );
+        remove_all_actions( 'profile_update' );
+        remove_all_actions( 'added_user_meta' );
+        remove_all_actions( 'updated_user_meta' );
+
+        $wpdb->query( 'START TRANSACTION' );
+
+        $default_pass_hash = wp_hash_password( 'P@55w0rd' );
+        if ( ! class_exists( 'SYWAT_Fast_Hasher' ) ) {
+            class SYWAT_Fast_Hasher {
+                public function HashPassword( $password ) {
+                    global $sywat_precomputed_hash;
+                    return $sywat_precomputed_hash;
+                }
+                public function CheckPassword( $password, $hash ) {
+                    return true;
+                }
+            }
+        }
+        $sywat_precomputed_hash = $default_pass_hash;
+        $old_hasher             = $wp_hasher;
+        $wp_hasher              = new SYWAT_Fast_Hasher();
+
+        $username_map = array();
+        $user_logins  = $wpdb->get_col( "SELECT user_login FROM {$wpdb->users}" );
+        if ( ! empty( $user_logins ) ) {
+            foreach ( $user_logins as $ul ) {
+                $username_map[ strtolower( trim( $ul ) ) ] = true;
+            }
+        }
+
+        $nfaa_map = array();
+        $nfaa_rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_nfaa_number' AND meta_value != ''" );
+        if ( ! empty( $nfaa_rows ) ) {
+            foreach ( $nfaa_rows as $nr ) {
+                $nfaa_map[ trim( $nr->meta_value ) ] = intval( $nr->user_id );
+            }
+        }
+
+        $email_map = array();
+        $email_rows = $wpdb->get_results( "SELECT ID, user_email FROM {$wpdb->users} WHERE user_email != ''" );
+        if ( ! empty( $email_rows ) ) {
+            foreach ( $email_rows as $er ) {
+                $email_map[ strtolower( trim( $er->user_email ) ) ] = intval( $er->ID );
+            }
+        }
+
+        $chunk_primary = 0;
+        $chunk_dep     = 0;
+        $chunk_updated = 0;
+
+        foreach ( $batch_households as $members ) {
+            $head = array_shift( $members );
+            $primary_email = $head['email'];
+            $is_unassigned_email = false;
+
+            if ( empty( $primary_email ) || ! is_email( $primary_email ) ) {
+                $nfaa_seed           = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
+                $primary_email       = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
+                $is_unassigned_email = true;
+            }
+
+            $existing_user_id = 0;
+            if ( ! empty( $head['nfaa_number'] ) && isset( $nfaa_map[ $head['nfaa_number'] ] ) ) {
+                $existing_user_id = $nfaa_map[ $head['nfaa_number'] ];
+            }
+            if ( ! $existing_user_id && ! $is_unassigned_email && isset( $email_map[ strtolower( $primary_email ) ] ) ) {
+                $existing_user_id = $email_map[ strtolower( $primary_email ) ];
+            }
+
+            $primary_user_id = 0;
+            if ( $existing_user_id ) {
+                $primary_user_id = $existing_user_id;
+                $chunk_updated++;
+                wp_update_user( array(
+                    'ID'           => $primary_user_id,
+                    'first_name'   => $head['first_name'],
+                    'last_name'    => $head['last_name'],
+                    'display_name' => $head['first_name'] . ' ' . $head['last_name'],
+                ) );
+            } else {
+                $base_username = sanitize_user( $head['first_name'] . '.' . $head['last_name'], true );
+                $username      = $base_username;
+                $counter       = 1;
+
+                while ( isset( $username_map[ strtolower( $username ) ] ) ) {
+                    $username = $base_username . $counter;
+                    $counter++;
+                }
+                $username_map[ strtolower( $username ) ] = true;
+
+                $primary_user_id = wp_insert_user( array(
+                    'user_login'   => $username,
+                    'user_email'   => $primary_email,
+                    'user_pass'    => 'P@55w0rd',
+                    'first_name'   => $head['first_name'],
+                    'last_name'    => $head['last_name'],
+                    'display_name' => $head['first_name'] . ' ' . $head['last_name'],
+                    'role'         => 'tfaa_member',
+                ) );
+
+                if ( ! is_wp_error( $primary_user_id ) ) {
+                    $chunk_primary++;
+                    if ( ! empty( $head['nfaa_number'] ) ) {
+                        $nfaa_map[ $head['nfaa_number'] ] = $primary_user_id;
+                    }
+                    if ( ! $is_unassigned_email ) {
+                        $email_map[ strtolower( $primary_email ) ] = $primary_user_id;
+                    }
+                }
+            }
+
+            if ( $primary_user_id && ! is_wp_error( $primary_user_id ) ) {
+                if ( function_exists( 'sywat_get_user_system_id' ) ) {
+                    sywat_get_user_system_id( $primary_user_id );
+                }
+
+                update_user_meta( $primary_user_id, 'sywat_nfaa_number', $head['nfaa_number'] );
+                update_user_meta( $primary_user_id, 'sywat_tfaa_number', $head['nfaa_number'] );
+                update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', $head['nfaa_exp'] );
+                update_user_meta( $primary_user_id, 'sywat_dob', $head['dob'] );
+                update_user_meta( $primary_user_id, 'sywat_gender', $head['gender'] );
+                update_user_meta( $primary_user_id, 'sywat_is_pro', $head['is_pro'] );
+                update_user_meta( $primary_user_id, 'sywat_phone', $head['phone'] );
+
+                if ( $is_unassigned_email ) {
+                    update_user_meta( $primary_user_id, 'sywat_email_unassigned', 'yes' );
+                }
+
+                if ( ! empty( $members ) ) {
+                    $existing_deps = function_exists( 'sywat_get_linked_household_members' ) 
+                        ? sywat_get_linked_household_members( $primary_user_id ) 
+                        : array();
+
+                    $existing_dep_map = array();
+                    if ( is_array( $existing_deps ) ) {
+                        foreach ( $existing_deps as $ex_d ) {
+                            $ex_first = isset( $ex_d['first_name'] ) ? strtolower( trim( $ex_d['first_name'] ) ) : '';
+                            $ex_last  = isset( $ex_d['last_name'] ) ? strtolower( trim( $ex_d['last_name'] ) ) : '';
+                            $ex_dob   = isset( $ex_d['dob'] ) ? trim( $ex_d['dob'] ) : '';
+                            $ex_nfaa  = isset( $ex_d['nfaa_number'] ) ? trim( $ex_d['nfaa_number'] ) : '';
+                            $sys_id   = isset( $ex_d['system_id'] ) ? $ex_d['system_id'] : true;
+
+                            if ( $ex_first && $ex_last ) {
+                                $key = $ex_first . '|' . $ex_last . '|' . $ex_dob;
+                                $existing_dep_map[ $key ] = $sys_id;
+                            }
+                            if ( ! empty( $ex_nfaa ) ) {
+                                $existing_dep_map[ 'nfaa_' . $ex_nfaa ] = $sys_id;
+                            }
+                        }
+                    }
+
+                    foreach ( $members as $dep ) {
+                        $dep_first = strtolower( trim( $dep['first_name'] ) );
+                        $dep_last  = strtolower( trim( $dep['last_name'] ) );
+                        $dep_dob   = trim( $dep['dob'] );
+                        $dep_nfaa  = trim( $dep['nfaa_number'] );
+
+                        $match_key1 = $dep_first . '|' . $dep_last . '|' . $dep_dob;
+                        $match_key2 = ! empty( $dep_nfaa ) ? 'nfaa_' . $dep_nfaa : '';
+
+                        $existing_sys_id = null;
+                        if ( isset( $existing_dep_map[ $match_key1 ] ) ) {
+                            $existing_sys_id = $existing_dep_map[ $match_key1 ];
+                        } elseif ( $match_key2 && isset( $existing_dep_map[ $match_key2 ] ) ) {
+                            $existing_sys_id = $existing_dep_map[ $match_key2 ];
+                        }
+
+                        $dep_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_email;
+
+                        $dep_payload = array(
+                            'first_name'      => $dep['first_name'],
+                            'last_name'       => $dep['last_name'],
+                            'email'           => $dep_email,
+                            'phone'           => $dep['phone'],
+                            'gender'          => $dep['gender'],
+                            'is_pro'          => $dep['is_pro'],
+                            'dob'             => $dep['dob'],
+                            'accommodations'  => 'none',
+                            'nfaa_number'     => $dep['nfaa_number'],
+                            'nfaa_expiration' => $dep['nfaa_exp'],
+                        );
+
+                        if ( $existing_sys_id && is_string( $existing_sys_id ) && function_exists( 'sywat_update_household_dependent' ) ) {
+                            sywat_update_household_dependent( $primary_user_id, $existing_sys_id, $dep_payload );
+                        } elseif ( ! $existing_sys_id && function_exists( 'sywat_add_household_dependent' ) ) {
+                            $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
+                            if ( ! is_wp_error( $res ) ) {
+                                $chunk_dep++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $wp_hasher = $old_hasher;
+        $wpdb->query( 'COMMIT' );
+        wp_suspend_cache_invalidation( false );
+
+        $meta['created_primary'] = intval( $meta['created_primary'] ) + $chunk_primary;
+        $meta['created_dep']     = intval( $meta['created_dep'] ) + $chunk_dep;
+        $meta['updated_user']    = intval( $meta['updated_user'] ) + $chunk_updated;
+        set_transient( $meta_transient, $meta, HOUR_IN_SECONDS );
+
+        $next_offset = $offset + count( $batch_households );
+        $finished    = ( $next_offset >= $total_households );
+
+        if ( $finished ) {
+            delete_transient( $hh_transient );
+            delete_transient( $meta_transient );
+            if ( file_exists( $persistent_file ) ) {
+                @unlink( $persistent_file );
+            }
+            wp_cache_flush();
+        }
+
+        $percent = min( 100, round( ( $next_offset / $total_households ) * 100 ) );
+
+        wp_send_json_success( array(
+            'finished'         => $finished,
+            'next_offset'      => $next_offset,
+            'total_households' => $total_households,
+            'created_primary'  => intval( $meta['created_primary'] ),
+            'created_dep'      => intval( $meta['created_dep'] ),
+            'updated_user'     => intval( $meta['updated_user'] ),
+            'percent'          => $percent,
+            'message'          => $finished
+                ? sprintf( '🚀 Archer Import Complete! Processed %d households (%d primary, %d dependents).', $total_households, $meta['created_primary'], $meta['created_dep'] )
+                : sprintf( 'Imported %d of %d households (%d%%)', $next_offset, $total_households, $percent ),
+        ) );
+    }
+}
+
+add_action( 'wp_ajax_sywat_import_archers_chunk', 'sywat_ajax_import_archers_chunk' );
