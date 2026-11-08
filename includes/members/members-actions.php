@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts into household dependent rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -642,63 +642,102 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 10. TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT INTO TARGET HOUSEHOLD
+        // 10. TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT OR UNASSIGNED POOL ARCHER INTO TARGET HOUSEHOLD
         if ( $action === 'transfer_household_member' ) {
             if ( ! current_user_can( 'administrator' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can merge or transfer member accounts.</div>';
             }
 
-            $source_user_id = isset( $_POST['source_user_id'] ) ? intval( $_POST['source_user_id'] ) : 0;
-            $target_head_id = isset( $_POST['target_head_id'] ) ? intval( $_POST['target_head_id'] ) : 0;
+            $source_user_id   = isset( $_POST['source_user_id'] ) ? intval( $_POST['source_user_id'] ) : 0;
+            $target_head_id   = isset( $_POST['target_head_id'] ) ? intval( $_POST['target_head_id'] ) : 0;
+            $target_system_id = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
 
-            if ( $source_user_id <= 0 || $target_head_id <= 0 || $source_user_id === $target_head_id ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid source member and a different target Head of Household.</div>';
+            if ( $target_head_id <= 0 ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid target Head of Household.</div>';
             }
 
-            $src_user = get_userdata( $source_user_id );
             $tgt_user = get_userdata( $target_head_id );
-
-            if ( ! $src_user || ! $tgt_user ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified source or target user account does not exist.</div>';
+            if ( ! $tgt_user ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified target Head of Household account does not exist.</div>';
             }
 
-            $src_fname = get_user_meta( $source_user_id, 'first_name', true ) ? get_user_meta( $source_user_id, 'first_name', true ) : $src_user->first_name;
-            $src_lname = get_user_meta( $source_user_id, 'last_name', true ) ? get_user_meta( $source_user_id, 'last_name', true ) : $src_user->last_name;
-
-            $dep_payload = array(
-                'first_name'      => $src_fname,
-                'last_name'       => $src_lname,
-                'email'           => $src_user->user_email,
-                'phone'           => get_user_meta( $source_user_id, 'sywat_phone', true ),
-                'gender'          => get_user_meta( $source_user_id, 'sywat_gender', true ),
-                'is_pro'          => get_user_meta( $source_user_id, 'sywat_is_pro', true ),
-                'dob'             => get_user_meta( $source_user_id, 'sywat_dob', true ),
-                'accommodations'  => get_user_meta( $source_user_id, 'sywat_accommodations', true ),
-                'nfaa_number'     => get_user_meta( $source_user_id, 'sywat_nfaa_number', true ),
-                'nfaa_expiration' => get_user_meta( $source_user_id, 'sywat_nfaa_expiration', true ),
-                'address_1'       => get_user_meta( $source_user_id, 'sywat_address_1', true ),
-                'address_2'       => get_user_meta( $source_user_id, 'sywat_address_2', true ),
-                'city'            => get_user_meta( $source_user_id, 'sywat_city', true ),
-                'state'           => get_user_meta( $source_user_id, 'sywat_state', true ),
-                'zip'             => get_user_meta( $source_user_id, 'sywat_zip', true ),
-            );
-
-            if ( function_exists( 'sywat_add_household_dependent' ) ) {
-                $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
-                if ( is_wp_error( $res ) ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+            // OPTION A: Standalone WP_User Account Migration
+            if ( $source_user_id > 0 ) {
+                if ( $source_user_id === $target_head_id ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Source member cannot be transferred to their own household.</div>';
                 }
 
-                require_once ABSPATH . 'wp-admin/includes/user.php';
-                wp_delete_user( $source_user_id );
-                wp_cache_flush();
+                $src_user = get_userdata( $source_user_id );
+                if ( ! $src_user ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified source user account does not exist.</div>';
+                }
 
-                return sprintf(
-                    '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>%s %s</strong> successfully transferred to <strong>%s</strong>\'s household roster! Redundant standalone account merged.</div>',
-                    esc_html( $src_fname ),
-                    esc_html( $src_lname ),
-                    esc_html( $tgt_user->display_name )
+                $src_fname = get_user_meta( $source_user_id, 'first_name', true ) ? get_user_meta( $source_user_id, 'first_name', true ) : $src_user->first_name;
+                $src_lname = get_user_meta( $source_user_id, 'last_name', true ) ? get_user_meta( $source_user_id, 'last_name', true ) : $src_user->last_name;
+
+                $dep_payload = array(
+                    'first_name'      => $src_fname,
+                    'last_name'       => $src_lname,
+                    'email'           => $src_user->user_email,
+                    'phone'           => get_user_meta( $source_user_id, 'sywat_phone', true ),
+                    'gender'          => get_user_meta( $source_user_id, 'sywat_gender', true ),
+                    'is_pro'          => get_user_meta( $source_user_id, 'sywat_is_pro', true ),
+                    'dob'             => get_user_meta( $source_user_id, 'sywat_dob', true ),
+                    'accommodations'  => get_user_meta( $source_user_id, 'sywat_accommodations', true ),
+                    'nfaa_number'     => get_user_meta( $source_user_id, 'sywat_nfaa_number', true ),
+                    'nfaa_expiration' => get_user_meta( $source_user_id, 'sywat_nfaa_expiration', true ),
+                    'address_1'       => get_user_meta( $source_user_id, 'sywat_address_1', true ),
+                    'address_2'       => get_user_meta( $source_user_id, 'sywat_address_2', true ),
+                    'city'            => get_user_meta( $source_user_id, 'sywat_city', true ),
+                    'state'           => get_user_meta( $source_user_id, 'sywat_state', true ),
+                    'zip'             => get_user_meta( $source_user_id, 'sywat_zip', true ),
                 );
+
+                if ( function_exists( 'sywat_add_household_dependent' ) ) {
+                    $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
+                    if ( is_wp_error( $res ) ) {
+                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+                    }
+
+                    require_once ABSPATH . 'wp-admin/includes/user.php';
+                    wp_delete_user( $source_user_id );
+                    wp_cache_flush();
+
+                    return sprintf(
+                        '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>%s %s</strong> successfully transferred to <strong>%s</strong>\'s household roster! Redundant standalone account merged.</div>',
+                        esc_html( $src_fname ),
+                        esc_html( $src_lname ),
+                        esc_html( $tgt_user->display_name )
+                    );
+                }
+            }
+
+            // OPTION B: Unassigned Pool Archer Migration
+            if ( ! empty( $target_system_id ) ) {
+                $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
+                if ( is_array( $unassigned_pool ) && isset( $unassigned_pool[ $target_system_id ] ) ) {
+                    $dep_payload = $unassigned_pool[ $target_system_id ];
+                    $fn          = isset( $dep_payload['first_name'] ) ? $dep_payload['first_name'] : '';
+                    $ln          = isset( $dep_payload['last_name'] ) ? $dep_payload['last_name'] : '';
+
+                    if ( function_exists( 'sywat_add_household_dependent' ) ) {
+                        $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
+                        if ( is_wp_error( $res ) ) {
+                            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+                        }
+
+                        // Clean up unassigned pool record
+                        unset( $unassigned_pool[ $target_system_id ] );
+                        update_option( 'sywat_unassigned_archers', $unassigned_pool );
+
+                        return sprintf(
+                            '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 Unassigned archer <strong>%s %s</strong> linked to <strong>%s</strong>\'s household roster successfully!</div>',
+                            esc_html( $fn ),
+                            esc_html( $ln ),
+                            esc_html( $tgt_user->display_name )
+                        );
+                    }
+                }
             }
         }
 
