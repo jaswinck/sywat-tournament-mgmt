@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board POST Action Handling
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging, and 2-step batch spreadsheet importer persistent file staging.
+ * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, and 2-step batch spreadsheet importer persistent file staging.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.7
+ * Version: 3.9.8
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -158,7 +158,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 2. PURGE TEST MEMBERS (HIGH-PERFORMANCE PROTECTED BULK RESET)
+        // 2. PURGE TEST MEMBERS (HIGH-PERFORMANCE PROTECTED BULK RESET WITH CACHE & HOOK SUSPENSION)
         if ( $action === 'purge_test_members' ) {
             if ( ! current_user_can( 'administrator' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data purges.</div>';
@@ -215,6 +215,11 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $protected_count = 0;
 
             if ( ! empty( $all_user_ids ) ) {
+                // Suspend object cache invalidations and unhook deletion callbacks for maximum speed
+                wp_suspend_cache_invalidation( true );
+                remove_all_actions( 'delete_user' );
+                remove_all_actions( 'deleted_user' );
+
                 // Wrap in MySQL transaction for ultra-fast atomic batch deletion
                 $wpdb->query( 'START TRANSACTION' );
 
@@ -232,6 +237,10 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 }
 
                 $wpdb->query( 'COMMIT' );
+
+                // Re-enable cache invalidation and flush object cache in one single atomic command
+                wp_suspend_cache_invalidation( false );
+                wp_cache_flush();
             }
 
             return sprintf(
