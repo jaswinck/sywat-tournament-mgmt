@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), and compact 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), neutral unassigned metric pill formatting, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -443,7 +443,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         ⚪ <strong><?php echo number_format( $stat_expired ); ?></strong> Expired
                                     </span>
                                     <?php if ( $stat_unassigned > 0 ): ?>
-                                        <span class="sywat-inline-pill sywat-inline-pill-expired" title="Unassigned Pool">
+                                        <span class="sywat-inline-pill sywat-inline-pill-unassigned" title="Unassigned Pool">
                                             📁 <strong><?php echo number_format( $stat_unassigned ); ?></strong> Unassigned
                                         </span>
                                     <?php endif; ?>
@@ -544,7 +544,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <?php if ( current_user_can( 'administrator' ) ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $a_name ); ?>', '<?php echo esc_attr( $a_sys_id ); ?>')">🔗 Link Household</button>
                                                             <?php endif; ?>
                                                         <?php endif; ?>
 
