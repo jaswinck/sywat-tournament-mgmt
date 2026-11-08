@@ -2,8 +2,9 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
+ * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.1.0
+ * Version: 5.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -112,12 +113,19 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     </a>
                 </nav>
 
-                <!-- Right: Account Profile or Sign In Link -->
+                <!-- Right: Account Profile Dropdown or Sign In Link -->
                 <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
                     <?php if ( $is_logged_in ): ?>
-                        <span style="font-size:13px; font-weight:600; color:#e2e8f0; white-space:nowrap;">
-                            👤 <?php echo esc_html( $current_user->display_name ); ?>
-                        </span>
+                        <div class="sywat-auth-dropdown">
+                            <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
+                                👤 <strong><?php echo esc_html( $current_user->display_name ); ?></strong> <span class="sywat-dropdown-caret">▼</span>
+                            </a>
+                            <div class="sywat-auth-dropdown-menu">
+                                <a href="<?php echo esc_url( site_url( '/member-directory/?tab=members&subtab=profile' ) ); ?>">
+                                    👤 My Profile &amp; Household
+                                </a>
+                            </div>
+                        </div>
 
                         <a href="<?php echo esc_url( wp_logout_url( site_url( '/login/' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
                             🚪 Log Out
