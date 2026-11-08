@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine & AJAX Batch API
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, output-buffered AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, and household dependent deduplication guards.
+ * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, output-buffered AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, existing Head of Household DB priority preservation, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices, dedicated preview modal payloads, and JSON AJAX responses.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -454,7 +454,36 @@ if ( ! function_exists( 'sywat_ingest_archer_households_batch' ) ) {
         $updated_user    = 0;
 
         foreach ( $batch_households as $members ) {
-            $head = array_shift( $members );
+            if ( empty( $members ) ) continue;
+
+            // -----------------------------------------------------------------
+            // EXISTING HEAD OF HOUSEHOLD DB PRIORITY PRESERVATION
+            // -----------------------------------------------------------------
+            // Scan household members to see if ANY member already exists as a Primary WP_User
+            $head_index       = 0;
+            $existing_user_id = 0;
+
+            foreach ( $members as $idx => $m_candidate ) {
+                $cand_nfaa  = ! empty( $m_candidate['nfaa_number'] ) ? trim( $m_candidate['nfaa_number'] ) : '';
+                $cand_email = ! empty( $m_candidate['email'] ) ? strtolower( trim( $m_candidate['email'] ) ) : '';
+
+                if ( ! empty( $cand_nfaa ) && isset( $nfaa_map[ $cand_nfaa ] ) ) {
+                    $existing_user_id = $nfaa_map[ $cand_nfaa ];
+                    $head_index       = $idx;
+                    break;
+                }
+
+                if ( ! empty( $cand_email ) && is_email( $cand_email ) && isset( $email_map[ $cand_email ] ) ) {
+                    $existing_user_id = $email_map[ $cand_email ];
+                    $head_index       = $idx;
+                    break;
+                }
+            }
+
+            // Extract confirmed Head of Household record and leave remaining members as dependents
+            $head = $members[ $head_index ];
+            unset( $members[ $head_index ] );
+            $members = array_values( $members ); // Re-index dependent array
 
             $primary_email       = $head['email'];
             $is_unassigned_email = false;
@@ -463,16 +492,6 @@ if ( ! function_exists( 'sywat_ingest_archer_households_batch' ) ) {
                 $nfaa_seed           = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
                 $primary_email       = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
                 $is_unassigned_email = true;
-            }
-
-            $existing_user_id = 0;
-
-            if ( ! empty( $head['nfaa_number'] ) && isset( $nfaa_map[ $head['nfaa_number'] ] ) ) {
-                $existing_user_id = $nfaa_map[ $head['nfaa_number'] ];
-            }
-
-            if ( ! $existing_user_id && ! $is_unassigned_email && isset( $email_map[ strtolower( $primary_email ) ] ) ) {
-                $existing_user_id = $email_map[ strtolower( $primary_email ) ];
             }
 
             $primary_user_id = 0;
