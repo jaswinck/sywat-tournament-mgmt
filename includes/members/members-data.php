@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Archers, Active Members, and Expired/Historical Members).
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships).
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -62,7 +62,9 @@ if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
 if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
     /**
      * Statistical calculation engine for Member Directory metrics.
-     * Evaluates total, active, and expired/historical tallies strictly for users holding the 'tfaa_member' role.
+     * Evaluates total, active, and expired tallies strictly for users holding any role 
+     * containing "tfaa" (slug or display name), enforcing O(1) hashtable deduplication so 
+     * users with multiple TFAA roles are never double-counted.
      *
      * @param array|null $all_members Optional pre-fetched list of WP_User objects to process.
      * @return array Associative array containing 'total', 'active', and 'expired' integer counts.
@@ -75,20 +77,42 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
         $stat_total   = 0;
         $stat_active  = 0;
         $stat_expired = 0;
+        $counted_uids = array(); // Dedup guard hashtable
 
         if ( ! empty( $all_members ) && is_array( $all_members ) ) {
+            global $wp_roles;
+            $wp_role_names = $wp_roles ? $wp_roles->get_names() : array();
+
             foreach ( $all_members as $sm ) {
                 if ( ! $sm instanceof WP_User ) continue;
 
-                // Filter strictly for accounts holding the 'tfaa_member' role
-                $u_roles = (array) $sm->roles;
-                if ( ! in_array( 'tfaa_member', $u_roles, true ) ) {
+                $uid = intval( $sm->ID );
+                if ( isset( $counted_uids[ $uid ] ) ) {
+                    continue; // Skip if already counted via another role
+                }
+
+                $u_roles       = (array) $sm->roles;
+                $has_tfaa_role = false;
+
+                foreach ( $u_roles as $r_slug ) {
+                    $r_clean = strtolower( $r_slug );
+                    $r_name  = isset( $wp_role_names[$r_slug] ) ? strtolower( $wp_role_names[$r_slug] ) : '';
+
+                    if ( strpos( $r_clean, 'tfaa' ) !== false || strpos( $r_name, 'tfaa' ) !== false ) {
+                        $has_tfaa_role = true;
+                        break;
+                    }
+                }
+
+                if ( ! $has_tfaa_role ) {
                     continue;
                 }
 
+                $counted_uids[ $uid ] = true;
                 $stat_total++;
+
                 $sm_nfaa = function_exists( 'sywat_get_member_nfaa_status' ) 
-                    ? sywat_get_member_nfaa_status( $sm->ID ) 
+                    ? sywat_get_member_nfaa_status( $uid ) 
                     : array( 'is_active' => false );
 
                 if ( isset( $sm_nfaa['is_active'] ) && $sm_nfaa['is_active'] ) {
