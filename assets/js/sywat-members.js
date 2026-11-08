@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, and Protected Test Data Purge Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, search/status filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Standalone Account Transfer Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 4.0.0
+ * Version: 4.2.0
  */
 
 /**
@@ -396,6 +396,101 @@ function sywatClosePurgeModal() {
     const modal = document.getElementById('sywat_purge_test_modal');
     if (modal) {
         modal.classList.remove('active');
+    }
+}
+
+// 11. Standalone Member Transfer / Merge Modal
+function sywatOpenTransferMemberModal(sourceUserId, sourceUserName) {
+    const modal = document.getElementById('sywat_transfer_member_modal');
+    const sourceInput = document.getElementById('sywat_transfer_source_user_id');
+    const sourceLabel = document.getElementById('sywat_transfer_source_name');
+
+    if (sourceInput) sourceInput.value = sourceUserId;
+    if (sourceLabel) sourceLabel.textContent = sourceUserName;
+
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function sywatCloseTransferMemberModal() {
+    const modal = document.getElementById('sywat_transfer_member_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+/**
+ * Handles live autocompletion searches against unassigned archers when linking household members.
+ */
+let sywatSearchDebounceTimer = null;
+
+function sywatHandleArcherSearch(input) {
+    if (!input) return;
+
+    const query = input.value.trim();
+    const resultsBox = document.getElementById('sywat_add_dep_autocomplete_results');
+    if (!resultsBox) return;
+
+    clearTimeout(sywatSearchDebounceTimer);
+
+    if (query.length < 2) {
+        resultsBox.innerHTML = '';
+        resultsBox.classList.add('sywat-hidden');
+        return;
+    }
+
+    sywatSearchDebounceTimer = setTimeout(function() {
+        const ajaxUrl = window.ajaxurl || '/wp-admin/admin-ajax.php';
+        const form = document.getElementById('sywat_add_dependent_form');
+        const nonceInput = form ? form.querySelector('input[name="sywat_nonce"]') : null;
+        const nonce = nonceInput ? nonceInput.value : '';
+
+        fetch(ajaxUrl + '?action=sywat_search_unassigned_archers&term=' + encodeURIComponent(query) + '&sywat_nonce=' + encodeURIComponent(nonce))
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+                    let html = '';
+                    data.data.forEach(item => {
+                        const nfaaDisp = item.nfaa_number ? item.nfaa_number : 'No NFAA ID';
+                        const dobDisp = item.dob ? item.dob : 'No DOB';
+                        html += `<div class="sywat-autocomplete-item" onclick='sywatSelectArcherResult(${JSON.stringify(item)})'>
+                            <strong>${item.first_name} ${item.last_name}</strong>
+                            <div class="sywat-meta-subtext">🆔 ${nfaaDisp} | 📅 DOB: ${dobDisp}</div>
+                        </div>`;
+                    });
+                    resultsBox.innerHTML = html;
+                    resultsBox.classList.remove('sywat-hidden');
+                } else {
+                    resultsBox.innerHTML = '<div class="sywat-autocomplete-item sywat-meta-subtext">No unassigned archers found</div>';
+                    resultsBox.classList.remove('sywat-hidden');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                resultsBox.classList.add('sywat-hidden');
+            });
+    }, 300);
+}
+
+/**
+ * Auto-fills selected unassigned archer profile fields into the Add Family Member form.
+ */
+function sywatSelectArcherResult(item) {
+    const resultsBox = document.getElementById('sywat_add_dep_autocomplete_results');
+    const searchInput = document.getElementById('sywat_add_dep_autocomplete');
+
+    if (item.first_name) document.getElementById('add_dep_first_name').value = item.first_name;
+    if (item.last_name) document.getElementById('add_dep_last_name').value = item.last_name;
+    if (item.dob) document.getElementById('add_dep_dob').value = item.dob;
+    if (item.gender) document.getElementById('add_dep_gender').value = item.gender;
+    if (item.nfaa_number) document.getElementById('add_dep_nfaa_number').value = item.nfaa_number;
+    if (item.nfaa_expiration) document.getElementById('add_dep_nfaa_expiration').value = item.nfaa_expiration;
+
+    if (searchInput) searchInput.value = item.first_name + ' ' + item.last_name;
+    if (resultsBox) {
+        resultsBox.innerHTML = '';
+        resultsBox.classList.add('sywat-hidden');
     }
 }
 
