@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.4.0
+ * Version: 4.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -501,6 +501,69 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
             }
+        }
+
+        // 4B. HEAD OF HOUSEHOLD SELF-SERVICE PROFILE UPDATE
+        if ( $action === 'update_self_profile' ) {
+            $user_id = get_current_user_id();
+            if ( $user_id <= 0 ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">You must be logged in to update your profile.</div>';
+            }
+
+            $first_name      = sanitize_text_field( $_POST['first_name'] );
+            $last_name       = sanitize_text_field( $_POST['last_name'] );
+            $email           = sanitize_email( $_POST['email'] );
+            $phone           = sanitize_text_field( $_POST['phone'] );
+            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
+            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
+            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
+            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
+            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
+            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
+            $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
+            $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
+            $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
+            $state           = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
+            $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
+
+            $new_pw         = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
+            $confirm_new_pw = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
+
+            if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
+            }
+
+            if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
+                $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
+                if ( $pw_val !== true ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
+                }
+                wp_set_password( $new_pw, $user_id );
+            }
+
+            wp_update_user( array(
+                'ID'           => $user_id,
+                'first_name'   => $first_name,
+                'last_name'    => $last_name,
+                'display_name' => $first_name . ' ' . $last_name,
+                'user_email'   => $email,
+            ) );
+
+            update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
+            update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
+            update_user_meta( $user_id, 'sywat_phone', $phone );
+            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
+            update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
+            update_user_meta( $user_id, 'sywat_dob', $dob );
+            update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
+            update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
+            update_user_meta( $user_id, 'sywat_address_1', $address_1 );
+            update_user_meta( $user_id, 'sywat_address_2', $address_2 );
+            update_user_meta( $user_id, 'sywat_city', $city );
+            update_user_meta( $user_id, 'sywat_state', $state );
+            update_user_meta( $user_id, 'sywat_zip', $zip );
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Your household master profile has been updated successfully!</div>';
         }
 
         // 5. DELETE MEMBER ACCOUNT OR PERMANENTLY PURGE DEPENDENT SUB-PROFILE
