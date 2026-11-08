@@ -1,6 +1,11 @@
 /* Top Full-Width Authentication Header */
 .sywat-auth-bar { width: 100%; background: #0f172a; color: #ffffff; margin: 0 0 24px 0; padding: 14px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); box-sizing: border-box; }
 .sywat-auth-bar-inner { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; flex-wrap: wrap; gap: 10px; }
+.sywat-auth-brand-wrapper { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.sywat-auth-logo, .sywat-auth-logo-sm { height: 40px !important; width: auto !important; display: block; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
+.sywat-auth-brand-title { font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 0.3px; white-space: nowrap; }
+.sywat-auth-nav-track { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sywat-auth-user-controls { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .sywat-auth-nav-link { color: #e2e8f0; font-size: 13px; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 6px; white-space: nowrap !important; display: inline-flex; align-items: center; transition: background 0.2s ease, color 0.2s ease; }
 .sywat-auth-nav-link:hover { background-color: #1e293b; color: #38bdf8; }
 .sywat-auth-dropdown { position: relative; display: inline-block; }
