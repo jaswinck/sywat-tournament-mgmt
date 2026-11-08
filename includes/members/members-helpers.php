@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -229,23 +229,21 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
         $expiration           = '';
         $is_active            = false;
         $system_account_label = '';
-        $has_membership_role  = true; // Default true for direct date strings or unlinked contexts
+        $has_membership_role  = true;
 
         if ( is_numeric( $user_id_or_date ) && intval( $user_id_or_date ) > 0 ) {
             $user_id    = intval( $user_id_or_date );
             $user_obj   = get_userdata( $user_id );
             $user_roles = $user_obj ? (array) $user_obj->roles : array();
 
-            // Qualifying shooting member & officer roles ONLY
-            $qualifying_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
-                ? sywat_get_custom_roles_slugs() 
-                : array(
-                    'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
-                    'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-                    'tfaa_webmaster', 'tfaa_field_governor'
-                );
+            // STRICT EXPLICIT SHOOTING ROLES ONLY - DO NOT CALL sywat_get_custom_roles_slugs()
+            $qualifying_roles = array(
+                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+                'tfaa_webmaster', 'tfaa_field_governor'
+            );
 
-            // STEP 1: EVALUATE ROLES FIRST BEFORE TOUCHING ANY EXPIRATION DATE META
+            // Step 1: Evaluate roles FIRST
             $has_membership_role = false;
             foreach ( $user_roles as $r ) {
                 $r_clean = strtolower( $r );
@@ -257,9 +255,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 }
             }
 
-            // STEP 2: ABSOLUTE ROLE SHORT-CIRCUIT
-            // IF MEMBER CHECKBOX IS NOT CHECKED ($has_membership_role === false), STOP HERE.
-            // DO NOT READ OR EVALUATE ANY EXPIRATION DATE FROM WP_USERMETA.
+            // Step 2: GUARANTEED SHORT-CIRCUIT FOR NON-SHOOTING ROLES
             if ( ! $has_membership_role ) {
                 if ( ! empty( $system_account_label ) ) {
                     return array(
@@ -267,7 +263,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                         'expiration'           => 'System Account',
                         'raw_date'             => '',
                         'badge_class'          => 'sywat-badge-checkedin',
-                        'is_active'            => false, // Strictly false: suppresses member status badge
+                        'is_active'            => false,
                         'system_account_label' => $system_account_label,
                         'has_membership_role'  => false,
                     );
@@ -284,11 +280,10 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 );
             }
 
-            // STEP 3: ONLY FETCH DATABASE EXPIRATION META IF THE USER IS A CONFIRMED SHOOTING MEMBER
+            // Step 3: Only fetch database meta IF user explicitly has a shooting member role
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
-            // Dual-Role or Member Account without an explicit NFAA ID or expiration date set
             if ( empty( $expiration ) && empty( $nfaa_id ) ) {
                 $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
                 $is_active   = ( $legacy_flag === 'yes' );
