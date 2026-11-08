@@ -41,11 +41,11 @@
 .sywat-table-header-controls input[type="text"] { width: 160px !important; font-size: 13px !important; padding: 4px 10px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
 .sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync) { padding: 4px 12px !important; font-size: 13px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
 
-/* Clean Left-Side In-Line Stat Badges (Zero Heavy Gray Background Container) */
-.sywat-stats-inline-pills { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.sywat-inline-pill { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; font-size: 12px; font-weight: 600; border-radius: 4px; background: #ffffff; border: 1px solid #cbd5e1; color: #334155; white-space: nowrap; box-sizing: border-box; }
-.sywat-inline-pill-active { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.sywat-inline-pill-expired { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
+/* Clean Left-Side In-Line Stat Badges (Zero Container Boxes) */
+.sywat-stats-inline-pills { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 2px; }
+.sywat-inline-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #334155; white-space: nowrap; background: transparent; border: none; padding: 0; }
+.sywat-inline-pill-active { color: #166534; }
+.sywat-inline-pill-expired { color: #64748b; }
 
 /* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -54,7 +54,10 @@
 .sywat-filter-bar-form { display: flex !important; align-items: flex-end !important; gap: 12px !important; flex-wrap: wrap !important; margin: 0 !important; }
 .sywat-filter-field { display: flex; flex-direction: column; gap: 4px; }
 .sywat-field-auto { width: auto !important; }
-.sywat-filter-field label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+
+/* Bolder, crisper STATUS heading */
+.sywat-filter-field label { font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.6px; line-height: 1; }
+
 .sywat-wrap .sywat-filter-field select, .sywat-app .sywat-filter-field select, .sywat-filter-field select { height: 34px !important; font-size: 13px !important; font-weight: 600 !important; padding: 4px 10px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; min-width: 170px !important; box-sizing: border-box !important; }
 .sywat-select-tournament { min-width: 200px !important; }
 .sywat-select-line { min-width: 160px !important; }
