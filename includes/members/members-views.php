@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data purge triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -410,15 +410,15 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         <!-- REFINED MEMBER STATISTICS BAR -->
                         <div class="sywat-member-stats-bar">
                             <div class="sywat-stat-item">
-                                <span class="sywat-stat-label">Total Records</span>
+                                <span class="sywat-stat-label">Total Members</span>
                                 <span class="sywat-stat-value"><?php echo number_format( $stat_total ); ?></span>
                             </div>
                             <div class="sywat-stat-item">
-                                <span class="sywat-stat-label">🟢 Active Members</span>
+                                <span class="sywat-stat-label">🟢 Active Membership</span>
                                 <span class="sywat-stat-value"><?php echo number_format( $stat_active ); ?></span>
                             </div>
                             <div class="sywat-stat-item">
-                                <span class="sywat-stat-label">⚪ Expired / Historical</span>
+                                <span class="sywat-stat-label">⚪ Expired Memberships</span>
                                 <span class="sywat-stat-value"><?php echo number_format( $stat_expired ); ?></span>
                             </div>
                         </div>
@@ -429,8 +429,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetMemberSearch()">Clear</button>
                                 </div>
-                                <div class="sywat-filter-group sywat-ml-2">
-                                    <label for="sywat_member_status_filter" class="sywat-filter-label">Status:</label>
+                                <div class="sywat-filter-field sywat-ml-2">
+                                    <label for="sywat_member_status_filter">Status</label>
                                     <select id="sywat_member_status_filter" onchange="sywatApplyMemberSearch()" class="sywat-select-filter">
                                         <option value="">-- All Statuses --</option>
                                         <option value="active">🟢 Active Only</option>
