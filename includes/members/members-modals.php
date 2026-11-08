@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, and protected test data purge overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, and standalone profile transfer/merge overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -385,7 +385,7 @@ function sywat_members_render_modals( $data ) {
                     <button type="button" class="sywat-modal-close" onclick="sywatCloseAddDependentModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
-                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>">
+                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_add_dependent_form">
                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="create_member">
                         <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -394,21 +394,28 @@ function sywat_members_render_modals( $data ) {
                             🏠 Sub-profile linked directly under Head of Household <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>. Zero password rules or WP login accounts required.
                         </div>
 
+                        <!-- LIVE ARCHER AUTOCOMPLETE SEARCH BOX -->
+                        <div class="sywat-field-group sywat-mt-2 sywat-mb-3 sywat-autocomplete-wrapper">
+                            <label>🔍 Search Existing Unassigned Archer (Type Name or NFAA ID)</label>
+                            <input type="text" id="sywat_add_dep_autocomplete" placeholder="Start typing name to search unassigned pool..." autocomplete="off" oninput="sywatHandleArcherSearch(this)">
+                            <div id="sywat_add_dep_autocomplete_results" class="sywat-autocomplete-results sywat-hidden"></div>
+                        </div>
+
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>First Name *</label>
-                                <input type="text" name="first_name" required placeholder="e.g. Timmy">
+                                <input type="text" name="first_name" id="add_dep_first_name" required placeholder="e.g. Timmy">
                             </div>
                             <div class="sywat-field-group">
                                 <label>Last Name *</label>
-                                <input type="text" name="last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" required>
+                                <input type="text" name="last_name" id="add_dep_last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" required>
                             </div>
                         </div>
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Gender *</label>
-                                <select name="gender" required>
+                                <select name="gender" id="add_dep_gender" required>
                                     <?php foreach ( $gender_options as $g_key => $g_label ): ?>
                                         <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( $g_key, 'unassigned' ); ?>><?php echo esc_html( $g_label ); ?></option>
                                     <?php endforeach; ?>
@@ -416,21 +423,21 @@ function sywat_members_render_modals( $data ) {
                             </div>
                             <div class="sywat-field-group">
                                 <label>Pro Archer Status (18+)</label>
-                                <select name="is_pro">
+                                <select name="is_pro" id="add_dep_is_pro">
                                     <option value="no" selected>No</option>
                                     <option value="yes">Yes</option>
                                 </select>
                             </div>
                             <div class="sywat-field-group">
                                 <label>Date of Birth * (For Age Divisions)</label>
-                                <input type="date" name="dob" required>
+                                <input type="date" name="dob" id="add_dep_dob" required>
                             </div>
                         </div>
 
                         <div class="sywat-form-grid-3 sywat-mt-3">
                             <div class="sywat-field-group">
                                 <label>Accommodations Needed</label>
-                                <select name="accommodations">
+                                <select name="accommodations" id="add_dep_accommodations">
                                     <?php foreach ( $accom_options as $a_key => $a_label ): ?>
                                         <option value="<?php echo esc_attr( $a_key ); ?>"><?php echo esc_html( $a_label ); ?></option>
                                     <?php endforeach; ?>
@@ -438,11 +445,11 @@ function sywat_members_render_modals( $data ) {
                             </div>
                             <div class="sywat-field-group">
                                 <label>NFAA Membership ID (Optional)</label>
-                                <input type="text" name="nfaa_number" placeholder="e.g. 123456">
+                                <input type="text" name="nfaa_number" id="add_dep_nfaa_number" placeholder="e.g. 123456">
                             </div>
                             <div class="sywat-field-group">
                                 <label>NFAA Expiration Date (Optional)</label>
-                                <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
+                                <input type="date" name="nfaa_expiration" id="add_dep_nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
                             </div>
                         </div>
 
@@ -1037,6 +1044,48 @@ function sywat_members_render_modals( $data ) {
                     <div class="sywat-modal-actions sywat-mt-4">
                         <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatClosePurgeModal()">Cancel</button>
                         <button type="submit" class="sywat-btn sywat-btn-danger" id="sywat_purge_submit_btn" disabled>🗑️ Execute Data Purge</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 10: TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_transfer_member_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>🔗 Transfer / Merge Archer to Household</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseTransferMemberModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_transfer_member_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="transfer_household_member">
+                    <input type="hidden" name="source_user_id" id="sywat_transfer_source_user_id" value="0">
+
+                    <div class="sywat-alert sywat-alert-info">
+                        🔗 <strong>Transfer Archer:</strong> Moves this member into a target family household as a dependent sub-profile while merging their redundant primary account.
+                    </div>
+
+                    <div class="sywat-member-info-banner sywat-mt-3">
+                        <span>👤 <strong>Archer Name:</strong> <span id="sywat_transfer_source_name">-- Select Member --</span></span>
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-4">
+                        <label>Select Target Head of Household *</label>
+                        <select name="target_head_id" required>
+                            <option value="">-- Choose Target Family Head --</option>
+                            <?php foreach ( $all_members as $m_item ): ?>
+                                <option value="<?php echo intval( $m_item->ID ); ?>">
+                                    <?php echo esc_html( $m_item->display_name ); ?> (<?php echo esc_html( $m_item->user_email ); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseTransferMemberModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Merge into Household</button>
                     </div>
                 </form>
             </div>
