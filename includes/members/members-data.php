@@ -5,7 +5,7 @@
  * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships).
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,23 +17,12 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
      * @return array List of WP_User objects.
      */
     function sywat_get_all_tfaa_members() {
-        $allowed_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
-            ? sywat_get_custom_roles_slugs() 
-            : array(
-                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
-                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-                'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager', 
-                'sywat_shop_user', 'administrator'
-            );
-
-        if ( is_array( $allowed_roles ) ) {
-            $extra_roles = array( 'sywat_shop_manager', 'sywat_shop_user', 'administrator' );
-            foreach ( $extra_roles as $er ) {
-                if ( ! in_array( $er, $allowed_roles, true ) ) {
-                    $allowed_roles[] = $er;
-                }
-            }
-        }
+        $allowed_roles = array(
+            'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+            'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+            'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager', 
+            'sywat_shop_user', 'administrator'
+        );
 
         return get_users( array(
             'role__in' => $allowed_roles,
@@ -80,14 +69,12 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
         $stat_expired = 0;
         $counted_uids = array(); // Dedup guard hashtable
 
-        // Define exact qualifying active membership roles
-        $qualifying_membership_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
-            ? sywat_get_custom_roles_slugs() 
-            : array(
-                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
-                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-                'tfaa_webmaster', 'tfaa_field_governor'
-            );
+        // STRICT EXPLICIT SHOOTING ROLES ONLY - DO NOT CALL sywat_get_custom_roles_slugs()
+        $qualifying_membership_roles = array(
+            'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+            'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+            'tfaa_webmaster', 'tfaa_field_governor'
+        );
 
         if ( ! empty( $all_members ) && is_array( $all_members ) ) {
             foreach ( $all_members as $sm ) {
