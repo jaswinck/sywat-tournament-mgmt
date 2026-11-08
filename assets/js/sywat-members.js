@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Household Link Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, Household Link Overlays, and Collapsible Standalone Account Conversion Drawers), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 4.4.0
+ * Version: 4.5.0
  */
 
 /**
@@ -63,6 +63,16 @@ function sywatToggleShopVisibility(formId, containerId) {
         if (select) {
             select.value = '';
         }
+    }
+}
+
+/**
+ * Toggles the visibility of the collapsible Standalone Account Conversion drawer inside Modal 4.
+ */
+function sywatTogglePromoteSection() {
+    const box = document.getElementById('sywat_promote_collapsible');
+    if (box) {
+        box.classList.toggle('sywat-hidden');
     }
 }
 
