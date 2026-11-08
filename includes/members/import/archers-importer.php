@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, pre-computed default password hashing, atomic MySQL transactions, persistent upload staging, and household dependent deduplication guards.
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, pre-computed default password hashing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
  * Author: SYWAT Archery
- * Version: 1.7.0
+ * Version: 1.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -429,9 +429,16 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         }
 
         // -------------------------------------------------------------------------
-        // MODE 2: COMMIT INGESTION WITH BULK IN-MEMORY MAPS & MYSQL TRANSACTIONS
+        // MODE 2: COMMIT INGESTION WITH BULK IN-MEMORY MAPS, HOOK & CACHE SUSPENSION, & MYSQL TRANSACTIONS
         // -------------------------------------------------------------------------
         global $wpdb;
+
+        // Suspend object cache invalidations and unhook registration callbacks for maximum ingestion speed
+        wp_suspend_cache_invalidation( true );
+        remove_all_actions( 'user_register' );
+        remove_all_actions( 'profile_update' );
+        remove_all_actions( 'added_user_meta' );
+        remove_all_actions( 'updated_user_meta' );
 
         // Start atomic MySQL Transaction for ultra-fast batch disk writes
         $wpdb->query( 'START TRANSACTION' );
@@ -630,6 +637,10 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         // Commit atomic MySQL transaction
         $wpdb->query( 'COMMIT' );
 
+        // Re-enable object cache invalidations and flush cache in a single atomic sync
+        wp_suspend_cache_invalidation( false );
+        wp_cache_flush();
+
         if ( file_exists( $file_path ) ) {
             @unlink( $file_path );
         }
@@ -644,4 +655,5 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             $metric_deduped_rows
         );
     }
+}
 }
