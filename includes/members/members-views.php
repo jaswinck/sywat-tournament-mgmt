@@ -102,6 +102,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
                         : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
+                    $is_hoh_member = ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] );
+
                     $age_div = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
                         ? sywat_get_eligible_age_division( $e_dob ) 
                         : 'Adult';
@@ -176,7 +178,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
                                             <?php endif; ?>
 
-                                            <?php if ( ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] ) ): ?>
+                                            <?php if ( $is_hoh_member ): ?>
                                                 <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
                                                     <?php echo ( ! empty( $nfaa_info['is_active'] ) ) ? '🟢 Active' : '⚪ Expired'; ?>
                                                 </span>
@@ -185,7 +187,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             <?php endif; ?>
                                         </div>
 
-                                        <?php if ( ( ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] ) ) && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' && $nfaa_info['expiration'] !== 'System Account' ): ?>
+                                        <?php if ( $is_hoh_member && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' && $nfaa_info['expiration'] !== 'System Account' ): ?>
                                             <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
                                         <?php endif; ?>
                                     </td>
