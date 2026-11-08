@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships).
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships across primary accounts and household dependents).
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -52,14 +52,16 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
     /**
      * Statistical calculation engine for Member Directory metrics.
      * Evaluates total, active, and expired tallies strictly for users holding active TFAA member 
-     * or officer roles, enforcing O(1) hashtable deduplication so users with multiple roles 
-     * are never double-counted. Shop managers and administrators without active membership 
-     * roles are correctly excluded from membership tallies.
+     * or officer roles (Primary WP_Users) AND all linked household dependent archers stored in database meta.
+     * Enforces O(1) hashtable deduplication so primary users with multiple roles are never double-counted. 
+     * Shop managers and administrators without active membership roles are correctly excluded from membership tallies.
      *
      * @param array|null $all_members Optional pre-fetched list of WP_User objects to process.
      * @return array Associative array containing 'total', 'active', and 'expired' integer counts.
      */
     function sywat_get_tfaa_member_statistics( $all_members = null ) {
+        global $wpdb;
+
         if ( null === $all_members ) {
             $all_members = sywat_get_all_tfaa_members();
         }
@@ -76,6 +78,9 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
             'tfaa_webmaster', 'tfaa_field_governor'
         );
 
+        // -------------------------------------------------------------------------
+        // 1. EVALUATE PRIMARY WP_USER ACCOUNT HOLDERS
+        // -------------------------------------------------------------------------
         if ( ! empty( $all_members ) && is_array( $all_members ) ) {
             foreach ( $all_members as $sm ) {
                 if ( ! $sm instanceof WP_User ) continue;
@@ -111,6 +116,47 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
                     $stat_active++;
                 } else {
                     $stat_expired++;
+                }
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        // 2. EVALUATE HOUSEHOLD DEPENDENT ARCHERS STORED IN USER META
+        // -------------------------------------------------------------------------
+        $dep_rows = $wpdb->get_col(
+            "SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_household_dependents' AND meta_value != '' AND meta_value != 'a:0:{}'"
+        );
+
+        if ( ! empty( $dep_rows ) ) {
+            $today = date( 'Y-m-d' );
+
+            foreach ( $dep_rows as $raw_meta ) {
+                $deps = maybe_unserialize( $raw_meta );
+                if ( ! is_array( $deps ) || empty( $deps ) ) {
+                    continue;
+                }
+
+                foreach ( $deps as $d ) {
+                    if ( empty( $d['first_name'] ) && empty( $d['last_name'] ) ) {
+                        continue;
+                    }
+
+                    $stat_total++;
+
+                    $exp_date  = isset( $d['nfaa_expiration'] ) ? trim( $d['nfaa_expiration'] ) : '';
+                    $is_active = false;
+
+                    if ( ! empty( $exp_date ) && $exp_date !== '0000-00-00' ) {
+                        if ( $exp_date === '2099-12-31' || strtotime( $exp_date ) >= strtotime( $today ) ) {
+                            $is_active = true;
+                        }
+                    }
+
+                    if ( $is_active ) {
+                        $stat_active++;
+                    } else {
+                        $stat_expired++;
+                    }
                 }
             }
         }
