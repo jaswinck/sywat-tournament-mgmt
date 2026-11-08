@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, and step-by-step AJAX progress chunking endpoints.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -35,6 +35,61 @@ if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
             return 'Password must contain at least one number (0-9).';
         }
         return true;
+    }
+}
+
+if ( ! function_exists( 'sywat_get_protected_user_map' ) ) {
+    /**
+     * Build O(1) hashtable map of protected account IDs (Administrators, Officers, Shop Managers, Board Members, active user).
+     *
+     * @return array Map array with user IDs as keys.
+     */
+    function sywat_get_protected_user_map() {
+        global $wpdb;
+
+        $protected_map   = array();
+        $current_user_id = get_current_user_id();
+
+        // Always protect active logged-in account
+        if ( $current_user_id > 0 ) {
+            $protected_map[ $current_user_id ] = true;
+        }
+
+        // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officers ($O(1) lookup)
+        $cap_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
+                $wpdb->prefix . 'capabilities'
+            )
+        );
+
+        if ( ! empty( $cap_rows ) ) {
+            foreach ( $cap_rows as $cr ) {
+                $uid  = intval( $cr->user_id );
+                $caps = @maybe_unserialize( $cr->meta_value );
+                if ( is_array( $caps ) ) {
+                    foreach ( array_keys( $caps ) as $role_slug ) {
+                        $r_clean = strtolower( $role_slug );
+                        if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
+                            $protected_map[ $uid ] = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Bulk pre-fetch active Board Member assignments
+        $board_rows = $wpdb->get_col(
+            "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
+        );
+        if ( ! empty( $board_rows ) ) {
+            foreach ( $board_rows as $b_uid ) {
+                $protected_map[ intval( $b_uid ) ] = true;
+            }
+        }
+
+        return $protected_map;
     }
 }
 
@@ -167,49 +222,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             require_once ABSPATH . 'wp-admin/includes/user.php';
             global $wpdb;
 
-            $current_user_id = get_current_user_id();
-            $protected_map   = array();
-
-            // Always protect active user account
-            if ( $current_user_id > 0 ) {
-                $protected_map[ $current_user_id ] = true;
-            }
-
-            // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officer roles ($O(1) hashtable)
-            $cap_rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
-                    $wpdb->prefix . 'capabilities'
-                )
-            );
-
-            if ( ! empty( $cap_rows ) ) {
-                foreach ( $cap_rows as $cr ) {
-                    $uid  = intval( $cr->user_id );
-                    $caps = @maybe_unserialize( $cr->meta_value );
-                    if ( is_array( $caps ) ) {
-                        foreach ( array_keys( $caps ) as $role_slug ) {
-                            $r_clean = strtolower( $role_slug );
-                            if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
-                                $protected_map[ $uid ] = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Bulk pre-fetch active Board Member assignments
-            $board_rows = $wpdb->get_col(
-                "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
-            );
-            if ( ! empty( $board_rows ) ) {
-                foreach ( $board_rows as $b_uid ) {
-                    $protected_map[ intval( $b_uid ) ] = true;
-                }
-            }
-
-            // Fetch user IDs only ($O(1) memory overhead)
+            $protected_map   = sywat_get_protected_user_map();
             $all_user_ids    = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
             $deleted_count   = 0;
             $protected_count = 0;
@@ -633,13 +646,20 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
     /**
      * AJAX Endpoint: Chunked Protected Test Data Purge Processor
      * Deletes test accounts in batches of 100 while returning percentage updates to the client progress bar.
+     * Enforces output buffer clearing to prevent stray HTML/script output from polluting the JSON stream.
      */
     function sywat_ajax_purge_test_members_chunk() {
         if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page and try again.' ) );
         }
 
         if ( ! current_user_can( 'administrator' ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Access denied. Only administrators can execute batch data purges.' ) );
         }
 
@@ -654,45 +674,7 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
 
         // 1. INITIALIZATION: Build queue on first chunk or explicit reset request
         if ( $chunk === 1 || $reset_queue || get_transient( $queue_key ) === false ) {
-            $protected_map = array();
-            if ( $user_id > 0 ) {
-                $protected_map[ $user_id ] = true;
-            }
-
-            // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officers
-            $cap_rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
-                    $wpdb->prefix . 'capabilities'
-                )
-            );
-
-            if ( ! empty( $cap_rows ) ) {
-                foreach ( $cap_rows as $cr ) {
-                    $uid  = intval( $cr->user_id );
-                    $caps = @maybe_unserialize( $cr->meta_value );
-                    if ( is_array( $caps ) ) {
-                        foreach ( array_keys( $caps ) as $role_slug ) {
-                            $r_clean = strtolower( $role_slug );
-                            if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
-                                $protected_map[ $uid ] = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Bulk pre-fetch active Board Member assignments
-            $board_rows = $wpdb->get_col(
-                "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
-            );
-            if ( ! empty( $board_rows ) ) {
-                foreach ( $board_rows as $b_uid ) {
-                    $protected_map[ intval( $b_uid ) ] = true;
-                }
-            }
-
+            $protected_map = function_exists( 'sywat_get_protected_user_map' ) ? sywat_get_protected_user_map() : array();
             $all_user_ids  = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
             $purge_queue   = array();
             $protected_cnt = 0;
@@ -721,6 +703,9 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         $meta        = get_transient( $meta_key );
 
         if ( ! is_array( $purge_queue ) || ! is_array( $meta ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Purge state lost or expired. Please reload and try again.' ) );
         }
 
@@ -734,6 +719,9 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
             delete_transient( $meta_key );
             wp_cache_flush();
 
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_success( array(
                 'finished'        => true,
                 'deleted_chunk'   => 0,
@@ -783,6 +771,9 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
 
         $percent = $total_purgeable > 0 ? min( 100, round( ( $new_total_deleted / $total_purgeable ) * 100 ) ) : 100;
 
+        if ( ob_get_length() ) {
+            ob_clean();
+        }
         wp_send_json_success( array(
             'finished'        => $finished,
             'deleted_chunk'   => $chunk_deleted,
