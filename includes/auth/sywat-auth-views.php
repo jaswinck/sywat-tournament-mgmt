@@ -3,8 +3,9 @@
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
  * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Compliance: Zero inline style attributes. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.2.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -36,18 +37,18 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
             <div class="sywat-auth-bar-inner">
                 
                 <!-- Left: Brand Logo & Title -->
-                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                <div class="sywat-auth-brand-wrapper">
                     <?php if ( ! empty( $logo_url ) ): ?>
-                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:40px; width:auto; display:block; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));" onerror="this.style.display='none';">
+                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo" onerror="this.style.display='none';">
                     <?php endif; ?>
                     
-                    <span style="font-size:16px; font-weight:800; color:#ffffff; letter-spacing:0.3px; white-space:nowrap;">
+                    <span class="sywat-auth-brand-title">
                         TFAA Archery
                     </span>
                 </div>
 
                 <!-- Center: Primary App Navigation Links -->
-                <nav style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <nav class="sywat-auth-nav-track">
                     
                     <!-- 1. Operational Tournaments Dropdown (Staff Only) -->
                     <?php if ( $can_manage_tournaments ): ?>
@@ -114,7 +115,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 </nav>
 
                 <!-- Right: Account Profile Dropdown or Sign In Link -->
-                <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                <div class="sywat-auth-user-controls">
                     <?php if ( $is_logged_in ): ?>
                         <div class="sywat-auth-dropdown">
                             <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
@@ -169,15 +170,15 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         <div class="sywat-login-card">
             
             <!-- Card Header -->
-            <div style="background:#0f172a; padding:28px 20px; text-align:center; color:#ffffff;">
+            <div class="sywat-login-card-header">
                 <?php if ( ! empty( $logo_url ) ): ?>
-                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" style="height:64px; width:auto; margin:0 auto 10px auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));" onerror="this.style.display='none';">
+                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-login-logo" onerror="this.style.display='none';">
                 <?php endif; ?>
-                <h3 style="margin:0; font-size:19px; font-weight:700; color:#ffffff;">Texas Field Archery Association</h3>
+                <h3 class="sywat-login-title">Texas Field Archery Association</h3>
             </div>
 
             <!-- Card Body -->
-            <div style="padding:24px; background:#f8fafc;">
+            <div class="sywat-login-card-body">
                 
                 <?php if ( ! empty( $auth_error ) ): ?>
                     <div class="sywat-alert sywat-alert-danger">
@@ -193,7 +194,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
                 <?php if ( $action === 'lost_password' ): ?>
                     <!-- STATE 2: REQUEST PASSWORD RESET -->
-                    <p style="font-size:13px; color:#475569; margin-top:0; margin-bottom:16px;">
+                    <p class="sywat-login-instructions">
                         Enter your username or email address below. You will receive an email with instructions to reset your password.
                     </p>
 
@@ -201,25 +202,25 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="lost_password">
 
-                        <div class="sywat-field-group" style="margin-bottom:18px;">
+                        <div class="sywat-field-group sywat-mb-3">
                             <label>Username or Email Address</label>
-                            <input type="text" name="sywat_user_login" required style="width:100%;">
+                            <input type="text" name="sywat_user_login" required class="sywat-w-100">
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-w-100">
                             Send Reset Link
                         </button>
                     </form>
 
-                    <div style="text-align:center; margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0;">
-                        <a href="<?php echo esc_url( $current_url ); ?>" style="font-size:12px; color:#0284c7; text-decoration:none; font-weight:600;">
+                    <div class="sywat-login-footer">
+                        <a href="<?php echo esc_url( $current_url ); ?>" class="sywat-login-footer-link">
                             ← Back to Sign In
                         </a>
                     </div>
 
                 <?php elseif ( $action === 'rp' ): ?>
                     <!-- STATE 3: SET NEW PASSWORD -->
-                    <p style="font-size:13px; color:#475569; margin-top:0; margin-bottom:16px;">
+                    <p class="sywat-login-instructions">
                         Please enter your new password below.
                     </p>
 
@@ -229,23 +230,23 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="rp_key" value="<?php echo esc_attr( $rp_key ); ?>">
                         <input type="hidden" name="rp_login" value="<?php echo esc_attr( $rp_login ); ?>">
 
-                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                        <div class="sywat-field-group sywat-mb-3">
                             <label>New Password</label>
-                            <input type="password" name="pass1" required autocomplete="new-password" style="width:100%;">
+                            <input type="password" name="pass1" required autocomplete="new-password" class="sywat-w-100">
                         </div>
 
-                        <div class="sywat-field-group" style="margin-bottom:18px;">
+                        <div class="sywat-field-group sywat-mb-3">
                             <label>Confirm New Password</label>
-                            <input type="password" name="pass2" required autocomplete="new-password" style="width:100%;">
+                            <input type="password" name="pass2" required autocomplete="new-password" class="sywat-w-100">
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-w-100">
                             Save New Password
                         </button>
                     </form>
 
-                    <div style="text-align:center; margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0;">
-                        <a href="<?php echo esc_url( $current_url ); ?>" style="font-size:12px; color:#0284c7; text-decoration:none; font-weight:600;">
+                    <div class="sywat-login-footer">
+                        <a href="<?php echo esc_url( $current_url ); ?>" class="sywat-login-footer-link">
                             ← Back to Sign In
                         </a>
                     </div>
@@ -257,29 +258,29 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="sywat_auth_action" value="login">
                         <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
 
-                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                        <div class="sywat-field-group sywat-mb-3">
                             <label>Username or Email Address</label>
-                            <input type="text" name="sywat_user_login" required autocomplete="username" style="width:100%;">
+                            <input type="text" name="sywat_user_login" required autocomplete="username" class="sywat-w-100">
                         </div>
 
-                        <div class="sywat-field-group" style="margin-bottom:14px;">
+                        <div class="sywat-field-group sywat-mb-3">
                             <label>Password</label>
-                            <input type="password" name="sywat_user_pass" required autocomplete="current-password" style="width:100%;">
+                            <input type="password" name="sywat_user_pass" required autocomplete="current-password" class="sywat-w-100">
                         </div>
 
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-                            <label style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; cursor:pointer;">
-                                <input type="checkbox" name="sywat_rememberme" value="1" checked style="margin:0;"> Remember Me
+                        <div class="sywat-login-remember-row">
+                            <label class="sywat-checkbox-label">
+                                <input type="checkbox" name="sywat_rememberme" value="1" checked class="sywat-m-0"> Remember Me
                             </label>
                         </div>
 
-                        <button type="submit" class="sywat-btn sywat-btn-primary" style="width:100%;">
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-w-100">
                             Sign In
                         </button>
                     </form>
 
-                    <div style="text-align:center; margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0;">
-                        <a href="<?php echo esc_url( $lost_pass_url ); ?>" style="font-size:12px; color:#0284c7; text-decoration:none; font-weight:600;">
+                    <div class="sywat-login-footer">
+                        <a href="<?php echo esc_url( $lost_pass_url ); ?>" class="sywat-login-footer-link">
                             Forgot Password?
                         </a>
                     </div>
@@ -307,10 +308,10 @@ if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
         if ( is_user_logged_in() ) {
             $user = wp_get_current_user();
             ?>
-            <div class="sywat-card" style="text-align:center; padding:30px; max-width:500px; width:min(100%, 500px); margin:20px auto;">
-                <div style="font-size:32px; margin-bottom:8px;">🎯</div>
-                <h3 style="margin-top:0; color:#0f172a;">Welcome, <?php echo esc_html( $user->display_name ); ?>!</h3>
-                <p style="color:#64748b; font-size:14px;">You are currently signed in to the Texas Field Archery Association portal.</p>
+            <div class="sywat-card sywat-card-welcome-box">
+                <div class="sywat-icon-welcome">🎯</div>
+                <h3 class="sywat-welcome-title">Welcome, <?php echo esc_html( $user->display_name ); ?>!</h3>
+                <p class="sywat-welcome-text">You are currently signed in to the Texas Field Archery Association portal.</p>
             </div>
             <?php
         } else {
