@@ -5,7 +5,7 @@
  * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships).
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -62,9 +62,10 @@ if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
 if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
     /**
      * Statistical calculation engine for Member Directory metrics.
-     * Evaluates total, active, and expired tallies strictly for users holding any role 
-     * containing "tfaa" (slug or display name), enforcing O(1) hashtable deduplication so 
-     * users with multiple TFAA roles are never double-counted.
+     * Evaluates total, active, and expired tallies strictly for users holding active TFAA member 
+     * or officer roles, enforcing O(1) hashtable deduplication so users with multiple roles 
+     * are never double-counted. Shop managers and administrators without active membership 
+     * roles are correctly excluded from membership tallies.
      *
      * @param array|null $all_members Optional pre-fetched list of WP_User objects to process.
      * @return array Associative array containing 'total', 'active', and 'expired' integer counts.
@@ -79,32 +80,36 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
         $stat_expired = 0;
         $counted_uids = array(); // Dedup guard hashtable
 
-        if ( ! empty( $all_members ) && is_array( $all_members ) ) {
-            global $wp_roles;
-            $wp_role_names = $wp_roles ? $wp_roles->get_names() : array();
+        // Define exact qualifying active membership roles
+        $qualifying_membership_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
+            ? sywat_get_custom_roles_slugs() 
+            : array(
+                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+                'tfaa_webmaster', 'tfaa_field_governor'
+            );
 
+        if ( ! empty( $all_members ) && is_array( $all_members ) ) {
             foreach ( $all_members as $sm ) {
                 if ( ! $sm instanceof WP_User ) continue;
 
                 $uid = intval( $sm->ID );
                 if ( isset( $counted_uids[ $uid ] ) ) {
-                    continue; // Skip if already counted via another role
+                    continue; // Skip if already counted
                 }
 
-                $u_roles       = (array) $sm->roles;
-                $has_tfaa_role = false;
+                $u_roles          = (array) $sm->roles;
+                $has_active_member_role = false;
 
                 foreach ( $u_roles as $r_slug ) {
-                    $r_clean = strtolower( $r_slug );
-                    $r_name  = isset( $wp_role_names[$r_slug] ) ? strtolower( $wp_role_names[$r_slug] ) : '';
-
-                    if ( strpos( $r_clean, 'tfaa' ) !== false || strpos( $r_name, 'tfaa' ) !== false ) {
-                        $has_tfaa_role = true;
+                    if ( in_array( strtolower( $r_slug ), $qualifying_membership_roles, true ) ) {
+                        $has_active_member_role = true;
                         break;
                     }
                 }
 
-                if ( ! $has_tfaa_role ) {
+                // If user does not hold a qualifying membership role (e.g., pure shop manager like Korbins), skip stats
+                if ( ! $has_active_member_role ) {
                     continue;
                 }
 
