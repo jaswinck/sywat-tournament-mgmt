@@ -3,9 +3,9 @@
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data purge triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions.
- * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes.
+ * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.0.0
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -397,23 +397,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         </div>
 
                         <?php
-                            // Pre-calculate active vs expired stats for the summary bar
-                            $stat_total = count( $all_members );
-                            $stat_active = 0;
-                            $stat_expired = 0;
-                            if ( ! empty( $all_members ) ) {
-                                foreach ( $all_members as $sm ) {
-                                    $sm_nfaa = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $sm->ID ) : array( 'is_active' => false );
-                                    if ( isset( $sm_nfaa['is_active'] ) && $sm_nfaa['is_active'] ) {
-                                        $stat_active++;
-                                    } else {
-                                        $stat_expired++;
-                                    }
-                                }
-                            }
+                            // Fetch pre-calculated directory statistics engine payload from members-data.php
+                            $member_stats = function_exists( 'sywat_get_tfaa_member_statistics' ) 
+                                ? sywat_get_tfaa_member_statistics( $all_members ) 
+                                : array( 'total' => 0, 'active' => 0, 'expired' => 0 );
+
+                            $stat_total   = isset( $member_stats['total'] ) ? $member_stats['total'] : 0;
+                            $stat_active  = isset( $member_stats['active'] ) ? $member_stats['active'] : 0;
+                            $stat_expired = isset( $member_stats['expired'] ) ? $member_stats['expired'] : 0;
                         ?>
 
-                        <!-- ACTIVE VS EXPIRED MEMBER STATISTICS BAR -->
+                        <!-- REFINED MEMBER STATISTICS BAR -->
                         <div class="sywat-member-stats-bar">
                             <div class="sywat-stat-item">
                                 <span class="sywat-stat-label">Total Records</span>
