@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions. Decoupled status badge presentation delegates payload evaluations strictly to members-helpers.php.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 4.8.0
+ * Version: 4.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -102,7 +102,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
                         : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
-                    $is_hoh_member = ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] );
+                    // Strict Boolean Check: User MUST hold a shooting member role to display active/expired badges
+                    $is_hoh_member = isset( $nfaa_info['has_membership_role'] ) && $nfaa_info['has_membership_role'] === true;
 
                     $age_div = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
                         ? sywat_get_eligible_age_division( $e_dob ) 
@@ -473,7 +474,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                     ? sywat_get_member_nfaa_status( $m->ID ) 
                                                     : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
-                                                $is_member  = ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] );
+                                                // Strict Boolean Check: User MUST hold a shooting member role to display active/expired status
+                                                $is_member  = isset( $nfaa_info['has_membership_role'] ) && $nfaa_info['has_membership_role'] === true;
                                                 $status_key = $is_member ? ( ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired' ) : 'non_member';
 
                                                 // DOB & Age Division Calculation (Retained for search data attribute)
