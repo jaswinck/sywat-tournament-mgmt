@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, and collapsible Standalone Account conversion drawers.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.5.0
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -321,30 +321,32 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
-                        <div class="sywat-field-group sywat-mt-4">
-                            <label>Assigned System Role(s) *</label>
-                            <div class="sywat-form-grid-2 sywat-role-grid">
-                                <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                    <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
-                                    <label class="sywat-checkbox-label">
-                                        <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $c_roles, true ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container')">
-                                        <?php echo esc_html( $r_details['name'] ); ?>
-                                    </label>
-                                <?php endforeach; ?>
+                        <?php if ( current_user_can( 'administrator' ) ): ?>
+                            <div class="sywat-field-group sywat-mt-4">
+                                <label>Assigned System Role(s) *</label>
+                                <div class="sywat-form-grid-2 sywat-role-grid">
+                                    <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                        <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
+                                        <label class="sywat-checkbox-label">
+                                            <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $c_roles, true ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container')">
+                                            <?php echo esc_html( $r_details['name'] ); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
-                        </div>
 
-                        <div id="sywat_edit_primary_shop_container" class="sywat-field-group sywat-mt-3 sywat-hidden">
-                            <label>Assigned Host Shop / Range</label>
-                            <select name="sywat_shop_id">
-                                <option value="" <?php selected( empty( $e_shop_id ), true ); ?>>-- None / Unassigned --</option>
-                                <?php foreach ( $all_shops as $s_id => $s_item ): ?>
-                                    <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $e_shop_id, $s_id ); ?>>
-                                        <?php echo esc_html( isset( $s_item['name'] ) ? $s_item['name'] : $s_id ); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                            <div id="sywat_edit_primary_shop_container" class="sywat-field-group sywat-mt-3 sywat-hidden">
+                                <label>Assigned Host Shop / Range</label>
+                                <select name="sywat_shop_id">
+                                    <option value="" <?php selected( empty( $e_shop_id ), true ); ?>>-- None / Unassigned --</option>
+                                    <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                        <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $e_shop_id, $s_id ); ?>>
+                                            <?php echo esc_html( isset( $s_item['name'] ) ? $s_item['name'] : $s_id ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="sywat-form-grid-2 sywat-mt-3">
                             <div class="sywat-field-group">
