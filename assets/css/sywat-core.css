@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 6.4.0
+   Version: 6.5.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -68,7 +68,99 @@ body {
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    overflow: hidden;
+    padding: 32px 28px;
+    box-sizing: border-box;
+}
+
+/* Custom Frontend Login Card Component Rules */
+.sywat-login-card img,
+.sywat-login-card .sywat-login-logo,
+.sywat-login-card p img {
+    max-height: 95px !important;
+    width: auto !important;
+    display: block !important;
+    margin: 0 auto 16px auto !important;
+    object-fit: contain;
+}
+
+.sywat-login-card h2,
+.sywat-login-card h1 {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: #1e3a8a !important;
+    text-align: center !important;
+    margin: 0 0 20px 0 !important;
+}
+
+.sywat-login-card form p {
+    margin-bottom: 14px;
+}
+
+.sywat-login-card label {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.sywat-login-card input[type="text"],
+.sywat-login-card input[type="password"],
+.sywat-login-card input[type="email"] {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 40px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+}
+
+.sywat-login-card input[type="submit"],
+.sywat-login-card .button-primary,
+.sywat-login-card button[type="submit"] {
+    width: 100% !important;
+    min-height: 42px !important;
+    background-color: #10b981 !important;
+    border: 1px solid #059669 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    margin-top: 10px !important;
+    font-size: 14px !important;
+    transition: background-color 0.15s ease !important;
+}
+
+.sywat-login-card input[type="submit"]:hover,
+.sywat-login-card .button-primary:hover,
+.sywat-login-card button[type="submit"]:hover {
+    background-color: #059669 !important;
+}
+
+.sywat-login-card .forgetmenot,
+.sywat-login-card .login-remember {
+    margin-bottom: 12px;
+}
+
+.sywat-login-card .sywat-login-footer,
+.sywat-login-card p.forgetmenot + p,
+.sywat-login-card #nav {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+}
+
+.sywat-login-card .sywat-login-footer a,
+.sywat-login-card #nav a {
+    color: #0284c7;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.sywat-login-card .sywat-login-footer a:hover,
+.sywat-login-card #nav a:hover {
+    text-decoration: underline;
 }
 
 /* Navigation Tabs Track (Card-Docked) */
