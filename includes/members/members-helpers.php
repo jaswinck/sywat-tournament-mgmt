@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -258,7 +258,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 }
             }
 
-            // If account has NO active membership role (e.g., pure Shop Manager like Korbins or pure Administrator like user)
+            // If account has NO active membership role (e.g., pure Shop Manager like Korbins or pure Administrator)
             if ( ! $has_membership_role ) {
                 if ( ! empty( $system_account_label ) ) {
                     return array(
@@ -283,20 +283,8 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 );
             }
 
-            // Pure System/Staff Account without an active NFAA ID or expiration date
+            // Dual-Role or Member Account without an explicit NFAA ID or expiration date set
             if ( empty( $expiration ) && empty( $nfaa_id ) ) {
-                if ( ! empty( $system_account_label ) ) {
-                    return array(
-                        'status'               => $system_account_label,
-                        'expiration'           => 'System Account',
-                        'raw_date'             => '',
-                        'badge_class'          => 'sywat-badge-checkedin',
-                        'is_active'            => true,
-                        'system_account_label' => $system_account_label,
-                        'has_membership_role'  => false,
-                    );
-                }
-
                 $legacy_flag = get_user_meta( $user_id, 'sywat_is_nfaa_member', true );
                 $is_active   = ( $legacy_flag === 'yes' );
                 return array(
@@ -305,8 +293,8 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                     'raw_date'             => '',
                     'badge_class'          => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
                     'is_active'            => $is_active,
-                    'system_account_label' => '',
-                    'has_membership_role'  => true,
+                    'system_account_label' => $system_account_label,
+                    'has_membership_role'  => $has_membership_role,
                 );
             }
         } elseif ( is_string( $user_id_or_date ) ) {
