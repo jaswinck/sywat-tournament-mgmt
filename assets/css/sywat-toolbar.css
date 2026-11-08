@@ -46,6 +46,7 @@
 .sywat-inline-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #334155; white-space: nowrap; background: transparent; border: none; padding: 0; }
 .sywat-inline-pill-active { color: #166534; }
 .sywat-inline-pill-expired { color: #64748b; }
+.sywat-inline-pill-unassigned { color: #0284c7; }
 
 /* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
