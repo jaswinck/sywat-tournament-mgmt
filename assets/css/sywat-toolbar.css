@@ -20,20 +20,33 @@
 /* Table Sub-Header Toolbar & Control Alignment Blueprint */
 .sywat-table-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
 .sywat-table-header-bar h2 { margin: 0; white-space: nowrap; }
-.sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; flex: 1 1 0%; min-width: 0; max-width: 100%; margin-left: auto; box-sizing: border-box; }
+.sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; flex: 1 1 0%; min-width: 0; max-width: 100%; margin-left: auto; box-sizing: border-box; }
 .sywat-table-header-controls .sywat-field-group, .sywat-table-header-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
-.sywat-table-header-controls input[type="text"], .sywat-table-header-controls select, .sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync), .sywat-table-header-controls .sywat-sync-pill { height: 32px !important; min-height: 32px !important; box-sizing: border-box !important; margin: 0 !important; }
+
+/* Exact Baseline Height Parity (32px) for Toolbar Controls */
+.sywat-table-header-controls input[type="text"], 
+.sywat-table-header-controls select, 
+.sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync), 
+.sywat-table-header-controls .sywat-sync-pill { 
+    height: 32px !important; 
+    min-height: 32px !important; 
+    box-sizing: border-box !important; 
+    margin: 0 !important; 
+    vertical-align: middle !important; 
+}
 .sywat-table-header-controls input[type="text"] { width: 130px !important; font-size: 12px !important; padding: 3px 8px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
 .sywat-table-header-controls select { width: 125px !important; font-size: 12px !important; padding: 3px 6px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
 .sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync) { padding: 3px 10px !important; font-size: 12px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
 
-/* Member Directory Statistics Bar & Labeled Filters */
-.sywat-member-stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; width: 100%; box-sizing: border-box; }
-.sywat-stat-item { flex: 1; min-width: 150px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; display: flex; flex-direction: column; box-sizing: border-box; }
-.sywat-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; letter-spacing: 0.5px; }
-.sywat-stat-value { font-size: 18px; font-weight: 700; color: #0f172a; }
-.sywat-filter-group { display: inline-flex; align-items: center; gap: 6px; }
-.sywat-filter-label { font-size: 12px; font-weight: 700; color: #334155; white-space: nowrap; }
+/* Flush Inline Status Filter Group */
+.sywat-filter-inline-group { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; white-space: nowrap; }
+.sywat-filter-inline-group select.sywat-select-filter { width: 130px !important; font-size: 12px !important; padding: 3px 6px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; height: 32px !important; box-sizing: border-box !important; }
+
+/* Inline Compact Stat Pills (Pushed Right) */
+.sywat-stats-inline-pills { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.sywat-inline-pill { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; font-size: 11px; font-weight: 600; border-radius: 4px; background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; white-space: nowrap; box-sizing: border-box; }
+.sywat-inline-pill-active { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.sywat-inline-pill-expired { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
 
 /* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
