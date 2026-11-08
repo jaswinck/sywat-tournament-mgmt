@@ -3,9 +3,9 @@
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
  * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, and protected test data purge overlays.
- * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js.
+ * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 3.9.6
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -843,19 +843,10 @@ function sywat_members_render_modals( $data ) {
                 $p_noemail   = isset( $preview_data['unassigned_emails_count'] ) ? $preview_data['unassigned_emails_count'] : 0;
                 $households  = isset( $preview_data['households'] ) && is_array( $preview_data['households'] ) ? $preview_data['households'] : array();
 
-                // BULK IN-MEMORY DATABASE PRE-FETCH FOR FAST PREVIEW MATCHING
-                global $wpdb;
-                $existing_nfaa_set = array();
-                $nfaa_db_rows = $wpdb->get_col( "SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_nfaa_number' AND meta_value != ''" );
-                if ( ! empty( $nfaa_db_rows ) ) {
-                    $existing_nfaa_set = array_flip( array_map( 'trim', $nfaa_db_rows ) );
-                }
-
-                $existing_email_set = array();
-                $email_db_rows = $wpdb->get_col( "SELECT user_email FROM {$wpdb->users} WHERE user_email != ''" );
-                if ( ! empty( $email_db_rows ) ) {
-                    $existing_email_set = array_flip( array_map( 'strtolower', array_map( 'trim', $email_db_rows ) ) );
-                }
+                // BULK IN-MEMORY DATABASE PRE-FETCH FOR FAST PREVIEW MATCHING (DELEGATED TO members-data.php)
+                $db_maps            = function_exists( 'sywat_get_import_preview_db_maps' ) ? sywat_get_import_preview_db_maps() : array();
+                $existing_nfaa_set  = isset( $db_maps['existing_nfaa_set'] ) ? $db_maps['existing_nfaa_set'] : array();
+                $existing_email_set = isset( $db_maps['existing_email_set'] ) ? $db_maps['existing_email_set'] : array();
             ?>
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
