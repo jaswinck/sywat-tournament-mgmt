@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.5.0
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -238,7 +238,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
-            // Check if user holds a qualifying active shooting membership or officer role
+            // Qualifying shooting member & officer roles ONLY
             $qualifying_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
                 ? sywat_get_custom_roles_slugs() 
                 : array(
@@ -258,15 +258,16 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 }
             }
 
-            // If account has NO active membership role (e.g., pure Shop Manager like Korbins or pure Administrator)
+            // GUARANTEED GUARD: If user has NO shooting member role, EXIT IMMEDIATELY.
+            // Do NOT allow execution to reach date comparisons below.
             if ( ! $has_membership_role ) {
                 if ( ! empty( $system_account_label ) ) {
                     return array(
                         'status'               => $system_account_label,
                         'expiration'           => 'System Account',
-                        'raw_date'             => $expiration,
+                        'raw_date'             => '',
                         'badge_class'          => 'sywat-badge-checkedin',
-                        'is_active'            => false, // Guarantees member status badges are suppressed
+                        'is_active'            => false, // Suppresses member status badge
                         'system_account_label' => $system_account_label,
                         'has_membership_role'  => false,
                     );
@@ -294,7 +295,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                     'badge_class'          => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
                     'is_active'            => $is_active,
                     'system_account_label' => $system_account_label,
-                    'has_membership_role'  => $has_membership_role,
+                    'has_membership_role'  => true,
                 );
             }
         } elseif ( is_string( $user_id_or_date ) ) {
