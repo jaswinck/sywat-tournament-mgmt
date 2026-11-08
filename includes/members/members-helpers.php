@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -222,7 +222,7 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
  * Returns neutral non-member status for management accounts lacking membership roles.
  *
  * @param int|string $user_id_or_date WordPress User ID or YYYY-MM-DD date string.
- * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', 'is_active', and 'system_account_label'.
+ * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', 'is_active', 'system_account_label', and 'has_membership_role'.
  */
 if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
     function sywat_get_member_nfaa_status( $user_id_or_date ) {
@@ -258,15 +258,28 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 }
             }
 
-            // If account has NO active membership role (e.g., pure Shop Manager like Korbins with no NFAA ID/expiration), return neutral state
-            if ( ! $has_membership_role && empty( $expiration ) && empty( $nfaa_id ) ) {
+            // If account has NO active membership role (e.g., pure Shop Manager like Korbins or pure Administrator like user)
+            if ( ! $has_membership_role ) {
+                if ( ! empty( $system_account_label ) ) {
+                    return array(
+                        'status'               => $system_account_label,
+                        'expiration'           => 'System Account',
+                        'raw_date'             => $expiration,
+                        'badge_class'          => 'sywat-badge-checkedin',
+                        'is_active'            => true,
+                        'system_account_label' => $system_account_label,
+                        'has_membership_role'  => false,
+                    );
+                }
+
                 return array(
-                    'status'               => ! empty( $system_account_label ) ? $system_account_label : 'Non-Member',
+                    'status'               => 'Non-Member',
                     'expiration'           => '—',
                     'raw_date'             => '',
-                    'badge_class'          => ! empty( $system_account_label ) ? 'sywat-badge-checkedin' : 'sywat-badge-muted',
+                    'badge_class'          => 'sywat-badge-muted',
                     'is_active'            => false,
-                    'system_account_label' => $system_account_label,
+                    'system_account_label' => '',
+                    'has_membership_role'  => false,
                 );
             }
 
@@ -280,6 +293,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                         'badge_class'          => 'sywat-badge-checkedin',
                         'is_active'            => true,
                         'system_account_label' => $system_account_label,
+                        'has_membership_role'  => false,
                     );
                 }
 
@@ -292,6 +306,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                     'badge_class'          => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
                     'is_active'            => $is_active,
                     'system_account_label' => '',
+                    'has_membership_role'  => true,
                 );
             }
         } elseif ( is_string( $user_id_or_date ) ) {
@@ -299,18 +314,6 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
         }
 
         if ( empty( $expiration ) ) {
-            // If they don't have a membership role and no expiration date, don't force 'Expired'
-            if ( is_numeric( $user_id_or_date ) && ! $has_membership_role ) {
-                return array(
-                    'status'               => ! empty( $system_account_label ) ? $system_account_label : 'Non-Member',
-                    'expiration'           => '—',
-                    'raw_date'             => '',
-                    'badge_class'          => ! empty( $system_account_label ) ? 'sywat-badge-checkedin' : 'sywat-badge-muted',
-                    'is_active'            => false,
-                    'system_account_label' => $system_account_label,
-                );
-            }
-
             return array(
                 'status'               => 'Expired',
                 'expiration'           => '—',
@@ -318,6 +321,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 'badge_class'          => 'sywat-badge-muted',
                 'is_active'            => false,
                 'system_account_label' => $system_account_label,
+                'has_membership_role'  => $has_membership_role,
             );
         }
 
@@ -332,6 +336,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             'badge_class'          => $is_active ? 'sywat-badge-open' : 'sywat-badge-muted',
             'is_active'            => $is_active,
             'system_account_label' => $system_account_label,
+            'has_membership_role'  => $has_membership_role,
         );
     }
 }
