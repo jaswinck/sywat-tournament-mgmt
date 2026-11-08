@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), WordPress system role badge tags, red unassigned badge formatting, text-overflow-protected status badge rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text rendering under archer names, red unassigned badge formatting, text-overflow-protected status badge rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -509,14 +509,14 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                                                 // Fetch user role names for primary accounts
                                                 $role_names_blob = '';
+                                                $role_names_list = array();
                                                 if ( $a_uid > 0 ) {
                                                     $u_obj = get_userdata( $a_uid );
                                                     if ( $u_obj && ! empty( $u_obj->roles ) ) {
-                                                        $r_labels = array();
                                                         foreach ( (array) $u_obj->roles as $r_slug ) {
-                                                            $r_labels[] = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : $r_slug;
+                                                            $role_names_list[] = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : ucfirst( str_replace( '_', ' ', $r_slug ) );
                                                         }
-                                                        $role_names_blob = implode( ' ', $r_labels );
+                                                        $role_names_blob = implode( ', ', $role_names_list );
                                                     }
                                                 }
                                             ?>
@@ -527,23 +527,13 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                         <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
                                                     <?php endif; ?>
                                                     <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $a_nfaa_n ); ?></strong></div>
+                                                    <?php if ( ! empty( $role_names_blob ) ): ?>
+                                                        <div class="sywat-meta-subtext">👤 Roles: <strong><?php echo esc_html( $role_names_blob ); ?></strong></div>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td>
                                                     <?php if ( $a_type === 'head' ): ?>
                                                         <span class="sywat-badge sywat-badge-open">👑 Head of Household</span>
-                                                        <?php 
-                                                            $user_obj = get_userdata( $a_uid );
-                                                            if ( $user_obj && ! empty( $user_obj->roles ) ): 
-                                                        ?>
-                                                            <div class="sywat-mt-1 sywat-badge-group">
-                                                                <?php foreach ( (array) $user_obj->roles as $r_slug ): ?>
-                                                                    <?php 
-                                                                        $r_name = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : ucfirst( str_replace( '_', ' ', $r_slug ) ); 
-                                                                    ?>
-                                                                    <span class="sywat-badge sywat-badge-muted">👤 <?php echo esc_html( $r_name ); ?></span>
-                                                                <?php endforeach; ?>
-                                                            </div>
-                                                        <?php endif; ?>
                                                     <?php elseif ( $a_type === 'dependent' ): ?>
                                                         <span class="sywat-badge sywat-badge-muted">🏠 Household Dependent</span>
                                                         <div class="sywat-meta-subtext">Head: <strong><?php echo esc_html( $a_head_name ); ?></strong></div>
