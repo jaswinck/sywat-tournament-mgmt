@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -744,6 +744,50 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
         return '';
     }
 }
+
+if ( ! function_exists( 'sywat_ajax_search_head_of_households' ) ) {
+    /**
+     * AJAX Endpoint: Autocomplete Head of Household Search Engine
+     * Queries primary WP_User accounts matching term for dynamic target Head selection.
+     */
+    function sywat_ajax_search_head_of_households() {
+        if ( ! isset( $_GET['sywat_nonce'] ) || ! wp_verify_nonce( $_GET['sywat_nonce'], 'sywat_desk_action' ) ) {
+            if ( ob_get_length() ) ob_clean();
+            wp_send_json_error( array( 'message' => 'Security check failed.' ) );
+        }
+
+        $term = isset( $_GET['term'] ) ? sanitize_text_field( trim( $_GET['term'] ) ) : '';
+        if ( strlen( $term ) < 2 ) {
+            if ( ob_get_length() ) ob_clean();
+            wp_send_json_success( array() );
+        }
+
+        $results = array();
+        $members = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
+
+        if ( is_array( $members ) ) {
+            foreach ( $members as $m ) {
+                if ( ! $m instanceof WP_User ) continue;
+                $nfaa_id = get_user_meta( $m->ID, 'sywat_nfaa_number', true );
+                $search_blob = strtolower( $m->display_name . ' ' . $m->user_email . ' ' . $m->first_name . ' ' . $m->last_name . ' ' . $nfaa_id );
+
+                if ( stripos( $search_blob, strtolower( $term ) ) !== false ) {
+                    $results[] = array(
+                        'user_id'      => intval( $m->ID ),
+                        'display_name' => $m->display_name,
+                        'email'        => $m->user_email,
+                        'nfaa_number'  => ! empty( $nfaa_id ) ? $nfaa_id : 'No NFAA ID',
+                    );
+                }
+            }
+        }
+
+        if ( ob_get_length() ) ob_clean();
+        wp_send_json_success( array_slice( $results, 0, 10 ) );
+    }
+}
+
+add_action( 'wp_ajax_sywat_search_head_of_households', 'sywat_ajax_search_head_of_households' );
 
 if ( ! function_exists( 'sywat_ajax_search_unassigned_archers' ) ) {
     /**
