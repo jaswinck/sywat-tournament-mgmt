@@ -5,7 +5,7 @@
  * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships).
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -98,7 +98,7 @@ if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
                     continue; // Skip if already counted
                 }
 
-                $u_roles          = (array) $sm->roles;
+                $u_roles                = (array) $sm->roles;
                 $has_active_member_role = false;
 
                 foreach ( $u_roles as $r_slug ) {
