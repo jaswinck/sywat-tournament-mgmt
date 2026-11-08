@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Household Link Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, search/status filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Household Link Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 /**
@@ -405,10 +405,23 @@ function sywatOpenTransferMemberModal(sourceUserId, sourceUserName, targetSystem
     const sourceInput = document.getElementById('sywat_transfer_source_user_id');
     const systemInput = document.getElementById('sywat_transfer_target_system_id');
     const sourceLabel = document.getElementById('sywat_transfer_source_name');
+    const targetInput = document.getElementById('sywat_transfer_target_head_id');
+    const searchInput = document.getElementById('sywat_transfer_head_search');
+    const displayBox  = document.getElementById('sywat_transfer_selected_head_display');
+    const submitBtn   = document.getElementById('sywat_transfer_submit_btn');
 
     if (sourceInput) sourceInput.value = sourceUserId || 0;
     if (systemInput) systemInput.value = targetSystemId || '';
     if (sourceLabel) sourceLabel.textContent = sourceUserName;
+    if (targetInput) targetInput.value = '';
+    if (searchInput) searchInput.value = '';
+
+    if (displayBox) {
+        displayBox.innerHTML = '';
+        displayBox.classList.add('sywat-hidden');
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
 
     if (modal) {
         modal.classList.add('active');
@@ -419,6 +432,87 @@ function sywatCloseTransferMemberModal() {
     const modal = document.getElementById('sywat_transfer_member_modal');
     if (modal) {
         modal.classList.remove('active');
+    }
+}
+
+/**
+ * Handles live autocompletion searches against target Heads of Household.
+ */
+let sywatHeadSearchDebounceTimer = null;
+
+function sywatHandleHeadSearch(input) {
+    if (!input) return;
+
+    const query = input.value.trim();
+    const resultsBox = document.getElementById('sywat_transfer_head_search_results');
+    if (!resultsBox) return;
+
+    clearTimeout(sywatHeadSearchDebounceTimer);
+
+    if (query.length < 2) {
+        resultsBox.innerHTML = '';
+        resultsBox.classList.add('sywat-hidden');
+        return;
+    }
+
+    sywatHeadSearchDebounceTimer = setTimeout(function() {
+        const ajaxUrl = window.ajaxurl || '/wp-admin/admin-ajax.php';
+        const form = document.getElementById('sywat_transfer_member_form');
+        const nonceInput = form ? form.querySelector('input[name="sywat_nonce"]') : null;
+        const nonce = nonceInput ? nonceInput.value : '';
+
+        fetch(ajaxUrl + '?action=sywat_search_head_of_households&term=' + encodeURIComponent(query) + '&sywat_nonce=' + encodeURIComponent(nonce))
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+                    let html = '';
+                    data.data.forEach(item => {
+                        const emailDisp = item.email ? item.email : 'No email';
+                        const nfaaDisp  = item.nfaa_number ? item.nfaa_number : 'No NFAA ID';
+                        html += `<div class="sywat-autocomplete-item" onclick='sywatSelectTargetHead(${JSON.stringify(item)})'>
+                            <strong>${item.display_name}</strong>
+                            <div class="sywat-meta-subtext">✉️ ${emailDisp} | 🆔 ${nfaaDisp}</div>
+                        </div>`;
+                    });
+                    resultsBox.innerHTML = html;
+                    resultsBox.classList.remove('sywat-hidden');
+                } else {
+                    resultsBox.innerHTML = '<div class="sywat-autocomplete-item sywat-meta-subtext">No matching Head of Household found</div>';
+                    resultsBox.classList.remove('sywat-hidden');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                resultsBox.classList.add('sywat-hidden');
+            });
+    }, 300);
+}
+
+/**
+ * Populates selected target Head of Household user ID into the Link form.
+ */
+function sywatSelectTargetHead(item) {
+    const targetInput = document.getElementById('sywat_transfer_target_head_id');
+    const searchInput = document.getElementById('sywat_transfer_head_search');
+    const resultsBox  = document.getElementById('sywat_transfer_head_search_results');
+    const displayBox  = document.getElementById('sywat_transfer_selected_head_display');
+    const submitBtn   = document.getElementById('sywat_transfer_submit_btn');
+
+    if (targetInput) targetInput.value = item.user_id;
+    if (searchInput) searchInput.value = item.display_name;
+
+    if (displayBox) {
+        displayBox.innerHTML = `<div class="sywat-alert sywat-alert-success sywat-notice-banner">
+            👑 <strong>Selected Target Head:</strong> ${item.display_name} (${item.email})
+        </div>`;
+        displayBox.classList.remove('sywat-hidden');
+    }
+
+    if (submitBtn) submitBtn.disabled = false;
+
+    if (resultsBox) {
+        resultsBox.innerHTML = '';
+        resultsBox.classList.add('sywat-hidden');
     }
 }
 
