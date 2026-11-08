@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.4.0
+ * Version: 4.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -238,7 +238,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
-            // Check if user holds a qualifying active membership or officer role
+            // Check if user holds a qualifying active shooting membership or officer role
             $qualifying_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
                 ? sywat_get_custom_roles_slugs() 
                 : array(
@@ -266,7 +266,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                         'expiration'           => 'System Account',
                         'raw_date'             => $expiration,
                         'badge_class'          => 'sywat-badge-checkedin',
-                        'is_active'            => true,
+                        'is_active'            => false, // Guarantees member status badges are suppressed
                         'system_account_label' => $system_account_label,
                         'has_membership_role'  => false,
                     );
