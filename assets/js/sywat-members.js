@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Standalone Account Transfer Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, search/status filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, and Household Link Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 /**
@@ -399,13 +399,15 @@ function sywatClosePurgeModal() {
     }
 }
 
-// 11. Standalone Member Transfer / Merge Modal
-function sywatOpenTransferMemberModal(sourceUserId, sourceUserName) {
-    const modal = document.getElementById('sywat_transfer_member_modal');
+// 11. Member Household Link Modal
+function sywatOpenTransferMemberModal(sourceUserId, sourceUserName, targetSystemId) {
+    const modal       = document.getElementById('sywat_transfer_member_modal');
     const sourceInput = document.getElementById('sywat_transfer_source_user_id');
+    const systemInput = document.getElementById('sywat_transfer_target_system_id');
     const sourceLabel = document.getElementById('sywat_transfer_source_name');
 
-    if (sourceInput) sourceInput.value = sourceUserId;
+    if (sourceInput) sourceInput.value = sourceUserId || 0;
+    if (systemInput) systemInput.value = targetSystemId || '';
     if (sourceLabel) sourceLabel.textContent = sourceUserName;
 
     if (modal) {
@@ -509,7 +511,7 @@ function sywatApplyMemberSearch() {
         const rowStatus  = (row.getAttribute('data-status') || '').toLowerCase();
 
         const matchesQuery  = (!query || searchData.indexOf(query) !== -1);
-        const matchesStatus = (!statusFilter || rowStatus === statusFilter);
+        const matchesStatus = (!statusFilter || rowStatus.indexOf(statusFilter) !== -1);
 
         if (matchesQuery && matchesStatus) {
             row.classList.remove('sywat-hidden');
