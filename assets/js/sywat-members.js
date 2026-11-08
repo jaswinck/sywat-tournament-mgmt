@@ -1,10 +1,10 @@
 /**
- * SYWAT Archery - Member & Board Management JavaScript
+ * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, and Protected Test Data Purge Overlays), client-side phone formatting, password policy validation, dynamic shop visibility, search/status filtering, and notice auto-dismissal.
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, and Protected Test Data Purge Overlays), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 3.9.5
+ * Version: 4.0.0
  */
 
 /**
@@ -117,6 +117,143 @@ function sywatUpdateRuleStatus(elementId, isValid, text) {
 }
 
 /**
+ * Dynamic Progress Bar Modal Builder & State Controller
+ */
+function sywatShowProgressModal(title) {
+    let modal = document.getElementById('sywat_progress_modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'sywat_progress_modal';
+        modal.className = 'sywat-modal-backdrop active';
+        modal.innerHTML = `
+            <div class="sywat-modal-content sywat-modal-sm">
+                <div class="sywat-modal-header">
+                    <h3 id="sywat_progress_title">${title}</h3>
+                </div>
+                <div class="sywat-modal-body">
+                    <div class="sywat-progress-track">
+                        <div id="sywat_progress_fill" class="sywat-progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="sywat-progress-meta">
+                        <span id="sywat_progress_percent">0%</span>
+                        <span id="sywat_progress_status">Initializing process...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } else {
+        const titleEl = document.getElementById('sywat_progress_title');
+        if (titleEl) titleEl.textContent = title;
+        modal.classList.add('active');
+    }
+    sywatUpdateProgressBar(0, 'Initializing process...');
+}
+
+function sywatUpdateProgressBar(percent, statusText) {
+    const fill = document.getElementById('sywat_progress_fill');
+    const percentEl = document.getElementById('sywat_progress_percent');
+    const statusEl = document.getElementById('sywat_progress_status');
+
+    const cleanPercent = Math.min(100, Math.max(0, parseInt(percent, 10) || 0));
+
+    if (fill) fill.style.width = cleanPercent + '%';
+    if (percentEl) percentEl.textContent = cleanPercent + '%';
+    if (statusEl && statusText) statusEl.textContent = statusText;
+}
+
+function sywatHideProgressModal() {
+    const modal = document.getElementById('sywat_progress_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+/**
+ * Recursive AJAX Stream: Step-by-Step Test Account Data Purge
+ */
+function sywatExecutePurgeAjax(nonce, chunk) {
+    const ajaxUrl = window.ajaxurl || '/wp-admin/admin-ajax.php';
+    const formData = new FormData();
+    formData.append('action', 'sywat_purge_test_members_chunk');
+    formData.append('sywat_nonce', nonce);
+    formData.append('chunk', chunk || 1);
+
+    fetch(ajaxUrl, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (!res.success) {
+            alert(res.data && res.data.message ? res.data.message : 'An error occurred during batch purge.');
+            sywatHideProgressModal();
+            return;
+        }
+
+        const data = res.data;
+        sywatUpdateProgressBar(data.percent, data.message);
+
+        if (data.finished) {
+            setTimeout(function() {
+                sywatHideProgressModal();
+                window.location.reload();
+            }, 800);
+        } else {
+            sywatExecutePurgeAjax(nonce, (chunk || 1) + 1);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error encountered while executing batch purge stream.');
+        sywatHideProgressModal();
+    });
+}
+
+/**
+ * Recursive AJAX Stream: Step-by-Step Archer Spreadsheet Ingestion
+ */
+function sywatExecuteImportAjax(nonce, persistentFilePath, offset) {
+    const ajaxUrl = window.ajaxurl || '/wp-admin/admin-ajax.php';
+    const formData = new FormData();
+    formData.append('action', 'sywat_import_archers_chunk');
+    formData.append('sywat_nonce', nonce);
+    formData.append('persistent_file_path', persistentFilePath);
+    formData.append('offset', offset || 0);
+    formData.append('limit', 100);
+
+    fetch(ajaxUrl, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (!res.success) {
+            alert(res.data && res.data.message ? res.data.message : 'An error occurred during batch import ingestion.');
+            sywatHideProgressModal();
+            return;
+        }
+
+        const data = res.data;
+        sywatUpdateProgressBar(data.percent, data.message);
+
+        if (data.finished) {
+            setTimeout(function() {
+                sywatHideProgressModal();
+                window.location.reload();
+            }, 1000);
+        } else {
+            sywatExecuteImportAjax(nonce, persistentFilePath, data.next_offset);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error encountered while executing batch import ingestion stream.');
+        sywatHideProgressModal();
+    });
+}
+
+/**
  * Modal Window Control Handlers (Open / Close Overlay Operations)
  */
 
@@ -210,7 +347,7 @@ function sywatCloseAddBoardModal() {
 function sywatCloseEditBoardModal() {
     const modal = document.getElementById('sywat_edit_board_modal');
     if (modal) {
-        modal.classList.remove('active');
+        modal.classList.add('active');
     }
     const url = new URL(window.location.href);
     url.searchParams.delete('edit_board_id');
@@ -332,7 +469,7 @@ function sywatResetBoardSearch() {
 }
 
 /**
- * Handles DOM load initializations: shop visibility state check, notice auto-dismissal, and form submit spinners.
+ * Handles DOM load initializations: shop visibility state check, notice auto-dismissal, form submit handlers, and AJAX stream progress modal triggers.
  */
 document.addEventListener("DOMContentLoaded", function() {
     sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container');
@@ -352,7 +489,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 5000);
     }
 
-    // Form submit handlers for loading spinners & button locking
+    // Step 1: Historical Archer Spreadsheet Audit Submit Handler
     const importForm = document.getElementById('sywat_import_archers_form');
     if (importForm) {
         importForm.addEventListener('submit', function() {
@@ -364,14 +501,39 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // Step 2: Commit Batch Import Stream Handler (AJAX Chunking with Real-Time Progress Bar)
     const commitForm = document.getElementById('sywat_commit_import_form');
     if (commitForm) {
-        commitForm.addEventListener('submit', function() {
-            const btn = document.getElementById('sywat_commit_submit_btn');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⌛ Ingesting Archers into Database...';
-            }
+        commitForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const nonceInput = commitForm.querySelector('input[name="sywat_nonce"]');
+            const fileInput  = commitForm.querySelector('input[name="persistent_file_path"]');
+
+            const nonce    = nonceInput ? nonceInput.value : '';
+            const filePath = fileInput ? fileInput.value : '';
+
+            sywatCloseImportPreviewModal();
+            sywatShowProgressModal('📥 Ingesting Archers into Database...');
+            sywatExecuteImportAjax(nonce, filePath, 0);
         });
+    }
+
+    // Step 3: Batch Protected Test Data Purge Handler (AJAX Chunking with Real-Time Progress Bar)
+    const purgeModal = document.getElementById('sywat_purge_test_modal');
+    if (purgeModal) {
+        const purgeForm = purgeModal.querySelector('form');
+        if (purgeForm) {
+            purgeForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const nonceInput = purgeForm.querySelector('input[name="sywat_nonce"]');
+                const nonce      = nonceInput ? nonceInput.value : '';
+
+                sywatClosePurgeModal();
+                sywatShowProgressModal('🗑️ Purging Test Account Data...');
+                sywatExecutePurgeAjax(nonce, 1);
+            });
+        }
     }
 });
