@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data purge triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -409,13 +409,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                         <!-- UNIFIED BASELINE CONTROL & STATS TOOLBAR -->
                         <div class="sywat-table-header-bar">
-                            <div class="sywat-table-header-controls sywat-ml-0">
-                                <div class="sywat-search-input-group">
-                                    <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetMemberSearch()">Clear</button>
-                                </div>
-                                <div class="sywat-filter-inline-group">
-                                    <label for="sywat_member_status_filter">Status:</label>
+                            <div class="sywat-table-header-left">
+                                <div class="sywat-filter-field">
+                                    <label for="sywat_member_status_filter">STATUS</label>
                                     <select id="sywat_member_status_filter" onchange="sywatApplyMemberSearch()" class="sywat-select-filter">
                                         <option value="">-- All Statuses --</option>
                                         <option value="active">🟢 Active Only</option>
@@ -424,14 +420,20 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 </div>
                                 <div class="sywat-stats-inline-pills">
                                     <span class="sywat-inline-pill" title="Total Members">
-                                        👥 <strong><?php echo number_format( $stat_total ); ?></strong> Total
+                                        👤 <strong><?php echo number_format( $stat_total ); ?></strong> Total Members
                                     </span>
                                     <span class="sywat-inline-pill sywat-inline-pill-active" title="Active Membership">
-                                        🟢 <strong><?php echo number_format( $stat_active ); ?></strong> Active
+                                        🟢 <strong><?php echo number_format( $stat_active ); ?></strong> Active Memberships
                                     </span>
                                     <span class="sywat-inline-pill sywat-inline-pill-expired" title="Expired Memberships">
-                                        ⚪ <strong><?php echo number_format( $stat_expired ); ?></strong> Expired
+                                        ⚪ <strong><?php echo number_format( $stat_expired ); ?></strong> Expired Memberships
                                     </span>
+                                </div>
+                            </div>
+                            <div class="sywat-table-header-controls">
+                                <div class="sywat-search-input-group">
+                                    <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetMemberSearch()">Clear</button>
                                 </div>
                             </div>
                         </div>
