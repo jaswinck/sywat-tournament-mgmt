@@ -27,6 +27,14 @@
 .sywat-table-header-controls select { width: 125px !important; font-size: 12px !important; padding: 3px 6px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
 .sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync) { padding: 3px 10px !important; font-size: 12px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
 
+/* Member Directory Statistics Bar & Labeled Filters */
+.sywat-member-stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; width: 100%; box-sizing: border-box; }
+.sywat-stat-item { flex: 1; min-width: 150px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; display: flex; flex-direction: column; box-sizing: border-box; }
+.sywat-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px; letter-spacing: 0.5px; }
+.sywat-stat-value { font-size: 18px; font-weight: 700; color: #0f172a; }
+.sywat-filter-group { display: inline-flex; align-items: center; gap: 6px; }
+.sywat-filter-label { font-size: 12px; font-weight: 700; color: #334155; white-space: nowrap; }
+
 /* Desk Toolbar & Filter Controls */
 .sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .sywat-filter-title { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; white-space: nowrap; }
