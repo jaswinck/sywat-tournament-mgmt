@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts into household dependent rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -161,7 +161,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     : null;
 
                 if ( $primary_user && $dep ) {
-                    // Package old primary head into a dependent payload
                     $old_head_dep = array(
                         'first_name'      => get_user_meta( $primary_user_id, 'first_name', true ) ? get_user_meta( $primary_user_id, 'first_name', true ) : $primary_user->first_name,
                         'last_name'       => get_user_meta( $primary_user_id, 'last_name', true ) ? get_user_meta( $primary_user_id, 'last_name', true ) : $primary_user->last_name,
@@ -180,7 +179,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         'zip'             => get_user_meta( $primary_user_id, 'sywat_zip', true ),
                     );
 
-                    // Update WP User record with target dependent's details
                     $new_first = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
                     $new_last  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
                     $new_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_user->user_email;
@@ -203,7 +201,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         update_user_meta( $primary_user_id, 'sywat_phone', $dep['phone'] );
                     }
 
-                    // Swap dependent sub-profile entry with the old primary user
                     if ( function_exists( 'sywat_update_household_dependent' ) ) {
                         sywat_update_household_dependent( $primary_user_id, $target_system_id, $old_head_dep );
                     }
@@ -228,12 +225,10 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $protected_count = 0;
 
             if ( ! empty( $all_user_ids ) ) {
-                // Suspend object cache invalidations and unhook deletion callbacks for maximum speed
                 wp_suspend_cache_invalidation( true );
                 remove_all_actions( 'delete_user' );
                 remove_all_actions( 'deleted_user' );
 
-                // Wrap in MySQL transaction for ultra-fast atomic batch deletion
                 $wpdb->query( 'START TRANSACTION' );
 
                 foreach ( $all_user_ids as $uid_raw ) {
@@ -250,8 +245,6 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 }
 
                 $wpdb->query( 'COMMIT' );
-
-                // Re-enable cache invalidation and flush object cache in one single atomic command
                 wp_suspend_cache_invalidation( false );
                 wp_cache_flush();
             }
@@ -552,7 +545,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 6. UNLINK HOUSEHOLD DEPENDENT (DETACH FROM HOUSEHOLD WHILE PRESERVING RECORDS)
+        // 6. UNLINK HOUSEHOLD DEPENDENT (PRESERVE IN UNASSIGNED POOL IF NO STANDALONE ACCOUNT)
         if ( $action === 'unlink_dependent' || $action === 'unlink_member' ) {
             $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
             $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
@@ -563,19 +556,30 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     : null;
                 $dep_name = ( $dep && isset( $dep['first_name'] ) ) ? $dep['first_name'] . ' ' . $dep['last_name'] : 'Family member';
 
+                if ( $dep ) {
+                    // Store in unassigned pool option to prevent data loss
+                    $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
+                    if ( ! is_array( $unassigned_pool ) ) {
+                        $unassigned_pool = array();
+                    }
+                    $dep['unlinked_from_head_id'] = $primary_user_id;
+                    $dep['unlinked_date']         = current_time( 'mysql' );
+                    $unassigned_pool[ $system_id ] = $dep;
+                    update_option( 'sywat_unassigned_archers', $unassigned_pool );
+                }
+
                 if ( function_exists( 'sywat_unlink_household_dependent' ) ) {
                     $res = sywat_unlink_household_dependent( $primary_user_id, $system_id );
                     if ( is_wp_error( $res ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
                 } elseif ( function_exists( 'sywat_delete_household_dependent' ) ) {
-                    // Fallback detachment logic
                     $res = sywat_delete_household_dependent( $primary_user_id, $system_id );
                     if ( is_wp_error( $res ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
                 }
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>' . esc_html( $dep_name ) . '</strong> has been unlinked from this household.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>' . esc_html( $dep_name ) . '</strong> has been unlinked from this household and moved to the unassigned archer pool.</div>';
             }
         }
 
@@ -638,9 +642,117 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
+        // 10. TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT INTO TARGET HOUSEHOLD
+        if ( $action === 'transfer_household_member' ) {
+            if ( ! current_user_can( 'administrator' ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can merge or transfer member accounts.</div>';
+            }
+
+            $source_user_id = isset( $_POST['source_user_id'] ) ? intval( $_POST['source_user_id'] ) : 0;
+            $target_head_id = isset( $_POST['target_head_id'] ) ? intval( $_POST['target_head_id'] ) : 0;
+
+            if ( $source_user_id <= 0 || $target_head_id <= 0 || $source_user_id === $target_head_id ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid source member and a different target Head of Household.</div>';
+            }
+
+            $src_user = get_userdata( $source_user_id );
+            $tgt_user = get_userdata( $target_head_id );
+
+            if ( ! $src_user || ! $tgt_user ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified source or target user account does not exist.</div>';
+            }
+
+            $src_fname = get_user_meta( $source_user_id, 'first_name', true ) ? get_user_meta( $source_user_id, 'first_name', true ) : $src_user->first_name;
+            $src_lname = get_user_meta( $source_user_id, 'last_name', true ) ? get_user_meta( $source_user_id, 'last_name', true ) : $src_user->last_name;
+
+            $dep_payload = array(
+                'first_name'      => $src_fname,
+                'last_name'       => $src_lname,
+                'email'           => $src_user->user_email,
+                'phone'           => get_user_meta( $source_user_id, 'sywat_phone', true ),
+                'gender'          => get_user_meta( $source_user_id, 'sywat_gender', true ),
+                'is_pro'          => get_user_meta( $source_user_id, 'sywat_is_pro', true ),
+                'dob'             => get_user_meta( $source_user_id, 'sywat_dob', true ),
+                'accommodations'  => get_user_meta( $source_user_id, 'sywat_accommodations', true ),
+                'nfaa_number'     => get_user_meta( $source_user_id, 'sywat_nfaa_number', true ),
+                'nfaa_expiration' => get_user_meta( $source_user_id, 'sywat_nfaa_expiration', true ),
+                'address_1'       => get_user_meta( $source_user_id, 'sywat_address_1', true ),
+                'address_2'       => get_user_meta( $source_user_id, 'sywat_address_2', true ),
+                'city'            => get_user_meta( $source_user_id, 'sywat_city', true ),
+                'state'           => get_user_meta( $source_user_id, 'sywat_state', true ),
+                'zip'             => get_user_meta( $source_user_id, 'sywat_zip', true ),
+            );
+
+            if ( function_exists( 'sywat_add_household_dependent' ) ) {
+                $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
+                if ( is_wp_error( $res ) ) {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
+                }
+
+                require_once ABSPATH . 'wp-admin/includes/user.php';
+                wp_delete_user( $source_user_id );
+                wp_cache_flush();
+
+                return sprintf(
+                    '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>%s %s</strong> successfully transferred to <strong>%s</strong>\'s household roster! Redundant standalone account merged.</div>',
+                    esc_html( $src_fname ),
+                    esc_html( $src_lname ),
+                    esc_html( $tgt_user->display_name )
+                );
+            }
+        }
+
         return '';
     }
 }
+
+if ( ! function_exists( 'sywat_ajax_search_unassigned_archers' ) ) {
+    /**
+     * AJAX Endpoint: Autocomplete Archer Search Engine
+     * Queries standalone archers and unassigned pool items matching term for dynamic household link autocomplete.
+     */
+    function sywat_ajax_search_unassigned_archers() {
+        if ( ! isset( $_GET['sywat_nonce'] ) || ! wp_verify_nonce( $_GET['sywat_nonce'], 'sywat_desk_action' ) ) {
+            if ( ob_get_length() ) ob_clean();
+            wp_send_json_error( array( 'message' => 'Security check failed.' ) );
+        }
+
+        $term = isset( $_GET['term'] ) ? sanitize_text_field( trim( $_GET['term'] ) ) : '';
+        if ( strlen( $term ) < 2 ) {
+            if ( ob_get_length() ) ob_clean();
+            wp_send_json_success( array() );
+        }
+
+        $results = array();
+        
+        // Search unassigned pool
+        $pool = get_option( 'sywat_unassigned_archers', array() );
+        if ( is_array( $pool ) ) {
+            foreach ( $pool as $sys_id => $item ) {
+                $fn = isset( $item['first_name'] ) ? $item['first_name'] : '';
+                $ln = isset( $item['last_name'] ) ? $item['last_name'] : '';
+                $name = trim( $fn . ' ' . $ln );
+                if ( stripos( $name, $term ) !== false || stripos( isset( $item['nfaa_number'] ) ? $item['nfaa_number'] : '', $term ) !== false ) {
+                    $results[] = array(
+                        'system_id'       => $sys_id,
+                        'first_name'      => $fn,
+                        'last_name'       => $ln,
+                        'dob'             => isset( $item['dob'] ) ? $item['dob'] : '',
+                        'gender'          => isset( $item['gender'] ) ? $item['gender'] : 'unassigned',
+                        'nfaa_number'     => isset( $item['nfaa_number'] ) ? $item['nfaa_number'] : '',
+                        'nfaa_expiration' => isset( $item['nfaa_expiration'] ) ? $item['nfaa_expiration'] : '',
+                        'source'          => 'unassigned_pool',
+                    );
+                }
+            }
+        }
+
+        if ( ob_get_length() ) ob_clean();
+        wp_send_json_success( array_slice( $results, 0, 10 ) );
+    }
+}
+
+add_action( 'wp_ajax_sywat_search_unassigned_archers', 'sywat_ajax_search_unassigned_archers' );
 
 if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
     /**
@@ -672,7 +784,6 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         $chunk       = isset( $_POST['chunk'] ) ? intval( $_POST['chunk'] ) : 1;
         $reset_queue = isset( $_POST['reset'] ) && $_POST['reset'] === 'yes';
 
-        // 1. INITIALIZATION: Build queue on first chunk or explicit reset request
         if ( $chunk === 1 || $reset_queue || get_transient( $queue_key ) === false ) {
             $protected_map = function_exists( 'sywat_get_protected_user_map' ) ? sywat_get_protected_user_map() : array();
             $all_user_ids  = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
@@ -698,7 +809,6 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
             ), HOUR_IN_SECONDS );
         }
 
-        // Fetch active state
         $purge_queue = get_transient( $queue_key );
         $meta        = get_transient( $meta_key );
 
@@ -713,7 +823,6 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         $protected_count = intval( $meta['protected_count'] );
         $total_deleted   = intval( $meta['total_deleted'] );
 
-        // If queue is already empty
         if ( empty( $purge_queue ) ) {
             delete_transient( $queue_key );
             delete_transient( $meta_key );
@@ -734,7 +843,6 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
             ) );
         }
 
-        // Process batch of up to 100 users
         $limit     = 100;
         $batch_ids = array_splice( $purge_queue, 0, $limit );
 
@@ -758,7 +866,6 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         $remaining         = count( $purge_queue );
         $finished          = ( $remaining === 0 );
 
-        // Update transient states
         set_transient( $queue_key, $purge_queue, HOUR_IN_SECONDS );
         $meta['total_deleted'] = $new_total_deleted;
         set_transient( $meta_key, $meta, HOUR_IN_SECONDS );
