@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure data retrieval, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), gender options dictionary (with 'unassigned' default), adult Pro status maps, US state resolution, accommodations maps, and household sub-profile management utilities.
- * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
+ * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 3.9.2
+ * Version: 4.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -156,55 +156,6 @@ if ( ! function_exists( 'sywat_get_user_nfaa_id' ) ) {
         }
         
         return ! empty( $nfaa_id ) ? $nfaa_id : 'Unassigned';
-    }
-}
-
-/**
- * Retrieve registered TFAA members matching custom system roles and administrators.
- *
- * @return array List of WP_User objects.
- */
-if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
-    function sywat_get_all_tfaa_members() {
-        $allowed_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
-            ? sywat_get_custom_roles_slugs() 
-            : array(
-                'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
-                'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-                'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager', 
-                'sywat_shop_user', 'administrator'
-            );
-
-        if ( is_array( $allowed_roles ) ) {
-            $extra_roles = array( 'sywat_shop_manager', 'sywat_shop_user', 'administrator' );
-            foreach ( $extra_roles as $er ) {
-                if ( ! in_array( $er, $allowed_roles, true ) ) {
-                    $allowed_roles[] = $er;
-                }
-            }
-        }
-
-        return get_users( array(
-            'role__in' => $allowed_roles,
-            'orderby'  => 'display_name',
-            'order'    => 'ASC',
-        ) );
-    }
-}
-
-/**
- * Retrieve all assigned TFAA Board Members.
- *
- * @return array List of WP_User objects with board assignments.
- */
-if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
-    function sywat_get_all_board_members() {
-        return get_users( array(
-            'meta_key'     => 'sywat_board_positions',
-            'meta_compare' => 'EXISTS',
-            'orderby'      => 'display_name',
-            'order'        => 'ASC',
-        ) );
     }
 }
 
