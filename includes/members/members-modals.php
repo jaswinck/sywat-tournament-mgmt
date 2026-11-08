@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, and profile household linking/transfer overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, and profile household linking/transfer overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.3.0
+ * Version: 4.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -1063,6 +1063,7 @@ function sywat_members_render_modals( $data ) {
                     <input type="hidden" name="sywat_action" value="transfer_household_member">
                     <input type="hidden" name="source_user_id" id="sywat_transfer_source_user_id" value="0">
                     <input type="hidden" name="target_system_id" id="sywat_transfer_target_system_id" value="">
+                    <input type="hidden" name="target_head_id" id="sywat_transfer_target_head_id" value="" required>
 
                     <div class="sywat-alert sywat-alert-info">
                         🔗 <strong>Link Archer:</strong> Assigns this archer under a target Head of Household as a family dependent sub-profile.
@@ -1072,21 +1073,18 @@ function sywat_members_render_modals( $data ) {
                         <span>👤 <strong>Archer Name:</strong> <span id="sywat_transfer_source_name">-- Select Member --</span></span>
                     </div>
 
-                    <div class="sywat-field-group sywat-mt-4">
-                        <label>Select Target Head of Household *</label>
-                        <select name="target_head_id" required>
-                            <option value="">-- Choose Target Family Head --</option>
-                            <?php foreach ( $all_members as $m_item ): ?>
-                                <option value="<?php echo intval( $m_item->ID ); ?>">
-                                    <?php echo esc_html( $m_item->display_name ); ?> (<?php echo esc_html( $m_item->user_email ); ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                    <!-- DYNAMIC AS-YOU-TYPE HEAD OF HOUSEHOLD AUTOCOMPLETE SEARCH -->
+                    <div class="sywat-field-group sywat-mt-4 sywat-autocomplete-wrapper">
+                        <label>🔍 Search Target Head of Household (Type Name or NFAA ID) *</label>
+                        <input type="text" id="sywat_transfer_head_search" placeholder="Start typing name or NFAA ID..." autocomplete="off" oninput="sywatHandleHeadSearch(this)">
+                        <div id="sywat_transfer_head_search_results" class="sywat-autocomplete-results sywat-hidden"></div>
                     </div>
+
+                    <div id="sywat_transfer_selected_head_display" class="sywat-mt-2 sywat-hidden"></div>
 
                     <div class="sywat-modal-actions sywat-mt-4">
                         <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseTransferMemberModal()">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Link to Household</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_transfer_submit_btn" disabled>🚀 Confirm &amp; Link to Household</button>
                     </div>
                 </form>
             </div>
