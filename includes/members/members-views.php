@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions. Decoupled status badge presentation delegates payload evaluations strictly to members-helpers.php.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, standalone account household transfer triggers, and explicit archer-specific Unlink & Delete actions. Decoupled status badge presentation delegates payload evaluations strictly to members-helpers.php.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -552,6 +552,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <td class="sywat-col-center">
                                                     <div class="sywat-table-actions-vertical">
                                                         <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $m->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
+                                                        <?php if ( current_user_can( 'administrator' ) && get_current_user_id() !== $m->ID ): ?>
+                                                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo intval( $m->ID ); ?>, '<?php echo esc_js( $m->display_name ); ?>')">🔗 Transfer</button>
+                                                        <?php endif; ?>
                                                         <?php if ( get_current_user_id() !== $m->ID ): ?>
                                                             <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete member &quot;<?php echo esc_js( $m->display_name ); ?>&quot;? This action cannot be undone.');">
                                                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
