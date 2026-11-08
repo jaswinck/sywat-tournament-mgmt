@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine & AJAX Batch API
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, output-buffered AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, existing Head of Household DB priority preservation, and household dependent deduplication guards.
+ * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, output-buffered AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, immutable existing Head of Household DB priority locks, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices, dedicated preview modal payloads, and JSON AJAX responses.
  * Author: SYWAT Archery
- * Version: 2.3.0
+ * Version: 2.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -453,60 +453,80 @@ if ( ! function_exists( 'sywat_ingest_archer_households_batch' ) ) {
         $created_dep     = 0;
         $updated_user    = 0;
 
-        foreach ( $batch_households as $members ) {
-            if ( empty( $members ) ) continue;
+        foreach ( $batch_households as $group_members ) {
+            if ( empty( $group_members ) ) continue;
 
             // -----------------------------------------------------------------
-            // EXISTING HEAD OF HOUSEHOLD DB PRIORITY PRESERVATION
+            // IMMUTABLE EXISTING HEAD OF HOUSEHOLD LOCK & MATCHING
             // -----------------------------------------------------------------
-            // Scan household members to see if ANY member already exists as a Primary WP_User
-            $head_index       = 0;
             $existing_user_id = 0;
+            $matched_member_idx = null;
 
-            foreach ( $members as $idx => $m_candidate ) {
-                $cand_nfaa  = ! empty( $m_candidate['nfaa_number'] ) ? trim( $m_candidate['nfaa_number'] ) : '';
-                $cand_email = ! empty( $m_candidate['email'] ) ? strtolower( trim( $m_candidate['email'] ) ) : '';
-
+            // Priority 1: Check if any member in the incoming spreadsheet group matches an existing WP_User by NFAA ID
+            foreach ( $group_members as $idx => $m_cand ) {
+                $cand_nfaa = ! empty( $m_cand['nfaa_number'] ) ? trim( $m_cand['nfaa_number'] ) : '';
                 if ( ! empty( $cand_nfaa ) && isset( $nfaa_map[ $cand_nfaa ] ) ) {
-                    $existing_user_id = $nfaa_map[ $cand_nfaa ];
-                    $head_index       = $idx;
-                    break;
-                }
-
-                if ( ! empty( $cand_email ) && is_email( $cand_email ) && isset( $email_map[ $cand_email ] ) ) {
-                    $existing_user_id = $email_map[ $cand_email ];
-                    $head_index       = $idx;
+                    $existing_user_id   = $nfaa_map[ $cand_nfaa ];
+                    $matched_member_idx = $idx;
                     break;
                 }
             }
 
-            // Extract confirmed Head of Household record and leave remaining members as dependents
-            $head = $members[ $head_index ];
-            unset( $members[ $head_index ] );
-            $members = array_values( $members ); // Re-index dependent array
-
-            $primary_email       = $head['email'];
-            $is_unassigned_email = false;
-
-            if ( empty( $primary_email ) || ! is_email( $primary_email ) ) {
-                $nfaa_seed           = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
-                $primary_email       = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
-                $is_unassigned_email = true;
+            // Priority 2: Check if any member matches an existing WP_User by Email Address
+            if ( ! $existing_user_id ) {
+                foreach ( $group_members as $idx => $m_cand ) {
+                    $cand_email = ! empty( $m_cand['email'] ) ? strtolower( trim( $m_cand['email'] ) ) : '';
+                    if ( ! empty( $cand_email ) && is_email( $cand_email ) && isset( $email_map[ $cand_email ] ) ) {
+                        $existing_user_id   = $email_map[ $cand_email ];
+                        $matched_member_idx = $idx;
+                        break;
+                    }
+                }
             }
 
             $primary_user_id = 0;
 
             if ( $existing_user_id ) {
+                // MATCHED EXISTING HOUSEHOLD: Lock existing Head of Household identity in WP. DO NOT CALL wp_update_user()
                 $primary_user_id = $existing_user_id;
                 $updated_user++;
 
-                wp_update_user( array(
-                    'ID'           => $primary_user_id,
-                    'first_name'   => $head['first_name'],
-                    'last_name'    => $head['last_name'],
-                    'display_name' => $head['first_name'] . ' ' . $head['last_name'],
-                ) );
+                // Retrieve established Primary User data to preserve metadata updates
+                $wp_user_obj = get_userdata( $primary_user_id );
+                $primary_email = $wp_user_obj ? $wp_user_obj->user_email : '';
+
+                // If a specific row matched the existing account holder, update their user meta (e.g. NFAA expiration)
+                if ( null !== $matched_member_idx && isset( $group_members[ $matched_member_idx ] ) ) {
+                    $matched_row = $group_members[ $matched_member_idx ];
+                    if ( ! empty( $matched_row['nfaa_number'] ) ) {
+                        update_user_meta( $primary_user_id, 'sywat_nfaa_number', $matched_row['nfaa_number'] );
+                        update_user_meta( $primary_user_id, 'sywat_tfaa_number', $matched_row['nfaa_number'] );
+                    }
+                    if ( ! empty( $matched_row['nfaa_exp'] ) ) {
+                        update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', $matched_row['nfaa_exp'] );
+                    }
+                    if ( ! empty( $matched_row['phone'] ) ) {
+                        update_user_meta( $primary_user_id, 'sywat_phone', $matched_row['phone'] );
+                    }
+                }
+
+                // Route ALL spreadsheet group rows directly into the dependent ingestion loop under this Primary Account
+                $dependents_queue = $group_members;
+
             } else {
+                // NEW HOUSEHOLD: Create new Primary Account using the first element ($head)
+                $head = array_shift( $group_members );
+                $dependents_queue = $group_members;
+
+                $primary_email       = $head['email'];
+                $is_unassigned_email = false;
+
+                if ( empty( $primary_email ) || ! is_email( $primary_email ) ) {
+                    $nfaa_seed           = ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : rand( 10000, 99999 );
+                    $primary_email       = 'unassigned-' . $nfaa_seed . '@system.sywat.local';
+                    $is_unassigned_email = true;
+                }
+
                 $base_username = sanitize_user( $head['first_name'] . '.' . $head['last_name'], true );
                 $username      = $base_username;
                 $counter       = 1;
@@ -536,91 +556,99 @@ if ( ! function_exists( 'sywat_ingest_archer_households_batch' ) ) {
                     if ( ! $is_unassigned_email ) {
                         $email_map[ strtolower( $primary_email ) ] = $primary_user_id;
                     }
+
+                    if ( function_exists( 'sywat_get_user_system_id' ) ) {
+                        sywat_get_user_system_id( $primary_user_id );
+                    }
+
+                    update_user_meta( $primary_user_id, 'sywat_nfaa_number', $head['nfaa_number'] );
+                    update_user_meta( $primary_user_id, 'sywat_tfaa_number', $head['nfaa_number'] );
+                    update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', $head['nfaa_exp'] );
+                    update_user_meta( $primary_user_id, 'sywat_dob', $head['dob'] );
+                    update_user_meta( $primary_user_id, 'sywat_gender', $head['gender'] );
+                    update_user_meta( $primary_user_id, 'sywat_is_pro', $head['is_pro'] );
+                    update_user_meta( $primary_user_id, 'sywat_phone', $head['phone'] );
+
+                    if ( $is_unassigned_email ) {
+                        update_user_meta( $primary_user_id, 'sywat_email_unassigned', 'yes' );
+                    }
                 }
             }
 
-            if ( $primary_user_id && ! is_wp_error( $primary_user_id ) ) {
-                if ( function_exists( 'sywat_get_user_system_id' ) ) {
-                    sywat_get_user_system_id( $primary_user_id );
-                }
+            // ---------------------------------------------------------------------
+            // STAGE 4: DEPENDENT INGESTION & DEDUPLICATION UNDER PRIMARY ACCOUNT
+            // ---------------------------------------------------------------------
+            if ( $primary_user_id && ! is_wp_error( $primary_user_id ) && ! empty( $dependents_queue ) ) {
+                $existing_deps = function_exists( 'sywat_get_linked_household_members' ) 
+                    ? sywat_get_linked_household_members( $primary_user_id ) 
+                    : array();
 
-                update_user_meta( $primary_user_id, 'sywat_nfaa_number', $head['nfaa_number'] );
-                update_user_meta( $primary_user_id, 'sywat_tfaa_number', $head['nfaa_number'] );
-                update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', $head['nfaa_exp'] );
-                update_user_meta( $primary_user_id, 'sywat_dob', $head['dob'] );
-                update_user_meta( $primary_user_id, 'sywat_gender', $head['gender'] );
-                update_user_meta( $primary_user_id, 'sywat_is_pro', $head['is_pro'] );
-                update_user_meta( $primary_user_id, 'sywat_phone', $head['phone'] );
+                $existing_dep_map = array();
+                if ( is_array( $existing_deps ) ) {
+                    foreach ( $existing_deps as $ex_d ) {
+                        $ex_first = isset( $ex_d['first_name'] ) ? strtolower( trim( $ex_d['first_name'] ) ) : '';
+                        $ex_last  = isset( $ex_d['last_name'] ) ? strtolower( trim( $ex_d['last_name'] ) ) : '';
+                        $ex_dob   = isset( $ex_d['dob'] ) ? trim( $ex_d['dob'] ) : '';
+                        $ex_nfaa  = isset( $ex_d['nfaa_number'] ) ? trim( $ex_d['nfaa_number'] ) : '';
+                        $sys_id   = isset( $ex_d['system_id'] ) ? $ex_d['system_id'] : true;
 
-                if ( $is_unassigned_email ) {
-                    update_user_meta( $primary_user_id, 'sywat_email_unassigned', 'yes' );
-                }
-
-                // ---------------------------------------------------------------------
-                // STAGE 4: DEPENDENT INGESTION & DEDUPLICATION
-                // ---------------------------------------------------------------------
-                if ( ! empty( $members ) ) {
-                    $existing_deps = function_exists( 'sywat_get_linked_household_members' ) 
-                        ? sywat_get_linked_household_members( $primary_user_id ) 
-                        : array();
-
-                    $existing_dep_map = array();
-                    if ( is_array( $existing_deps ) ) {
-                        foreach ( $existing_deps as $ex_d ) {
-                            $ex_first = isset( $ex_d['first_name'] ) ? strtolower( trim( $ex_d['first_name'] ) ) : '';
-                            $ex_last  = isset( $ex_d['last_name'] ) ? strtolower( trim( $ex_d['last_name'] ) ) : '';
-                            $ex_dob   = isset( $ex_d['dob'] ) ? trim( $ex_d['dob'] ) : '';
-                            $ex_nfaa  = isset( $ex_d['nfaa_number'] ) ? trim( $ex_d['nfaa_number'] ) : '';
-                            $sys_id   = isset( $ex_d['system_id'] ) ? $ex_d['system_id'] : true;
-
-                            if ( $ex_first && $ex_last ) {
-                                $key = $ex_first . '|' . $ex_last . '|' . $ex_dob;
-                                $existing_dep_map[ $key ] = $sys_id;
-                            }
-                            if ( ! empty( $ex_nfaa ) ) {
-                                $existing_dep_map[ 'nfaa_' . $ex_nfaa ] = $sys_id;
-                            }
+                        if ( $ex_first && $ex_last ) {
+                            $key = $ex_first . '|' . $ex_last . '|' . $ex_dob;
+                            $existing_dep_map[ $key ] = $sys_id;
+                        }
+                        if ( ! empty( $ex_nfaa ) ) {
+                            $existing_dep_map[ 'nfaa_' . $ex_nfaa ] = $sys_id;
                         }
                     }
+                }
 
-                    foreach ( $members as $dep ) {
-                        $dep_first = strtolower( trim( $dep['first_name'] ) );
-                        $dep_last  = strtolower( trim( $dep['last_name'] ) );
-                        $dep_dob   = trim( $dep['dob'] );
-                        $dep_nfaa  = trim( $dep['nfaa_number'] );
+                // Fetch established primary user name to prevent creating dependent duplicates of the Primary Account holder
+                $primary_wp_obj   = get_userdata( $primary_user_id );
+                $primary_fn_clean = $primary_wp_obj ? strtolower( trim( $primary_wp_obj->first_name ) ) : '';
+                $primary_ln_clean = $primary_wp_obj ? strtolower( trim( $primary_wp_obj->last_name ) ) : '';
 
-                        $match_key1 = $dep_first . '|' . $dep_last . '|' . $dep_dob;
-                        $match_key2 = ! empty( $dep_nfaa ) ? 'nfaa_' . $dep_nfaa : '';
+                foreach ( $dependents_queue as $dep ) {
+                    $dep_first = strtolower( trim( $dep['first_name'] ) );
+                    $dep_last  = strtolower( trim( $dep['last_name'] ) );
+                    $dep_dob   = trim( $dep['dob'] );
+                    $dep_nfaa  = trim( $dep['nfaa_number'] );
 
-                        $existing_sys_id = null;
-                        if ( isset( $existing_dep_map[ $match_key1 ] ) ) {
-                            $existing_sys_id = $existing_dep_map[ $match_key1 ];
-                        } elseif ( $match_key2 && isset( $existing_dep_map[ $match_key2 ] ) ) {
-                            $existing_sys_id = $existing_dep_map[ $match_key2 ];
-                        }
+                    // Skip creating a dependent sub-profile if the row matches the Head of Household's exact name
+                    if ( $primary_fn_clean && $primary_ln_clean && $dep_first === $primary_fn_clean && $dep_last === $primary_ln_clean ) {
+                        continue;
+                    }
 
-                        $dep_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_email;
+                    $match_key1 = $dep_first . '|' . $dep_last . '|' . $dep_dob;
+                    $match_key2 = ! empty( $dep_nfaa ) ? 'nfaa_' . $dep_nfaa : '';
 
-                        $dep_payload = array(
-                            'first_name'      => $dep['first_name'],
-                            'last_name'       => $dep['last_name'],
-                            'email'           => $dep_email,
-                            'phone'           => $dep['phone'],
-                            'gender'          => $dep['gender'],
-                            'is_pro'          => $dep['is_pro'],
-                            'dob'             => $dep['dob'],
-                            'accommodations'  => 'none',
-                            'nfaa_number'     => $dep['nfaa_number'],
-                            'nfaa_expiration' => $dep['nfaa_exp'],
-                        );
+                    $existing_sys_id = null;
+                    if ( isset( $existing_dep_map[ $match_key1 ] ) ) {
+                        $existing_sys_id = $existing_dep_map[ $match_key1 ];
+                    } elseif ( $match_key2 && isset( $existing_dep_map[ $match_key2 ] ) ) {
+                        $existing_sys_id = $existing_dep_map[ $match_key2 ];
+                    }
 
-                        if ( $existing_sys_id && is_string( $existing_sys_id ) && function_exists( 'sywat_update_household_dependent' ) ) {
-                            sywat_update_household_dependent( $primary_user_id, $existing_sys_id, $dep_payload );
-                        } elseif ( ! $existing_sys_id && function_exists( 'sywat_add_household_dependent' ) ) {
-                            $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
-                            if ( ! is_wp_error( $res ) ) {
-                                $created_dep++;
-                            }
+                    $dep_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_email;
+
+                    $dep_payload = array(
+                        'first_name'      => $dep['first_name'],
+                        'last_name'       => $dep['last_name'],
+                        'email'           => $dep_email,
+                        'phone'           => $dep['phone'],
+                        'gender'          => $dep['gender'],
+                        'is_pro'          => $dep['is_pro'],
+                        'dob'             => $dep['dob'],
+                        'accommodations'  => 'none',
+                        'nfaa_number'     => $dep['nfaa_number'],
+                        'nfaa_expiration' => $dep['nfaa_exp'],
+                    );
+
+                    if ( $existing_sys_id && is_string( $existing_sys_id ) && function_exists( 'sywat_update_household_dependent' ) ) {
+                        sywat_update_household_dependent( $primary_user_id, $existing_sys_id, $dep_payload );
+                    } elseif ( ! $existing_sys_id && function_exists( 'sywat_add_household_dependent' ) ) {
+                        $res = sywat_add_household_dependent( $primary_user_id, $dep_payload );
+                        if ( ! is_wp_error( $res ) ) {
+                            $created_dep++;
                         }
                     }
                 }
