@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, standalone account household transfer triggers, and explicit archer-specific Unlink & Delete actions. Decoupled status badge presentation delegates payload evaluations strictly to members-helpers.php.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), and compact 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -78,6 +78,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
         $accom_labels  = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
         $gender_labels = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
 
+        // Fetch Flat Unified Archer Directory Dataset from members-data.php
+        $all_archers = function_exists( 'sywat_get_all_flat_archers' ) ? sywat_get_all_flat_archers() : array();
+
         ob_start();
         ?>
         <div class="sywat-wrap">
@@ -102,7 +105,6 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
                         : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false, 'has_membership_role' => false );
 
-                    // STRICT BOOLEAN CHECK: User MUST explicitly hold a shooting member role (has_membership_role === true)
                     $is_hoh_member = isset( $nfaa_info['has_membership_role'] ) && ( $nfaa_info['has_membership_role'] === true );
 
                     $age_div = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
@@ -387,7 +389,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     </div>
 
                 <?php else: ?>
-                    <!-- SUB-TAB 1: MEMBER DIRECTORY TABLE -->
+                    <!-- SUB-TAB 1: UNIFIED FLAT MEMBER DIRECTORY TABLE -->
                     <div class="sywat-card no-print">
                         <div class="sywat-card-header-bar">
                             <div>
@@ -407,159 +409,158 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                             // Fetch pre-calculated directory statistics engine payload from members-data.php
                             $member_stats = function_exists( 'sywat_get_tfaa_member_statistics' ) 
                                 ? sywat_get_tfaa_member_statistics( $all_members ) 
-                                : array( 'total' => 0, 'active' => 0, 'expired' => 0 );
+                                : array( 'total' => 0, 'active' => 0, 'expired' => 0, 'primary_count' => 0, 'unassigned_count' => 0 );
 
-                            $stat_total   = isset( $member_stats['total'] ) ? $member_stats['total'] : 0;
-                            $stat_active  = isset( $member_stats['active'] ) ? $member_stats['active'] : 0;
-                            $stat_expired = isset( $member_stats['expired'] ) ? $member_stats['expired'] : 0;
+                            $stat_total      = isset( $member_stats['total'] ) ? $member_stats['total'] : 0;
+                            $stat_active     = isset( $member_stats['active'] ) ? $member_stats['active'] : 0;
+                            $stat_expired    = isset( $member_stats['expired'] ) ? $member_stats['expired'] : 0;
+                            $stat_primary    = isset( $member_stats['primary_count'] ) ? $member_stats['primary_count'] : 0;
+                            $stat_unassigned = isset( $member_stats['unassigned_count'] ) ? $member_stats['unassigned_count'] : 0;
                         ?>
 
                         <!-- UNIFIED BASELINE CONTROL & STATS TOOLBAR -->
                         <div class="sywat-table-header-bar">
                             <div class="sywat-table-header-left">
                                 <div class="sywat-filter-field">
-                                    <label for="sywat_member_status_filter">STATUS</label>
+                                    <label for="sywat_member_status_filter">FILTER</label>
                                     <select id="sywat_member_status_filter" onchange="sywatApplyMemberSearch()" class="sywat-select-filter">
-                                        <option value="">-- All Statuses --</option>
+                                        <option value="">-- All Statuses &amp; Types --</option>
                                         <option value="active">🟢 Active Only</option>
                                         <option value="expired">⚪ Expired Only</option>
+                                        <option value="head">👑 Heads of Household</option>
+                                        <option value="dependent">🏠 Household Dependents</option>
+                                        <option value="unassigned">📁 Unassigned Pool</option>
                                     </select>
                                 </div>
                                 <div class="sywat-stats-inline-pills">
-                                    <span class="sywat-inline-pill" title="Total Members">
-                                        👤 <strong><?php echo number_format( $stat_total ); ?></strong> Total Members
+                                    <span class="sywat-inline-pill" title="Total Archers">
+                                        👤 <strong><?php echo number_format( $stat_total ); ?></strong> Total Archers
                                     </span>
                                     <span class="sywat-inline-pill sywat-inline-pill-active" title="Active Membership">
-                                        🟢 <strong><?php echo number_format( $stat_active ); ?></strong> Active Memberships
+                                        🟢 <strong><?php echo number_format( $stat_active ); ?></strong> Active
                                     </span>
                                     <span class="sywat-inline-pill sywat-inline-pill-expired" title="Expired Memberships">
-                                        ⚪ <strong><?php echo number_format( $stat_expired ); ?></strong> Expired Memberships
+                                        ⚪ <strong><?php echo number_format( $stat_expired ); ?></strong> Expired
                                     </span>
+                                    <?php if ( $stat_unassigned > 0 ): ?>
+                                        <span class="sywat-inline-pill sywat-inline-pill-expired" title="Unassigned Pool">
+                                            📁 <strong><?php echo number_format( $stat_unassigned ); ?></strong> Unassigned
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="sywat-table-header-controls">
                                 <div class="sywat-search-input-group">
-                                    <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search members..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                    <input type="text" id="sywat_member_search_input" oninput="sywatApplyMemberSearch()" placeholder="Search archers..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetMemberSearch()">Clear</button>
                                 </div>
                             </div>
                         </div>
 
-                        <?php if ( empty( $all_members ) || ! is_array( $all_members ) ): ?>
-                            <p class="sywat-empty-state-notice">No TFAA members found in system database.</p>
+                        <?php if ( empty( $all_archers ) || ! is_array( $all_archers ) ): ?>
+                            <p class="sywat-empty-state-notice">No TFAA archers found in system database.</p>
                         <?php else: ?>
                             <div class="sywat-table-responsive">
                                 <table class="sywat-table">
                                     <thead>
                                         <tr>
-                                            <th class="sywat-col-w-22">Member Name</th>
-                                            <th class="sywat-col-w-24">Assigned Role(s)</th>
+                                            <th class="sywat-col-w-24">Archer Name &amp; ID</th>
+                                            <th class="sywat-col-w-24">Account / Household Type</th>
                                             <th class="sywat-col-w-22">Email Address</th>
                                             <th class="sywat-col-center sywat-col-w-12">Phone</th>
-                                            <th class="sywat-col-center sywat-col-w-10">Member Status</th>
+                                            <th class="sywat-col-center sywat-col-w-10">Status</th>
                                             <th class="sywat-col-center sywat-col-w-10">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ( $all_members as $m ): ?>
+                                        <?php foreach ( $all_archers as $arch ): ?>
                                             <?php 
-                                                if ( ! $m instanceof WP_User ) continue;
-                                                $m_nfaa_id = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $m->ID ) : 'Unassigned';
-                                                $m_phone   = get_user_meta( $m->ID, 'sywat_phone', true );
-                                                $m_gender  = get_user_meta( $m->ID, 'sywat_gender', true );
-                                                $m_dob     = get_user_meta( $m->ID, 'sywat_dob', true );
+                                                $a_type     = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
+                                                $a_uid      = isset( $arch['user_id'] ) ? intval( $arch['user_id'] ) : 0;
+                                                $a_sys_id   = isset( $arch['system_id'] ) ? $arch['system_id'] : '';
+                                                $a_fname    = isset( $arch['first_name'] ) ? $arch['first_name'] : '';
+                                                $a_lname    = isset( $arch['last_name'] ) ? $arch['last_name'] : '';
+                                                $a_name     = isset( $arch['display_name'] ) ? $arch['display_name'] : trim( $a_fname . ' ' . $a_lname );
+                                                $a_email    = isset( $arch['email'] ) ? $arch['email'] : '';
+                                                $a_phone    = isset( $arch['phone'] ) ? $arch['phone'] : '';
+                                                $a_nfaa_n   = ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 'Unassigned';
+                                                $a_nfaa_e   = isset( $arch['nfaa_expiration'] ) ? $arch['nfaa_expiration'] : '';
+                                                $a_is_pro   = isset( $arch['is_pro'] ) && $arch['is_pro'] === 'yes';
+                                                $a_head_id  = isset( $arch['head_user_id'] ) ? intval( $arch['head_user_id'] ) : 0;
+                                                $a_head_name= isset( $arch['head_name'] ) ? $arch['head_name'] : '';
 
-                                                // Evaluated Member NFAA Status & Expiration Payload from members-helpers.php
+                                                // Status evaluation
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
-                                                    ? sywat_get_member_nfaa_status( $m->ID ) 
-                                                    : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false, 'has_membership_role' => false );
+                                                    ? sywat_get_member_nfaa_status( $a_nfaa_e ) 
+                                                    : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'is_active' => false );
 
-                                                // STRICT BOOLEAN CHECK: User MUST explicitly hold a shooting member role (has_membership_role === true)
-                                                $is_member  = isset( $nfaa_info['has_membership_role'] ) && ( $nfaa_info['has_membership_role'] === true );
-                                                $status_key = $is_member ? ( ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired' ) : 'non_member';
-
-                                                // DOB & Age Division Calculation (Retained for search data attribute)
-                                                $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
-                                                    ? sywat_get_eligible_age_division( $m_dob ) 
-                                                    : '';
-
-                                                // Role Badges Formatting with Color Hierarchy
-                                                $m_roles     = (array) $m->roles;
-                                                $role_badges = array();
-                                                $role_names  = array();
-                                                foreach ( $m_roles as $r_slug ) {
-                                                    if ( in_array( strtolower( $r_slug ), $excluded_roles, true ) ) continue;
-                                                    
-                                                    $r_name = isset( $wp_role_names[$r_slug] ) ? $wp_role_names[$r_slug] : ucfirst( str_replace( '_', ' ', $r_slug ) );
-                                                    $r_name = trim( str_replace( array( 'TFAA ', 'SYWAT ' ), '', $r_name ) );
-                                                    $r_clean = strtolower( $r_slug );
-
-                                                    // Robust String Matching for Color Hierarchy Classes
-                                                    $badge_cls = 'sywat-badge-muted'; // Default TFAA Member
-                                                    if ( strpos( $r_clean, 'admin' ) !== false || strpos( $r_clean, 'webmaster' ) !== false ) {
-                                                        $badge_cls = 'sywat-badge-closed'; // Dark Gold / Crimson
-                                                    } elseif ( strpos( $r_clean, 'president' ) !== false || strpos( $r_clean, 'treasurer' ) !== false || strpos( $r_clean, 'secretary' ) !== false || strpos( $r_clean, 'director' ) !== false ) {
-                                                        $badge_cls = 'sywat-badge-open'; // Navy Blue
-                                                    } elseif ( strpos( $r_clean, 'governor' ) !== false ) {
-                                                        $badge_cls = 'sywat-badge-registered'; // Purple
-                                                    } elseif ( strpos( $r_clean, 'shop' ) !== false || strpos( $r_clean, 'club' ) !== false ) {
-                                                        $badge_cls = 'sywat-badge-checkedin'; // Teal Emerald
-                                                    }
-
-                                                    $role_names[]  = $r_name;
-                                                    $role_badges[] = '<span class="sywat-badge ' . esc_attr( $badge_cls ) . '">' . esc_html( $r_name ) . '</span>';
-                                                }
-                                                $roles_html   = ! empty( $role_badges ) ? implode( ' ', $role_badges ) : '<span class="sywat-no-data-tag">No Role</span>';
-                                                $roles_search = implode( ' ', $role_names );
-
-                                                // Dependents count tag
-                                                $m_deps       = function_exists( 'sywat_get_linked_household_members' ) ? sywat_get_linked_household_members( $m->ID ) : array();
-                                                $m_deps_count = is_array( $m_deps ) ? count( $m_deps ) : 0;
+                                                $status_key = ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired';
                                             ?>
-                                            <tr class="sywat-member-row" data-status="<?php echo esc_attr( $status_key ); ?>" data-search="<?php echo esc_attr( strtolower( $m->display_name . ' ' . $m->user_login . ' ' . $m->user_email . ' ' . $m_nfaa_id . ' ' . $m_phone . ' ' . $m_gender . ' ' . $roles_search . ' ' . ( isset( $nfaa_info['status'] ) ? $nfaa_info['status'] : '' ) . ' ' . $age_div ) ); ?>">
+                                            <tr class="sywat-member-row" data-status="<?php echo esc_attr( $status_key . ' ' . $a_type ); ?>" data-search="<?php echo esc_attr( strtolower( $a_name . ' ' . $a_email . ' ' . $a_nfaa_n . ' ' . $a_phone . ' ' . $a_head_name ) ); ?>">
                                                 <td>
-                                                    <strong><?php echo esc_html( $m->display_name ); ?></strong>
-                                                    <?php if ( $m_deps_count > 0 ): ?>
-                                                        <div class="sywat-meta-subtext">🏠 Household: <?php echo intval( $m_deps_count ); ?> Linked Archer(s)</div>
+                                                    <strong><?php echo esc_html( $a_name ); ?></strong>
+                                                    <?php if ( $a_is_pro ): ?>
+                                                        <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
+                                                    <?php endif; ?>
+                                                    <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $a_nfaa_n ); ?></strong></div>
+                                                </td>
+                                                <td>
+                                                    <?php if ( $a_type === 'head' ): ?>
+                                                        <span class="sywat-badge sywat-badge-open">👑 Head of Household</span>
+                                                    <?php elseif ( $a_type === 'dependent' ): ?>
+                                                        <span class="sywat-badge sywat-badge-muted">🏠 Household Dependent</span>
+                                                        <div class="sywat-meta-subtext">Head: <strong><?php echo esc_html( $a_head_name ); ?></strong></div>
+                                                    <?php else: ?>
+                                                        <span class="sywat-badge sywat-badge-prereg">📁 Unassigned Pool</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <div class="sywat-badge-group">
-                                                        <?php echo $roles_html; ?>
-                                                    </div>
+                                                    <?php if ( ! empty( $a_email ) ): ?>
+                                                        <a href="mailto:<?php echo esc_attr( $a_email ); ?>" class="sywat-table-link"><?php echo esc_html( $a_email ); ?></a>
+                                                    <?php else: ?>
+                                                        <span class="sywat-no-data-tag">—</span>
+                                                    <?php endif; ?>
                                                 </td>
-                                                <td><a href="mailto:<?php echo esc_attr( $m->user_email ); ?>" class="sywat-table-link"><?php echo esc_html( $m->user_email ); ?></a></td>
-                                                <td class="sywat-col-center"><?php echo esc_html( ! empty( $m_phone ) ? $m_phone : '—' ); ?></td>
+                                                <td class="sywat-col-center"><?php echo esc_html( ! empty( $a_phone ) ? $a_phone : '—' ); ?></td>
                                                 <td class="sywat-col-center">
-                                                    <div class="sywat-badge-group-vertical">
-                                                        <?php if ( ! empty( $nfaa_info['system_account_label'] ) ): ?>
-                                                            <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
-                                                        <?php endif; ?>
-
-                                                        <?php if ( $is_member ): ?>
-                                                            <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
-                                                                <?php echo ( ! empty( $nfaa_info['is_active'] ) ) ? '🟢 Active' : '⚪ Expired'; ?>
-                                                            </span>
-                                                        <?php elseif ( empty( $nfaa_info['system_account_label'] ) ): ?>
-                                                            <span class="sywat-badge sywat-badge-muted">Non-Member</span>
-                                                        <?php endif; ?>
-                                                    </div>
-
-                                                    <?php if ( $is_member && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' && $nfaa_info['expiration'] !== 'System Account' ): ?>
+                                                    <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
+                                                        <?php echo ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
+                                                    </span>
+                                                    <?php if ( ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
                                                         <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="sywat-col-center">
                                                     <div class="sywat-table-actions-vertical">
-                                                        <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $m->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
-                                                        <?php if ( current_user_can( 'administrator' ) && get_current_user_id() !== $m->ID ): ?>
-                                                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo intval( $m->ID ); ?>, '<?php echo esc_js( $m->display_name ); ?>')">🔗 Transfer</button>
+                                                        <?php if ( $a_type === 'head' ): ?>
+                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $a_uid; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
+                                                            <?php if ( current_user_can( 'administrator' ) && get_current_user_id() !== $a_uid ): ?>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo $a_uid; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link</button>
+                                                            <?php endif; ?>
+                                                        <?php elseif ( $a_type === 'dependent' ): ?>
+                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $a_head_id; ?>&edit_system_id=<?php echo esc_attr( $a_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
+                                                            <?php if ( current_user_can( 'administrator' ) ): ?>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo $a_head_id; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link</button>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <?php if ( current_user_can( 'administrator' ) ): ?>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                            <?php endif; ?>
                                                         <?php endif; ?>
-                                                        <?php if ( get_current_user_id() !== $m->ID ): ?>
-                                                            <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete member &quot;<?php echo esc_js( $m->display_name ); ?>&quot;? This action cannot be undone.');">
+
+                                                        <?php if ( $a_type === 'head' && get_current_user_id() !== $a_uid ): ?>
+                                                            <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete member &quot;<?php echo esc_js( $a_name ); ?>&quot;? This action cannot be undone.');">
                                                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                                 <input type="hidden" name="sywat_action" value="delete_member">
-                                                                <input type="hidden" name="target_user_id" value="<?php echo intval( $m->ID ); ?>">
+                                                                <input type="hidden" name="target_user_id" value="<?php echo $a_uid; ?>">
+                                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Delete</button>
+                                                            </form>
+                                                        <?php elseif ( $a_type === 'dependent' ): ?>
+                                                            <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete dependent &quot;<?php echo esc_js( $a_name ); ?>&quot;? This action cannot be undone.');">
+                                                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                                <input type="hidden" name="sywat_action" value="delete_member">
+                                                                <input type="hidden" name="primary_user_id" value="<?php echo $a_head_id; ?>">
+                                                                <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $a_sys_id ); ?>">
                                                                 <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Delete</button>
                                                             </form>
                                                         <?php endif; ?>
