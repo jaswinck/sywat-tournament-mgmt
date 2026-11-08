@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions. Enforces membership role checking for status badge rendering.
- * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php.
+ * Description: High-density visual renderers for Member Directory, Board Management, and Single-Dashboard Household Roster. Includes administrative batch import triggers, active/expired status filters and statistics counters, protected test data reset triggers, Head of Household swapping, and explicit archer-specific Unlink & Delete actions. Decoupled status badge presentation delegates payload evaluations strictly to members-helpers.php.
+ * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 4.7.0
+ * Version: 4.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -176,15 +176,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
                                             <?php endif; ?>
 
-                                            <?php if ( ! isset( $nfaa_info['has_membership_role'] ) || $nfaa_info['has_membership_role'] ): ?>
+                                            <?php if ( ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] ) ): ?>
                                                 <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
-                                                    <?php echo ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
+                                                    <?php echo ( ! empty( $nfaa_info['is_active'] ) ) ? '🟢 Active' : '⚪ Expired'; ?>
                                                 </span>
+                                            <?php elseif ( empty( $nfaa_info['system_account_label'] ) ): ?>
+                                                <span class="sywat-badge sywat-badge-muted">Non-Member</span>
                                             <?php endif; ?>
                                         </div>
 
-                                        <?php if ( ( ! isset( $nfaa_info['has_membership_role'] ) || $nfaa_info['has_membership_role'] ) && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
-                                            <div class="sywat-meta-subtext"><?php echo ( $nfaa_info['expiration'] === 'System Account' ) ? 'System Account' : 'Exp: ' . esc_html( $nfaa_info['expiration'] ); ?></div>
+                                        <?php if ( ( ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] ) ) && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' && $nfaa_info['expiration'] !== 'System Account' ): ?>
+                                            <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="sywat-col-center">
@@ -464,13 +466,13 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $m_gender  = get_user_meta( $m->ID, 'sywat_gender', true );
                                                 $m_dob     = get_user_meta( $m->ID, 'sywat_dob', true );
 
-                                                // Evaluated Member NFAA Status & Expiration
+                                                // Evaluated Member NFAA Status & Expiration Payload from members-helpers.php
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                                                     ? sywat_get_member_nfaa_status( $m->ID ) 
                                                     : array( 'status' => 'Expired', 'expiration' => '—', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false );
 
-                                                $has_member_role = isset( $nfaa_info['has_membership_role'] ) ? $nfaa_info['has_membership_role'] : true;
-                                                $status_key      = $has_member_role ? ( ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired' ) : 'non_member';
+                                                $is_member  = ! isset( $nfaa_info['has_membership_role'] ) || ! empty( $nfaa_info['has_membership_role'] );
+                                                $status_key = $is_member ? ( ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired' ) : 'non_member';
 
                                                 // DOB & Age Division Calculation (Retained for search data attribute)
                                                 $age_div = ! empty( $m_dob ) && function_exists( 'sywat_get_eligible_age_division' ) 
@@ -530,17 +532,17 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             <span class="sywat-badge sywat-badge-checkedin">🏢 <?php echo esc_html( $nfaa_info['system_account_label'] ); ?></span>
                                                         <?php endif; ?>
 
-                                                        <?php if ( $has_member_role ): ?>
+                                                        <?php if ( $is_member ): ?>
                                                             <span class="sywat-badge <?php echo esc_attr( isset( $nfaa_info['badge_class'] ) ? $nfaa_info['badge_class'] : 'sywat-badge-muted' ); ?>">
-                                                                <?php echo ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? '🟢 Active' : '⚪ Expired'; ?>
+                                                                <?php echo ( ! empty( $nfaa_info['is_active'] ) ) ? '🟢 Active' : '⚪ Expired'; ?>
                                                             </span>
                                                         <?php elseif ( empty( $nfaa_info['system_account_label'] ) ): ?>
                                                             <span class="sywat-badge sywat-badge-muted">Non-Member</span>
                                                         <?php endif; ?>
                                                     </div>
 
-                                                    <?php if ( $has_member_role && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' ): ?>
-                                                        <div class="sywat-meta-subtext"><?php echo ( $nfaa_info['expiration'] === 'System Account' ) ? 'System Account' : 'Exp: ' . esc_html( $nfaa_info['expiration'] ); ?></div>
+                                                    <?php if ( $is_member && ! empty( $nfaa_info['expiration'] ) && $nfaa_info['expiration'] !== '—' && $nfaa_info['expiration'] !== 'System Account' ): ?>
+                                                        <div class="sywat-meta-subtext">Exp: <?php echo esc_html( $nfaa_info['expiration'] ); ?></div>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="sywat-col-center">
