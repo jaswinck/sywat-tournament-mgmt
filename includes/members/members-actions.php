@@ -1,11 +1,11 @@
 <?php
 /**
- * Sub-Module: Member & Board POST Action Handling
+ * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified POST action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, and 2-step batch spreadsheet importer persistent file staging.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, and step-by-step AJAX progress chunking endpoints.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 3.9.8
+ * Version: 4.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -628,3 +628,174 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
         return '';
     }
 }
+
+if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
+    /**
+     * AJAX Endpoint: Chunked Protected Test Data Purge Processor
+     * Deletes test accounts in batches of 100 while returning percentage updates to the client progress bar.
+     */
+    function sywat_ajax_purge_test_members_chunk() {
+        if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
+            wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page and try again.' ) );
+        }
+
+        if ( ! current_user_can( 'administrator' ) ) {
+            wp_send_json_error( array( 'message' => 'Access denied. Only administrators can execute batch data purges.' ) );
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/user.php';
+        global $wpdb;
+
+        $user_id     = get_current_user_id();
+        $queue_key   = 'sywat_purge_queue_' . $user_id;
+        $meta_key    = 'sywat_purge_meta_' . $user_id;
+        $chunk       = isset( $_POST['chunk'] ) ? intval( $_POST['chunk'] ) : 1;
+        $reset_queue = isset( $_POST['reset'] ) && $_POST['reset'] === 'yes';
+
+        // 1. INITIALIZATION: Build queue on first chunk or explicit reset request
+        if ( $chunk === 1 || $reset_queue || get_transient( $queue_key ) === false ) {
+            $protected_map = array();
+            if ( $user_id > 0 ) {
+                $protected_map[ $user_id ] = true;
+            }
+
+            // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officers
+            $cap_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
+                    $wpdb->prefix . 'capabilities'
+                )
+            );
+
+            if ( ! empty( $cap_rows ) ) {
+                foreach ( $cap_rows as $cr ) {
+                    $uid  = intval( $cr->user_id );
+                    $caps = @maybe_unserialize( $cr->meta_value );
+                    if ( is_array( $caps ) ) {
+                        foreach ( array_keys( $caps ) as $role_slug ) {
+                            $r_clean = strtolower( $role_slug );
+                            if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
+                                $protected_map[ $uid ] = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bulk pre-fetch active Board Member assignments
+            $board_rows = $wpdb->get_col(
+                "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
+            );
+            if ( ! empty( $board_rows ) ) {
+                foreach ( $board_rows as $b_uid ) {
+                    $protected_map[ intval( $b_uid ) ] = true;
+                }
+            }
+
+            $all_user_ids  = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
+            $purge_queue   = array();
+            $protected_cnt = 0;
+
+            if ( ! empty( $all_user_ids ) ) {
+                foreach ( $all_user_ids as $uid_raw ) {
+                    $uid = intval( $uid_raw );
+                    if ( isset( $protected_map[ $uid ] ) ) {
+                        $protected_cnt++;
+                    } else {
+                        $purge_queue[] = $uid;
+                    }
+                }
+            }
+
+            set_transient( $queue_key, $purge_queue, HOUR_IN_SECONDS );
+            set_transient( $meta_key, array(
+                'total_purgeable' => count( $purge_queue ),
+                'protected_count' => $protected_cnt,
+                'total_deleted'   => 0,
+            ), HOUR_IN_SECONDS );
+        }
+
+        // Fetch active state
+        $purge_queue = get_transient( $queue_key );
+        $meta        = get_transient( $meta_key );
+
+        if ( ! is_array( $purge_queue ) || ! is_array( $meta ) ) {
+            wp_send_json_error( array( 'message' => 'Purge state lost or expired. Please reload and try again.' ) );
+        }
+
+        $total_purgeable = intval( $meta['total_purgeable'] );
+        $protected_count = intval( $meta['protected_count'] );
+        $total_deleted   = intval( $meta['total_deleted'] );
+
+        // If queue is already empty
+        if ( empty( $purge_queue ) ) {
+            delete_transient( $queue_key );
+            delete_transient( $meta_key );
+            wp_cache_flush();
+
+            wp_send_json_success( array(
+                'finished'        => true,
+                'deleted_chunk'   => 0,
+                'total_deleted'   => $total_deleted,
+                'total_records'   => $total_purgeable,
+                'protected_count' => $protected_count,
+                'remaining'       => 0,
+                'percent'         => 100,
+                'message'         => sprintf( '🗑️ Batch Purge Complete! Deleted %d test member accounts. Protected %d accounts.', $total_deleted, $protected_count ),
+            ) );
+        }
+
+        // Process batch of up to 100 users
+        $limit     = 100;
+        $batch_ids = array_splice( $purge_queue, 0, $limit );
+
+        wp_suspend_cache_invalidation( true );
+        remove_all_actions( 'delete_user' );
+        remove_all_actions( 'deleted_user' );
+
+        $wpdb->query( 'START TRANSACTION' );
+        $chunk_deleted = 0;
+
+        foreach ( $batch_ids as $uid ) {
+            if ( wp_delete_user( $uid ) ) {
+                $chunk_deleted++;
+            }
+        }
+
+        $wpdb->query( 'COMMIT' );
+        wp_suspend_cache_invalidation( false );
+
+        $new_total_deleted = $total_deleted + $chunk_deleted;
+        $remaining         = count( $purge_queue );
+        $finished          = ( $remaining === 0 );
+
+        // Update transient states
+        set_transient( $queue_key, $purge_queue, HOUR_IN_SECONDS );
+        $meta['total_deleted'] = $new_total_deleted;
+        set_transient( $meta_key, $meta, HOUR_IN_SECONDS );
+
+        if ( $finished ) {
+            delete_transient( $queue_key );
+            delete_transient( $meta_key );
+            wp_cache_flush();
+        }
+
+        $percent = $total_purgeable > 0 ? min( 100, round( ( $new_total_deleted / $total_purgeable ) * 100 ) ) : 100;
+
+        wp_send_json_success( array(
+            'finished'        => $finished,
+            'deleted_chunk'   => $chunk_deleted,
+            'total_deleted'   => $new_total_deleted,
+            'total_records'   => $total_purgeable,
+            'protected_count' => $protected_count,
+            'remaining'       => $remaining,
+            'percent'         => $percent,
+            'message'         => $finished 
+                ? sprintf( '🗑️ Batch Purge Complete! Deleted %d test member accounts. Protected %d accounts.', $new_total_deleted, $protected_count )
+                : sprintf( 'Purged %d of %d accounts (%d%%)', $new_total_deleted, $total_purgeable, $percent ),
+        ) );
+    }
+}
+
+add_action( 'wp_ajax_sywat_purge_test_members_chunk', 'sywat_ajax_purge_test_members_chunk' );
