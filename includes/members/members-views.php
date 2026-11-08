@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text rendering under archer names, red unassigned badge formatting, text-overflow-protected status badge rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text rendering under archer names, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -347,11 +347,11 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <table class="sywat-table">
                                     <thead>
                                         <tr>
-                                            <th class="sywat-col-w-22">Board Member Name</th>
-                                            <th class="sywat-col-w-32">Assigned Position(s)</th>
+                                            <th class="sywat-col-w-24">Board Member Name</th>
+                                            <th class="sywat-col-w-30">Assigned Position(s)</th>
                                             <th class="sywat-col-w-22">Email Address</th>
-                                            <th class="sywat-col-center sywat-col-w-14">Phone</th>
-                                            <th class="sywat-col-center sywat-col-w-10">Actions</th>
+                                            <th class="sywat-col-center sywat-col-w-12">Phone</th>
+                                            <th class="sywat-col-center sywat-col-w-12">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -361,11 +361,23 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $bm_phone   = get_user_meta( $bm->ID, 'sywat_phone', true );
                                                 $pos_labels = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $bm->ID ) : array();
                                                 $pos_search = implode( ' ', $pos_labels );
+
+                                                // Format system roles sub-text for board members
+                                                $bm_roles_list = array();
+                                                if ( ! empty( $bm->roles ) ) {
+                                                    foreach ( (array) $bm->roles as $r_slug ) {
+                                                        $bm_roles_list[] = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : ucfirst( str_replace( '_', ' ', $r_slug ) );
+                                                    }
+                                                }
+                                                $bm_roles_blob = implode( ', ', $bm_roles_list );
                                             ?>
-                                            <tr class="sywat-board-row" data-search="<?php echo esc_attr( strtolower( $bm->display_name . ' ' . $bm->user_login . ' ' . $bm->user_email . ' ' . $pos_search . ' ' . $bm_phone ) ); ?>">
+                                            <tr class="sywat-board-row" data-search="<?php echo esc_attr( strtolower( $bm->display_name . ' ' . $bm->user_login . ' ' . $bm->user_email . ' ' . $pos_search . ' ' . $bm_phone . ' ' . $bm_roles_blob ) ); ?>">
                                                 <td>
                                                     <strong><?php echo esc_html( $bm->display_name ); ?></strong>
-                                                    <div class="sywat-meta-subtext">👤 <?php echo esc_html( $bm->user_login ); ?></div>
+                                                    <div class="sywat-meta-subtext">👤 Login: <code><?php echo esc_html( $bm->user_login ); ?></code></div>
+                                                    <?php if ( ! empty( $bm_roles_blob ) ): ?>
+                                                        <div class="sywat-meta-subtext">👤 Roles: <strong><?php echo esc_html( $bm_roles_blob ); ?></strong></div>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td>
                                                     <div class="sywat-badge-group">
@@ -381,12 +393,15 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <td class="sywat-col-center">
                                                     <div class="sywat-table-actions-vertical">
                                                         <a href="?tab=members&view=edit_member&edit_member_id=<?php echo intval( $bm->ID ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
+                                                        
                                                         <?php if ( function_exists( 'sywat_can_manage_board' ) && sywat_can_manage_board() ): ?>
+                                                            <a href="?tab=members&subtab=board&edit_board_id=<?php echo intval( $bm->ID ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">🏛️ Edit Positions</a>
+                                                            
                                                             <form method="post" action="?tab=members&subtab=board" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to remove &quot;<?php echo esc_js( $bm->display_name ); ?>&quot; from the Board of Directors?');">
                                                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                                 <input type="hidden" name="sywat_action" value="remove_board_member">
                                                                 <input type="hidden" name="target_user_id" value="<?php echo intval( $bm->ID ); ?>">
-                                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Remove</button>
+                                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-mt-1">Remove</button>
                                                             </form>
                                                         <?php endif; ?>
                                                     </div>
