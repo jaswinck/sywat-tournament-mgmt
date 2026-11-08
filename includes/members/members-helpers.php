@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -219,6 +219,7 @@ if ( ! function_exists( 'sywat_get_eligible_age_division' ) ) {
 /**
  * Evaluate NFAA Membership Expiration Status for a given user or expiration date string.
  * Supports dual-role detection for Shop / Club staff who also maintain an NFAA ID.
+ * Returns neutral non-member status for management accounts lacking membership roles.
  *
  * @param int|string $user_id_or_date WordPress User ID or YYYY-MM-DD date string.
  * @return array Status payload with 'status', 'expiration', 'raw_date', 'badge_class', 'is_active', and 'system_account_label'.
@@ -228,6 +229,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
         $expiration           = '';
         $is_active            = false;
         $system_account_label = '';
+        $has_membership_role  = true; // Default true for direct date strings or unlinked contexts
 
         if ( is_numeric( $user_id_or_date ) && intval( $user_id_or_date ) > 0 ) {
             $user_id    = intval( $user_id_or_date );
@@ -236,13 +238,36 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
-            // Detect shop/club system level roles for both pure and dual-role accounts
+            // Check if user holds a qualifying active membership or officer role
+            $qualifying_roles = function_exists( 'sywat_get_custom_roles_slugs' ) 
+                ? sywat_get_custom_roles_slugs() 
+                : array(
+                    'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+                    'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+                    'tfaa_webmaster', 'tfaa_field_governor'
+                );
+
+            $has_membership_role = false;
             foreach ( $user_roles as $r ) {
                 $r_clean = strtolower( $r );
+                if ( in_array( $r_clean, $qualifying_roles, true ) ) {
+                    $has_membership_role = true;
+                }
                 if ( strpos( $r_clean, 'shop' ) !== false || strpos( $r_clean, 'club' ) !== false ) {
                     $system_account_label = 'Shop / Club';
-                    break;
                 }
+            }
+
+            // If account has NO active membership role (e.g., pure Shop Manager like Korbins with no NFAA ID/expiration), return neutral state
+            if ( ! $has_membership_role && empty( $expiration ) && empty( $nfaa_id ) ) {
+                return array(
+                    'status'               => ! empty( $system_account_label ) ? $system_account_label : 'Non-Member',
+                    'expiration'           => '—',
+                    'raw_date'             => '',
+                    'badge_class'          => ! empty( $system_account_label ) ? 'sywat-badge-checkedin' : 'sywat-badge-muted',
+                    'is_active'            => false,
+                    'system_account_label' => $system_account_label,
+                );
             }
 
             // Pure System/Staff Account without an active NFAA ID or expiration date
@@ -274,6 +299,18 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
         }
 
         if ( empty( $expiration ) ) {
+            // If they don't have a membership role and no expiration date, don't force 'Expired'
+            if ( is_numeric( $user_id_or_date ) && ! $has_membership_role ) {
+                return array(
+                    'status'               => ! empty( $system_account_label ) ? $system_account_label : 'Non-Member',
+                    'expiration'           => '—',
+                    'raw_date'             => '',
+                    'badge_class'          => ! empty( $system_account_label ) ? 'sywat-badge-checkedin' : 'sywat-badge-muted',
+                    'is_active'            => false,
+                    'system_account_label' => $system_account_label,
+                );
+            }
+
             return array(
                 'status'               => 'Expired',
                 'expiration'           => '—',
