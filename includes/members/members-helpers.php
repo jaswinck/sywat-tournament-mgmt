@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -245,7 +245,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                     'tfaa_webmaster', 'tfaa_field_governor'
                 );
 
-            // Step 1: Evaluate roles FIRST
+            // STEP 1: EVALUATE ROLES FIRST BEFORE TOUCHING ANY EXPIRATION DATE META
             $has_membership_role = false;
             foreach ( $user_roles as $r ) {
                 $r_clean = strtolower( $r );
@@ -257,9 +257,9 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 }
             }
 
-            // Step 2: GUARANTEED SHORT-CIRCUIT
-            // If the user does NOT have a checked shooting member role, STOP HERE.
-            // Do NOT read or evaluate any expiration date from wp_usermeta.
+            // STEP 2: ABSOLUTE ROLE SHORT-CIRCUIT
+            // IF MEMBER CHECKBOX IS NOT CHECKED ($has_membership_role === false), STOP HERE.
+            // DO NOT READ OR EVALUATE ANY EXPIRATION DATE FROM WP_USERMETA.
             if ( ! $has_membership_role ) {
                 if ( ! empty( $system_account_label ) ) {
                     return array(
@@ -267,7 +267,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                         'expiration'           => 'System Account',
                         'raw_date'             => '',
                         'badge_class'          => 'sywat-badge-checkedin',
-                        'is_active'            => false,
+                        'is_active'            => false, // Strictly false: suppresses member status badge
                         'system_account_label' => $system_account_label,
                         'has_membership_role'  => false,
                     );
@@ -284,7 +284,7 @@ if ( ! function_exists( 'sywat_get_member_nfaa_status' ) ) {
                 );
             }
 
-            // Step 3: Only fetch database meta IF the user is a confirmed shooting member
+            // STEP 3: ONLY FETCH DATABASE EXPIRATION META IF THE USER IS A CONFIRMED SHOOTING MEMBER
             $expiration = get_user_meta( $user_id, 'sywat_nfaa_expiration', true );
             $nfaa_id    = get_user_meta( $user_id, 'sywat_nfaa_number', true );
 
