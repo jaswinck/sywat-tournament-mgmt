@@ -2,17 +2,17 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, and pure statistical calculation engines for TFAA membership counts (Total Members, Active Membership, and Expired Memberships across primary accounts and household dependents).
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
     /**
-     * Retrieve registered TFAA members matching custom system roles, shop managers, and administrators.
+     * Retrieve registered TFAA primary members matching custom system roles, shop managers, and administrators.
      *
      * @return array List of WP_User objects.
      */
@@ -29,6 +29,130 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
             'orderby'  => 'display_name',
             'order'    => 'ASC',
         ) );
+    }
+}
+
+if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
+    /**
+     * Build unified flat array of ALL archers (Heads of Household, Dependents, and Unassigned Pool Archers).
+     *
+     * @return array Standardized list of archer associative arrays.
+     */
+    function sywat_get_all_flat_archers() {
+        global $wpdb;
+        $all_archers = array();
+
+        // 1. Primary WP_User Accounts (Heads of Household)
+        $primary_users = sywat_get_all_tfaa_members();
+        if ( ! empty( $primary_users ) && is_array( $primary_users ) ) {
+            foreach ( $primary_users as $pu ) {
+                if ( ! $pu instanceof WP_User ) continue;
+                $uid = intval( $pu->ID );
+
+                $all_archers[] = array(
+                    'account_type'    => 'head',
+                    'user_id'         => $uid,
+                    'system_id'       => function_exists( 'sywat_get_user_system_id' ) ? sywat_get_user_system_id( $uid ) : 'WP-' . $uid,
+                    'first_name'      => get_user_meta( $uid, 'first_name', true ) ? get_user_meta( $uid, 'first_name', true ) : $pu->first_name,
+                    'last_name'       => get_user_meta( $uid, 'last_name', true ) ? get_user_meta( $uid, 'last_name', true ) : $pu->last_name,
+                    'display_name'    => $pu->display_name,
+                    'email'           => $pu->user_email,
+                    'phone'           => get_user_meta( $uid, 'sywat_phone', true ),
+                    'gender'          => get_user_meta( $uid, 'sywat_gender', true ),
+                    'is_pro'          => get_user_meta( $uid, 'sywat_is_pro', true ),
+                    'dob'             => get_user_meta( $uid, 'sywat_dob', true ),
+                    'accommodations'  => get_user_meta( $uid, 'sywat_accommodations', true ),
+                    'nfaa_number'     => get_user_meta( $uid, 'sywat_nfaa_number', true ),
+                    'nfaa_expiration' => get_user_meta( $uid, 'sywat_nfaa_expiration', true ),
+                    'head_user_id'    => $uid,
+                    'head_name'       => $pu->display_name,
+                    'wp_user_obj'     => $pu,
+                );
+            }
+        }
+
+        // 2. Household Dependents (Stored in User Meta)
+        $dep_meta_rows = $wpdb->get_results(
+            "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_household_dependents' AND meta_value != '' AND meta_value != 'a:0:{}'"
+        );
+
+        if ( ! empty( $dep_meta_rows ) ) {
+            foreach ( $dep_meta_rows as $row ) {
+                $head_id   = intval( $row->user_id );
+                $head_user = get_userdata( $head_id );
+                $head_name = $head_user ? $head_user->display_name : 'Primary Account';
+                $deps      = maybe_unserialize( $row->meta_value );
+
+                if ( is_array( $deps ) && ! empty( $deps ) ) {
+                    foreach ( $deps as $d ) {
+                        $fn   = isset( $d['first_name'] ) ? $d['first_name'] : '';
+                        $ln   = isset( $d['last_name'] ) ? $d['last_name'] : '';
+                        $name = isset( $d['display_name'] ) ? $d['display_name'] : trim( $fn . ' ' . $ln );
+
+                        if ( empty( $fn ) && empty( $ln ) ) continue;
+
+                        $all_archers[] = array(
+                            'account_type'    => 'dependent',
+                            'user_id'         => 0,
+                            'system_id'       => isset( $d['system_id'] ) ? $d['system_id'] : '',
+                            'first_name'      => $fn,
+                            'last_name'       => $ln,
+                            'display_name'    => $name,
+                            'email'           => isset( $d['email'] ) ? $d['email'] : '',
+                            'phone'           => isset( $d['phone'] ) ? $d['phone'] : '',
+                            'gender'          => isset( $d['gender'] ) ? $d['gender'] : 'unassigned',
+                            'is_pro'          => isset( $d['is_pro'] ) ? $d['is_pro'] : 'no',
+                            'dob'             => isset( $d['dob'] ) ? $d['dob'] : '',
+                            'accommodations'  => isset( $d['accommodations'] ) ? $d['accommodations'] : 'none',
+                            'nfaa_number'     => isset( $d['nfaa_number'] ) ? $d['nfaa_number'] : '',
+                            'nfaa_expiration' => isset( $d['nfaa_expiration'] ) ? $d['nfaa_expiration'] : '',
+                            'head_user_id'    => $head_id,
+                            'head_name'       => $head_name,
+                            'wp_user_obj'     => null,
+                        );
+                    }
+                }
+            }
+        }
+
+        // 3. Unassigned Pool Archers (Stored in Option Array)
+        $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
+        if ( is_array( $unassigned_pool ) && ! empty( $unassigned_pool ) ) {
+            foreach ( $unassigned_pool as $sys_id => $u_item ) {
+                $fn   = isset( $u_item['first_name'] ) ? $u_item['first_name'] : '';
+                $ln   = isset( $u_item['last_name'] ) ? $u_item['last_name'] : '';
+                $name = isset( $u_item['display_name'] ) ? $u_item['display_name'] : trim( $fn . ' ' . $ln );
+
+                if ( empty( $fn ) && empty( $ln ) ) continue;
+
+                $all_archers[] = array(
+                    'account_type'    => 'unassigned',
+                    'user_id'         => 0,
+                    'system_id'       => $sys_id,
+                    'first_name'      => $fn,
+                    'last_name'       => $ln,
+                    'display_name'    => $name,
+                    'email'           => isset( $u_item['email'] ) ? $u_item['email'] : '',
+                    'phone'           => isset( $u_item['phone'] ) ? $u_item['phone'] : '',
+                    'gender'          => isset( $u_item['gender'] ) ? $u_item['gender'] : 'unassigned',
+                    'is_pro'          => isset( $u_item['is_pro'] ) ? $u_item['is_pro'] : 'no',
+                    'dob'             => isset( $u_item['dob'] ) ? $u_item['dob'] : '',
+                    'accommodations'  => isset( $u_item['accommodations'] ) ? $u_item['accommodations'] : 'none',
+                    'nfaa_number'     => isset( $u_item['nfaa_number'] ) ? $u_item['nfaa_number'] : '',
+                    'nfaa_expiration' => isset( $u_item['nfaa_expiration'] ) ? $u_item['nfaa_expiration'] : '',
+                    'head_user_id'    => 0,
+                    'head_name'       => 'Unassigned Pool',
+                    'wp_user_obj'     => null,
+                );
+            }
+        }
+
+        // Sort alphabetically by Display Name
+        usort( $all_archers, function( $a, $b ) {
+            return strcasecmp( $a['display_name'], $b['display_name'] );
+        } );
+
+        return $all_archers;
     }
 }
 
@@ -51,120 +175,50 @@ if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
 if ( ! function_exists( 'sywat_get_tfaa_member_statistics' ) ) {
     /**
      * Statistical calculation engine for Member Directory metrics.
-     * Evaluates total, active, and expired tallies strictly for users holding active TFAA member 
-     * or officer roles (Primary WP_Users) AND all linked household dependent archers stored in database meta.
-     * Enforces O(1) hashtable deduplication so primary users with multiple roles are never double-counted. 
-     * Shop managers and administrators without active membership roles are correctly excluded from membership tallies.
+     * Evaluates total, active, expired tallies, primary accounts, and unassigned count across all flat archer records.
      *
-     * @param array|null $all_members Optional pre-fetched list of WP_User objects to process.
-     * @return array Associative array containing 'total', 'active', and 'expired' integer counts.
+     * @param array|null $all_members Optional pre-fetched list of WP_User objects or flat archer arrays.
+     * @return array Associative array containing 'total', 'active', 'expired', 'primary_count', and 'unassigned_count'.
      */
     function sywat_get_tfaa_member_statistics( $all_members = null ) {
-        global $wpdb;
+        $flat_archers = sywat_get_all_flat_archers();
 
-        if ( null === $all_members ) {
-            $all_members = sywat_get_all_tfaa_members();
-        }
+        $stat_total      = count( $flat_archers );
+        $stat_active     = 0;
+        $stat_expired    = 0;
+        $primary_count   = 0;
+        $unassigned_cnt  = 0;
+        $today           = date( 'Y-m-d' );
 
-        $stat_total   = 0;
-        $stat_active  = 0;
-        $stat_expired = 0;
-        $counted_uids = array(); // Dedup guard hashtable
+        foreach ( $flat_archers as $arch ) {
+            if ( $arch['account_type'] === 'head' ) {
+                $primary_count++;
+            } elseif ( $arch['account_type'] === 'unassigned' ) {
+                $unassigned_cnt++;
+            }
 
-        // STRICT EXPLICIT SHOOTING ROLES ONLY - DO NOT CALL sywat_get_custom_roles_slugs()
-        $qualifying_membership_roles = array(
-            'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
-            'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
-            'tfaa_webmaster', 'tfaa_field_governor'
-        );
+            $exp_date  = isset( $arch['nfaa_expiration'] ) ? trim( $arch['nfaa_expiration'] ) : '';
+            $is_active = false;
 
-        // -------------------------------------------------------------------------
-        // 1. EVALUATE PRIMARY WP_USER ACCOUNT HOLDERS
-        // -------------------------------------------------------------------------
-        if ( ! empty( $all_members ) && is_array( $all_members ) ) {
-            foreach ( $all_members as $sm ) {
-                if ( ! $sm instanceof WP_User ) continue;
-
-                $uid = intval( $sm->ID );
-                if ( isset( $counted_uids[ $uid ] ) ) {
-                    continue; // Skip if already counted
-                }
-
-                $u_roles                = (array) $sm->roles;
-                $has_active_member_role = false;
-
-                foreach ( $u_roles as $r_slug ) {
-                    if ( in_array( strtolower( $r_slug ), $qualifying_membership_roles, true ) ) {
-                        $has_active_member_role = true;
-                        break;
-                    }
-                }
-
-                // If user does not hold a qualifying membership role (e.g., pure shop manager like Korbins), skip stats
-                if ( ! $has_active_member_role ) {
-                    continue;
-                }
-
-                $counted_uids[ $uid ] = true;
-                $stat_total++;
-
-                $sm_nfaa = function_exists( 'sywat_get_member_nfaa_status' ) 
-                    ? sywat_get_member_nfaa_status( $uid ) 
-                    : array( 'is_active' => false );
-
-                if ( isset( $sm_nfaa['is_active'] ) && $sm_nfaa['is_active'] ) {
-                    $stat_active++;
-                } else {
-                    $stat_expired++;
+            if ( ! empty( $exp_date ) && $exp_date !== '0000-00-00' ) {
+                if ( $exp_date === '2099-12-31' || strtotime( $exp_date ) >= strtotime( $today ) ) {
+                    $is_active = true;
                 }
             }
-        }
 
-        // -------------------------------------------------------------------------
-        // 2. EVALUATE HOUSEHOLD DEPENDENT ARCHERS STORED IN USER META
-        // -------------------------------------------------------------------------
-        $dep_rows = $wpdb->get_col(
-            "SELECT meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_household_dependents' AND meta_value != '' AND meta_value != 'a:0:{}'"
-        );
-
-        if ( ! empty( $dep_rows ) ) {
-            $today = date( 'Y-m-d' );
-
-            foreach ( $dep_rows as $raw_meta ) {
-                $deps = maybe_unserialize( $raw_meta );
-                if ( ! is_array( $deps ) || empty( $deps ) ) {
-                    continue;
-                }
-
-                foreach ( $deps as $d ) {
-                    if ( empty( $d['first_name'] ) && empty( $d['last_name'] ) ) {
-                        continue;
-                    }
-
-                    $stat_total++;
-
-                    $exp_date  = isset( $d['nfaa_expiration'] ) ? trim( $d['nfaa_expiration'] ) : '';
-                    $is_active = false;
-
-                    if ( ! empty( $exp_date ) && $exp_date !== '0000-00-00' ) {
-                        if ( $exp_date === '2099-12-31' || strtotime( $exp_date ) >= strtotime( $today ) ) {
-                            $is_active = true;
-                        }
-                    }
-
-                    if ( $is_active ) {
-                        $stat_active++;
-                    } else {
-                        $stat_expired++;
-                    }
-                }
+            if ( $is_active ) {
+                $stat_active++;
+            } else {
+                $stat_expired++;
             }
         }
 
         return array(
-            'total'   => $stat_total,
-            'active'  => $stat_active,
-            'expired' => $stat_expired,
+            'total'            => $stat_total,
+            'active'           => $stat_active,
+            'expired'          => $stat_expired,
+            'primary_count'    => $primary_count,
+            'unassigned_count' => $unassigned_cnt,
         );
     }
 }
