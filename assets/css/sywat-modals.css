@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
-   Version: 6.6.0
+   Version: 6.7.0
    ========================================================================== */
 
 /* 1. Modal Container & Backdrop Engine */
@@ -489,6 +489,11 @@
 /* ==========================================================================
    5. TFAA Autocomplete Dropdown & Multi-Style Callouts
    ========================================================================== */
+.sywat-autocomplete-wrapper {
+    position: relative !important;
+}
+
+.sywat-autocomplete-results,
 .sywat-tfaa-autocomplete-dropdown,
 .sywat-desk-tfaa-dropdown {
     position: absolute !important;
@@ -496,7 +501,7 @@
     left: 0 !important;
     width: 100% !important;
     min-width: 240px !important;
-    z-index: 99999 !important;
+    z-index: 100000 !important;
     background: #ffffff !important;
     border: 1px solid #94a3b8 !important;
     border-radius: 4px !important;
@@ -506,6 +511,7 @@
     margin-top: 2px !important;
 }
 
+.sywat-autocomplete-item,
 .sywat-tfaa-autocomplete-dropdown > div,
 .sywat-tfaa-item,
 .sywat-desk-tfaa-item {
@@ -519,6 +525,7 @@
     color: #1e293b !important;
 }
 
+.sywat-autocomplete-item:hover,
 .sywat-tfaa-autocomplete-dropdown > div:hover,
 .sywat-tfaa-item:hover,
 .sywat-desk-tfaa-item:hover { 
