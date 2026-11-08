@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, and profile household linking/transfer overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, and collapsible Standalone Account conversion drawers.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.4.0
+ * Version: 4.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -505,7 +505,7 @@ function sywat_members_render_modals( $data ) {
         </div>
     <?php endif; ?>
 
-    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE PROMOTION -->
+    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE ACCOUNT CONVERSION -->
     <div class="sywat-modal-backdrop <?php echo $open_edit_dependent_modal ? 'active' : ''; ?>" id="sywat_edit_dependent_modal">
         <?php if ( $edit_user_obj && $edit_dep_subprofile ): ?>
             <?php 
@@ -640,72 +640,66 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </form>
 
-                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-4">
+                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
 
-                    <!-- UNLINK & DELETE SUB-PROFILE ACTION BAR -->
-                    <div class="sywat-card-header-bar">
-                        <div>
-                            <h3>🔗 Manage Household Link &amp; Deletion</h3>
-                            <div class="sywat-subtitle">Unlink this archer to detach them from the household, or permanently purge duplicate entries.</div>
-                        </div>
-                    </div>
-
-                    <div class="sywat-form-grid-2 sywat-mt-3">
-                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');">
+                    <!-- COMPACT 3-BUTTON ACTION STRIP -->
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');" class="sywat-m-0">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="unlink_dependent">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
                             <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-w-100">🔗 Unlink <?php echo esc_html( $d_fname ); ?> from Household</button>
+                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-w-100">🔗 Unlink Member</button>
                         </form>
 
-                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');">
+                        <button type="button" class="sywat-btn sywat-btn-primary sywat-w-100" onclick="sywatTogglePromoteSection()">
+                            🔄 Convert to Standalone
+                        </button>
+
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');" class="sywat-m-0">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="delete_member">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
                             <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-w-100">🗑️ Permanently Delete <?php echo esc_html( $d_fname ); ?></button>
+                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-w-100">🗑️ Permanently Delete</button>
                         </form>
                     </div>
 
-                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-4">
+                    <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER (Hidden by default, toggles on click) -->
+                    <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
+                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="promote_dependent">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
 
-                    <!-- PROMOTION ENGINE AT AGE 18 -->
-                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Promote <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
-                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                        <input type="hidden" name="sywat_action" value="promote_dependent">
-                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                        <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-
-                        <div class="sywat-card-header-bar">
-                            <div>
-                                <h3>🎓 Promote to Standalone Account (Age 18+)</h3>
-                                <div class="sywat-subtitle">Creates an independent WordPress login account for this member while preserving 100% of their historical score records.</div>
+                            <div class="sywat-alert sywat-alert-info">
+                                🔄 <strong>Convert to Standalone Account:</strong> Creates an independent WordPress login account for this member while preserving 100% of their historical score records.
                             </div>
-                        </div>
 
-                        <div class="sywat-form-grid-2 sywat-mt-3">
-                            <div class="sywat-field-group">
-                                <label>New Standalone Email Address *</label>
-                                <input type="email" name="new_email" value="<?php echo esc_attr( $d_email ); ?>" required placeholder="unique_email@domain.com">
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>New Standalone Email Address *</label>
+                                    <input type="email" name="new_email" value="<?php echo esc_attr( $d_email ); ?>" required placeholder="unique_email@domain.com">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>Initial Login Password (Optional)</label>
+                                    <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to auto-generate..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
                             </div>
-                            <div class="sywat-field-group">
-                                <label>Initial Login Password (Optional)</label>
-                                <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to auto-generate..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
-                            </div>
-                        </div>
 
-                        <div class="sywat-form-grid-2 sywat-mt-3">
-                            <div class="sywat-field-group">
-                                <label>Confirm Login Password</label>
-                                <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>Confirm Login Password</label>
+                                    <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="sywat-modal-actions sywat-mt-3">
-                            <button type="submit" class="sywat-btn sywat-btn-primary">Promote to Standalone Primary Account</button>
-                        </div>
-                    </form>
+                            <div class="sywat-modal-actions sywat-mt-3">
+                                <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm Account Conversion</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         <?php endif; ?>
