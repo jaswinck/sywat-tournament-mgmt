@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.6.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -189,10 +189,7 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
  * Sort board member record array by strict TFAA organizational hierarchy rank.
  * Highest position rank wins when a member holds multiple positions.
  *
- * Order: President (1), Vice President (2), Secretary (3), Treasurer (4),
- * Social Media (5), Webmaster (6), Tournament Director (7), Field Governors 1-7 (8-14).
- *
- * @param array $board_members Array of board member objects or associative arrays containing user IDs/positions.
+ * @param array $board_members Array of board member objects or associative arrays.
  * @return array Sorted board members array.
  */
 if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
@@ -201,86 +198,53 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
             return array();
         }
 
-        // Canonical hierarchy weight map (lower weight = higher rank)
         $rank_weights = array(
-            'tfaa_president'             => 1,
-            'president'                  => 1,
-            'tfaa_vice_president'        => 2,
-            'vice_president'             => 2,
-            'tfaa_secretary'             => 3,
-            'secretary'                  => 3,
-            'tfaa_treasurer'             => 4,
-            'treasurer'                  => 4,
-            'tfaa_social_media_director' => 5,
-            'tfaa_social_media'          => 5,
-            'social_media'               => 5,
-            'tfaa_webmaster'             => 6,
-            'webmaster'                  => 6,
-            'tfaa_tournament_director'   => 7,
-            'tournament_director'        => 7,
-            'tfaa_field_governor_1'      => 8,
-            'field_governor_1'           => 8,
-            'tfaa_field_governor_2'      => 9,
-            'field_governor_2'           => 9,
-            'tfaa_field_governor_3'      => 10,
-            'field_governor_3'           => 10,
-            'tfaa_field_governor_4'      => 11,
-            'field_governor_4'           => 11,
-            'tfaa_field_governor_5'      => 12,
-            'field_governor_5'           => 12,
-            'tfaa_field_governor_6'      => 13,
-            'field_governor_6'           => 13,
-            'tfaa_field_governor_7'      => 14,
-            'field_governor_7'           => 14,
-            'tfaa_field_governor'        => 15,
-            'field_governor'             => 15,
+            'tfaa_president'             => 1,  'president'           => 1,
+            'tfaa_vice_president'        => 2,  'vice_president'      => 2,
+            'tfaa_secretary'             => 3,  'secretary'           => 3,
+            'tfaa_treasurer'             => 4,  'treasurer'           => 4,
+            'tfaa_social_media_director' => 5,  'tfaa_social_media'   => 5, 'social_media' => 5,
+            'tfaa_webmaster'             => 6,  'webmaster'           => 6,
+            'tfaa_tournament_director'   => 7,  'tournament_director' => 7,
+            'tfaa_field_governor_1'      => 8,  'field_governor_1'    => 8,
+            'tfaa_field_governor_2'      => 9,  'field_governor_2'    => 9,
+            'tfaa_field_governor_3'      => 10, 'field_governor_3'    => 10,
+            'tfaa_field_governor_4'      => 11, 'field_governor_4'    => 11,
+            'tfaa_field_governor_5'      => 12, 'field_governor_5'    => 12,
+            'tfaa_field_governor_6'      => 13, 'field_governor_6'    => 13,
+            'tfaa_field_governor_7'      => 14, 'field_governor_7'    => 14,
+            'tfaa_field_governor'        => 15, 'field_governor'      => 15,
         );
 
         usort( $board_members, function( $a, $b ) use ( $rank_weights ) {
-            // Extract user ID
-            $id_a = is_object( $a ) ? ( isset( $a->ID ) ? $a->ID : 0 ) : ( isset( $a['ID'] ) ? $a['ID'] : ( isset( $a['user_id'] ) ? $a['user_id'] : 0 ) );
-            $id_b = is_object( $b ) ? ( isset( $b->ID ) ? $b->ID : 0 ) : ( isset( $b['ID'] ) ? $b['ID'] : ( isset( $b['user_id'] ) ? $b['user_id'] : 0 ) );
-
-            // Extract assigned positions array
-            $pos_a = is_object( $a ) && isset( $a->positions ) && is_array( $a->positions ) ? $a->positions : ( is_array( $a ) && isset( $a['positions'] ) && is_array( $a['positions'] ) ? $a['positions'] : ( $id_a > 0 ? (array) get_user_meta( $id_a, 'sywat_board_positions', true ) : array() ) );
-            $pos_b = is_object( $b ) && isset( $b->positions ) && is_array( $b->positions ) ? $b->positions : ( is_array( $b ) && isset( $b['positions'] ) && is_array( $b['positions'] ) ? $b['positions'] : ( $id_b > 0 ? (array) get_user_meta( $id_b, 'sywat_board_positions', true ) : array() ) );
-
-            // Fallback to role checks if position meta array is empty
-            if ( empty( $pos_a ) && $id_a > 0 ) {
-                $user_obj_a = get_userdata( $id_a );
-                $pos_a     = $user_obj_a ? (array) $user_obj_a->roles : array();
-            }
-            if ( empty( $pos_b ) && $id_b > 0 ) {
-                $user_obj_b = get_userdata( $id_b );
-                $pos_b     = $user_obj_b ? (array) $user_obj_b->roles : array();
-            }
-
-            // Calculate minimum weight (highest rank) for member A
-            $weight_a = 999;
-            foreach ( $pos_a as $p ) {
-                $p_clean = strtolower( trim( $p ) );
-                if ( isset( $rank_weights[$p_clean] ) && $rank_weights[$p_clean] < $weight_a ) {
-                    $weight_a = $rank_weights[$p_clean];
+            $get_weight = function( $item ) use ( $rank_weights ) {
+                $id = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
+                $pos = is_object( $item ) && isset( $item->positions ) ? (array) $item->positions : ( is_array( $item ) && isset( $item['positions'] ) ? (array) $item['positions'] : array() );
+                
+                if ( empty( $pos ) && $id > 0 ) {
+                    $meta_pos = get_user_meta( $id, 'sywat_board_positions', true );
+                    $pos = ! empty( $meta_pos ) ? (array) $meta_pos : (array) ( get_userdata( $id ) ? get_userdata( $id )->roles : array() );
                 }
-            }
 
-            // Calculate minimum weight (highest rank) for member B
-            $weight_b = 999;
-            foreach ( $pos_b as $p ) {
-                $p_clean = strtolower( trim( $p ) );
-                if ( isset( $rank_weights[$p_clean] ) && $rank_weights[$p_clean] < $weight_b ) {
-                    $weight_b = $rank_weights[$p_clean];
+                $min = 999;
+                foreach ( $pos as $p ) {
+                    $key = strtolower( trim( $p ) );
+                    if ( isset( $rank_weights[$key] ) && $rank_weights[$key] < $min ) {
+                        $min = $rank_weights[$key];
+                    }
                 }
+                return $min;
+            };
+
+            $w_a = $get_weight( $a );
+            $w_b = $get_weight( $b );
+
+            if ( $w_a !== $w_b ) {
+                return ( $w_a < $w_b ) ? -1 : 1;
             }
 
-            // Primary Sort: Hierarchy Weight Comparison
-            if ( $weight_a !== $weight_b ) {
-                return ( $weight_a < $weight_b ) ? -1 : 1;
-            }
-
-            // Secondary Sort: Alphabetical Display Name Tie-Breaker
-            $name_a = is_object( $a ) ? ( isset( $a->display_name ) ? $a->display_name : '' ) : ( isset( $a['display_name'] ) ? $a['display_name'] : '' );
-            $name_b = is_object( $b ) ? ( isset( $b->display_name ) ? $b->display_name : '' ) : ( isset( $b['display_name'] ) ? $b['display_name'] : '' );
+            $name_a = is_object( $a ) ? $a->display_name : ( isset( $a['display_name'] ) ? $a['display_name'] : '' );
+            $name_b = is_object( $b ) ? $b->display_name : ( isset( $b['display_name'] ) ? $b['display_name'] : '' );
 
             return strcasecmp( $name_a, $name_b );
         } );
