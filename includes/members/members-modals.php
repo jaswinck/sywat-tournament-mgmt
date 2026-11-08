@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, and standalone profile transfer/merge overlays.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, and profile household linking/transfer overlays.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.2.0
+ * Version: 4.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -1050,11 +1050,11 @@ function sywat_members_render_modals( $data ) {
         </div>
     </div>
 
-    <!-- MODAL 10: TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT MODAL -->
+    <!-- MODAL 10: LINK ARCHER TO HOUSEHOLD OVERLAY -->
     <div class="sywat-modal-backdrop" id="sywat_transfer_member_modal">
         <div class="sywat-modal-content sywat-modal-md">
             <div class="sywat-modal-header no-print">
-                <h3>🔗 Transfer / Merge Archer to Household</h3>
+                <h3>🔗 Link Archer to Household</h3>
                 <button type="button" class="sywat-modal-close" onclick="sywatCloseTransferMemberModal()">&times;</button>
             </div>
             <div class="sywat-modal-body">
@@ -1062,9 +1062,10 @@ function sywat_members_render_modals( $data ) {
                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                     <input type="hidden" name="sywat_action" value="transfer_household_member">
                     <input type="hidden" name="source_user_id" id="sywat_transfer_source_user_id" value="0">
+                    <input type="hidden" name="target_system_id" id="sywat_transfer_target_system_id" value="">
 
                     <div class="sywat-alert sywat-alert-info">
-                        🔗 <strong>Transfer Archer:</strong> Moves this member into a target family household as a dependent sub-profile while merging their redundant primary account.
+                        🔗 <strong>Link Archer:</strong> Assigns this archer under a target Head of Household as a family dependent sub-profile.
                     </div>
 
                     <div class="sywat-member-info-banner sywat-mt-3">
@@ -1085,7 +1086,7 @@ function sywat_members_render_modals( $data ) {
 
                     <div class="sywat-modal-actions sywat-mt-4">
                         <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseTransferMemberModal()">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Merge into Household</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm &amp; Link to Household</button>
                     </div>
                 </form>
             </div>
