@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine & AJAX Batch API
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, and AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, and household dependent deduplication guards.
+ * Description: High-performance, DRY-refactored 2-step audit preview, batch ingestion, output-buffered AJAX progress chunking engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, step-by-step AJAX progress endpoints, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices, dedicated preview modal payloads, and JSON AJAX responses.
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -716,13 +716,20 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
     /**
      * AJAX Endpoint: Chunked Archer Spreadsheet Ingestion Processor
      * Processes staged spreadsheet households in batches of 100 while returning percentage updates to the client progress bar.
+     * Enforces output buffer clearing to prevent stray HTML/script output from polluting the JSON stream.
      */
     function sywat_ajax_import_archers_chunk() {
         if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page and try again.' ) );
         }
 
         if ( ! current_user_can( 'administrator' ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Access denied. Only administrators can execute batch data imports.' ) );
         }
 
@@ -741,11 +748,17 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
         // INITIALIZATION: Build household tree queue on offset 0 or reset
         if ( $offset === 0 || $reset || get_transient( $hh_transient ) === false ) {
             if ( empty( $persistent_file ) || ! file_exists( $persistent_file ) ) {
+                if ( ob_get_length() ) {
+                    ob_clean();
+                }
                 wp_send_json_error( array( 'message' => 'Staged spreadsheet upload file missing or expired. Please upload again.' ) );
             }
 
             $rows = sywat_parse_spreadsheet_rows( $persistent_file );
             if ( empty( $rows ) ) {
+                if ( ob_get_length() ) {
+                    ob_clean();
+                }
                 wp_send_json_error( array( 'message' => 'Spreadsheet file is empty or unparseable.' ) );
             }
 
@@ -768,6 +781,9 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
         $meta           = get_transient( $meta_transient );
 
         if ( ! is_array( $all_households ) || ! is_array( $meta ) ) {
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_error( array( 'message' => 'Import state session expired. Please re-upload the spreadsheet file.' ) );
         }
 
@@ -780,6 +796,9 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
             }
             wp_cache_flush();
 
+            if ( ob_get_length() ) {
+                ob_clean();
+            }
             wp_send_json_success( array(
                 'finished'         => true,
                 'next_offset'      => $total_households,
@@ -814,6 +833,9 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
 
         $percent = min( 100, round( ( $next_offset / $total_households ) * 100 ) );
 
+        if ( ob_get_length() ) {
+            ob_clean();
+        }
         wp_send_json_success( array(
             'finished'         => $finished,
             'next_offset'      => $next_offset,
