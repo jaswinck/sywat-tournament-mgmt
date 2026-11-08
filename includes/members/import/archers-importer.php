@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical Archers Batch Spreadsheet Importer Engine
  * Path: includes/members/import/archers-importer.php
- * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, pre-computed default password hashing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, and household dependent deduplication guards.
+ * Description: High-performance 2-step audit preview and batch processing engine for ingesting Archers.xlsx / CSV historical data. Features email-first Head of Household sorting, ZipArchive + SimpleXML XLSX parsing, O(1) last-name hashtable indexing, global $wp_hasher class interception, in-memory username map indexing, atomic MySQL transactions with cache and hook suspension, persistent upload staging, and household dependent deduplication guards.
  * Compliance: Zero inline styles, zero HTML layout templates. Returns structured alert notices and dedicated preview modal payloads.
  * Author: SYWAT Archery
- * Version: 1.8.0
+ * Version: 1.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -429,9 +429,9 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
         }
 
         // -------------------------------------------------------------------------
-        // MODE 2: COMMIT INGESTION WITH BULK IN-MEMORY MAPS, HOOK & CACHE SUSPENSION, & MYSQL TRANSACTIONS
+        // MODE 2: COMMIT INGESTION WITH HASHER INTERCEPTION & BULK MAPS
         // -------------------------------------------------------------------------
-        global $wpdb;
+        global $wpdb, $wp_hasher, $sywat_precomputed_hash;
 
         // Suspend object cache invalidations and unhook registration callbacks for maximum ingestion speed
         wp_suspend_cache_invalidation( true );
@@ -445,6 +445,31 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
 
         // Pre-compute Bcrypt hash for default password ("P@55w0rd") ONCE before loop
         $default_pass_hash = wp_hash_password( 'P@55w0rd' );
+
+        // Intercept global $wp_hasher class to eliminate CPU Blowfish hashing inside wp_insert_user()
+        if ( ! class_exists( 'SYWAT_Fast_Hasher' ) ) {
+            class SYWAT_Fast_Hasher {
+                public function HashPassword( $password ) {
+                    global $sywat_precomputed_hash;
+                    return $sywat_precomputed_hash;
+                }
+                public function CheckPassword( $password, $hash ) {
+                    return true;
+                }
+            }
+        }
+        $sywat_precomputed_hash = $default_pass_hash;
+        $old_hasher             = $wp_hasher;
+        $wp_hasher              = new SYWAT_Fast_Hasher();
+
+        // Bulk Pre-fetch Username Map ($O(1) RAM lookup to eliminate username_exists SQL overhead)
+        $username_map = array();
+        $user_logins  = $wpdb->get_col( "SELECT user_login FROM {$wpdb->users}" );
+        if ( ! empty( $user_logins ) ) {
+            foreach ( $user_logins as $ul ) {
+                $username_map[ strtolower( trim( $ul ) ) ] = true;
+            }
+        }
 
         // Bulk Pre-fetch NFAA ID to User ID Map ($O(1) lookup)
         $nfaa_map = array();
@@ -511,10 +536,11 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
                 $username      = $base_username;
                 $counter       = 1;
 
-                while ( username_exists( $username ) ) {
+                while ( isset( $username_map[ strtolower( $username ) ] ) ) {
                     $username = $base_username . $counter;
                     $counter++;
                 }
+                $username_map[ strtolower( $username ) ] = true;
 
                 $primary_user_id = wp_insert_user( array(
                     'user_login'   => $username,
@@ -528,9 +554,6 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
 
                 if ( ! is_wp_error( $primary_user_id ) ) {
                     $real_created_primary++;
-
-                    // Set pre-computed password hash to ensure instant login compatibility & bypass repetitive CPU hashing
-                    $wpdb->update( $wpdb->users, array( 'user_pass' => $default_pass_hash ), array( 'ID' => $primary_user_id ) );
 
                     if ( ! empty( $head['nfaa_number'] ) ) {
                         $nfaa_map[ $head['nfaa_number'] ] = $primary_user_id;
@@ -634,6 +657,9 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             }
         }
 
+        // Restore standard WordPress password hasher class
+        $wp_hasher = $old_hasher;
+
         // Commit atomic MySQL transaction
         $wpdb->query( 'COMMIT' );
 
@@ -655,5 +681,4 @@ if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
             $metric_deduped_rows
         );
     }
-}
 }
