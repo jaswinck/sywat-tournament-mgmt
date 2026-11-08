@@ -5,7 +5,7 @@
  * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -39,7 +39,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <!-- Left: Brand Logo & Title -->
                 <div class="sywat-auth-brand-wrapper">
                     <?php if ( ! empty( $logo_url ) ): ?>
-                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo" onerror="this.style.display='none';">
+                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo sywat-auth-logo-sm" onerror="this.style.display='none';">
                     <?php endif; ?>
                     
                     <span class="sywat-auth-brand-title">
