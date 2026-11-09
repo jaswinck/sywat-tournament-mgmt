@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, unified Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), unified Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.7.0
+ * Version: 6.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,7 +28,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             $view           = 'edit_member';
             $edit_target_id = get_current_user_id();
         } else {
-            $edit_target_id = isset( $_REQUEST['edit_member_id'] ) ? intval( $_REQUEST['edit_member_id'] ) : 0;
+            $edit_target_id = isset( $_REQUEST['edit_member_id'] ) ? sanitize_text_field( $_REQUEST['edit_member_id'] ) : 0;
         }
 
         $notice = '';
@@ -69,11 +69,31 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
         $all_board_positions = function_exists( 'sywat_get_tfaa_board_positions_list' ) ? sywat_get_tfaa_board_positions_list() : array();
 
-        $edit_user_obj   = ( $edit_target_id > 0 ) ? get_userdata( $edit_target_id ) : null;
+        // MULTI-KEY USER RESOLUTION (WP User ID, NFAA ID, or System ID)
+        $edit_user_obj = null;
+        if ( ! empty( $edit_target_id ) ) {
+            if ( is_numeric( $edit_target_id ) ) {
+                $edit_user_obj = get_userdata( intval( $edit_target_id ) );
+            }
+            if ( ! $edit_user_obj ) {
+                $meta_users = get_users( array(
+                    'meta_query' => array(
+                        'relation' => 'OR',
+                        array( 'key' => 'sywat_system_id', 'value' => $edit_target_id ),
+                        array( 'key' => 'sywat_nfaa_number', 'value' => $edit_target_id ),
+                        array( 'key' => 'sywat_tfaa_number', 'value' => $edit_target_id ),
+                    ),
+                    'number' => 1,
+                ) );
+                if ( ! empty( $meta_users ) ) {
+                    $edit_user_obj = $meta_users[0];
+                }
+            }
+        }
 
         $edit_system_id      = isset( $_REQUEST['edit_system_id'] ) ? sanitize_text_field( $_REQUEST['edit_system_id'] ) : '';
-        $edit_dep_subprofile = ( $edit_target_id > 0 && ! empty( $edit_system_id ) && function_exists( 'sywat_get_household_dependent_by_system_id' ) ) 
-            ? sywat_get_household_dependent_by_system_id( $edit_target_id, $edit_system_id ) 
+        $edit_dep_subprofile = ( $edit_user_obj && ! empty( $edit_system_id ) && function_exists( 'sywat_get_household_dependent_by_system_id' ) ) 
+            ? sywat_get_household_dependent_by_system_id( $edit_user_obj->ID, $edit_system_id ) 
             : null;
 
         $edit_board_id       = isset( $_REQUEST['edit_board_id'] ) ? intval( $_REQUEST['edit_board_id'] ) : 0;
@@ -513,7 +533,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <?php foreach ( $all_archers as $arch ): ?>
                                             <?php 
                                                 $a_type     = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
-                                                $a_uid      = isset( $arch['user_id'] ) ? intval( $arch['user_id'] ) : 0;
+                                                
+                                                // Safely fallback if user_id is missing/0 to use system_id or nfaa_number instead
+                                                $a_uid      = ! empty( $arch['user_id'] ) && intval( $arch['user_id'] ) > 0 
+                                                                ? intval( $arch['user_id'] ) 
+                                                                : ( ! empty( $arch['system_id'] ) ? $arch['system_id'] : ( ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 0 ) );
+                                                                
                                                 $a_sys_id   = isset( $arch['system_id'] ) ? $arch['system_id'] : '';
                                                 $a_fname    = isset( $arch['first_name'] ) ? $arch['first_name'] : '';
                                                 $a_lname    = isset( $arch['last_name'] ) ? $arch['last_name'] : '';
@@ -523,7 +548,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 $a_nfaa_n   = ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 'Unassigned';
                                                 $a_nfaa_e   = isset( $arch['nfaa_expiration'] ) ? $arch['nfaa_expiration'] : '';
                                                 $a_is_pro   = isset( $arch['is_pro'] ) && $arch['is_pro'] === 'yes';
-                                                $a_head_id  = isset( $arch['head_user_id'] ) ? intval( $arch['head_user_id'] ) : 0;
+                                                
+                                                // Safely fallback head_user_id
+                                                $a_head_id  = ! empty( $arch['head_user_id'] ) && intval( $arch['head_user_id'] ) > 0 
+                                                                ? intval( $arch['head_user_id'] ) 
+                                                                : $a_uid;
+                                                                
                                                 $a_head_name= isset( $arch['head_name'] ) ? $arch['head_name'] : '';
 
                                                 // Status evaluation
@@ -536,8 +566,8 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 // Fetch user role names and board position labels for primary accounts
                                                 $role_names_blob = '';
                                                 $role_names_list = array();
-                                                if ( $a_uid > 0 ) {
-                                                    $u_obj = get_userdata( $a_uid );
+                                                if ( ! empty( $arch['user_id'] ) && intval( $arch['user_id'] ) > 0 ) {
+                                                    $u_obj = get_userdata( intval( $arch['user_id'] ) );
                                                     if ( $u_obj && ! empty( $u_obj->roles ) ) {
                                                         foreach ( (array) $u_obj->roles as $r_slug ) {
                                                             $role_names_list[] = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : ucfirst( str_replace( '_', ' ', $r_slug ) );
@@ -545,7 +575,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                         $role_names_blob = implode( ', ', $role_names_list );
                                                     }
 
-                                                    $a_board_pos = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $a_uid ) : array();
+                                                    $a_board_pos = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( intval( $arch['user_id'] ) ) : array();
                                                     if ( ! empty( $a_board_pos ) ) {
                                                         $board_pos_str = '🏛️ ' . implode( ', ', $a_board_pos );
                                                         $role_names_blob = ! empty( $role_names_blob ) ? $role_names_blob . ' | ' . $board_pos_str : $board_pos_str;
@@ -592,14 +622,14 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 <td class="sywat-col-center">
                                                     <div class="sywat-table-actions-vertical">
                                                         <?php if ( $a_type === 'head' ): ?>
-                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $a_uid; ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
-                                                            <?php if ( current_user_can( 'administrator' ) && get_current_user_id() !== $a_uid ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo $a_uid; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo esc_attr( $a_uid ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
+                                                            <?php if ( current_user_can( 'administrator' ) && (string) get_current_user_id() !== (string) $a_uid ): ?>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_uid) ? intval($a_uid) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
                                                             <?php endif; ?>
                                                         <?php elseif ( $a_type === 'dependent' ): ?>
-                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo $a_head_id; ?>&edit_system_id=<?php echo esc_attr( $a_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
+                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo esc_attr( $a_head_id ); ?>&edit_system_id=<?php echo esc_attr( $a_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
                                                             <?php if ( current_user_can( 'administrator' ) ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo $a_head_id; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_head_id) ? intval($a_head_id) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <?php if ( current_user_can( 'administrator' ) ): ?>
@@ -607,18 +637,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             <?php endif; ?>
                                                         <?php endif; ?>
 
-                                                        <?php if ( $a_type === 'head' && get_current_user_id() !== $a_uid ): ?>
+                                                        <?php if ( $a_type === 'head' && (string) get_current_user_id() !== (string) $a_uid ): ?>
                                                             <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete member &quot;<?php echo esc_js( $a_name ); ?>&quot;? This action cannot be undone.');">
                                                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                                 <input type="hidden" name="sywat_action" value="delete_member">
-                                                                <input type="hidden" name="target_user_id" value="<?php echo $a_uid; ?>">
+                                                                <input type="hidden" name="target_user_id" value="<?php echo esc_attr( $a_uid ); ?>">
                                                                 <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Delete</button>
                                                             </form>
                                                         <?php elseif ( $a_type === 'dependent' ): ?>
                                                             <form method="post" action="?tab=members&subtab=directory" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to permanently delete dependent &quot;<?php echo esc_js( $a_name ); ?>&quot;? This action cannot be undone.');">
                                                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                                 <input type="hidden" name="sywat_action" value="delete_member">
-                                                                <input type="hidden" name="primary_user_id" value="<?php echo $a_head_id; ?>">
+                                                                <input type="hidden" name="primary_user_id" value="<?php echo esc_attr( $a_head_id ); ?>">
                                                                 <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $a_sys_id ); ?>">
                                                                 <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Delete</button>
                                                             </form>
