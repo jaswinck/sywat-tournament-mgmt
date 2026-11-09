@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, integrated footer standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, in-form governance card standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -685,53 +685,56 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
-                        <!-- INTEGRATED FOOTER ACTIONS BAR (SPLIT ALIGNMENT) -->
-                        <div class="sywat-modal-actions sywat-mt-4">
-                            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatTogglePromoteSection()">
-                                🔄 Convert to Standalone Account
-                            </button>
-                            <div>
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
-                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
+                        <!-- IN-FORM GOVERNANCE CARD FOR STANDALONE CONVERSION -->
+                        <div class="sywat-card sywat-mt-4">
+                            <div class="sywat-card-header-bar">
+                                <div>
+                                    <h4 class="sywat-m-0">🔄 Convert to Standalone Account</h4>
+                                    <div class="sywat-meta-subtext">Promote this family member to an independent primary account with dedicated login credentials.</div>
+                                </div>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm" onclick="sywatTogglePromoteSection()">
+                                    Expand Form
+                                </button>
+                            </div>
+
+                            <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
+                            <div id="sywat_promote_collapsible" class="sywat-mt-3 sywat-hidden">
+                                <div class="sywat-alert sywat-alert-info">
+                                    🔄 <strong>Convert to Standalone Account:</strong> Creates an independent WordPress login account for this member while preserving 100% of their historical score records.
+                                </div>
+
+                                <div class="sywat-form-grid-2 sywat-mt-3">
+                                    <div class="sywat-field-group">
+                                        <label>New Standalone Email Address *</label>
+                                        <input type="email" name="new_email" value="<?php echo esc_attr( $d_email ); ?>" placeholder="unique_email@domain.com">
+                                    </div>
+                                    <div class="sywat-field-group">
+                                        <label>Initial Login Password (Optional)</label>
+                                        <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to auto-generate..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                    </div>
+                                </div>
+
+                                <div class="sywat-form-grid-2 sywat-mt-3">
+                                    <div class="sywat-field-group">
+                                        <label>Confirm Login Password</label>
+                                        <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                    </div>
+                                </div>
+
+                                <div class="sywat-mt-3 sywat-text-right">
+                                    <button type="submit" name="sywat_action" value="promote_dependent" class="sywat-btn sywat-btn-primary" onclick="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
+                                        🚀 Confirm Account Conversion
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- CLEAN MODAL FOOTER ACTIONS -->
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
+                        </div>
                     </form>
-
-                    <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
-                    <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
-                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
-                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                            <input type="hidden" name="sywat_action" value="promote_dependent">
-                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-
-                            <div class="sywat-alert sywat-alert-info">
-                                🔄 <strong>Convert to Standalone Account:</strong> Creates an independent WordPress login account for this member while preserving 100% of their historical score records.
-                            </div>
-
-                            <div class="sywat-form-grid-2 sywat-mt-3">
-                                <div class="sywat-field-group">
-                                    <label>New Standalone Email Address *</label>
-                                    <input type="email" name="new_email" value="<?php echo esc_attr( $d_email ); ?>" required placeholder="unique_email@domain.com">
-                                </div>
-                                <div class="sywat-field-group">
-                                    <label>Initial Login Password (Optional)</label>
-                                    <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to auto-generate..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
-                                </div>
-                            </div>
-
-                            <div class="sywat-form-grid-2 sywat-mt-3">
-                                <div class="sywat-field-group">
-                                    <label>Confirm Login Password</label>
-                                    <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
-                                </div>
-                            </div>
-
-                            <div class="sywat-modal-actions sywat-mt-3">
-                                <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm Account Conversion</button>
-                            </div>
-                        </form>
-                    </div>
                 </div>
             </div>
         <?php endif; ?>
