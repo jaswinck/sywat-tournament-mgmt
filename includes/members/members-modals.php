@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated role assignment fields displaying all system and board officer roles, and native button controls for client-side modal state management.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -32,6 +32,12 @@ function sywat_members_render_modals( $data ) {
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
+
+    $board_officer_roles = array(
+        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+        'tfaa_tournament_director', 'tfaa_field_governor'
+    );
 
     // Primary User Data Unpacking (if active)
     $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
@@ -157,18 +163,33 @@ function sywat_members_render_modals( $data ) {
                         </div>
                     </div>
 
-                    <div class="sywat-field-group sywat-mt-3">
-                        <label>Assigned System Role(s) *</label>
-                        <div class="sywat-meta-subtext sywat-mb-2">Note: Select all system and board officer roles to assign to this member account.</div>
-                        <div class="sywat-form-grid-2 sywat-role-grid">
+                    <!-- ASSIGNED SYSTEM ROLES GRID -->
+                    <div class="sywat-field-group sywat-mt-4">
+                        <label>Assigned System Access Role(s) *</label>
+                        <div class="sywat-meta-subtext sywat-mb-2">Note: Select base system login capabilities for this account.</div>
+                        <div class="sywat-form-grid-4 sywat-role-grid">
                             <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                 <?php 
                                     $r_clean = strtolower( $r_key );
-                                    if ( in_array( $r_clean, $excluded_roles, true ) ) continue; 
+                                    if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
                                 ?>
                                 <label class="sywat-checkbox-label">
                                     <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?> onchange="sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container')">
                                     <?php echo esc_html( $r_details['name'] ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- ASSIGNED BOARD POSITIONS GRID -->
+                    <div class="sywat-field-group sywat-mt-3">
+                        <label>Assigned Board Position(s)</label>
+                        <div class="sywat-meta-subtext sywat-mb-2">Note: Select official TFAA Board of Directors position(s) if applicable.</div>
+                        <div class="sywat-form-grid-4 sywat-role-grid">
+                            <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                <label class="sywat-checkbox-label">
+                                    <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>">
+                                    <?php echo esc_html( $pos_title ); ?>
                                 </label>
                             <?php endforeach; ?>
                         </div>
@@ -219,6 +240,10 @@ function sywat_members_render_modals( $data ) {
 
     <!-- MODAL 2: EDIT HEAD OF HOUSEHOLD PRIMARY PROFILE -->
     <?php if ( $edit_user_obj ): ?>
+        <?php 
+            $cur_positions = get_user_meta( $edit_user_obj->ID, 'sywat_board_positions', true );
+            if ( ! is_array( $cur_positions ) ) $cur_positions = array();
+        ?>
         <div class="sywat-modal-backdrop" id="sywat_edit_primary_modal">
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
@@ -326,18 +351,33 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <?php if ( current_user_can( 'administrator' ) ): ?>
+                            <!-- ASSIGNED SYSTEM ROLES GRID -->
                             <div class="sywat-field-group sywat-mt-4">
-                                <label>Assigned System Role(s) *</label>
-                                <div class="sywat-meta-subtext sywat-mb-2">Note: Select all system and board officer roles to assign to this primary member account.</div>
-                                <div class="sywat-form-grid-2 sywat-role-grid">
+                                <label>Assigned System Access Role(s) *</label>
+                                <div class="sywat-meta-subtext sywat-mb-2">Note: Select base system login capabilities for this account.</div>
+                                <div class="sywat-form-grid-4 sywat-role-grid">
                                     <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
                                         <?php 
                                             $r_clean = strtolower( $r_key );
-                                            if ( in_array( $r_clean, $excluded_roles, true ) ) continue; 
+                                            if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
                                         ?>
                                         <label class="sywat-checkbox-label">
                                             <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $c_roles, true ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container')">
                                             <?php echo esc_html( $r_details['name'] ); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <!-- ASSIGNED BOARD POSITIONS GRID -->
+                            <div class="sywat-field-group sywat-mt-3">
+                                <label>Assigned Board Position(s)</label>
+                                <div class="sywat-meta-subtext sywat-mb-2">Note: Select official TFAA Board of Directors position(s) assigned to this member.</div>
+                                <div class="sywat-form-grid-4 sywat-role-grid">
+                                    <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                        <label class="sywat-checkbox-label">
+                                            <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>" <?php checked( in_array( $pos_key, $cur_positions, true ), true ); ?>>
+                                            <?php echo esc_html( $pos_title ); ?>
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
@@ -676,7 +716,7 @@ function sywat_members_render_modals( $data ) {
                         </form>
                     </div>
 
-                    <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER (Hidden by default, toggles on click) -->
+                    <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
                     <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
                         <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
