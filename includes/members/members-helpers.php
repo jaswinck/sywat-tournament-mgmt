@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, and household sub-profile management utilities.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -182,6 +182,33 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
         }
 
         return $labels;
+    }
+}
+
+/**
+ * Single-Source-of-Truth dictionary mapping board position keys to WordPress User Role slugs.
+ *
+ * @return array Associative array of board position keys to WP Role slugs.
+ */
+if ( ! function_exists( 'sywat_get_board_position_role_map' ) ) {
+    function sywat_get_board_position_role_map() {
+        return array(
+            'tfaa_president'             => 'tfaa_president',
+            'president'                  => 'tfaa_president',
+            'tfaa_vice_president'        => 'tfaa_vice_president',
+            'vice_president'             => 'tfaa_vice_president',
+            'tfaa_secretary'             => 'tfaa_secretary',
+            'secretary'                  => 'tfaa_secretary',
+            'tfaa_treasurer'             => 'tfaa_treasurer',
+            'treasurer'                  => 'tfaa_treasurer',
+            'tfaa_social_media_director' => 'tfaa_social_media_director',
+            'tfaa_social_media'          => 'tfaa_social_media_director',
+            'social_media'               => 'tfaa_social_media_director',
+            'tfaa_webmaster'             => 'tfaa_webmaster',
+            'webmaster'                  => 'tfaa_webmaster',
+            'tfaa_tournament_director'   => 'tfaa_tournament_director',
+            'tournament_director'        => 'tfaa_tournament_director',
+        );
     }
 }
 
