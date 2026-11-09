@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields filtered to exclude redundant board officer roles.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.8.0
+ * Version: 4.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -32,6 +32,13 @@ function sywat_members_render_modals( $data ) {
 
     global $wp_roles;
     $editable_roles = $wp_roles ? $wp_roles->roles : array();
+
+    // Officer roles filtered out of profile forms (managed automatically via Board Positions)
+    $board_officer_roles = array(
+        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+        'tfaa_tournament_director', 'tfaa_field_governor'
+    );
 
     // Primary User Data Unpacking (if active)
     $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
@@ -159,9 +166,13 @@ function sywat_members_render_modals( $data ) {
 
                     <div class="sywat-field-group sywat-mt-3">
                         <label>Assigned System Role(s) *</label>
+                        <div class="sywat-meta-subtext sywat-mb-2">Note: Board Officer &amp; Field Governor roles are assigned automatically via Board Member Positions.</div>
                         <div class="sywat-form-grid-2 sywat-role-grid">
                             <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
+                                <?php 
+                                    $r_clean = strtolower( $r_key );
+                                    if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
+                                ?>
                                 <label class="sywat-checkbox-label">
                                     <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?> onchange="sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container')">
                                     <?php echo esc_html( $r_details['name'] ); ?>
@@ -324,9 +335,13 @@ function sywat_members_render_modals( $data ) {
                         <?php if ( current_user_can( 'administrator' ) ): ?>
                             <div class="sywat-field-group sywat-mt-4">
                                 <label>Assigned System Role(s) *</label>
+                                <div class="sywat-meta-subtext sywat-mb-2">Note: Board Officer &amp; Field Governor roles are assigned automatically via Board Member Positions under the Board tab.</div>
                                 <div class="sywat-form-grid-2 sywat-role-grid">
                                     <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
-                                        <?php if ( in_array( strtolower( $r_key ), $excluded_roles, true ) ) continue; ?>
+                                        <?php 
+                                            $r_clean = strtolower( $r_key );
+                                            if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
+                                        ?>
                                         <label class="sywat-checkbox-label">
                                             <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $c_roles, true ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container')">
                                             <?php echo esc_html( $r_details['name'] ); ?>
