@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, card-label-styled bold headers matching table header scale, flex-aligned column layout for household summary footer, slash-delimited contact info formatting, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, 2-column CSS grid aligned household summary footer with 13px font sizing matching archer table names, slash-delimited contact info formatting, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 8.0.0
+ * Version: 8.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -325,22 +325,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <!-- MASTER HOUSEHOLD ADDRESS & CONTACT SUMMARY FOOTER -->
                     <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
                     <div class="sywat-form-grid-2">
-                        <div class="sywat-summary-item">
+                        <div class="sywat-summary-grid">
                             <span class="sywat-summary-icon">📍</span>
-                            <div class="sywat-summary-content">
-                                <div><strong>Master Household Address:</strong></div>
-                                <div class="sywat-meta-subtext sywat-mt-1">
-                                    <strong><?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?></strong>
-                                </div>
+                            <div class="sywat-summary-title">Master Household Address:</div>
+                            <div class="sywat-summary-value">
+                                <?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?>
                             </div>
                         </div>
-                        <div class="sywat-summary-item">
+                        <div class="sywat-summary-grid">
                             <span class="sywat-summary-icon">📞</span>
-                            <div class="sywat-summary-content">
-                                <div><strong>Master Phone / Email Contact:</strong></div>
-                                <div class="sywat-meta-subtext sywat-mt-1">
-                                    <strong><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?> / <?php echo esc_html( $edit_user_obj->user_email ); ?></strong>
-                                </div>
+                            <div class="sywat-summary-title">Master Phone / Email Contact:</div>
+                            <div class="sywat-summary-value">
+                                <?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?> / <?php echo esc_html( $edit_user_obj->user_email ); ?>
                             </div>
                         </div>
                     </div>
