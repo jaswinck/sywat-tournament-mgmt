@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, context-aware Change Household and Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -301,13 +301,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">👑 Make Head</button>
                                                         </form>
 
-                                                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Unlink <?php echo esc_js( $dep_name ); ?> from this household? Their record will be detached and preserved.');">
-                                                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                                            <input type="hidden" name="sywat_action" value="unlink_dependent">
-                                                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                                                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $dep_sys_id ); ?>">
-                                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1">🔗 Link Household</button>
-                                                        </form>
+                                                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $dep_name ); ?>', '<?php echo esc_attr( $dep_sys_id ); ?>')">
+                                                            🔄 Change Household
+                                                        </button>
 
                                                         <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $dep_name ); ?>? This action cannot be undone.');">
                                                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
