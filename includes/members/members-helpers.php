@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities with robust dual key/property system ID resolution.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -553,6 +553,7 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
 
 /**
  * Retrieve a specific household dependent sub-profile by Primary User ID and System ID.
+ * Supports both outer array key matching and inner 'system_id' property matching.
  *
  * @param int    $primary_user_id WordPress User ID of Primary Account Holder.
  * @param string $system_id       Unique internal System ID of the dependent.
@@ -560,12 +561,31 @@ if ( ! function_exists( 'sywat_get_linked_household_members' ) ) {
  */
 if ( ! function_exists( 'sywat_get_household_dependent_by_system_id' ) ) {
     function sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) {
+        if ( $primary_user_id <= 0 || empty( $system_id ) ) {
+            return null;
+        }
+
         $dependents = sywat_get_linked_household_members( $primary_user_id );
-        foreach ( $dependents as $dep ) {
-            if ( isset( $dep['system_id'] ) && (string) $dep['system_id'] === (string) $system_id ) {
+        if ( ! is_array( $dependents ) ) {
+            return null;
+        }
+
+        $target_clean = strval( $system_id );
+
+        foreach ( $dependents as $dep_key => $dep ) {
+            if ( ! is_array( $dep ) ) continue;
+
+            $key_match   = ( strval( $dep_key ) === $target_clean );
+            $inner_match = ( isset( $dep['system_id'] ) && strval( $dep['system_id'] ) === $target_clean );
+
+            if ( $key_match || $inner_match ) {
+                if ( empty( $dep['system_id'] ) ) {
+                    $dep['system_id'] = $target_clean;
+                }
                 return $dep;
             }
         }
+
         return null;
     }
 }
