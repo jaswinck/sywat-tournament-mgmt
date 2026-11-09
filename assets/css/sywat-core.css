@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.3.0
+   Version: 7.4.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -119,37 +119,25 @@ body {
     padding: 0 !important;
 }
 
-/* High-Specificity Form Field Spacing Engine */
-html body .sywat-login-card form p,
-html body .sywat-login-card #loginform p,
-html body .sywat-login-card .login-username,
-html body .sywat-login-card .login-password,
-html body .sywat-login-card .user-pass-wrap,
-html body #loginform p,
-html body #loginform .user-pass-wrap {
-    margin-top: 0 !important;
-    margin-bottom: 24px !important;
+/* Form Paragraph & Field Container Spacing */
+.sywat-login-card form p {
+    margin: 0 0 24px 0 !important;
     padding: 0 !important;
+    clear: both !important;
 }
 
-html body .sywat-login-card label,
-html body .sywat-login-card #loginform label,
-html body #loginform label {
+.sywat-login-card label {
     font-size: 12px !important;
     font-weight: 700 !important;
     color: #1e293b !important;
     display: block !important;
-    margin-top: 0 !important;
-    margin-bottom: 6px !important;
-    padding: 0 !important;
+    margin: 0 0 6px 0 !important;
     line-height: 1.3 !important;
 }
 
-html body .sywat-login-card input[type="text"],
-html body .sywat-login-card input[type="password"],
-html body .sywat-login-card input[type="email"],
-html body #loginform input[type="text"],
-html body #loginform input[type="password"] {
+.sywat-login-card input[type="text"],
+.sywat-login-card input[type="password"],
+.sywat-login-card input[type="email"] {
     width: 100% !important;
     box-sizing: border-box !important;
     min-height: 38px !important;
@@ -160,51 +148,37 @@ html body #loginform input[type="password"] {
     font-size: 13px !important;
     color: #1e293b !important;
     background-color: #f8fafc !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+    margin: 0 !important;
     display: block !important;
     transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-html body .sywat-login-card input[type="text"]:focus,
-html body .sywat-login-card input[type="password"]:focus,
-html body .sywat-login-card input[type="email"]:focus,
-html body #loginform input[type="text"]:focus,
-html body #loginform input[type="password"]:focus {
+.sywat-login-card input[type="text"]:focus,
+.sywat-login-card input[type="password"]:focus,
+.sywat-login-card input[type="email"]:focus {
     border-color: #0284c7 !important;
     background-color: #ffffff !important;
     box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2) !important;
     outline: none !important;
 }
 
-html body .sywat-login-card .wp-pwd,
-html body #loginform .wp-pwd {
-    position: relative !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-}
-
 /* Remember Me Checkbox & Float Clear Rules */
-html body .sywat-login-card .forgetmenot,
-html body .sywat-login-card .login-remember,
-html body .sywat-login-card p.forgetmenot,
-html body #loginform .forgetmenot,
-html body #loginform p.forgetmenot {
+.sywat-login-card p.forgetmenot,
+.sywat-login-card .forgetmenot,
+.sywat-login-card .login-remember {
     float: none !important;
     clear: both !important;
     display: block !important;
     width: 100% !important;
-    margin-top: 24px !important;
-    margin-bottom: 24px !important;
+    margin: 20px 0 24px 0 !important;
     padding: 0 !important;
     font-size: 12px !important;
     color: #475569 !important;
     line-height: 1.4 !important;
 }
 
-html body .sywat-login-card .forgetmenot label,
-html body .sywat-login-card .login-remember label,
-html body #loginform .forgetmenot label {
+.sywat-login-card .forgetmenot label,
+.sywat-login-card .login-remember label {
     display: inline-flex !important;
     align-items: center !important;
     gap: 8px !important;
@@ -214,8 +188,7 @@ html body #loginform .forgetmenot label {
     cursor: pointer !important;
 }
 
-html body .sywat-login-card input[type="checkbox"],
-html body #loginform input[type="checkbox"] {
+.sywat-login-card input[type="checkbox"] {
     margin: 0 !important;
     vertical-align: middle !important;
     width: 16px !important;
@@ -224,10 +197,16 @@ html body #loginform input[type="checkbox"] {
 }
 
 /* Primary SYWAT Action Blue Button Rules */
-html body .sywat-login-card input[type="submit"],
-html body .sywat-login-card .button-primary,
-html body .sywat-login-card button[type="submit"],
-html body #loginform input[type="submit"] {
+.sywat-login-card p.submit,
+.sywat-login-card .submit {
+    margin: 0 0 16px 0 !important;
+    padding: 0 !important;
+    clear: both !important;
+}
+
+.sywat-login-card input[type="submit"],
+.sywat-login-card .button-primary,
+.sywat-login-card button[type="submit"] {
     width: 100% !important;
     min-height: 42px !important;
     height: 42px !important;
@@ -238,41 +217,36 @@ html body #loginform input[type="submit"] {
     font-size: 14px !important;
     border-radius: 4px !important;
     cursor: pointer !important;
-    margin-top: 0 !important;
-    margin-bottom: 16px !important;
+    margin: 0 !important;
     display: block !important;
     float: none !important;
     transition: background-color 0.15s ease, border-color 0.15s ease !important;
 }
 
-html body .sywat-login-card input[type="submit"]:hover,
-html body .sywat-login-card .button-primary:hover,
-html body .sywat-login-card button[type="submit"]:hover,
-html body #loginform input[type="submit"]:hover {
+.sywat-login-card input[type="submit"]:hover,
+.sywat-login-card .button-primary:hover,
+.sywat-login-card button[type="submit"]:hover {
     background-color: #0369a1 !important;
     border-color: #075985 !important;
 }
 
 .sywat-login-card .sywat-login-footer,
 .sywat-login-card p.forgetmenot + p,
-.sywat-login-card #nav,
-#loginform + #nav {
+.sywat-login-card #nav {
     text-align: center;
     margin-top: 16px;
     font-size: 12px;
 }
 
 .sywat-login-card .sywat-login-footer a,
-.sywat-login-card #nav a,
-#loginform + #nav a {
+.sywat-login-card #nav a {
     color: #0284c7;
     text-decoration: none;
     font-weight: 600;
 }
 
 .sywat-login-card .sywat-login-footer a:hover,
-.sywat-login-card #nav a:hover,
-#loginform + #nav a:hover {
+.sywat-login-card #nav a:hover {
     text-decoration: underline;
 }
 
