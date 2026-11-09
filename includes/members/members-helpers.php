@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.6.1
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -189,6 +189,9 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
  * Sort board member record array by strict TFAA organizational hierarchy rank.
  * Highest position rank wins when a member holds multiple positions.
  *
+ * Order: President (1), Vice President (2), Secretary (3), Treasurer (4),
+ * Social Media (5), Webmaster (6), Tournament Director (7), Field Governors 1-7 (8-14).
+ *
  * @param array $board_members Array of board member objects or associative arrays.
  * @return array Sorted board members array.
  */
@@ -198,7 +201,8 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
             return array();
         }
 
-        $rank_weights = array(
+        // Canonical hierarchy weight map for executive officers
+        $base_weights = array(
             'tfaa_president'             => 1,  'president'           => 1,
             'tfaa_vice_president'        => 2,  'vice_president'      => 2,
             'tfaa_secretary'             => 3,  'secretary'           => 3,
@@ -206,45 +210,70 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
             'tfaa_social_media_director' => 5,  'tfaa_social_media'   => 5, 'social_media' => 5,
             'tfaa_webmaster'             => 6,  'webmaster'           => 6,
             'tfaa_tournament_director'   => 7,  'tournament_director' => 7,
-            'tfaa_field_governor_1'      => 8,  'field_governor_1'    => 8,
-            'tfaa_field_governor_2'      => 9,  'field_governor_2'    => 9,
-            'tfaa_field_governor_3'      => 10, 'field_governor_3'    => 10,
-            'tfaa_field_governor_4'      => 11, 'field_governor_4'    => 11,
-            'tfaa_field_governor_5'      => 12, 'field_governor_5'    => 12,
-            'tfaa_field_governor_6'      => 13, 'field_governor_6'    => 13,
-            'tfaa_field_governor_7'      => 14, 'field_governor_7'    => 14,
-            'tfaa_field_governor'        => 15, 'field_governor'      => 15,
         );
 
-        usort( $board_members, function( $a, $b ) use ( $rank_weights ) {
-            $get_weight = function( $item ) use ( $rank_weights ) {
-                $id = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
+        usort( $board_members, function( $a, $b ) use ( $base_weights ) {
+            $get_member_min_weight = function( $item ) use ( $base_weights ) {
+                $id  = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
                 $pos = is_object( $item ) && isset( $item->positions ) ? (array) $item->positions : ( is_array( $item ) && isset( $item['positions'] ) ? (array) $item['positions'] : array() );
-                
+
+                // Fallback to meta array and roles if explicitly passed positions array is empty
                 if ( empty( $pos ) && $id > 0 ) {
                     $meta_pos = get_user_meta( $id, 'sywat_board_positions', true );
-                    $pos = ! empty( $meta_pos ) ? (array) $meta_pos : (array) ( get_userdata( $id ) ? get_userdata( $id )->roles : array() );
-                }
-
-                $min = 999;
-                foreach ( $pos as $p ) {
-                    $key = strtolower( trim( $p ) );
-                    if ( isset( $rank_weights[$key] ) && $rank_weights[$key] < $min ) {
-                        $min = $rank_weights[$key];
+                    if ( ! empty( $meta_pos ) && is_array( $meta_pos ) ) {
+                        $pos = $meta_pos;
+                    } else {
+                        $u_obj = get_userdata( $id );
+                        $pos   = $u_obj ? (array) $u_obj->roles : array();
                     }
                 }
-                return $min;
+
+                // Append human-readable position labels if user ID is present
+                if ( $id > 0 && function_exists( 'sywat_get_user_board_position_labels' ) ) {
+                    $formatted_labels = sywat_get_user_board_position_labels( $id );
+                    if ( ! empty( $formatted_labels ) ) {
+                        $pos = array_merge( $pos, array_keys( $formatted_labels ), array_values( $formatted_labels ) );
+                    }
+                }
+
+                $min_weight = 999;
+                foreach ( $pos as $p ) {
+                    $p_clean = strtolower( trim( (string) $p ) );
+
+                    // Check Executive / Officer base weights (Weights 1 - 7)
+                    if ( isset( $base_weights[$p_clean] ) && $base_weights[$p_clean] < $min_weight ) {
+                        $min_weight = $base_weights[$p_clean];
+                        continue;
+                    }
+
+                    // Check Field Governor District 1 - 7 pattern matches (Weights 8 - 14)
+                    if ( preg_match( '/(?:field[_\-\s]*governor|district)[_\-\s]*([1-7])/i', $p_clean, $matches ) ) {
+                        $district_num = intval( $matches[1] );
+                        $dist_weight  = 7 + $district_num; // District 1 = 8, District 7 = 14
+                        if ( $dist_weight < $min_weight ) {
+                            $min_weight = $dist_weight;
+                        }
+                    } elseif ( strpos( $p_clean, 'field_governor' ) !== false || strpos( $p_clean, 'governor' ) !== false ) {
+                        // Generic Field Governor fallback (Weight 15)
+                        if ( 15 < $min_weight ) {
+                            $min_weight = 15;
+                        }
+                    }
+                }
+
+                return $min_weight;
             };
 
-            $w_a = $get_weight( $a );
-            $w_b = $get_weight( $b );
+            $w_a = $get_member_min_weight( $a );
+            $w_b = $get_member_min_weight( $b );
 
             if ( $w_a !== $w_b ) {
                 return ( $w_a < $w_b ) ? -1 : 1;
             }
 
-            $name_a = is_object( $a ) ? $a->display_name : ( isset( $a['display_name'] ) ? $a['display_name'] : '' );
-            $name_b = is_object( $b ) ? $b->display_name : ( isset( $b['display_name'] ) ? $b['display_name'] : '' );
+            // Secondary Sort: Alphabetical Display Name Tie-Breaker
+            $name_a = is_object( $a ) ? ( isset( $a->display_name ) ? $a->display_name : '' ) : ( isset( $a['display_name'] ) ? $a['display_name'] : '' );
+            $name_b = is_object( $b ) ? ( isset( $b->display_name ) ? $b->display_name : '' ) : ( isset( $b['display_name'] ) ? $b['display_name'] : '' );
 
             return strcasecmp( $name_a, $name_b );
         } );
