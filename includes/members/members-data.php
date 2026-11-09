@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), hierarchy-sorted board member retrieval, and pure statistical calculation engines for TFAA membership counts.
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -159,14 +159,28 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
 if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
     /**
      * Retrieve all assigned TFAA Board Members pre-sorted by official organizational hierarchy rank.
+     * Combines users holding sywat_board_positions meta and users assigned official officer/governor roles.
      *
      * @return array List of WP_User objects with board assignments sorted by rank.
      */
     function sywat_get_all_board_members() {
-        $board_members = get_users( array(
-            'meta_key'     => 'sywat_board_positions',
-            'meta_compare' => 'EXISTS',
-        ) );
+        $board_roles = array(
+            'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer', 
+            'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director', 
+            'tfaa_webmaster', 'tfaa_field_governor'
+        );
+
+        $users_meta  = get_users( array( 'meta_key' => 'sywat_board_positions', 'meta_compare' => 'EXISTS' ) );
+        $users_roles = get_users( array( 'role__in' => $board_roles ) );
+
+        $combined_map = array();
+        foreach ( array_merge( (array) $users_meta, (array) $users_roles ) as $u ) {
+            if ( $u instanceof WP_User ) {
+                $combined_map[ $u->ID ] = $u;
+            }
+        }
+
+        $board_members = array_values( $combined_map );
 
         if ( function_exists( 'sywat_sort_board_members_by_hierarchy' ) && ! empty( $board_members ) ) {
             return sywat_sort_board_members_by_hierarchy( $board_members );
