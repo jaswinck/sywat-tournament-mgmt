@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields filtered to exclude redundant board officer roles.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated role assignment fields filtered to exclude redundant board officer roles, and dual-layer anchor fallbacks for server-hydrated modal dismissal.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.9.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -230,7 +230,7 @@ function sywat_members_render_modals( $data ) {
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
                     <h3>Edit Head of Household: <?php echo esc_html( $edit_user_obj->display_name ); ?></h3>
-                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditPrimaryModal()">&times;</button>
+                    <a href="?tab=members&subtab=directory" class="sywat-modal-close" onclick="sywatCloseEditPrimaryModal()">&times;</a>
                 </div>
                 <div class="sywat-modal-body">
                     <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_edit_primary_form">
@@ -386,7 +386,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions sywat-mt-4">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditPrimaryModal()">Cancel</button>
+                            <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditPrimaryModal()">Cancel</a>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Master Profile</button>
                         </div>
                     </form>
@@ -544,14 +544,15 @@ function sywat_members_render_modals( $data ) {
                 $d_zip     = isset( $edit_dep_subprofile['zip'] ) ? $edit_dep_subprofile['zip'] : '';
                 $d_age_div = ! empty( $d_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $d_dob ) : 'Adult';
                 $d_name    = trim( $d_fname . ' ' . $d_lname );
+                $parent_edit_url = '?tab=members&view=edit_member&edit_member_id=' . intval( $edit_user_obj->ID );
             ?>
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
                     <h3>✏️ Edit Family Sub-Profile: <?php echo esc_html( $d_name ); ?></h3>
-                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</button>
+                    <a href="<?php echo esc_url( $parent_edit_url ); ?>" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</a>
                 </div>
                 <div class="sywat-modal-body">
-                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>">
+                    <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>">
                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="sywat_action" value="update_member">
                         <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -652,7 +653,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions sywat-mt-4">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
+                            <a href="<?php echo esc_url( $parent_edit_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</a>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
                         </div>
                     </form>
@@ -661,7 +662,7 @@ function sywat_members_render_modals( $data ) {
 
                     <!-- COMPACT 3-BUTTON ACTION STRIP -->
                     <div class="sywat-form-grid-3 sywat-mt-3">
-                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');" class="sywat-m-0">
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');" class="sywat-m-0">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="unlink_dependent">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -673,7 +674,7 @@ function sywat_members_render_modals( $data ) {
                             🔄 Convert to Standalone
                         </button>
 
-                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');" class="sywat-m-0">
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');" class="sywat-m-0">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="delete_member">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -684,7 +685,7 @@ function sywat_members_render_modals( $data ) {
 
                     <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER (Hidden by default, toggles on click) -->
                     <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
-                        <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                             <input type="hidden" name="sywat_action" value="promote_dependent">
                             <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
@@ -780,7 +781,7 @@ function sywat_members_render_modals( $data ) {
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print">
                     <h3>Edit Board Member: <?php echo esc_html( $edit_board_user_obj->display_name ); ?></h3>
-                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</button>
+                    <a href="?tab=members&subtab=board" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</a>
                 </div>
                 <div class="sywat-modal-body">
                     <form method="post" action="?tab=members&subtab=board">
@@ -806,7 +807,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditBoardModal()">Cancel</button>
+                            <a href="?tab=members&subtab=board" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditBoardModal()">Cancel</a>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Positions</button>
                         </div>
                     </form>
