@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.2.0
+   Version: 7.3.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -119,8 +119,12 @@ body {
     padding: 0 !important;
 }
 
-.sywat-login-card form p {
-    margin-bottom: 14px;
+/* Form Field Spacing & Label Alignment */
+.sywat-login-card form p,
+.sywat-login-card .user-pass-wrap,
+.sywat-login-card .login-username,
+.sywat-login-card .login-password {
+    margin-bottom: 22px !important;
 }
 
 .sywat-login-card label {
@@ -128,7 +132,7 @@ body {
     font-weight: 700 !important;
     color: #1e293b !important;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px !important;
 }
 
 .sywat-login-card input[type="text"],
@@ -155,44 +159,15 @@ body {
     outline: none !important;
 }
 
-/* Primary SYWAT Action Blue Button Rules */
-.sywat-login-card input[type="submit"],
-.sywat-login-card .button-primary,
-.sywat-login-card button[type="submit"] {
-    width: 100% !important;
-    min-height: 38px !important;
-    background-color: #0284c7 !important; /* SYWAT Primary Action Blue */
-    border: 1px solid #0369a1 !important;
-    color: #ffffff !important;
-    font-weight: 700 !important;
-    border-radius: 4px !important;
-    cursor: pointer !important;
-    margin-top: 10px !important;
-    font-size: 13px !important;
-    transition: background-color 0.15s ease, border-color 0.15s ease !important;
-}
-
-.sywat-login-card input[type="submit"]:hover,
-.sywat-login-card .button-primary:hover,
-.sywat-login-card button[type="submit"]:hover {
-    background-color: #0369a1 !important;
-    border-color: #075985 !important;
-}
-
 /* Remember Me Checkbox & Float Clear Rules */
-.sywat-login-card .user-pass-wrap,
-.sywat-login-card .login-password {
-    margin-bottom: 14px !important;
-}
-
 .sywat-login-card .forgetmenot,
 .sywat-login-card .login-remember,
 .sywat-login-card p.forgetmenot {
     float: none !important;
     clear: both !important;
     display: block !important;
-    margin-top: 14px !important;
-    margin-bottom: 16px !important;
+    margin-top: 20px !important;
+    margin-bottom: 22px !important;
     font-size: 12px !important;
     color: #475569 !important;
 }
@@ -203,6 +178,30 @@ body {
     vertical-align: middle !important;
     margin-top: -2px !important;
     margin-right: 6px !important;
+}
+
+/* Primary SYWAT Action Blue Button Rules */
+.sywat-login-card input[type="submit"],
+.sywat-login-card .button-primary,
+.sywat-login-card button[type="submit"] {
+    width: 100% !important;
+    min-height: 42px !important;
+    background-color: #0284c7 !important; /* SYWAT Primary Action Blue */
+    border: 1px solid #0369a1 !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    margin-top: 0 !important;
+    font-size: 13px !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.sywat-login-card input[type="submit"]:hover,
+.sywat-login-card .button-primary:hover,
+.sywat-login-card button[type="submit"]:hover {
+    background-color: #0369a1 !important;
+    border-color: #075985 !important;
 }
 
 .sywat-login-card .sywat-login-footer,
