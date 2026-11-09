@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.1.0
+   Version: 7.2.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -179,12 +179,30 @@ body {
     border-color: #075985 !important;
 }
 
+/* Remember Me Checkbox & Float Clear Rules */
+.sywat-login-card .user-pass-wrap,
+.sywat-login-card .login-password {
+    margin-bottom: 14px !important;
+}
+
 .sywat-login-card .forgetmenot,
-.sywat-login-card .login-remember {
-    margin-top: 10px !important;
-    margin-bottom: 12px;
+.sywat-login-card .login-remember,
+.sywat-login-card p.forgetmenot {
+    float: none !important;
+    clear: both !important;
+    display: block !important;
+    margin-top: 14px !important;
+    margin-bottom: 16px !important;
     font-size: 12px !important;
     color: #475569 !important;
+}
+
+.sywat-login-card .forgetmenot input[type="checkbox"],
+.sywat-login-card .login-remember input[type="checkbox"],
+.sywat-login-card input[type="checkbox"] {
+    vertical-align: middle !important;
+    margin-top: -2px !important;
+    margin-right: 6px !important;
 }
 
 .sywat-login-card .sywat-login-footer,
