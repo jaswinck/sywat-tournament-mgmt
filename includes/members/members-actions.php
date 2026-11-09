@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position assignment, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated board position role-syncing, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.5.0
+ * Version: 4.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -674,7 +674,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
         }
 
-        // 8. ASSIGN OR UPDATE BOARD MEMBER POSITIONS
+        // 8. ASSIGN OR UPDATE BOARD MEMBER POSITIONS (WITH AUTOMATED SINGLE-ACTION ROLE BINDING)
         if ( $action === 'save_board_member' ) {
             $user_id   = intval( $_POST['board_user_id'] );
             $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
@@ -683,15 +683,56 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid member to assign to the Board.</div>';
             }
 
+            $user_obj = new WP_User( $user_id );
+
             if ( empty( $positions ) ) {
                 delete_user_meta( $user_id, 'sywat_board_positions' );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions removed for member.</div>';
             }
 
+            // Save position meta array
             update_user_meta( $user_id, 'sywat_board_positions', $positions );
-            $user = get_userdata( $user_id );
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated for "<strong>' . esc_html( $user->display_name ) . '</strong>".</div>';
+            // Single-Action Role Binding: Automate WordPress User Role sync from assigned Board Positions
+            if ( $user_obj->exists() ) {
+                $pos_to_role_map = array(
+                    'tfaa_president'             => 'tfaa_president',
+                    'president'                  => 'tfaa_president',
+                    'tfaa_vice_president'        => 'tfaa_vice_president',
+                    'vice_president'             => 'tfaa_vice_president',
+                    'tfaa_secretary'             => 'tfaa_secretary',
+                    'secretary'                  => 'tfaa_secretary',
+                    'tfaa_treasurer'             => 'tfaa_treasurer',
+                    'treasurer'                  => 'tfaa_treasurer',
+                    'tfaa_social_media_director' => 'tfaa_social_media_director',
+                    'tfaa_social_media'          => 'tfaa_social_media_director',
+                    'social_media'               => 'tfaa_social_media_director',
+                    'tfaa_webmaster'             => 'tfaa_webmaster',
+                    'webmaster'                  => 'tfaa_webmaster',
+                    'tfaa_tournament_director'   => 'tfaa_tournament_director',
+                    'tournament_director'        => 'tfaa_tournament_director',
+                );
+
+                // Collect target officer/governor roles matching assigned positions
+                $target_roles = array( 'tfaa_member' ); // Baseline member role
+                foreach ( $positions as $p_key ) {
+                    $p_clean = strtolower( trim( $p_key ) );
+                    if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
+                        $target_roles[] = $pos_to_role_map[ $p_clean ];
+                    } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
+                        $target_roles[] = 'tfaa_field_governor';
+                    }
+                }
+
+                // Automatically grant required roles to user object
+                foreach ( array_unique( $target_roles ) as $r_slug ) {
+                    if ( ! in_array( $r_slug, (array) $user_obj->roles, true ) ) {
+                        $user_obj->add_role( $r_slug );
+                    }
+                }
+            }
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated and user roles automatically synchronized for "<strong>' . esc_html( $user_obj->display_name ) . '</strong>"!</div>';
         }
 
         // 9. REMOVE BOARD MEMBER ASSIGNMENT
