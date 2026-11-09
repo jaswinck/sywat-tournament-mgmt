@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.0.0
+   Version: 7.1.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -20,7 +20,8 @@ body {
     box-sizing: border-box;
 }
 
-.sywat-wrap-sm {
+.sywat-wrap-sm,
+.sywat-card-sm {
     max-width: 600px;
     margin: 20px auto;
 }
@@ -56,11 +57,6 @@ body {
     margin-bottom: 20px;
 }
 
-.sywat-card-sm {
-    max-width: 600px;
-    margin: 20px auto;
-}
-
 /* ==========================================================================
    Custom Frontend Login Card Component Rules
    ========================================================================== */
@@ -76,7 +72,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Compact Dark Navy Header Banner */
+/* Compact Dark Navy Header Banner & Logo Rules */
 .sywat-login-card-header,
 .sywat-login-card > header {
     background-color: #0f172a !important;
@@ -87,7 +83,9 @@ body {
 
 .sywat-login-card-header img,
 .sywat-login-card-header .sywat-login-logo,
-.sywat-login-card > header img {
+.sywat-login-card > header img,
+.sywat-login-card > img,
+.sywat-login-card > .sywat-login-logo {
     max-height: 60px !important;
     width: auto !important;
     display: block !important;
@@ -99,41 +97,20 @@ body {
 .sywat-login-card-header h1,
 .sywat-login-card-header .sywat-login-title,
 .sywat-login-card > header h2,
-.sywat-login-card > header h1 {
+.sywat-login-card > header h1,
+.sywat-login-card > h2,
+.sywat-login-card > h1 {
     font-size: 17px !important;
     font-weight: 700 !important;
     color: #ffffff !important; /* Pure White High-Contrast Title */
-    margin: 0 !important;
+    margin: 0 0 16px 0 !important;
     padding: 0 !important;
     line-height: 1.2 !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Inner Card Body & Inputs */
-.sywat-login-card-body {
-    padding: 24px 24px 0 24px;
-}
-
-/* Fallback Single Card Image & Title Rules */
-.sywat-login-card > img,
-.sywat-login-card > .sywat-login-logo {
-    max-height: 65px !important;
-    width: auto !important;
-    display: block !important;
-    margin: 18px auto 10px auto !important;
-    object-fit: contain;
-}
-
-.sywat-login-card > h2,
-.sywat-login-card > h1 {
-    font-size: 18px !important;
-    font-weight: 700 !important;
-    color: #ffffff !important;
-    text-align: center !important;
-    margin: 0 0 16px 0 !important;
-    line-height: 1.3 !important;
-}
-
+/* Inner Card Body & Form Wrappers */
+.sywat-login-card-body,
 .sywat-login-card form {
     padding: 24px 24px 0 24px;
 }
@@ -204,6 +181,7 @@ body {
 
 .sywat-login-card .forgetmenot,
 .sywat-login-card .login-remember {
+    margin-top: 10px !important;
     margin-bottom: 12px;
     font-size: 12px !important;
     color: #475569 !important;
