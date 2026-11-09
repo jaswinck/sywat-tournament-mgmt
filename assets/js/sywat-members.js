@@ -320,9 +320,6 @@ function sywatCloseEditDependentModal() {
     if (modal) {
         modal.classList.remove('active');
     }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('edit_system_id');
-    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 5. Legacy Edit Standalone Member Profile Modal Cleanup
@@ -331,11 +328,6 @@ function sywatCloseEditMemberModal() {
     if (modal) {
         modal.classList.remove('active');
     }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('edit_member_id');
-    url.searchParams.delete('edit_system_id');
-    url.searchParams.delete('action_mode');
-    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 6. Assign Board Member Modal
@@ -359,10 +351,6 @@ function sywatCloseEditBoardModal() {
     if (modal) {
         modal.classList.remove('active');
     }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('edit_board_id');
-    url.searchParams.delete('edit_board_user_id');
-    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 8. Historical Archers Batch Spreadsheet Import Modal
