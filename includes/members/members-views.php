@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text rendering under archer names, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -175,6 +175,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <?php endif; ?>
                                         <div class="sywat-meta-subtext">🆔 NFAA ID: <strong><?php echo esc_html( $e_nfaa_id ); ?></strong></div>
                                         <div class="sywat-meta-subtext">👤 Login: <code><?php echo esc_html( $edit_user_obj->user_login ); ?></code></div>
+                                        <?php 
+                                            $e_board_pos = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $edit_user_obj->ID ) : array();
+                                            if ( ! empty( $e_board_pos ) ): 
+                                        ?>
+                                            <div class="sywat-meta-subtext">🏛️ Board: <strong><?php echo esc_html( implode( ', ', $e_board_pos ) ); ?></strong></div>
+                                        <?php endif; ?>
                                         <?php if ( ! empty( $e_accom ) && $e_accom !== 'none' ): ?>
                                             <div class="sywat-mt-1">
                                                 <span class="sywat-badge sywat-badge-prereg">♿ <?php echo esc_html( isset( $accom_labels[$e_accom] ) ? $accom_labels[$e_accom] : $e_accom ); ?></span>
@@ -527,7 +533,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                                                 $status_key = ( isset( $nfaa_info['is_active'] ) && $nfaa_info['is_active'] ) ? 'active' : 'expired';
 
-                                                // Fetch user role names for primary accounts
+                                                // Fetch user role names and board position labels for primary accounts
                                                 $role_names_blob = '';
                                                 $role_names_list = array();
                                                 if ( $a_uid > 0 ) {
@@ -537,6 +543,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                             $role_names_list[] = isset( $wp_role_names[ $r_slug ] ) ? $wp_role_names[ $r_slug ] : ucfirst( str_replace( '_', ' ', $r_slug ) );
                                                         }
                                                         $role_names_blob = implode( ', ', $role_names_list );
+                                                    }
+
+                                                    $a_board_pos = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $a_uid ) : array();
+                                                    if ( ! empty( $a_board_pos ) ) {
+                                                        $board_pos_str = '🏛️ ' . implode( ', ', $a_board_pos );
+                                                        $role_names_blob = ! empty( $role_names_blob ) ? $role_names_blob . ' | ' . $board_pos_str : $board_pos_str;
                                                     }
                                                 }
                                             ?>
