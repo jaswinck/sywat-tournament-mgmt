@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, in-form governance card standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, in-form governance card standalone account conversion drawer with standardized button weight and high-contrast typography, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.9.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -689,10 +689,10 @@ function sywat_members_render_modals( $data ) {
                         <div class="sywat-card sywat-mt-4">
                             <div class="sywat-card-header-bar">
                                 <div>
-                                    <h4 class="sywat-m-0">🔄 Convert to Standalone Account</h4>
-                                    <div class="sywat-meta-subtext">Promote this family member to an independent primary account with dedicated login credentials.</div>
+                                    <h5 class="sywat-m-0">🔄 Convert to Standalone Account</h5>
+                                    <p class="sywat-card-desc sywat-m-0 sywat-mt-1">Promote this family member to an independent primary account with dedicated login credentials.</p>
                                 </div>
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm" onclick="sywatTogglePromoteSection()">
+                                <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatTogglePromoteSection()">
                                     Expand Form
                                 </button>
                             </div>
