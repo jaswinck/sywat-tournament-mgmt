@@ -5,7 +5,7 @@
  * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -556,7 +556,7 @@ function sywat_members_render_modals( $data ) {
     <?php endif; ?>
 
     <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE ACCOUNT CONVERSION -->
-    <div class="sywat-modal-backdrop" id="sywat_edit_dependent_modal">
+    <div class="sywat-modal-backdrop <?php echo $open_edit_dependent_modal ? 'active' : ''; ?>" id="sywat_edit_dependent_modal">
         <?php if ( $edit_user_obj && $edit_dep_subprofile ): ?>
             <?php 
                 $d_fname   = isset( $edit_dep_subprofile['first_name'] ) ? $edit_dep_subprofile['first_name'] : '';
@@ -805,7 +805,7 @@ function sywat_members_render_modals( $data ) {
     </div>
 
     <!-- MODAL 6: EDIT BOARD MEMBER POSITIONS MODAL -->
-    <div class="sywat-modal-backdrop" id="sywat_edit_board_modal">
+    <div class="sywat-modal-backdrop <?php echo $open_edit_board_modal ? 'active' : ''; ?>" id="sywat_edit_board_modal">
         <?php if ( $edit_board_user_obj ): ?>
             <?php 
                 $cur_positions = get_user_meta( $edit_board_user_obj->ID, 'sywat_board_positions', true );
