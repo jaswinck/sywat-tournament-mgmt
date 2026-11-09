@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities with robust dual key/property system ID resolution.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter (optimized with O(N) computational hoisting to eliminate N+1 query bottlenecks), board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities with robust dual key/property system ID resolution.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -255,72 +255,74 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
             'tfaa_tournament_director'   => 7,  'tournament_director' => 7,
         );
 
-        usort( $board_members, function( $a, $b ) use ( $base_weights ) {
-            $get_member_min_weight = function( $item ) use ( $base_weights ) {
-                $id  = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
-                $pos = is_object( $item ) && isset( $item->positions ) ? (array) $item->positions : ( is_array( $item ) && isset( $item['positions'] ) ? (array) $item['positions'] : array() );
+        // HOISTING: Map and pre-calculate weights in O(N) time to prevent O(N log N) database queries
+        $mapped_members = array();
 
-                // Fallback to user meta & roles if position array is missing
-                if ( $id > 0 ) {
-                    $meta_pos = get_user_meta( $id, 'sywat_board_positions', true );
-                    if ( ! empty( $meta_pos ) && is_array( $meta_pos ) ) {
-                        $pos = array_merge( $pos, $meta_pos );
-                    }
-                    $u_obj = get_userdata( $id );
-                    if ( $u_obj && ! empty( $u_obj->roles ) ) {
-                        $pos = array_merge( $pos, (array) $u_obj->roles );
-                    }
-                    if ( function_exists( 'sywat_get_user_board_position_labels' ) ) {
-                        $formatted_labels = sywat_get_user_board_position_labels( $id );
-                        if ( ! empty( $formatted_labels ) ) {
-                            $pos = array_merge( $pos, array_keys( $formatted_labels ), array_values( $formatted_labels ) );
-                        }
+        foreach ( $board_members as $item ) {
+            $id  = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
+            $pos = is_object( $item ) && isset( $item->positions ) ? (array) $item->positions : ( is_array( $item ) && isset( $item['positions'] ) ? (array) $item['positions'] : array() );
+
+            // Single pass database query resolution
+            if ( $id > 0 ) {
+                $meta_pos = get_user_meta( $id, 'sywat_board_positions', true );
+                if ( ! empty( $meta_pos ) && is_array( $meta_pos ) ) {
+                    $pos = array_merge( $pos, $meta_pos );
+                }
+                $u_obj = get_userdata( $id );
+                if ( $u_obj && ! empty( $u_obj->roles ) ) {
+                    $pos = array_merge( $pos, (array) $u_obj->roles );
+                }
+                if ( function_exists( 'sywat_get_user_board_position_labels' ) ) {
+                    $formatted_labels = sywat_get_user_board_position_labels( $id );
+                    if ( ! empty( $formatted_labels ) ) {
+                        $pos = array_merge( $pos, array_keys( $formatted_labels ), array_values( $formatted_labels ) );
                     }
                 }
-
-                $min_weight = 999;
-                foreach ( $pos as $p ) {
-                    $p_clean = strtolower( trim( (string) $p ) );
-
-                    // Evaluate Executive Officers (Weights 1 - 7)
-                    if ( isset( $base_weights[$p_clean] ) && $base_weights[$p_clean] < $min_weight ) {
-                        $min_weight = $base_weights[$p_clean];
-                        continue;
-                    }
-
-                    // Evaluate Field Governor Districts 1 - 7 (Weights 8 - 14)
-                    if ( preg_match( '/(?:field[_\-\s]*governor|district)[_\-\s]*([1-7])/i', $p_clean, $matches ) ) {
-                        $district_num = intval( $matches[1] );
-                        $dist_weight  = 7 + $district_num; // District 1 = 8 ... District 7 = 14
-                        if ( $dist_weight < $min_weight ) {
-                            $min_weight = $dist_weight;
-                        }
-                    } elseif ( strpos( $p_clean, 'field_governor' ) !== false || strpos( $p_clean, 'governor' ) !== false ) {
-                        // Generic Field Governor Fallback (Weight 15)
-                        if ( 15 < $min_weight ) {
-                            $min_weight = 15;
-                        }
-                    }
-                }
-
-                return $min_weight;
-            };
-
-            $w_a = $get_member_min_weight( $a );
-            $w_b = $get_member_min_weight( $b );
-
-            if ( $w_a !== $w_b ) {
-                return ( $w_a < $w_b ) ? -1 : 1;
             }
 
-            // Secondary Sort: Alphabetical Display Name Tie-Breaker
-            $name_a = is_object( $a ) ? ( isset( $a->display_name ) ? $a->display_name : '' ) : ( isset( $a['display_name'] ) ? $a['display_name'] : '' );
-            $name_b = is_object( $b ) ? ( isset( $b->display_name ) ? $b->display_name : '' ) : ( isset( $b['display_name'] ) ? $b['display_name'] : '' );
+            $min_weight = 999;
+            foreach ( $pos as $p ) {
+                $p_clean = strtolower( trim( (string) $p ) );
 
-            return strcasecmp( $name_a, $name_b );
+                // Evaluate Executive Officers (Weights 1 - 7)
+                if ( isset( $base_weights[$p_clean] ) && $base_weights[$p_clean] < $min_weight ) {
+                    $min_weight = $base_weights[$p_clean];
+                    continue;
+                }
+
+                // Evaluate Field Governor Districts 1 - 7 (Weights 8 - 14)
+                if ( preg_match( '/(?:field[_\-\s]*governor|district)[_\-\s]*([1-7])/i', $p_clean, $matches ) ) {
+                    $district_num = intval( $matches[1] );
+                    $dist_weight  = 7 + $district_num; // District 1 = 8 ... District 7 = 14
+                    if ( $dist_weight < $min_weight ) {
+                        $min_weight = $dist_weight;
+                    }
+                } elseif ( strpos( $p_clean, 'field_governor' ) !== false || strpos( $p_clean, 'governor' ) !== false ) {
+                    // Generic Field Governor Fallback (Weight 15)
+                    if ( 15 < $min_weight ) {
+                        $min_weight = 15;
+                    }
+                }
+            }
+
+            $name = is_object( $item ) ? ( isset( $item->display_name ) ? $item->display_name : '' ) : ( isset( $item['display_name'] ) ? $item['display_name'] : '' );
+
+            $mapped_members[] = array(
+                'original' => $item,
+                'weight'   => $min_weight,
+                'name'     => $name
+            );
+        }
+
+        // O(1) Memory Sort using pre-calculated weights (No Database Hits)
+        usort( $mapped_members, function( $a, $b ) {
+            if ( $a['weight'] !== $b['weight'] ) {
+                return ( $a['weight'] < $b['weight'] ) ? -1 : 1;
+            }
+            return strcasecmp( $a['name'], $b['name'] );
         } );
 
-        return $board_members;
+        return array_column( $mapped_members, 'original' );
     }
 }
 
