@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, isolated standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, integrated footer standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -105,7 +105,7 @@ function sywat_members_render_modals( $data ) {
                             </select>
                         </div>
                         <div class="sywat-field-group">
-                            <label>Pro Archer Status (18+)</label>
+                            <label>Pro Archer Status</label>
                             <select name="is_pro">
                                 <option value="no" selected>No</option>
                                 <option value="yes">Yes</option>
@@ -288,7 +288,7 @@ function sywat_members_render_modals( $data ) {
                                 </select>
                             </div>
                             <div class="sywat-field-group">
-                                <label>Pro Archer Status (18+)</label>
+                                <label>Pro Archer Status</label>
                                 <select name="is_pro">
                                     <option value="no" <?php selected( $e_is_pro, 'no' ); ?>>No</option>
                                     <option value="yes" <?php selected( $e_is_pro, 'yes' ); ?>>Yes</option>
@@ -472,7 +472,7 @@ function sywat_members_render_modals( $data ) {
                                 </select>
                             </div>
                             <div class="sywat-field-group">
-                                <label>Pro Archer Status (18+)</label>
+                                <label>Pro Archer Status</label>
                                 <select name="is_pro" id="add_dep_is_pro">
                                     <option value="no" selected>No</option>
                                     <option value="yes">Yes</option>
@@ -612,7 +612,7 @@ function sywat_members_render_modals( $data ) {
                                 </select>
                             </div>
                             <div class="sywat-field-group">
-                                <label>Pro Archer Status (18+)</label>
+                                <label>Pro Archer Status</label>
                                 <select name="is_pro">
                                     <option value="no" <?php selected( $d_is_pro, 'no' ); ?>>No</option>
                                     <option value="yes" <?php selected( $d_is_pro, 'yes' ); ?>>Yes</option>
@@ -685,20 +685,17 @@ function sywat_members_render_modals( $data ) {
                             </div>
                         </div>
 
+                        <!-- INTEGRATED FOOTER ACTIONS BAR (SPLIT ALIGNMENT) -->
                         <div class="sywat-modal-actions sywat-mt-4">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
-                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatTogglePromoteSection()">
+                                🔄 Convert to Standalone Account
+                            </button>
+                            <div>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
+                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
+                            </div>
                         </div>
                     </form>
-
-                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
-
-                    <!-- ISOLATED STANDALONE ACCOUNT PROMOTION BUTTON -->
-                    <div class="sywat-mt-3">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-w-100" onclick="sywatTogglePromoteSection()">
-                            🔄 Convert to Standalone Account (18+)
-                        </button>
-                    </div>
 
                     <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
                     <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
