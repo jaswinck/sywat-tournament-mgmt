@@ -5,7 +5,7 @@
  * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.9.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -40,7 +40,8 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
      */
     function sywat_get_all_flat_archers() {
         global $wpdb;
-        $all_archers = array();
+        $all_archers   = array();
+        $head_name_map = array();
 
         // 1. Primary WP_User Accounts (Heads of Household)
         $primary_users = sywat_get_all_tfaa_members();
@@ -48,6 +49,9 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
             foreach ( $primary_users as $pu ) {
                 if ( ! $pu instanceof WP_User ) continue;
                 $uid = intval( $pu->ID );
+                
+                // Populate O(1) lookup map for dependent loop
+                $head_name_map[ $uid ] = $pu->display_name;
 
                 $all_archers[] = array(
                     'account_type'    => 'head',
@@ -78,10 +82,18 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
 
         if ( ! empty( $dep_meta_rows ) ) {
             foreach ( $dep_meta_rows as $row ) {
-                $head_id   = intval( $row->user_id );
-                $head_user = get_userdata( $head_id );
-                $head_name = $head_user ? $head_user->display_name : 'Primary Account';
-                $deps      = maybe_unserialize( $row->meta_value );
+                $head_id = intval( $row->user_id );
+                
+                // O(1) Hashtable lookup to prevent N+1 query loop
+                if ( isset( $head_name_map[ $head_id ] ) ) {
+                    $head_name = $head_name_map[ $head_id ];
+                } else {
+                    // Fallback only if Head was stripped of their role but retained dependents
+                    $head_user = get_userdata( $head_id );
+                    $head_name = $head_user ? $head_user->display_name : 'Primary Account';
+                }
+                
+                $deps = maybe_unserialize( $row->meta_value );
 
                 if ( is_array( $deps ) && ! empty( $deps ) ) {
                     foreach ( $deps as $d ) {
