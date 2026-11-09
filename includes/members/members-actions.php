@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings in fallback role map), high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.7.0
+ * Version: 5.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -740,6 +740,15 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     'webmaster'                  => 'tfaa_webmaster',
                     'tfaa_tournament_director'   => 'tfaa_tournament_director',
                     'tournament_director'        => 'tfaa_tournament_director',
+                    'tfaa_field_governor'        => 'tfaa_field_governor',
+                    'field_governor'             => 'tfaa_field_governor',
+                    'field_governor_1'           => 'tfaa_field_governor',
+                    'field_governor_2'           => 'tfaa_field_governor',
+                    'field_governor_3'           => 'tfaa_field_governor',
+                    'field_governor_4'           => 'tfaa_field_governor',
+                    'field_governor_5'           => 'tfaa_field_governor',
+                    'field_governor_6'           => 'tfaa_field_governor',
+                    'field_governor_7'           => 'tfaa_field_governor',
                 );
 
                 // Collect target officer/governor roles matching assigned positions
