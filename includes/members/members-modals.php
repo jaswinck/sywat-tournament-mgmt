@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated role assignment fields filtered to exclude redundant board officer roles, and dual-layer anchor fallbacks for server-hydrated modal dismissal.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated role assignment fields filtered to exclude redundant board officer roles, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -230,7 +230,7 @@ function sywat_members_render_modals( $data ) {
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
                     <h3>Edit Head of Household: <?php echo esc_html( $edit_user_obj->display_name ); ?></h3>
-                    <a href="?tab=members&subtab=directory" class="sywat-modal-close" onclick="sywatCloseEditPrimaryModal()">&times;</a>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditPrimaryModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
                     <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_edit_primary_form">
@@ -386,7 +386,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions sywat-mt-4">
-                            <a href="?tab=members&subtab=directory" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditPrimaryModal()">Cancel</a>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditPrimaryModal()">Cancel</button>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Master Profile</button>
                         </div>
                     </form>
@@ -549,7 +549,7 @@ function sywat_members_render_modals( $data ) {
             <div class="sywat-modal-content sywat-modal-lg">
                 <div class="sywat-modal-header no-print">
                     <h3>✏️ Edit Family Sub-Profile: <?php echo esc_html( $d_name ); ?></h3>
-                    <a href="<?php echo esc_url( $parent_edit_url ); ?>" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</a>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
                     <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>">
@@ -653,7 +653,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions sywat-mt-4">
-                            <a href="<?php echo esc_url( $parent_edit_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</a>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
                         </div>
                     </form>
@@ -781,7 +781,7 @@ function sywat_members_render_modals( $data ) {
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print">
                     <h3>Edit Board Member: <?php echo esc_html( $edit_board_user_obj->display_name ); ?></h3>
-                    <a href="?tab=members&subtab=board" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</a>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
                     <form method="post" action="?tab=members&subtab=board">
@@ -807,7 +807,7 @@ function sywat_members_render_modals( $data ) {
                         </div>
 
                         <div class="sywat-modal-actions">
-                            <a href="?tab=members&subtab=board" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditBoardModal()">Cancel</a>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditBoardModal()">Cancel</button>
                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Positions</button>
                         </div>
                     </form>
