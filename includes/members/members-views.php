@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), accurate Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 6.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
