@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), and pure statistical calculation engines for TFAA membership counts.
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), hierarchy-sorted board member retrieval, and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -158,17 +158,21 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
 
 if ( ! function_exists( 'sywat_get_all_board_members' ) ) {
     /**
-     * Retrieve all assigned TFAA Board Members.
+     * Retrieve all assigned TFAA Board Members pre-sorted by official organizational hierarchy rank.
      *
-     * @return array List of WP_User objects with board assignments.
+     * @return array List of WP_User objects with board assignments sorted by rank.
      */
     function sywat_get_all_board_members() {
-        return get_users( array(
+        $board_members = get_users( array(
             'meta_key'     => 'sywat_board_positions',
             'meta_compare' => 'EXISTS',
-            'orderby'      => 'display_name',
-            'order'        => 'ASC',
         ) );
+
+        if ( function_exists( 'sywat_sort_board_members_by_hierarchy' ) && ! empty( $board_members ) ) {
+            return sywat_sort_board_members_by_hierarchy( $board_members );
+        }
+
+        return $board_members;
     }
 }
 
