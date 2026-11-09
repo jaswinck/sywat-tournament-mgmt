@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with role-filtered member selection, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, and administrator-gated role assignment fields.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 4.7.0
+ * Version: 4.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -722,21 +722,10 @@ function sywat_members_render_modals( $data ) {
                     <div class="sywat-field-group">
                         <label>Select Member *</label>
                         <select name="board_user_id" required>
-                            <option value="">-- Choose Officer / Member from Directory --</option>
+                            <option value="">-- Choose Member from Directory --</option>
                             <?php 
-                                $excluded_board_select_roles = array( 'tfaa_member', 'sywat_shop_manager', 'sywat_shop_user', 'subscriber', 'contributor', 'author', 'editor' );
                                 foreach ( $all_members as $m_item ): 
                                     if ( ! $m_item instanceof WP_User ) continue;
-                                    $m_roles = (array) $m_item->roles;
-                                    // Check if user has ANY specialized role beyond basic member/shop manager/default roles
-                                    $has_board_eligible_role = false;
-                                    foreach ( $m_roles as $r_slug ) {
-                                        if ( ! in_array( strtolower( $r_slug ), $excluded_board_select_roles, true ) ) {
-                                            $has_board_eligible_role = true;
-                                            break;
-                                        }
-                                    }
-                                    if ( ! $has_board_eligible_role ) continue;
                             ?>
                                 <option value="<?php echo intval( $m_item->ID ); ?>">
                                     <?php echo esc_html( $m_item->display_name ); ?> (<?php echo esc_html( $m_item->user_email ); ?>)
