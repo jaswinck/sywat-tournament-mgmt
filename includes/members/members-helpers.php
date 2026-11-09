@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary, and household sub-profile management utilities.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.9.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -208,6 +208,15 @@ if ( ! function_exists( 'sywat_get_board_position_role_map' ) ) {
             'webmaster'                  => 'tfaa_webmaster',
             'tfaa_tournament_director'   => 'tfaa_tournament_director',
             'tournament_director'        => 'tfaa_tournament_director',
+            'tfaa_field_governor'        => 'tfaa_field_governor',
+            'field_governor'             => 'tfaa_field_governor',
+            'field_governor_1'           => 'tfaa_field_governor',
+            'field_governor_2'           => 'tfaa_field_governor',
+            'field_governor_3'           => 'tfaa_field_governor',
+            'field_governor_4'           => 'tfaa_field_governor',
+            'field_governor_5'           => 'tfaa_field_governor',
+            'field_governor_6'           => 'tfaa_field_governor',
+            'field_governor_7'           => 'tfaa_field_governor',
         );
     }
 }
