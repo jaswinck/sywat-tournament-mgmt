@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 6.9.0
+   Version: 7.0.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -427,22 +427,39 @@ body {
     color: #1e293b;
 }
 
-/* Summary Block Flex Alignment */
-.sywat-summary-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+/* Summary Grid Component Rules (13px Font Scale Matching Table Names) */
+.sywat-summary-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 6px;
+    row-gap: 3px;
+    align-items: baseline;
 }
 
 .sywat-summary-icon {
-    font-size: 14px;
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 13px;
     line-height: 1.4;
     user-select: none;
 }
 
-.sywat-summary-content {
-    display: flex;
-    flex-direction: column;
+.sywat-summary-title {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.4;
+}
+
+.sywat-summary-value {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.4;
 }
 
 /* Badges & System Alerts */
