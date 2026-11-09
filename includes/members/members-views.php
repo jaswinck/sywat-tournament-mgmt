@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, card-label-styled bold headers matching table header scale, sywat-ml-3 indented compact bold values aligned under heading text for household summary footer, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, card-label-styled bold headers matching table header scale, structural flex-aligned compact bold values perfectly aligned under heading text for household summary footer, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -325,16 +325,22 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <!-- MASTER HOUSEHOLD ADDRESS & CONTACT SUMMARY FOOTER -->
                     <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
                     <div class="sywat-form-grid-2">
-                        <div>
-                            <div class="sywat-card-label">📍 <strong>Master Household Address:</strong></div>
-                            <div class="sywat-meta-subtext sywat-ml-3 sywat-mt-1">
-                                <strong><?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?></strong>
+                        <div class="sywat-table-header-left">
+                            <span class="sywat-card-label">📍</span>
+                            <div>
+                                <div class="sywat-card-label"><strong>Master Household Address:</strong></div>
+                                <div class="sywat-meta-subtext sywat-mt-1">
+                                    <strong><?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?></strong>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div class="sywat-card-label">📞 <strong>Master Phone / Email Contact:</strong></div>
-                            <div class="sywat-meta-subtext sywat-ml-3 sywat-mt-1">
-                                <strong><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?> (<?php echo esc_html( $edit_user_obj->user_email ); ?>)</strong>
+                        <div class="sywat-table-header-left">
+                            <span class="sywat-card-label">📞</span>
+                            <div>
+                                <div class="sywat-card-label"><strong>Master Phone / Email Contact:</strong></div>
+                                <div class="sywat-meta-subtext sywat-mt-1">
+                                    <strong><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?> (<?php echo esc_html( $edit_user_obj->user_email ); ?>)</strong>
+                                </div>
                             </div>
                         </div>
                     </div>
