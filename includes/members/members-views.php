@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), unified Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), unified View Household navigation across all family accounts, context-aware Change Household and Link Household action button labels, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.8.0
+ * Version: 6.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -624,16 +624,16 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                         <?php if ( $a_type === 'head' ): ?>
                                                             <a href="?tab=members&view=edit_member&edit_member_id=<?php echo esc_attr( $a_uid ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
                                                             <?php if ( current_user_can( 'administrator' ) && (string) get_current_user_id() !== (string) $a_uid ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_uid) ? intval($a_uid) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_uid) ? intval($a_uid) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔄 Change Household</button>
                                                             <?php endif; ?>
                                                         <?php elseif ( $a_type === 'dependent' ): ?>
-                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo esc_attr( $a_head_id ); ?>&edit_system_id=<?php echo esc_attr( $a_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit Profile</a>
+                                                            <a href="?tab=members&view=edit_member&edit_member_id=<?php echo esc_attr( $a_head_id ); ?>&edit_system_id=<?php echo esc_attr( $a_sys_id ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">View Household</a>
                                                             <?php if ( current_user_can( 'administrator' ) ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_head_id) ? intval($a_head_id) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔗 Link Household</button>
+                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(<?php echo is_numeric($a_head_id) ? intval($a_head_id) : 0; ?>, '<?php echo esc_js( $a_name ); ?>')">🔄 Change Household</button>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <?php if ( current_user_can( 'administrator' ) ): ?>
-                                                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $a_name ); ?>', '<?php echo esc_attr( $a_sys_id ); ?>')">🔗 Link Household</button>
+                                                                <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-sm sywat-mt-1" onclick="sywatOpenTransferMemberModal(0, '<?php echo esc_js( $a_name ); ?>', '<?php echo esc_attr( $a_sys_id ); ?>')">🔗 Link Household</button>
                                                             <?php endif; ?>
                                                         <?php endif; ?>
 
