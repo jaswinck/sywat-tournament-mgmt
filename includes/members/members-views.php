@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, balanced typographic hierarchy for household summary footer, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -326,12 +326,12 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                     <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
                     <div class="sywat-form-grid-2">
                         <div>
-                            <span class="sywat-meta-subtext">📍 Master Household Address:</span>
-                            <div><strong><?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?></strong></div>
+                            <strong class="sywat-card-label">📍 Master Household Address:</strong>
+                            <div class="sywat-mt-1"><?php echo esc_html( ! empty( $full_address ) ? $full_address : 'Unassigned / Not on File' ); ?></div>
                         </div>
                         <div class="sywat-text-right">
-                            <span class="sywat-meta-subtext">📞 Master Phone / Email Contact:</span>
-                            <div><strong><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?></strong> (<code><?php echo esc_html( $edit_user_obj->user_email ); ?></code>)</div>
+                            <strong class="sywat-card-label">📞 Master Phone / Email Contact:</strong>
+                            <div class="sywat-mt-1"><?php echo esc_html( ! empty( $e_phone ) ? $e_phone : '—' ); ?> (<code><?php echo esc_html( $edit_user_obj->user_email ); ?></code>)</div>
                         </div>
                     </div>
                 </div>
