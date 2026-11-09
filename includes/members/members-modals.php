@@ -1,1164 +1,1142 @@
 <?php
 /**
- * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
- * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position handling in primary profile forms with automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings), high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
- * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
+ * Sub-Module: Member & Board Management Portal Modals
+ * Path: includes/members/members-modals.php
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
+ * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'sywat_validate_password_rules' ) ) {
-    /**
-     * Validate password rules for new primary accounts or password resets.
-     *
-     * @param string $password         Password string.
-     * @param string $confirm_password Confirm password string.
-     * @return bool|string True if valid, or error message string.
-     */
-    function sywat_validate_password_rules( $password, $confirm_password ) {
-        if ( $password !== $confirm_password ) {
-            return 'Passwords do not match. Please ensure both password fields are identical.';
-        }
-        if ( strlen( $password ) < 8 ) {
-            return 'Password must be at least 8 characters long.';
-        }
-        if ( ! preg_match( '/[A-Z]/', $password ) ) {
-            return 'Password must contain at least one uppercase letter (A-Z).';
-        }
-        if ( ! preg_match( '/[a-z]/', $password ) ) {
-            return 'Password must contain at least one lowercase letter (a-z).';
-        }
-        if ( ! preg_match( '/[0-9]/', $password ) ) {
-            return 'Password must contain at least one number (0-9).';
-        }
-        return true;
-    }
+/**
+ * Render all Member and Board management modal overlays.
+ *
+ * @param array $data Data payload passed from controller containing member lists, board roles, and edit objects.
+ */
+function sywat_members_render_modals( $data ) {
+    $all_members         = isset( $data['all_members'] ) ? $data['all_members'] : array();
+    $all_board_positions = isset( $data['all_board_positions'] ) ? $data['all_board_positions'] : array();
+    $edit_user_obj       = isset( $data['edit_user_obj'] ) ? $data['edit_user_obj'] : null;
+    $edit_dep_subprofile = isset( $data['edit_dep_subprofile'] ) ? $data['edit_dep_subprofile'] : null;
+    $edit_board_user_obj = isset( $data['edit_board_user_obj'] ) ? $data['edit_board_user_obj'] : null;
+    $excluded_roles      = isset( $data['excluded_roles'] ) ? $data['excluded_roles'] : array();
+
+    $open_edit_board_modal     = ( $edit_board_user_obj !== null );
+    $open_edit_dependent_modal = ( $edit_dep_subprofile !== null );
+    $all_shops                 = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+    $us_states                 = function_exists( 'sywat_get_us_states_list' ) ? sywat_get_us_states_list() : array();
+    $accom_options             = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+    $gender_options            = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
+
+    global $wp_roles;
+    $editable_roles = $wp_roles ? $wp_roles->roles : array();
+
+    $board_officer_roles = array(
+        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+        'tfaa_tournament_director', 'tfaa_field_governor'
+    );
+
+    // Primary User Data Unpacking (if active)
+    $e_phone      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_phone', true ) : '';
+    $e_gender     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_gender', true ) : 'unassigned';
+    $e_is_pro     = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true ) : 'no';
+    $e_dob        = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_dob', true ) : '';
+    $e_accom      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true ) : 'none';
+    $e_nfaa_id    = $edit_user_obj && function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : '';
+    $e_expiration = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_nfaa_expiration', true ) : '';
+    $e_address_1  = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true ) : '';
+    $e_address_2  = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true ) : '';
+    $e_city       = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_city', true ) : '';
+    $e_state      = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_state', true ) : '';
+    $e_zip        = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_zip', true ) : '';
+    $e_shop_id    = $edit_user_obj ? get_user_meta( $edit_user_obj->ID, 'sywat_shop_id', true ) : '';
+    $c_roles      = $edit_user_obj ? (array) $edit_user_obj->roles : array();
+    $e_age_div    = ! empty( $e_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $e_dob ) : 'Adult';
+    ?>
+
+    <!-- MODAL 1: ADD NEW MEMBER MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_add_member_modal">
+        <div class="sywat-modal-content sywat-modal-lg">
+            <div class="sywat-modal-header no-print">
+                <h3>Create New Primary Member Account</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseAddMemberModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_add_member_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="create_member">
+
+                    <div class="sywat-alert sywat-alert-success sywat-notice-banner">
+                        🆔 <strong>TFAA Member ID &amp; Username:</strong> Auto-formatted as <code>Firstname.Lastname</code>; ID generated sequentially.
+                    </div>
+
+                    <div class="sywat-form-grid-2">
+                        <div class="sywat-field-group">
+                            <label>First Name *</label>
+                            <input type="text" name="first_name" required>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Last Name *</label>
+                            <input type="text" name="last_name" required>
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Email Address *</label>
+                            <input type="email" name="email" required>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Phone Number</label>
+                            <input type="text" name="phone" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12">
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Gender *</label>
+                            <select name="gender" required>
+                                <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                    <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( $g_key, 'unassigned' ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Pro Archer Status (18+)</label>
+                            <select name="is_pro">
+                                <option value="no" selected>No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Date of Birth * (For Age Divisions)</label>
+                            <input type="date" name="dob" required>
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Accommodations Needed</label>
+                            <select name="accommodations">
+                                <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                    <option value="<?php echo esc_attr( $a_key ); ?>"><?php echo esc_html( $a_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>NFAA Membership Expiration Date</label>
+                            <input type="date" name="nfaa_expiration">
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Street Address Line 1</label>
+                            <input type="text" name="address_1" placeholder="123 Main St">
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Street Address Line 2</label>
+                            <input type="text" name="address_2" placeholder="Apt / Suite #">
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>City</label>
+                            <input type="text" name="city">
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>State</label>
+                            <select name="state">
+                                <option value="">-- Select State --</option>
+                                <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                    <option value="<?php echo esc_attr( $s_code ); ?>"><?php echo esc_html( $s_label ); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Zip Code</label>
+                            <input type="text" name="zip" maxlength="10">
+                        </div>
+                    </div>
+
+                    <!-- ASSIGNED SYSTEM ROLES GRID -->
+                    <div class="sywat-field-group sywat-mt-4">
+                        <label>Assigned System Access Role(s) *</label>
+                        <div class="sywat-meta-subtext sywat-mb-2">Note: Select base system login capabilities for this account.</div>
+                        <div class="sywat-form-grid-4 sywat-role-grid">
+                            <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                <?php 
+                                    $r_clean = strtolower( $r_key );
+                                    if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
+                                ?>
+                                <label class="sywat-checkbox-label">
+                                    <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( $r_key, 'tfaa_member' ); ?> onchange="sywatToggleShopVisibility('sywat_add_member_form', 'sywat_add_shop_container')">
+                                    <?php echo esc_html( $r_details['name'] ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- ASSIGNED BOARD POSITIONS GRID -->
+                    <div class="sywat-field-group sywat-mt-3">
+                        <label>Assigned Board Position(s)</label>
+                        <div class="sywat-meta-subtext sywat-mb-2">Note: Select official TFAA Board of Directors position(s) if applicable.</div>
+                        <div class="sywat-form-grid-4 sywat-role-grid">
+                            <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                <label class="sywat-checkbox-label">
+                                    <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>">
+                                    <?php echo esc_html( $pos_title ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="sywat_add_shop_container" class="sywat-field-group sywat-mt-3 sywat-hidden">
+                        <label>Assigned Host Shop / Club</label>
+                        <select name="sywat_shop_id">
+                            <option value="" selected>-- None / Unassigned --</option>
+                            <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                <option value="<?php echo esc_attr( $s_id ); ?>">
+                                    <?php echo esc_html( isset( $s_item['name'] ) ? $s_item['name'] : $s_id ); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Initial Password *</label>
+                            <input type="password" id="sywat_add_pw" name="password" required oninput="sywatValidatePasswordRules('sywat_add_pw', 'sywat_add_pw_confirm', 'add_rule')">
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Confirm Password *</label>
+                            <input type="password" id="sywat_add_pw_confirm" name="confirm_password" required oninput="sywatValidatePasswordRules('sywat_add_pw', 'sywat_add_pw_confirm', 'add_rule')">
+                        </div>
+                    </div>
+
+                    <div class="sywat-password-rules-box">
+                        <div class="sywat-password-rules-bar">
+                            <span class="sywat-password-rules-label">Rules:</span>
+                            <span id="add_rule_len" class="sywat-rule-badge">🔴 8+ Chars</span>
+                            <span id="add_rule_upper" class="sywat-rule-badge">🔴 1 Upper</span>
+                            <span id="add_rule_lower" class="sywat-rule-badge">🔴 1 Lower</span>
+                            <span id="add_rule_num" class="sywat-rule-badge">🔴 1 Num</span>
+                            <span id="add_rule_match" class="sywat-rule-badge">🔴 Passwords Match</span>
+                        </div>
+                    </div>
+
+                    <div class="sywat-modal-actions">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseAddMemberModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Member Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: EDIT HEAD OF HOUSEHOLD PRIMARY PROFILE -->
+    <?php if ( $edit_user_obj ): ?>
+        <?php 
+            $cur_positions = get_user_meta( $edit_user_obj->ID, 'sywat_board_positions', true );
+            if ( ! is_array( $cur_positions ) ) $cur_positions = array();
+        ?>
+        <div class="sywat-modal-backdrop" id="sywat_edit_primary_modal">
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <h3>Edit Head of Household: <?php echo esc_html( $edit_user_obj->display_name ); ?></h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditPrimaryModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_edit_primary_form">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="update_member">
+                        <input type="hidden" name="target_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+
+                        <div class="sywat-form-grid-2">
+                            <div class="sywat-field-group">
+                                <label>First Name *</label>
+                                <input type="text" name="first_name" value="<?php echo esc_attr( $edit_user_obj->first_name ); ?>" required>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Last Name *</label>
+                                <input type="text" name="last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Email Address *</label>
+                                <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Phone Number</label>
+                                <input type="text" name="phone" value="<?php echo esc_attr( $e_phone ); ?>" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Gender *</label>
+                                <select name="gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( strtolower( $e_gender ), $g_key ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro">
+                                    <option value="no" <?php selected( $e_is_pro, 'no' ); ?>>No</option>
+                                    <option value="yes" <?php selected( $e_is_pro, 'yes' ); ?>>Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Date of Birth (Division: <strong><?php echo esc_html( $e_age_div ); ?></strong>)</label>
+                                <input type="date" name="dob" value="<?php echo esc_attr( $e_dob ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>" <?php selected( $e_accom, $a_key ); ?>><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership ID</label>
+                                <input type="text" name="nfaa_number" value="<?php echo esc_attr( $e_nfaa_id !== 'Unassigned' ? $e_nfaa_id : '' ); ?>" placeholder="e.g. 123456">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership Expiration Date</label>
+                                <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 1</label>
+                                <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>" placeholder="123 Main St">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 2</label>
+                                <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>" placeholder="Apt / Suite #">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>City</label>
+                                <input type="text" name="city" value="<?php echo esc_attr( $e_city ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>State</label>
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $e_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Zip Code</label>
+                                <input type="text" name="zip" value="<?php echo esc_attr( $e_zip ); ?>" maxlength="10">
+                            </div>
+                        </div>
+
+                        <?php if ( current_user_can( 'administrator' ) ): ?>
+                            <!-- ASSIGNED SYSTEM ROLES GRID -->
+                            <div class="sywat-field-group sywat-mt-4">
+                                <label>Assigned System Access Role(s) *</label>
+                                <div class="sywat-meta-subtext sywat-mb-2">Note: Select base system login capabilities for this account.</div>
+                                <div class="sywat-form-grid-4 sywat-role-grid">
+                                    <?php foreach ( $editable_roles as $r_key => $r_details ): ?>
+                                        <?php 
+                                            $r_clean = strtolower( $r_key );
+                                            if ( in_array( $r_clean, $excluded_roles, true ) || in_array( $r_clean, $board_officer_roles, true ) ) continue; 
+                                        ?>
+                                        <label class="sywat-checkbox-label">
+                                            <input type="checkbox" name="sywat_roles[]" value="<?php echo esc_attr( $r_key ); ?>" <?php checked( in_array( $r_key, $c_roles, true ), true ); ?> onchange="sywatToggleShopVisibility('sywat_edit_primary_form', 'sywat_edit_primary_shop_container')">
+                                            <?php echo esc_html( $r_details['name'] ); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <!-- ASSIGNED BOARD POSITIONS GRID -->
+                            <div class="sywat-field-group sywat-mt-3">
+                                <label>Assigned Board Position(s)</label>
+                                <div class="sywat-meta-subtext sywat-mb-2">Note: Select official TFAA Board of Directors position(s) assigned to this member.</div>
+                                <div class="sywat-form-grid-4 sywat-role-grid">
+                                    <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                        <label class="sywat-checkbox-label">
+                                            <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>" <?php checked( in_array( $pos_key, $cur_positions, true ), true ); ?>>
+                                            <?php echo esc_html( $pos_title ); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <div id="sywat_edit_primary_shop_container" class="sywat-field-group sywat-mt-3 sywat-hidden">
+                                <label>Assigned Host Shop / Range</label>
+                                <select name="sywat_shop_id">
+                                    <option value="" <?php selected( empty( $e_shop_id ), true ); ?>>-- None / Unassigned --</option>
+                                    <?php foreach ( $all_shops as $s_id => $s_item ): ?>
+                                        <option value="<?php echo esc_attr( $s_id ); ?>" <?php selected( $e_shop_id, $s_id ); ?>>
+                                            <?php echo esc_html( isset( $s_item['name'] ) ? $s_item['name'] : $s_id ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Reset Password (Optional)</label>
+                                <input type="password" id="sywat_edit_prim_pw" name="new_password" placeholder="Leave blank to keep current..." oninput="sywatValidatePasswordRules('sywat_edit_prim_pw', 'sywat_edit_prim_pw_confirm', 'edit_prim_rule')">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Confirm New Password</label>
+                                <input type="password" id="sywat_edit_prim_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_edit_prim_pw', 'sywat_edit_prim_pw_confirm', 'edit_prim_rule')">
+                            </div>
+                        </div>
+
+                        <div class="sywat-password-rules-box">
+                            <div class="sywat-password-rules-bar">
+                                <span class="sywat-password-rules-label">Rules:</span>
+                                <span id="edit_prim_rule_len" class="sywat-rule-badge">⚪ 8+ Chars</span>
+                                <span id="edit_prim_rule_upper" class="sywat-rule-badge">⚪ 1 Upper</span>
+                                <span id="edit_prim_rule_lower" class="sywat-rule-badge">⚪ 1 Lower</span>
+                                <span id="edit_prim_rule_num" class="sywat-rule-badge">⚪ 1 Num</span>
+                                <span id="edit_prim_rule_match" class="sywat-rule-badge">⚪ Passwords Match</span>
+                            </div>
+                        </div>
+
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditPrimaryModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Master Profile</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 3: ADD FAMILY MEMBER SUB-PROFILE TO HOUSEHOLD -->
+        <div class="sywat-modal-backdrop" id="sywat_add_dependent_modal">
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <h3>➕ Add Family Member to Household</h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseAddDependentModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <form method="post" action="?tab=members&view=edit_member&edit_member_id=<?php echo $edit_user_obj->ID; ?>" id="sywat_add_dependent_form">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="create_member">
+                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+
+                        <div class="sywat-alert sywat-alert-success sywat-notice-banner">
+                            🏠 Sub-profile linked directly under Head of Household <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>. Zero password rules or WP login accounts required.
+                        </div>
+
+                        <!-- LIVE ARCHER AUTOCOMPLETE SEARCH BOX -->
+                        <div class="sywat-field-group sywat-mt-2 sywat-mb-3 sywat-autocomplete-wrapper">
+                            <label>🔍 Search Existing Unassigned Archer (Type Name or NFAA ID)</label>
+                            <input type="text" id="sywat_add_dep_autocomplete" placeholder="Start typing name to search unassigned pool..." autocomplete="off" oninput="sywatHandleArcherSearch(this)">
+                            <div id="sywat_add_dep_autocomplete_results" class="sywat-autocomplete-results sywat-hidden"></div>
+                        </div>
+
+                        <div class="sywat-form-grid-2">
+                            <div class="sywat-field-group">
+                                <label>First Name *</label>
+                                <input type="text" name="first_name" id="add_dep_first_name" required placeholder="e.g. Timmy">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Last Name *</label>
+                                <input type="text" name="last_name" id="add_dep_last_name" value="<?php echo esc_attr( $edit_user_obj->last_name ); ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Gender *</label>
+                                <select name="gender" id="add_dep_gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( $g_key, 'unassigned' ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro" id="add_dep_is_pro">
+                                    <option value="no" selected>No</option>
+                                    <option value="yes">Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Date of Birth * (For Age Divisions)</label>
+                                <input type="date" name="dob" id="add_dep_dob" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations" id="add_dep_accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>"><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership ID (Optional)</label>
+                                <input type="text" name="nfaa_number" id="add_dep_nfaa_number" placeholder="e.g. 123456">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Expiration Date (Optional)</label>
+                                <input type="date" name="nfaa_expiration" id="add_dep_nfaa_expiration" value="<?php echo esc_attr( $e_expiration ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Contact Email Address (Defaults to Primary Email)</label>
+                                <input type="email" name="email" value="<?php echo esc_attr( $edit_user_obj->user_email ); ?>" required>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Contact Phone Number (Defaults to Primary Phone)</label>
+                                <input type="text" name="phone" value="<?php echo esc_attr( $e_phone ); ?>" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 1</label>
+                                <input type="text" name="address_1" value="<?php echo esc_attr( $e_address_1 ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 2</label>
+                                <input type="text" name="address_2" value="<?php echo esc_attr( $e_address_2 ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>City</label>
+                                <input type="text" name="city" value="<?php echo esc_attr( $e_city ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>State</label>
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $e_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Zip Code</label>
+                                <input type="text" name="zip" value="<?php echo esc_attr( $e_zip ); ?>" maxlength="10">
+                            </div>
+                        </div>
+
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseAddDependentModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save &amp; Link Family Member</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE ACCOUNT CONVERSION -->
+    <div class="sywat-modal-backdrop" id="sywat_edit_dependent_modal">
+        <?php if ( $edit_user_obj && $edit_dep_subprofile ): ?>
+            <?php 
+                $d_fname   = isset( $edit_dep_subprofile['first_name'] ) ? $edit_dep_subprofile['first_name'] : '';
+                $d_lname   = isset( $edit_dep_subprofile['last_name'] ) ? $edit_dep_subprofile['last_name'] : '';
+                $d_email   = isset( $edit_dep_subprofile['email'] ) ? $edit_dep_subprofile['email'] : '';
+                $d_phone   = isset( $edit_dep_subprofile['phone'] ) ? $edit_dep_subprofile['phone'] : '';
+                $d_gender  = isset( $edit_dep_subprofile['gender'] ) ? $edit_dep_subprofile['gender'] : 'unassigned';
+                $d_is_pro  = isset( $edit_dep_subprofile['is_pro'] ) ? $edit_dep_subprofile['is_pro'] : 'no';
+                $d_dob     = isset( $edit_dep_subprofile['dob'] ) ? $edit_dep_subprofile['dob'] : '';
+                $d_accom   = isset( $edit_dep_subprofile['accommodations'] ) ? $edit_dep_subprofile['accommodations'] : 'none';
+                $d_nfaa_n  = isset( $edit_dep_subprofile['nfaa_number'] ) ? $edit_dep_subprofile['nfaa_number'] : '';
+                $d_nfaa_e  = isset( $edit_dep_subprofile['nfaa_expiration'] ) ? $edit_dep_subprofile['nfaa_expiration'] : '';
+                $d_sys_id  = isset( $edit_dep_subprofile['system_id'] ) ? $edit_dep_subprofile['system_id'] : '';
+                $d_addr_1  = isset( $edit_dep_subprofile['address_1'] ) ? $edit_dep_subprofile['address_1'] : '';
+                $d_addr_2  = isset( $edit_dep_subprofile['address_2'] ) ? $edit_dep_subprofile['address_2'] : '';
+                $d_city    = isset( $edit_dep_subprofile['city'] ) ? $edit_dep_subprofile['city'] : '';
+                $d_state   = isset( $edit_dep_subprofile['state'] ) ? $edit_dep_subprofile['state'] : '';
+                $d_zip     = isset( $edit_dep_subprofile['zip'] ) ? $edit_dep_subprofile['zip'] : '';
+                $d_age_div = ! empty( $d_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $d_dob ) : 'Adult';
+                $d_name    = trim( $d_fname . ' ' . $d_lname );
+                $parent_edit_url = '?tab=members&view=edit_member&edit_member_id=' . intval( $edit_user_obj->ID );
+            ?>
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <h3>✏️ Edit Family Sub-Profile: <?php echo esc_html( $d_name ); ?></h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditDependentModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="update_member">
+                        <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                        <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+
+                        <div class="sywat-form-grid-2">
+                            <div class="sywat-field-group">
+                                <label>First Name *</label>
+                                <input type="text" name="first_name" value="<?php echo esc_attr( $d_fname ); ?>" required>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Last Name *</label>
+                                <input type="text" name="last_name" value="<?php echo esc_attr( $d_lname ); ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Gender *</label>
+                                <select name="gender" required>
+                                    <?php foreach ( $gender_options as $g_key => $g_label ): ?>
+                                        <option value="<?php echo esc_attr( $g_key ); ?>" <?php selected( strtolower( $d_gender ), $g_key ); ?>><?php echo esc_html( $g_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Pro Archer Status (18+)</label>
+                                <select name="is_pro">
+                                    <option value="no" <?php selected( $d_is_pro, 'no' ); ?>>No</option>
+                                    <option value="yes" <?php selected( $d_is_pro, 'yes' ); ?>>Yes</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Date of Birth * (Age Division: <strong><?php echo esc_html( $d_age_div ); ?></strong>)</label>
+                                <input type="date" name="dob" value="<?php echo esc_attr( $d_dob ); ?>" required>
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Accommodations Needed</label>
+                                <select name="accommodations">
+                                    <?php foreach ( $accom_options as $a_key => $a_label ): ?>
+                                        <option value="<?php echo esc_attr( $a_key ); ?>" <?php selected( $d_accom, $a_key ); ?>><?php echo esc_html( $a_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership ID</label>
+                                <input type="text" name="nfaa_number" value="<?php echo esc_attr( $d_nfaa_n ); ?>" placeholder="e.g. 123456">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>NFAA Membership Expiration Date</label>
+                                <input type="date" name="nfaa_expiration" value="<?php echo esc_attr( $d_nfaa_e ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Contact Email Address</label>
+                                <input type="email" name="email" value="<?php echo esc_attr( $d_email ); ?>" required>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Contact Phone Number</label>
+                                <input type="text" name="phone" value="<?php echo esc_attr( $d_phone ); ?>" oninput="sywatFormatPhoneInput(this)" placeholder="XXX-XXX-XXXX" maxlength="12">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 1</label>
+                                <input type="text" name="address_1" value="<?php echo esc_attr( $d_addr_1 ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Street Address Line 2</label>
+                                <input type="text" name="address_2" value="<?php echo esc_attr( $d_addr_2 ); ?>">
+                            </div>
+                        </div>
+
+                        <div class="sywat-form-grid-3 sywat-mt-3">
+                            <div class="sywat-field-group">
+                                <label>City</label>
+                                <input type="text" name="city" value="<?php echo esc_attr( $d_city ); ?>">
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>State</label>
+                                <select name="state">
+                                    <option value="">-- Select State --</option>
+                                    <?php foreach ( $us_states as $s_code => $s_label ): ?>
+                                        <option value="<?php echo esc_attr( $s_code ); ?>" <?php selected( strtoupper( $d_state ), $s_code ); ?>><?php echo esc_html( $s_label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label>Zip Code</label>
+                                <input type="text" name="zip" value="<?php echo esc_attr( $d_zip ); ?>" maxlength="10">
+                            </div>
+                        </div>
+
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditDependentModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Family Sub-Profile</button>
+                        </div>
+                    </form>
+
+                    <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
+
+                    <!-- COMPACT 3-BUTTON ACTION STRIP -->
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');" class="sywat-m-0">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="unlink_dependent">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-w-100">🔗 Unlink Member</button>
+                        </form>
+
+                        <button type="button" class="sywat-btn sywat-btn-primary sywat-w-100" onclick="sywatTogglePromoteSection()">
+                            🔄 Convert to Standalone
+                        </button>
+
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');" class="sywat-m-0">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="delete_member">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-w-100">🗑️ Permanently Delete</button>
+                        </form>
+                    </div>
+
+                    <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
+                    <div id="sywat_promote_collapsible" class="sywat-card sywat-mt-3 sywat-hidden">
+                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Convert <?php echo esc_js( $d_name ); ?> to a standalone Primary Account Holder? Their System ID and tournament score history will be preserved.');">
+                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                            <input type="hidden" name="sywat_action" value="promote_dependent">
+                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
+                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
+
+                            <div class="sywat-alert sywat-alert-info">
+                                🔄 <strong>Convert to Standalone Account:</strong> Creates an independent WordPress login account for this member while preserving 100% of their historical score records.
+                            </div>
+
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>New Standalone Email Address *</label>
+                                    <input type="email" name="new_email" value="<?php echo esc_attr( $d_email ); ?>" required placeholder="unique_email@domain.com">
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>Initial Login Password (Optional)</label>
+                                    <input type="password" id="sywat_promote_pw" name="new_password" placeholder="Leave blank to auto-generate..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
+                            </div>
+
+                            <div class="sywat-form-grid-2 sywat-mt-3">
+                                <div class="sywat-field-group">
+                                    <label>Confirm Login Password</label>
+                                    <input type="password" id="sywat_promote_pw_confirm" name="confirm_new_password" placeholder="Confirm new password..." oninput="sywatValidatePasswordRules('sywat_promote_pw', 'sywat_promote_pw_confirm', 'promote_rule')">
+                                </div>
+                            </div>
+
+                            <div class="sywat-modal-actions sywat-mt-3">
+                                <button type="submit" class="sywat-btn sywat-btn-primary">🚀 Confirm Account Conversion</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- MODAL 5: ADD / ASSIGN BOARD MEMBER MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_add_board_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>Assign Board Member Positions</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseAddBoardModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=board">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="save_board_member">
+
+                    <div class="sywat-field-group">
+                        <label>Select Member *</label>
+                        <select name="board_user_id" required>
+                            <option value="">-- Choose Member from Directory --</option>
+                            <?php 
+                                foreach ( $all_members as $m_item ): 
+                                    if ( ! $m_item instanceof WP_User ) continue;
+                            ?>
+                                <option value="<?php echo intval( $m_item->ID ); ?>">
+                                    <?php echo esc_html( $m_item->display_name ); ?> (<?php echo esc_html( $m_item->user_email ); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-3 sywat-mb-4">
+                        <label>Assign Board Position(s) *</label>
+                        <div class="sywat-form-grid-2 sywat-role-grid">
+                            <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                <label class="sywat-checkbox-label">
+                                    <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>">
+                                    <?php echo esc_html( $pos_title ); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div class="sywat-modal-actions">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseAddBoardModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Board Assignment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 6: EDIT BOARD MEMBER POSITIONS MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_edit_board_modal">
+        <?php if ( $edit_board_user_obj ): ?>
+            <?php 
+                $cur_positions = get_user_meta( $edit_board_user_obj->ID, 'sywat_board_positions', true );
+                if ( ! is_array( $cur_positions ) ) $cur_positions = array();
+            ?>
+            <div class="sywat-modal-content sywat-modal-md">
+                <div class="sywat-modal-header no-print">
+                    <h3>Edit Board Member: <?php echo esc_html( $edit_board_user_obj->display_name ); ?></h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseEditBoardModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <form method="post" action="?tab=members&subtab=board">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="save_board_member">
+                        <input type="hidden" name="board_user_id" value="<?php echo intval( $edit_board_user_obj->ID ); ?>">
+
+                        <div class="sywat-member-info-banner">
+                            <span>👤 <strong>Name:</strong> <?php echo esc_html( $edit_board_user_obj->display_name ); ?></span>
+                            <span>✉️ <strong>Email:</strong> <?php echo esc_html( $edit_board_user_obj->user_email ); ?></span>
+                        </div>
+
+                        <div class="sywat-field-group sywat-mb-4">
+                            <label>Assigned Position(s)</label>
+                            <div class="sywat-form-grid-2 sywat-role-grid">
+                                <?php foreach ( $all_board_positions as $pos_key => $pos_title ): ?>
+                                    <label class="sywat-checkbox-label">
+                                        <input type="checkbox" name="board_positions[]" value="<?php echo esc_attr( $pos_key ); ?>" <?php checked( in_array( $pos_key, $cur_positions, true ), true ); ?>>
+                                        <?php echo esc_html( $pos_title ); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <div class="sywat-modal-actions">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatCloseEditBoardModal()">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Update Positions</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- MODAL 7: HISTORICAL ARCHERS BATCH SPREADSHEET IMPORTER MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_import_archers_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>📥 Import Historical Archers Spreadsheet</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseImportModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" enctype="multipart/form-data" id="sywat_import_archers_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                    <input type="hidden" name="import_mode" value="preview">
+
+                    <div class="sywat-alert sywat-alert-info">
+                        📊 <strong>Batch Archer Import:</strong> Upload an Archers spreadsheet (.xlsx / .csv). Records will be cleaned, deduplicated, and grouped into household units automatically before database ingestion.
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-3">
+                        <label>Select Archers Spreadsheet File (.xlsx / .csv) *</label>
+                        <input type="file" name="archers_file" accept=".xlsx, .xls, .csv" required>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_import_submit_btn">🔍 Audit &amp; Preview File</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 8: HISTORICAL ARCHERS BATCH IMPORT AUDIT PREVIEW OVERLAY -->
+    <?php
+    $preview_data       = isset( $GLOBALS['sywat_import_preview_data'] ) ? $GLOBALS['sywat_import_preview_data'] : null;
+    $open_preview_modal = ( $preview_data !== null );
+    ?>
+    <div class="sywat-modal-backdrop <?php echo $open_preview_modal ? 'active' : ''; ?>" id="sywat_import_preview_modal">
+        <?php if ( $preview_data ): ?>
+            <?php
+                $p_file_path = isset( $preview_data['file_path'] ) ? $preview_data['file_path'] : '';
+                $p_file_name = isset( $preview_data['file_name'] ) ? $preview_data['file_name'] : '';
+                $p_total     = isset( $preview_data['total_rows'] ) ? $preview_data['total_rows'] : 0;
+                $p_purged    = isset( $preview_data['purged_rows'] ) ? $preview_data['purged_rows'] : 0;
+                $p_clean     = isset( $preview_data['clean_unique_count'] ) ? $preview_data['clean_unique_count'] : 0;
+                $p_primary   = isset( $preview_data['primary_accounts_count'] ) ? $preview_data['primary_accounts_count'] : 0;
+                $p_dep       = isset( $preview_data['dependents_count'] ) ? $preview_data['dependents_count'] : 0;
+                $p_noemail   = isset( $preview_data['unassigned_emails_count'] ) ? $preview_data['unassigned_emails_count'] : 0;
+                $households  = isset( $preview_data['households'] ) && is_array( $preview_data['households'] ) ? $preview_data['households'] : array();
+
+                // BULK IN-MEMORY DATABASE PRE-FETCH FOR FAST PREVIEW MATCHING (DELEGATED TO members-data.php)
+                $db_maps            = function_exists( 'sywat_get_import_preview_db_maps' ) ? sywat_get_import_preview_db_maps() : array();
+                $existing_nfaa_set  = isset( $db_maps['existing_nfaa_set'] ) ? $db_maps['existing_nfaa_set'] : array();
+                $existing_email_set = isset( $db_maps['existing_email_set'] ) ? $db_maps['existing_email_set'] : array();
+            ?>
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <h3>📊 Archer Batch Import Audit Preview</h3>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseImportPreviewModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <div class="sywat-alert sywat-alert-info">
+                        File Analyzed: <strong><?php echo esc_html( $p_file_name ); ?></strong> — Review summary metrics and itemized archer mappings before committing database changes.
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Total Spreadsheet Rows</span>
+                            <h3><?php echo intval( $p_total ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Clean Unique Archers</span>
+                            <h3><?php echo intval( $p_clean ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Purged Garbage Rows</span>
+                            <h3><?php echo intval( $p_purged ); ?></h3>
+                        </div>
+                    </div>
+
+                    <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Primary WP Accounts (Households)</span>
+                            <h3><?php echo intval( $p_primary ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Household Dependents</span>
+                            <h3><?php echo intval( $p_dep ); ?></h3>
+                        </div>
+                        <div class="sywat-metric-box">
+                            <span class="sywat-meta-subtext">Unassigned Emails Flagged</span>
+                            <h3><?php echo intval( $p_noemail ); ?></h3>
+                        </div>
+                    </div>
+
+                    <div class="sywat-card-header-bar sywat-mt-4">
+                        <div>
+                            <h3>👥 Itemized Household &amp; Archer Mapping List</h3>
+                            <div class="sywat-subtitle">Showing all mapped Primary Accounts and linked Family Dependents before database ingestion.</div>
+                        </div>
+                    </div>
+
+                    <div class="sywat-table-responsive sywat-mt-2">
+                        <table class="sywat-table">
+                            <thead>
+                                <tr>
+                                    <th class="sywat-col-w-28">Archer Name &amp; Role</th>
+                                    <th class="sywat-col-w-28">Assigned Email</th>
+                                    <th class="sywat-col-center sywat-col-w-16">NFAA ID &amp; Exp</th>
+                                    <th class="sywat-col-center sywat-col-w-14">DOB / Pro</th>
+                                    <th class="sywat-col-center sywat-col-w-14">DB Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ( $households as $members ): ?>
+                                    <?php 
+                                        $head = array_shift( $members );
+                                        
+                                        $existing_match = false;
+                                        if ( ! empty( $head['nfaa_number'] ) && isset( $existing_nfaa_set[ $head['nfaa_number'] ] ) ) {
+                                            $existing_match = true;
+                                        }
+                                        if ( ! $existing_match && ! empty( $head['email'] ) && isset( $existing_email_set[ strtolower( $head['email'] ) ] ) ) {
+                                            $existing_match = true;
+                                        }
+
+                                        $primary_email_disp = ! empty( $head['email'] ) ? $head['email'] : 'unassigned-' . ( ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : 'temp' ) . '@system.sywat.local';
+                                    ?>
+                                    <!-- ROW 1: PRIMARY ACCOUNT HOLDER (HEAD OF HOUSEHOLD) -->
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html( $head['first_name'] . ' ' . $head['last_name'] ); ?></strong>
+                                            <div class="sywat-meta-subtext">👑 Head of Household</div>
+                                        </td>
+                                        <td>
+                                            <code><?php echo esc_html( $primary_email_disp ); ?></code>
+                                            <?php if ( empty( $head['email'] ) ): ?>
+                                                <div class="sywat-meta-subtext">⚠️ Placeholder System Email</div>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <div>🆔 <strong><?php echo esc_html( ! empty( $head['nfaa_number'] ) ? $head['nfaa_number'] : '—' ); ?></strong></div>
+                                            <div class="sywat-meta-subtext"><?php echo ! empty( $head['nfaa_exp'] ) ? esc_html( date( 'M Y', strtotime( $head['nfaa_exp'] ) ) ) : '—'; ?></div>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <div><?php echo ! empty( $head['dob'] ) ? esc_html( date( 'M j, Y', strtotime( $head['dob'] ) ) ) : '—'; ?></div>
+                                            <?php if ( $head['is_pro'] === 'yes' ): ?>
+                                                <span class="sywat-badge sywat-badge-pro sywat-mt-1">⭐ Pro</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="sywat-col-center">
+                                            <?php if ( $existing_match ): ?>
+                                                <span class="sywat-badge sywat-badge-checkedin">🔄 Update Profile</span>
+                                            <?php else: ?>
+                                                <span class="sywat-badge sywat-badge-open">🆕 New Account</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+
+                                    <!-- DEPENDENTS IN THIS HOUSEHOLD -->
+                                    <?php foreach ( $members as $dep ): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="sywat-ml-3">
+                                                    ↪️ <strong><?php echo esc_html( $dep['first_name'] . ' ' . $dep['last_name'] ); ?></strong>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="sywat-ml-3 sywat-meta-subtext">
+                                                    (Linked to Household Email)
+                                                </div>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <div>🆔 <strong><?php echo esc_html( ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '—' ); ?></strong></div>
+                                                <div class="sywat-meta-subtext"><?php echo ! empty( $dep['nfaa_exp'] ) ? esc_html( date( 'M Y', strtotime( $dep['nfaa_exp'] ) ) ) : '—'; ?></div>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <div><?php echo ! empty( $dep['dob'] ) ? esc_html( date( 'M j, Y', strtotime( $dep['dob'] ) ) ) : '—'; ?></div>
+                                                <?php if ( $dep['is_pro'] === 'yes' ): ?>
+                                                    <span class="sywat-badge sywat-badge-pro sywat-mt-1">⭐ Pro</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="sywat-col-center">
+                                                <span class="sywat-badge sywat-badge-muted">🏠 Dependent</span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <form method="post" action="?tab=members&subtab=directory" id="sywat_commit_import_form">
+                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                        <input type="hidden" name="sywat_action" value="import_archers_spreadsheet">
+                        <input type="hidden" name="import_mode" value="commit">
+                        <input type="hidden" name="persistent_file_path" value="<?php echo esc_attr( $p_file_path ); ?>">
+
+                        <div class="sywat-modal-actions sywat-mt-4">
+                            <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseImportPreviewModal()">Cancel Import</button>
+                            <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_commit_submit_btn">🚀 Confirm &amp; Ingest <?php echo intval( $p_clean ); ?> Archers into Database</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- MODAL 9: PROTECTED BATCH TEST DATA PURGE MODAL -->
+    <div class="sywat-modal-backdrop" id="sywat_purge_test_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>🗑️ Purge Batch Test Data</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatClosePurgeModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_purge_test_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="purge_test_members">
+
+                    <div class="sywat-alert sywat-alert-danger">
+                        ⚠️ <strong>Protected Data Reset Tool:</strong> This action will permanently remove standard imported test members from the directory database.
+                    </div>
+
+                    <div class="sywat-member-info-banner sywat-mt-3">
+                        <div>🛡️ <strong>Automatically Protected Accounts (Will NOT Be Deleted):</strong></div>
+                        <ul class="sywat-mt-1 sywat-mb-0 sywat-pl-3">
+                            <li>System Administrators &amp; Webmasters</li>
+                            <li>Your Active Logged-In Account</li>
+                            <li>Shop &amp; Club Managers / Desk Staff</li>
+                            <li>Official Board Directors &amp; Field Governors</li>
+                        </ul>
+                    </div>
+
+                    <div class="sywat-field-group sywat-mt-4">
+                        <label class="sywat-checkbox-label">
+                            <input type="checkbox" id="sywat_purge_confirm_check" onchange="document.getElementById('sywat_purge_submit_btn').disabled = !this.checked;">
+                            I understand this will delete standard test members while preserving all protected officers and shop managers.
+                        </label>
+                    </div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatClosePurgeModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-danger" id="sywat_purge_submit_btn" disabled>🗑️ Execute Data Purge</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 10: LINK ARCHER TO HOUSEHOLD OVERLAY -->
+    <div class="sywat-modal-backdrop" id="sywat_transfer_member_modal">
+        <div class="sywat-modal-content sywat-modal-md">
+            <div class="sywat-modal-header no-print">
+                <h3>🔗 Link Archer to Household</h3>
+                <button type="button" class="sywat-modal-close" onclick="sywatCloseTransferMemberModal()">&times;</button>
+            </div>
+            <div class="sywat-modal-body">
+                <form method="post" action="?tab=members&subtab=directory" id="sywat_transfer_member_form">
+                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                    <input type="hidden" name="sywat_action" value="transfer_household_member">
+                    <input type="hidden" name="source_user_id" id="sywat_transfer_source_user_id" value="0">
+                    <input type="hidden" name="target_system_id" id="sywat_transfer_target_system_id" value="">
+                    <input type="hidden" name="target_head_id" id="sywat_transfer_target_head_id" value="" required>
+
+                    <div class="sywat-alert sywat-alert-info">
+                        🔗 <strong>Link Archer:</strong> Assigns this archer under a target Head of Household as a family dependent sub-profile.
+                    </div>
+
+                    <div class="sywat-member-info-banner sywat-mt-3">
+                        <span>👤 <strong>Archer Name:</strong> <span id="sywat_transfer_source_name">-- Select Member --</span></span>
+                    </div>
+
+                    <!-- DYNAMIC AS-YOU-TYPE HEAD OF HOUSEHOLD AUTOCOMPLETE SEARCH -->
+                    <div class="sywat-field-group sywat-mt-4 sywat-autocomplete-wrapper">
+                        <label>🔍 Search Target Head of Household (Type Name or NFAA ID) *</label>
+                        <input type="text" id="sywat_transfer_head_search" placeholder="Start typing name or NFAA ID..." autocomplete="off" oninput="sywatHandleHeadSearch(this)">
+                        <div id="sywat_transfer_head_search_results" class="sywat-autocomplete-results sywat-hidden"></div>
+                    </div>
+
+                    <div id="sywat_transfer_selected_head_display" class="sywat-mt-2 sywat-hidden"></div>
+
+                    <div class="sywat-modal-actions sywat-mt-4">
+                        <button type="button" class="sywat-btn sywat-btn-secondary" onclick="sywatCloseTransferMemberModal()">Cancel</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary" id="sywat_transfer_submit_btn" disabled>🚀 Confirm &amp; Link to Household</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php
 }
-
-if ( ! function_exists( 'sywat_get_protected_user_map' ) ) {
-    /**
-     * Build O(1) hashtable map of protected account IDs (Administrators, Officers, Shop Managers, Board Members, active user).
-     *
-     * @return array Map array with user IDs as keys.
-     */
-    function sywat_get_protected_user_map() {
-        global $wpdb;
-
-        $protected_map   = array();
-        $current_user_id = get_current_user_id();
-
-        // Always protect active logged-in account
-        if ( $current_user_id > 0 ) {
-            $protected_map[ $current_user_id ] = true;
-        }
-
-        // Bulk pre-fetch user capabilities to protect Admins, Shop Managers, and Officers ($O(1) lookup)
-        $cap_rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = %s",
-                $wpdb->prefix . 'capabilities'
-            )
-        );
-
-        if ( ! empty( $cap_rows ) ) {
-            foreach ( $cap_rows as $cr ) {
-                $uid  = intval( $cr->user_id );
-                $caps = @maybe_unserialize( $cr->meta_value );
-                if ( is_array( $caps ) ) {
-                    foreach ( array_keys( $caps ) as $role_slug ) {
-                        $r_clean = strtolower( $role_slug );
-                        if ( preg_match( '/(administrator|sywat_shop_manager|sywat_shop_user|president|treasurer|secretary|governor|director|officer|manager|webmaster)/i', $r_clean ) ) {
-                            $protected_map[ $uid ] = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Bulk pre-fetch active Board Member assignments
-        $board_rows = $wpdb->get_col(
-            "SELECT DISTINCT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'sywat_board_positions' AND meta_value != '' AND meta_value != 'a:0:{}'"
-        );
-        if ( ! empty( $board_rows ) ) {
-            foreach ( $board_rows as $b_uid ) {
-                $protected_map[ intval( $b_uid ) ] = true;
-            }
-        }
-
-        return $protected_map;
-    }
-}
-
-if ( ! function_exists( 'sywat_sync_user_board_roles' ) ) {
-    /**
-     * Synchronizes WordPress user roles based on assigned TFAA Board Positions.
-     * Acts as the single source of truth for officer role binding across all form submissions.
-     *
-     * @param int   $user_id   WordPress User ID.
-     * @param array $positions Array of board position keys.
-     */
-    function sywat_sync_user_board_roles( $user_id, $positions ) {
-        $user_id = intval( $user_id );
-        if ( $user_id <= 0 ) return;
-
-        $user_obj = new WP_User( $user_id );
-        if ( ! $user_obj->exists() ) return;
-
-        $officer_roles = array(
-            'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
-            'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
-            'tfaa_tournament_director', 'tfaa_field_governor'
-        );
-
-        if ( empty( $positions ) ) {
-            delete_user_meta( $user_id, 'sywat_board_positions' );
-            foreach ( $officer_roles as $o_role ) {
-                if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
-                    $user_obj->remove_role( $o_role );
-                }
-            }
-            return;
-        }
-
-        update_user_meta( $user_id, 'sywat_board_positions', $positions );
-
-        $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array(
-            'tfaa_president'             => 'tfaa_president',
-            'president'                  => 'tfaa_president',
-            'tfaa_vice_president'        => 'tfaa_vice_president',
-            'vice_president'             => 'tfaa_vice_president',
-            'tfaa_secretary'             => 'tfaa_secretary',
-            'secretary'                  => 'tfaa_secretary',
-            'tfaa_treasurer'             => 'tfaa_treasurer',
-            'treasurer'                  => 'tfaa_treasurer',
-            'tfaa_social_media_director' => 'tfaa_social_media_director',
-            'tfaa_social_media'          => 'tfaa_social_media_director',
-            'social_media'               => 'tfaa_social_media_director',
-            'tfaa_webmaster'             => 'tfaa_webmaster',
-            'webmaster'                  => 'tfaa_webmaster',
-            'tfaa_tournament_director'   => 'tfaa_tournament_director',
-            'tournament_director'        => 'tfaa_tournament_director',
-            'tfaa_field_governor'        => 'tfaa_field_governor',
-            'field_governor'             => 'tfaa_field_governor',
-            'field_governor_1'           => 'tfaa_field_governor',
-            'field_governor_2'           => 'tfaa_field_governor',
-            'field_governor_3'           => 'tfaa_field_governor',
-            'field_governor_4'           => 'tfaa_field_governor',
-            'field_governor_5'           => 'tfaa_field_governor',
-            'field_governor_6'           => 'tfaa_field_governor',
-            'field_governor_7'           => 'tfaa_field_governor',
-        );
-
-        $target_board_roles = array();
-        foreach ( $positions as $p_key ) {
-            $p_clean = strtolower( trim( $p_key ) );
-            if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
-                $target_board_roles[] = $pos_to_role_map[ $p_clean ];
-            } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
-                $target_board_roles[] = 'tfaa_field_governor';
-            }
-        }
-
-        foreach ( array_unique( $target_board_roles ) as $r_slug ) {
-            if ( ! in_array( $r_slug, (array) $user_obj->roles, true ) ) {
-                $user_obj->add_role( $r_slug );
-            }
-        }
-
-        foreach ( $officer_roles as $o_role ) {
-            if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $target_board_roles, true ) ) {
-                $user_obj->remove_role( $o_role );
-            }
-        }
-    }
-}
-
-if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
-    /**
-     * Central POST handler for member actions.
-     *
-     * @return string Alert notice markup.
-     */
-    function sywat_handle_member_post_actions() {
-        // Nonce Verification
-        if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
-        }
-
-        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
-
-        // 0. 2-STEP BATCH HISTORICAL ARCHERS SPREADSHEET IMPORT HANDLER
-        if ( $action === 'import_archers_spreadsheet' ) {
-            if ( ! current_user_can( 'administrator' ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data imports.</div>';
-            }
-
-            $import_mode = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'preview';
-
-            $importer_path = plugin_dir_path( __FILE__ ) . 'import/archers-importer.php';
-            if ( file_exists( $importer_path ) ) {
-                require_once $importer_path;
-            }
-
-            if ( ! function_exists( 'sywat_import_archers_spreadsheet' ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer Importer Module Engine is missing or unavailable.</div>';
-            }
-
-            if ( $import_mode === 'preview' ) {
-                if ( empty( $_FILES['archers_file'] ) || empty( $_FILES['archers_file']['tmp_name'] ) ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a spreadsheet file (.xlsx or .csv) to import.</div>';
-                }
-
-                $preview_result = sywat_import_archers_spreadsheet( $_FILES['archers_file'], 'preview' );
-                if ( is_string( $preview_result ) ) {
-                    return $preview_result;
-                }
-
-                if ( is_array( $preview_result ) ) {
-                    $GLOBALS['sywat_import_preview_data'] = $preview_result;
-                    return '<div class="sywat-alert sywat-alert-info">🔍 <strong>File Audited:</strong> Review the batch archer mapping details in the pop-up modal below.</div>';
-                }
-            } elseif ( $import_mode === 'commit' ) {
-                $persistent_file = isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( $_POST['persistent_file_path'] ) : '';
-
-                if ( empty( $persistent_file ) || ! file_exists( $persistent_file ) ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Staged upload file missing or expired. Please upload the spreadsheet again.</div>';
-                }
-
-                return sywat_import_archers_spreadsheet( $persistent_file, 'commit' );
-            }
-        }
-
-        // 1. SWAP HEAD OF HOUSEHOLD WITH A DEPENDENT SUB-PROFILE
-        if ( $action === 'swap_head_of_household' ) {
-            $primary_user_id  = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
-            $target_system_id = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
-
-            if ( $primary_user_id > 0 && ! empty( $target_system_id ) ) {
-                $primary_user = get_userdata( $primary_user_id );
-                $dep          = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
-                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $target_system_id ) 
-                    : null;
-
-                if ( $primary_user && $dep ) {
-                    $old_head_dep = array(
-                        'first_name'      => get_user_meta( $primary_user_id, 'first_name', true ) ? get_user_meta( $primary_user_id, 'first_name', true ) : $primary_user->first_name,
-                        'last_name'       => get_user_meta( $primary_user_id, 'last_name', true ) ? get_user_meta( $primary_user_id, 'last_name', true ) : $primary_user->last_name,
-                        'email'           => $primary_user->user_email,
-                        'phone'           => get_user_meta( $primary_user_id, 'sywat_phone', true ),
-                        'gender'          => get_user_meta( $primary_user_id, 'sywat_gender', true ),
-                        'is_pro'          => get_user_meta( $primary_user_id, 'sywat_is_pro', true ),
-                        'dob'             => get_user_meta( $primary_user_id, 'sywat_dob', true ),
-                        'accommodations'  => get_user_meta( $primary_user_id, 'sywat_accommodations', true ),
-                        'nfaa_number'     => get_user_meta( $primary_user_id, 'sywat_nfaa_number', true ),
-                        'nfaa_expiration' => get_user_meta( $primary_user_id, 'sywat_nfaa_expiration', true ),
-                        'address_1'       => get_user_meta( $primary_user_id, 'sywat_address_1', true ),
-                        'address_2'       => get_user_meta( $primary_user_id, 'sywat_address_2', true ),
-                        'city'            => get_user_meta( $primary_user_id, 'sywat_city', true ),
-                        'state'           => get_user_meta( $primary_user_id, 'sywat_state', true ),
-                        'zip'             => get_user_meta( $primary_user_id, 'sywat_zip', true ),
-                    );
-
-                    $new_first = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
-                    $new_last  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
-                    $new_email = ! empty( $dep['email'] ) ? $dep['email'] : $primary_user->user_email;
-
-                    wp_update_user( array(
-                        'ID'           => $primary_user_id,
-                        'first_name'   => $new_first,
-                        'last_name'    => $new_last,
-                        'display_name' => trim( $new_first . ' ' . $new_last ),
-                        'user_email'   => $new_email,
-                    ) );
-
-                    update_user_meta( $primary_user_id, 'sywat_nfaa_number', isset( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '' );
-                    update_user_meta( $primary_user_id, 'sywat_tfaa_number', isset( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : '' );
-                    update_user_meta( $primary_user_id, 'sywat_nfaa_expiration', isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '' );
-                    update_user_meta( $primary_user_id, 'sywat_dob', isset( $dep['dob'] ) ? $dep['dob'] : '' );
-                    update_user_meta( $primary_user_id, 'sywat_gender', isset( $dep['gender'] ) ? $dep['gender'] : 'unassigned' );
-                    update_user_meta( $primary_user_id, 'sywat_is_pro', isset( $dep['is_pro'] ) ? $dep['is_pro'] : 'no' );
-                    if ( ! empty( $dep['phone'] ) ) {
-                        update_user_meta( $primary_user_id, 'sywat_phone', $dep['phone'] );
-                    }
-
-                    if ( function_exists( 'sywat_update_household_dependent' ) ) {
-                        sywat_update_household_dependent( $primary_user_id, $target_system_id, $old_head_dep );
-                    }
-
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">👑 <strong>' . esc_html( $new_first . ' ' . $new_last ) . '</strong> is now designated as the Head of Household!</div>';
-                }
-            }
-        }
-
-        // 2. PURGE TEST MEMBERS (HIGH-PERFORMANCE PROTECTED BULK RESET WITH CACHE & HOOK SUSPENSION)
-        if ( $action === 'purge_test_members' ) {
-            if ( ! current_user_can( 'administrator' ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can execute batch data purges.</div>';
-            }
-
-            require_once ABSPATH . 'wp-admin/includes/user.php';
-            global $wpdb;
-
-            $protected_map   = sywat_get_protected_user_map();
-            $all_user_ids    = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
-            $deleted_count   = 0;
-            $protected_count = 0;
-
-            if ( ! empty( $all_user_ids ) ) {
-                wp_suspend_cache_invalidation( true );
-                remove_all_actions( 'delete_user' );
-                remove_all_actions( 'deleted_user' );
-
-                $wpdb->query( 'START TRANSACTION' );
-
-                foreach ( $all_user_ids as $uid_raw ) {
-                    $uid = intval( $uid_raw );
-
-                    if ( isset( $protected_map[ $uid ] ) ) {
-                        $protected_count++;
-                        continue;
-                    }
-
-                    if ( wp_delete_user( $uid ) ) {
-                        $deleted_count++;
-                    }
-                }
-
-                $wpdb->query( 'COMMIT' );
-                wp_suspend_cache_invalidation( false );
-                wp_cache_flush();
-            }
-
-            return sprintf(
-                '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ <strong>Batch Test Data Purge Complete!</strong> Permanently deleted <strong>%d</strong> test member accounts. Retained and protected <strong>%d</strong> Officer, Shop Manager, and Administrator accounts.</div>',
-                $deleted_count,
-                $protected_count
-            );
-        }
-
-        // 3. CREATE NEW MEMBER ACCOUNT OR HOUSEHOLD DEPENDENT
-        if ( $action === 'create_member' ) {
-            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
-            $first_name      = ucfirst( strtolower( sanitize_text_field( $_POST['first_name'] ) ) );
-            $last_name       = ucfirst( strtolower( sanitize_text_field( $_POST['last_name'] ) ) );
-            $email           = sanitize_email( $_POST['email'] );
-            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
-            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
-            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
-            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
-            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
-            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
-
-            // HOUSEHOLD DEPENDENT SUB-PROFILE CREATION
-            if ( $primary_user_id > 0 ) {
-                if ( empty( $first_name ) || empty( $last_name ) || empty( $dob ) ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Date of Birth for the family member.</div>';
-                }
-
-                $dep_payload = array(
-                    'first_name'      => $first_name,
-                    'last_name'       => $last_name,
-                    'email'           => $email,
-                    'phone'           => isset( $_POST['phone'] ) ? sanitize_text_field( $_POST['phone'] ) : '',
-                    'gender'          => in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned',
-                    'is_pro'          => $is_pro,
-                    'dob'             => $dob,
-                    'accommodations'  => $accommodations,
-                    'nfaa_number'     => $nfaa_number,
-                    'nfaa_expiration' => $nfaa_expiration,
-                    'address_1'       => isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '',
-                    'address_2'       => isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '',
-                    'city'            => isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '',
-                    'state'           => isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '',
-                    'zip'             => isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '',
-                );
-
-                if ( function_exists( 'sywat_add_household_dependent' ) ) {
-                    $system_id = sywat_add_household_dependent( $primary_user_id, $dep_payload );
-                    if ( is_wp_error( $system_id ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $system_id->get_error_message() ) . '</div>';
-                    }
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Family member <strong>' . esc_html( $first_name . ' ' . $last_name ) . '</strong> added to household successfully!</div>';
-                }
-            }
-
-            // STANDALONE PRIMARY ACCOUNT CREATION
-            $password         = isset( $_POST['password'] ) ? $_POST['password'] : '';
-            $confirm_password = isset( $_POST['confirm_password'] ) ? $_POST['confirm_password'] : '';
-            $phone            = sanitize_text_field( $_POST['phone'] );
-            $is_nfaa          = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
-            $submitted_roles  = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array( 'tfaa_member' );
-            $submitted_board  = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
-            $shop_id          = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
-
-            $address_1 = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
-            $address_2 = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
-            $city      = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
-            $state     = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
-            $zip       = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
-
-            if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
-            }
-
-            if ( email_exists( $email ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">An account with email address "' . esc_html( $email ) . '" already exists.</div>';
-            }
-
-            $pw_val = sywat_validate_password_rules( $password, $confirm_password );
-            if ( $pw_val !== true ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
-            }
-
-            $base_username = sanitize_user( $first_name . '.' . $last_name, true );
-            $username      = $base_username;
-            $counter       = 1;
-
-            while ( username_exists( $username ) ) {
-                $username = $base_username . $counter;
-                $counter++;
-            }
-
-            $user_id = wp_insert_user( array(
-                'user_login'   => $username,
-                'user_email'   => $email,
-                'user_pass'    => $password,
-                'first_name'   => $first_name,
-                'last_name'    => $last_name,
-                'display_name' => $first_name . ' ' . $last_name,
-            ) );
-
-            if ( is_wp_error( $user_id ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $user_id->get_error_message() ) . '</div>';
-            }
-
-            $new_user_obj = new WP_User( $user_id );
-            if ( $new_user_obj->exists() ) {
-                $submitted_roles = array_unique( $submitted_roles );
-                $new_user_obj->set_role( reset( $submitted_roles ) );
-                foreach ( $submitted_roles as $r_slug ) {
-                    $new_user_obj->add_role( $r_slug );
-                }
-            }
-
-            if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
-                sywat_sync_user_board_roles( $user_id, $submitted_board );
-            }
-
-            $system_id = function_exists( 'sywat_get_user_system_id' ) ? sywat_get_user_system_id( $user_id ) : '';
-
-            update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
-            update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
-            update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
-            update_user_meta( $user_id, 'sywat_phone', $phone );
-            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
-            update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
-            update_user_meta( $user_id, 'sywat_dob', $dob );
-            update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
-            update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
-            update_user_meta( $user_id, 'sywat_address_1', $address_1 );
-            update_user_meta( $user_id, 'sywat_address_2', $address_2 );
-            update_user_meta( $user_id, 'sywat_city', $city );
-            update_user_meta( $user_id, 'sywat_state', $state );
-            update_user_meta( $user_id, 'sywat_zip', $zip );
-
-            if ( ! empty( $shop_id ) ) {
-                update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
-            }
-
-            $disp_nfaa = ! empty( $nfaa_number ) ? $nfaa_number : 'Unassigned';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Primary Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | NFAA ID: <strong>' . esc_html( $disp_nfaa ) . '</strong></div>';
-        }
-
-        // 4. UPDATE EXISTING MEMBER PROFILE (OR DEPENDENT SUB-PROFILE)
-        if ( $action === 'update_member' ) {
-            $user_id         = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
-            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
-            $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
-
-            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
-            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
-
-            // Update Dependent Sub-Profile
-            if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
-                $dep_update = array(
-                    'first_name'      => sanitize_text_field( $_POST['first_name'] ),
-                    'last_name'       => sanitize_text_field( $_POST['last_name'] ),
-                    'email'           => sanitize_email( $_POST['email'] ),
-                    'phone'           => sanitize_text_field( $_POST['phone'] ),
-                    'gender'          => in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned',
-                    'is_pro'          => $is_pro,
-                    'dob'             => sanitize_text_field( $_POST['dob'] ),
-                    'accommodations'  => isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none',
-                    'nfaa_number'     => sanitize_text_field( $_POST['nfaa_number'] ),
-                    'nfaa_expiration' => sanitize_text_field( $_POST['nfaa_expiration'] ),
-                    'address_1'       => sanitize_text_field( $_POST['address_1'] ),
-                    'address_2'       => sanitize_text_field( $_POST['address_2'] ),
-                    'city'            => sanitize_text_field( $_POST['city'] ),
-                    'state'           => strtoupper( sanitize_text_field( $_POST['state'] ) ),
-                    'zip'             => sanitize_text_field( $_POST['zip'] ),
-                );
-
-                if ( function_exists( 'sywat_update_household_dependent' ) ) {
-                    $res = sywat_update_household_dependent( $primary_user_id, $system_id, $dep_update );
-                    if ( is_wp_error( $res ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                    }
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Household member sub-profile updated successfully.</div>';
-                }
-            }
-
-            // Update Primary Member Profile
-            $first_name      = sanitize_text_field( $_POST['first_name'] );
-            $last_name       = sanitize_text_field( $_POST['last_name'] );
-            $email           = sanitize_email( $_POST['email'] );
-            $phone           = sanitize_text_field( $_POST['phone'] );
-            $is_nfaa         = ( isset( $_POST['is_nfaa_member'] ) && $_POST['is_nfaa_member'] === 'yes' ) ? 'yes' : 'no';
-            $submitted_roles = isset( $_POST['sywat_roles'] ) && is_array( $_POST['sywat_roles'] ) ? array_map( 'sanitize_text_field', $_POST['sywat_roles'] ) : array();
-            $shop_id         = isset( $_POST['sywat_shop_id'] ) ? sanitize_text_field( $_POST['sywat_shop_id'] ) : '';
-            $new_pw          = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
-            $confirm_new_pw  = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
-
-            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
-            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
-            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
-            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
-            $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
-            $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
-            $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
-            $state           = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
-            $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
-
-            if ( $user_id > 0 && get_userdata( $user_id ) ) {
-                if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
-                    $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
-                    if ( $pw_val !== true ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
-                    }
-                    wp_set_password( $new_pw, $user_id );
-                }
-
-                wp_update_user( array(
-                    'ID'           => $user_id,
-                    'first_name'   => $first_name,
-                    'last_name'    => $last_name,
-                    'display_name' => $first_name . ' ' . $last_name,
-                    'user_email'   => $email,
-                ) );
-
-                if ( function_exists( 'sywat_get_user_system_id' ) ) {
-                    sywat_get_user_system_id( $user_id );
-                }
-
-                update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
-                update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
-                update_user_meta( $user_id, 'sywat_is_nfaa_member', $is_nfaa );
-                update_user_meta( $user_id, 'sywat_phone', $phone );
-                update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
-                update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
-                update_user_meta( $user_id, 'sywat_dob', $dob );
-                update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
-                update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
-                update_user_meta( $user_id, 'sywat_address_1', $address_1 );
-                update_user_meta( $user_id, 'sywat_address_2', $address_2 );
-                update_user_meta( $user_id, 'sywat_city', $city );
-                update_user_meta( $user_id, 'sywat_state', $state );
-                update_user_meta( $user_id, 'sywat_zip', $zip );
-
-                if ( ! empty( $shop_id ) ) {
-                    update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
-                } else {
-                    delete_user_meta( $user_id, 'sywat_shop_id' );
-                }
-
-                // Process assigned board positions input if posted by admin
-                if ( current_user_can( 'administrator' ) && isset( $_POST['board_positions'] ) ) {
-                    $submitted_positions = is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
-                    if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
-                        sywat_sync_user_board_roles( $user_id, $submitted_positions );
-                    }
-                }
-
-                // Sync standard system roles (excluding officer roles mapped by the sync function)
-                $user_obj = new WP_User( $user_id );
-                if ( $user_obj->exists() ) {
-                    $officer_roles = array(
-                        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
-                        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
-                        'tfaa_tournament_director', 'tfaa_field_governor'
-                    );
-
-                    foreach ( (array) $user_obj->roles as $old_role ) {
-                        if ( ! in_array( $old_role, $submitted_roles, true ) && ! in_array( $old_role, $officer_roles, true ) ) {
-                            $user_obj->remove_role( $old_role );
-                        }
-                    }
-                    foreach ( array_unique( $submitted_roles ) as $new_role ) {
-                        if ( ! in_array( $new_role, (array) $user_obj->roles, true ) && ! in_array( $new_role, $officer_roles, true ) ) {
-                            $user_obj->add_role( $new_role );
-                        }
-                    }
-                }
-
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
-            }
-        }
-
-        // 4B. HEAD OF HOUSEHOLD SELF-SERVICE PROFILE UPDATE
-        if ( $action === 'update_self_profile' ) {
-            $user_id = get_current_user_id();
-            if ( $user_id <= 0 ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">You must be logged in to update your profile.</div>';
-            }
-
-            $first_name      = sanitize_text_field( $_POST['first_name'] );
-            $last_name       = sanitize_text_field( $_POST['last_name'] );
-            $email           = sanitize_email( $_POST['email'] );
-            $phone           = sanitize_text_field( $_POST['phone'] );
-            $gender          = isset( $_POST['gender'] ) ? strtolower( sanitize_text_field( $_POST['gender'] ) ) : 'unassigned';
-            $is_pro          = ( isset( $_POST['is_pro'] ) && $_POST['is_pro'] === 'yes' ) ? 'yes' : 'no';
-            $dob             = isset( $_POST['dob'] ) ? sanitize_text_field( $_POST['dob'] ) : '';
-            $accommodations  = isset( $_POST['accommodations'] ) ? sanitize_text_field( $_POST['accommodations'] ) : 'none';
-            $nfaa_number     = isset( $_POST['nfaa_number'] ) ? sanitize_text_field( $_POST['nfaa_number'] ) : '';
-            $nfaa_expiration = isset( $_POST['nfaa_expiration'] ) ? sanitize_text_field( $_POST['nfaa_expiration'] ) : '';
-            $address_1       = isset( $_POST['address_1'] ) ? sanitize_text_field( $_POST['address_1'] ) : '';
-            $address_2       = isset( $_POST['address_2'] ) ? sanitize_text_field( $_POST['address_2'] ) : '';
-            $city            = isset( $_POST['city'] ) ? sanitize_text_field( $_POST['city'] ) : '';
-            $state           = isset( $_POST['state'] ) ? strtoupper( sanitize_text_field( $_POST['state'] ) ) : '';
-            $zip             = isset( $_POST['zip'] ) ? sanitize_text_field( $_POST['zip'] ) : '';
-
-            $new_pw         = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
-            $confirm_new_pw = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
-
-            if ( empty( $first_name ) || empty( $last_name ) || ! is_email( $email ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid First Name, Last Name, and Email Address.</div>';
-            }
-
-            if ( ! empty( $new_pw ) || ! empty( $confirm_new_pw ) ) {
-                $pw_val = sywat_validate_password_rules( $new_pw, $confirm_new_pw );
-                if ( $pw_val !== true ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
-                }
-                wp_set_password( $new_pw, $user_id );
-            }
-
-            wp_update_user( array(
-                'ID'           => $user_id,
-                'first_name'   => $first_name,
-                'last_name'    => $last_name,
-                'display_name' => $first_name . ' ' . $last_name,
-                'user_email'   => $email,
-            ) );
-
-            update_user_meta( $user_id, 'sywat_nfaa_number', $nfaa_number );
-            update_user_meta( $user_id, 'sywat_tfaa_number', $nfaa_number );
-            update_user_meta( $user_id, 'sywat_phone', $phone );
-            update_user_meta( $user_id, 'sywat_gender', in_array( $gender, array( 'male', 'female', 'unassigned' ), true ) ? $gender : 'unassigned' );
-            update_user_meta( $user_id, 'sywat_is_pro', $is_pro );
-            update_user_meta( $user_id, 'sywat_dob', $dob );
-            update_user_meta( $user_id, 'sywat_accommodations', $accommodations );
-            update_user_meta( $user_id, 'sywat_nfaa_expiration', $nfaa_expiration );
-            update_user_meta( $user_id, 'sywat_address_1', $address_1 );
-            update_user_meta( $user_id, 'sywat_address_2', $address_2 );
-            update_user_meta( $user_id, 'sywat_city', $city );
-            update_user_meta( $user_id, 'sywat_state', $state );
-            update_user_meta( $user_id, 'sywat_zip', $zip );
-
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Your household master profile has been updated successfully!</div>';
-        }
-
-        // 5. DELETE MEMBER ACCOUNT OR PERMANENTLY PURGE DEPENDENT SUB-PROFILE
-        if ( $action === 'delete_member' ) {
-            $user_id         = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
-            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
-            $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
-
-            // Delete Dependent Sub-Profile Permanently
-            if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
-                $dep = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
-                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) 
-                    : null;
-                $dep_name = ( $dep && isset( $dep['first_name'] ) ) ? $dep['first_name'] . ' ' . $dep['last_name'] : 'Family member';
-
-                if ( function_exists( 'sywat_delete_household_dependent' ) ) {
-                    $res = sywat_delete_household_dependent( $primary_user_id, $system_id );
-                    if ( is_wp_error( $res ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                    }
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ Sub-profile "<strong>' . esc_html( $dep_name ) . '</strong>" permanently deleted from household.</div>';
-                }
-            }
-
-            // Delete Standalone Primary Account
-            $user = get_userdata( $user_id );
-            if ( ! $user ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">User not found.</div>';
-            }
-
-            if ( get_current_user_id() === $user_id ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">You cannot delete your own active administrator account.</div>';
-            }
-
-            require_once ABSPATH . 'wp-admin/includes/user.php';
-            $deleted_name = $user->display_name;
-
-            if ( wp_delete_user( $user_id ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account "<strong>' . esc_html( $deleted_name ) . '</strong>" has been permanently deleted.</div>';
-            } else {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to delete user account. Please try again.</div>';
-            }
-        }
-
-        // 6. UNLINK HOUSEHOLD DEPENDENT (PRESERVE IN UNASSIGNED POOL IF NO STANDALONE ACCOUNT)
-        if ( $action === 'unlink_dependent' || $action === 'unlink_member' ) {
-            $primary_user_id = isset( $_POST['primary_user_id'] ) ? intval( $_POST['primary_user_id'] ) : 0;
-            $system_id       = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
-
-            if ( $primary_user_id > 0 && ! empty( $system_id ) ) {
-                $dep = function_exists( 'sywat_get_household_dependent_by_system_id' ) 
-                    ? sywat_get_household_dependent_by_system_id( $primary_user_id, $system_id ) 
-                    : null;
-                $dep_name = ( $dep && isset( $dep['first_name'] ) ) ? $dep['first_name'] . ' ' . $dep['last_name'] : 'Family member';
-
-                if ( $dep ) {
-                    // Store in unassigned pool option to prevent data loss
-                    $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
-                    if ( ! is_array( $unassigned_pool ) ) {
-                        $unassigned_pool = array();
-                    }
-                    $dep['unlinked_from_head_id'] = $primary_user_id;
-                    $dep['unlinked_date']         = current_time( 'mysql' );
-                    $unassigned_pool[ $system_id ] = $dep;
-                    update_option( 'sywat_unassigned_archers', $unassigned_pool );
-                }
-
-                if ( function_exists( 'sywat_unlink_household_dependent' ) ) {
-                    $res = sywat_unlink_household_dependent( $primary_user_id, $system_id );
-                    if ( is_wp_error( $res ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                    }
-                } elseif ( function_exists( 'sywat_delete_household_dependent' ) ) {
-                    $res = sywat_delete_household_dependent( $primary_user_id, $system_id );
-                    if ( is_wp_error( $res ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                    }
-                }
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>' . esc_html( $dep_name ) . '</strong> has been unlinked from this household and moved to the unassigned archer pool.</div>';
-            }
-        }
-
-        // 7. PROMOTE DEPENDENT TO STANDALONE ACCOUNT (AGE 18)
-        if ( $action === 'promote_dependent' ) {
-            $primary_user_id = intval( $_POST['primary_user_id'] );
-            $system_id       = sanitize_text_field( $_POST['target_system_id'] );
-            $new_email       = sanitize_email( $_POST['new_email'] );
-            $new_pw          = isset( $_POST['new_password'] ) ? $_POST['new_password'] : '';
-            $conf_pw         = isset( $_POST['confirm_new_password'] ) ? $_POST['confirm_new_password'] : '';
-
-            if ( empty( $new_email ) || ! is_email( $new_email ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please provide a valid standalone email address for the member.</div>';
-            }
-
-            if ( ! empty( $new_pw ) ) {
-                $pw_val = sywat_validate_password_rules( $new_pw, $conf_pw );
-                if ( $pw_val !== true ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $pw_val ) . '</div>';
-                }
-            }
-
-            if ( function_exists( 'sywat_promote_dependent_to_primary' ) ) {
-                $promoted_id = sywat_promote_dependent_to_primary( $primary_user_id, $system_id, $new_email, $new_pw );
-                if ( is_wp_error( $promoted_id ) ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $promoted_id->get_error_message() ) . '</div>';
-                }
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member promoted to standalone Primary Account Holder successfully!</div>';
-            }
-        }
-
-        // 8. ASSIGN OR UPDATE BOARD MEMBER POSITIONS (WITH AUTOMATED SINGLE-ACTION ROLE BINDING)
-        if ( $action === 'save_board_member' ) {
-            $user_id   = intval( $_POST['board_user_id'] );
-            $positions = isset( $_POST['board_positions'] ) && is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
-
-            if ( $user_id <= 0 || ! get_userdata( $user_id ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid member to assign to the Board.</div>';
-            }
-
-            if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
-                sywat_sync_user_board_roles( $user_id, $positions );
-            }
-            
-            if ( empty( $positions ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions and officer roles removed for member.</div>';
-            }
-
-            $user_obj = get_userdata( $user_id );
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated and user roles automatically synchronized for "<strong>' . esc_html( $user_obj->display_name ) . '</strong>"!</div>';
-        }
-
-        // 9. REMOVE BOARD MEMBER ASSIGNMENT
-        if ( $action === 'remove_board_member' ) {
-            $user_id = isset( $_POST['target_user_id'] ) ? intval( $_POST['target_user_id'] ) : 0;
-            $user    = get_userdata( $user_id );
-
-            if ( $user ) {
-                delete_user_meta( $user_id, 'sywat_board_positions' );
-                $user_obj = new WP_User( $user_id );
-                if ( $user_obj->exists() ) {
-                    $officer_roles = array(
-                        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
-                        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
-                        'tfaa_tournament_director', 'tfaa_field_governor'
-                    );
-                    foreach ( $officer_roles as $o_role ) {
-                        if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
-                            $user_obj->remove_role( $o_role );
-                        }
-                    }
-                }
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">"<strong>' . esc_html( $user->display_name ) . '</strong>" has been removed from the Board of Directors and board roles revoked.</div>';
-            }
-        }
-
-        // 10. TRANSFER / MERGE STANDALONE PRIMARY ACCOUNT OR UNASSIGNED POOL ARCHER INTO TARGET HOUSEHOLD
-        if ( $action === 'transfer_household_member' ) {
-            if ( ! current_user_can( 'administrator' ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators can merge or transfer member accounts.</div>';
-            }
-
-            $source_user_id   = isset( $_POST['source_user_id'] ) ? intval( $_POST['source_user_id'] ) : 0;
-            $target_head_id   = isset( $_POST['target_head_id'] ) ? intval( $_POST['target_head_id'] ) : 0;
-            $target_system_id = isset( $_POST['target_system_id'] ) ? sanitize_text_field( $_POST['target_system_id'] ) : '';
-
-            if ( $target_head_id <= 0 ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid target Head of Household.</div>';
-            }
-
-            $tgt_user = get_userdata( $target_head_id );
-            if ( ! $tgt_user ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified target Head of Household account does not exist.</div>';
-            }
-
-            // OPTION A: Standalone WP_User Account Migration
-            if ( $source_user_id > 0 ) {
-                if ( $source_user_id === $target_head_id ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Source member cannot be transferred to their own household.</div>';
-                }
-
-                $src_user = get_userdata( $source_user_id );
-                if ( ! $src_user ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Specified source user account does not exist.</div>';
-                }
-
-                $src_fname = get_user_meta( $source_user_id, 'first_name', true ) ? get_user_meta( $source_user_id, 'first_name', true ) : $src_user->first_name;
-                $src_lname = get_user_meta( $source_user_id, 'last_name', true ) ? get_user_meta( $source_user_id, 'last_name', true ) : $src_user->last_name;
-
-                $dep_payload = array(
-                    'first_name'      => $src_fname,
-                    'last_name'       => $src_lname,
-                    'email'           => $src_user->user_email,
-                    'phone'           => get_user_meta( $source_user_id, 'sywat_phone', true ),
-                    'gender'          => get_user_meta( $source_user_id, 'sywat_gender', true ),
-                    'is_pro'          => get_user_meta( $source_user_id, 'sywat_is_pro', true ),
-                    'dob'             => get_user_meta( $source_user_id, 'sywat_dob', true ),
-                    'accommodations'  => get_user_meta( $source_user_id, 'sywat_accommodations', true ),
-                    'nfaa_number'     => get_user_meta( $source_user_id, 'sywat_nfaa_number', true ),
-                    'nfaa_expiration' => get_user_meta( $source_user_id, 'sywat_nfaa_expiration', true ),
-                    'address_1'       => get_user_meta( $source_user_id, 'sywat_address_1', true ),
-                    'address_2'       => get_user_meta( $source_user_id, 'sywat_address_2', true ),
-                    'city'            => get_user_meta( $source_user_id, 'sywat_city', true ),
-                    'state'           => get_user_meta( $source_user_id, 'sywat_state', true ),
-                    'zip'             => get_user_meta( $source_user_id, 'sywat_zip', true ),
-                );
-
-                if ( function_exists( 'sywat_add_household_dependent' ) ) {
-                    $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
-                    if ( is_wp_error( $res ) ) {
-                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                    }
-
-                    require_once ABSPATH . 'wp-admin/includes/user.php';
-                    wp_delete_user( $source_user_id );
-                    wp_cache_flush();
-
-                    return sprintf(
-                        '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>%s %s</strong> successfully transferred to <strong>%s</strong>\'s household roster! Redundant standalone account merged.</div>',
-                        esc_html( $src_fname ),
-                        esc_html( $src_lname ),
-                        esc_html( $tgt_user->display_name )
-                    );
-                }
-            }
-
-            // OPTION B: Unassigned Pool Archer Migration
-            if ( ! empty( $target_system_id ) ) {
-                $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
-                if ( is_array( $unassigned_pool ) && isset( $unassigned_pool[ $target_system_id ] ) ) {
-                    $dep_payload = $unassigned_pool[ $target_system_id ];
-                    $fn          = isset( $dep_payload['first_name'] ) ? $dep_payload['first_name'] : '';
-                    $ln          = isset( $dep_payload['last_name'] ) ? $dep_payload['last_name'] : '';
-
-                    if ( function_exists( 'sywat_add_household_dependent' ) ) {
-                        $res = sywat_add_household_dependent( $target_head_id, $dep_payload );
-                        if ( is_wp_error( $res ) ) {
-                            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
-                        }
-
-                        // Clean up unassigned pool record
-                        unset( $unassigned_pool[ $target_system_id ] );
-                        update_option( 'sywat_unassigned_archers', $unassigned_pool );
-
-                        return sprintf(
-                            '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 Unassigned archer <strong>%s %s</strong> linked to <strong>%s</strong>\'s household roster successfully!</div>',
-                            esc_html( $fn ),
-                            esc_html( $ln ),
-                            esc_html( $tgt_user->display_name )
-                        );
-                    }
-                }
-            }
-        }
-
-        return '';
-    }
-}
-
-if ( ! function_exists( 'sywat_ajax_search_head_of_households' ) ) {
-    /**
-     * AJAX Endpoint: Autocomplete Head of Household Search Engine
-     * Queries primary WP_User accounts matching term for dynamic target Head selection.
-     */
-    function sywat_ajax_search_head_of_households() {
-        if ( ! isset( $_GET['sywat_nonce'] ) || ! wp_verify_nonce( $_GET['sywat_nonce'], 'sywat_desk_action' ) ) {
-            if ( ob_get_length() ) ob_clean();
-            wp_send_json_error( array( 'message' => 'Security check failed.' ) );
-        }
-
-        $term = isset( $_GET['term'] ) ? sanitize_text_field( trim( $_GET['term'] ) ) : '';
-        if ( strlen( $term ) < 2 ) {
-            if ( ob_get_length() ) ob_clean();
-            wp_send_json_success( array() );
-        }
-
-        $results = array();
-        $members = function_exists( 'sywat_get_all_tfaa_members' ) ? sywat_get_all_tfaa_members() : array();
-
-        if ( is_array( $members ) ) {
-            foreach ( $members as $m ) {
-                if ( ! $m instanceof WP_User ) continue;
-                $nfaa_id = get_user_meta( $m->ID, 'sywat_nfaa_number', true );
-                $search_blob = strtolower( $m->display_name . ' ' . $m->user_email . ' ' . $m->first_name . ' ' . $m->last_name . ' ' . $nfaa_id );
-
-                if ( stripos( $search_blob, strtolower( $term ) ) !== false ) {
-                    $results[] = array(
-                        'user_id'      => intval( $m->ID ),
-                        'display_name' => $m->display_name,
-                        'email'        => $m->user_email,
-                        'nfaa_number'  => ! empty( $nfaa_id ) ? $nfaa_id : 'No NFAA ID',
-                    );
-                }
-            }
-        }
-
-        if ( ob_get_length() ) ob_clean();
-        wp_send_json_success( array_slice( $results, 0, 10 ) );
-    }
-}
-
-add_action( 'wp_ajax_sywat_search_head_of_households', 'sywat_ajax_search_head_of_households' );
-
-if ( ! function_exists( 'sywat_ajax_search_unassigned_archers' ) ) {
-    /**
-     * AJAX Endpoint: Autocomplete Archer Search Engine
-     * Queries standalone archers and unassigned pool items matching term for dynamic household link autocomplete.
-     */
-    function sywat_ajax_search_unassigned_archers() {
-        if ( ! isset( $_GET['sywat_nonce'] ) || ! wp_verify_nonce( $_GET['sywat_nonce'], 'sywat_desk_action' ) ) {
-            if ( ob_get_length() ) ob_clean();
-            wp_send_json_error( array( 'message' => 'Security check failed.' ) );
-        }
-
-        $term = isset( $_GET['term'] ) ? sanitize_text_field( trim( $_GET['term'] ) ) : '';
-        if ( strlen( $term ) < 2 ) {
-            if ( ob_get_length() ) ob_clean();
-            wp_send_json_success( array() );
-        }
-
-        $results = array();
-        
-        // Search unassigned pool
-        $pool = get_option( 'sywat_unassigned_archers', array() );
-        if ( is_array( $pool ) ) {
-            foreach ( $pool as $sys_id => $item ) {
-                $fn = isset( $item['first_name'] ) ? $item['first_name'] : '';
-                $ln = isset( $item['last_name'] ) ? $item['last_name'] : '';
-                $name = trim( $fn . ' ' . $ln );
-                if ( stripos( $name, $term ) !== false || stripos( isset( $item['nfaa_number'] ) ? $item['nfaa_number'] : '', $term ) !== false ) {
-                    $results[] = array(
-                        'system_id'       => $sys_id,
-                        'first_name'      => $fn,
-                        'last_name'       => $ln,
-                        'dob'             => isset( $item['dob'] ) ? $item['dob'] : '',
-                        'gender'          => isset( $item['gender'] ) ? $item['gender'] : 'unassigned',
-                        'nfaa_number'     => isset( $item['nfaa_number'] ) ? $item['nfaa_number'] : '',
-                        'nfaa_expiration' => isset( $item['nfaa_expiration'] ) ? $item['nfaa_expiration'] : '',
-                        'source'          => 'unassigned_pool',
-                    );
-                }
-            }
-        }
-
-        if ( ob_get_length() ) ob_clean();
-        wp_send_json_success( array_slice( $results, 0, 10 ) );
-    }
-}
-
-add_action( 'wp_ajax_sywat_search_unassigned_archers', 'sywat_ajax_search_unassigned_archers' );
-
-if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
-    /**
-     * AJAX Endpoint: Chunked Protected Test Data Purge Processor
-     * Deletes test accounts in batches of 100 while returning percentage updates to the client progress bar.
-     * Enforces output buffer clearing to prevent stray HTML/script output from polluting the JSON stream.
-     */
-    function sywat_ajax_purge_test_members_chunk() {
-        if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) {
-            if ( ob_get_length() ) {
-                ob_clean();
-            }
-            wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page and try again.' ) );
-        }
-
-        if ( ! current_user_can( 'administrator' ) ) {
-            if ( ob_get_length() ) {
-                ob_clean();
-            }
-            wp_send_json_error( array( 'message' => 'Access denied. Only administrators can execute batch data purges.' ) );
-        }
-
-        require_once ABSPATH . 'wp-admin/includes/user.php';
-        global $wpdb;
-
-        $user_id     = get_current_user_id();
-        $queue_key   = 'sywat_purge_queue_' . $user_id;
-        $meta_key    = 'sywat_purge_meta_' . $user_id;
-        $chunk       = isset( $_POST['chunk'] ) ? intval( $_POST['chunk'] ) : 1;
-        $reset_queue = isset( $_POST['reset'] ) && $_POST['reset'] === 'yes';
-
-        if ( $chunk === 1 || $reset_queue || get_transient( $queue_key ) === false ) {
-            $protected_map = function_exists( 'sywat_get_protected_user_map' ) ? sywat_get_protected_user_map() : array();
-            $all_user_ids  = $wpdb->get_col( "SELECT ID FROM {$wpdb->users}" );
-            $purge_queue   = array();
-            $protected_cnt = 0;
-
-            if ( ! empty( $all_user_ids ) ) {
-                foreach ( $all_user_ids as $uid_raw ) {
-                    $uid = intval( $uid_raw );
-                    if ( isset( $protected_map[ $uid ] ) ) {
-                        $protected_cnt++;
-                    } else {
-                        $purge_queue[] = $uid;
-                    }
-                }
-            }
-
-            set_transient( $queue_key, $purge_queue, HOUR_IN_SECONDS );
-            set_transient( $meta_key, array(
-                'total_purgeable' => count( $purge_queue ),
-                'protected_count' => $protected_cnt,
-                'total_deleted'   => 0,
-            ), HOUR_IN_SECONDS );
-        }
-
-        $purge_queue = get_transient( $queue_key );
-        $meta        = get_transient( $meta_key );
-
-        if ( ! is_array( $purge_queue ) || ! is_array( $meta ) ) {
-            if ( ob_get_length() ) {
-                ob_clean();
-            }
-            wp_send_json_error( array( 'message' => 'Purge state lost or expired. Please reload and try again.' ) );
-        }
-
-        $total_purgeable = intval( $meta['total_purgeable'] );
-        $protected_count = intval( $meta['protected_count'] );
-        $total_deleted   = intval( $meta['total_deleted'] );
-
-        if ( empty( $purge_queue ) ) {
-            delete_transient( $queue_key );
-            delete_transient( $meta_key );
-            wp_cache_flush();
-
-            if ( ob_get_length() ) {
-                ob_clean();
-            }
-            wp_send_json_success( array(
-                'finished'        => true,
-                'deleted_chunk'   => 0,
-                'total_deleted'   => $total_deleted,
-                'total_records'   => $total_purgeable,
-                'protected_count' => $protected_count,
-                'remaining'       => 0,
-                'percent'         => 100,
-                'message'         => sprintf( '🗑️ Batch Purge Complete! Deleted %d test member accounts. Protected %d accounts.', $total_deleted, $protected_count ),
-            ) );
-        }
-
-        $limit     = 100;
-        $batch_ids = array_splice( $purge_queue, 0, $limit );
-
-        wp_suspend_cache_invalidation( true );
-        remove_all_actions( 'delete_user' );
-        remove_all_actions( 'deleted_user' );
-
-        $wpdb->query( 'START TRANSACTION' );
-        $chunk_deleted = 0;
-
-        foreach ( $batch_ids as $uid ) {
-            if ( wp_delete_user( $uid ) ) {
-                $chunk_deleted++;
-            }
-        }
-
-        $wpdb->query( 'COMMIT' );
-        wp_suspend_cache_invalidation( false );
-
-        $new_total_deleted = $total_deleted + $chunk_deleted;
-        $remaining         = count( $purge_queue );
-        $finished          = ( $remaining === 0 );
-
-        set_transient( $queue_key, $purge_queue, HOUR_IN_SECONDS );
-        $meta['total_deleted'] = $new_total_deleted;
-        set_transient( $meta_key, $meta, HOUR_IN_SECONDS );
-
-        if ( $finished ) {
-            delete_transient( $queue_key );
-            delete_transient( $meta_key );
-            wp_cache_flush();
-        }
-
-        $percent = $total_purgeable > 0 ? min( 100, round( ( $new_total_deleted / $total_purgeable ) * 100 ) ) : 100;
-
-        if ( ob_get_length() ) {
-            ob_clean();
-        }
-        wp_send_json_success( array(
-            'finished'        => $finished,
-            'deleted_chunk'   => $chunk_deleted,
-            'total_deleted'   => $new_total_deleted,
-            'total_records'   => $total_purgeable,
-            'protected_count' => $protected_count,
-            'remaining'       => $remaining,
-            'percent'         => $percent,
-            'message'         => $finished 
-                ? sprintf( '🗑️ Batch Purge Complete! Deleted %d test member accounts. Protected %d accounts.', $new_total_deleted, $protected_count )
-                : sprintf( 'Purged %d of %d accounts (%d%%)', $new_total_deleted, $total_purgeable, $percent ),
-        ) );
-    }
-}
-
-add_action( 'wp_ajax_sywat_purge_test_members_chunk', 'sywat_ajax_purge_test_members_chunk' );
