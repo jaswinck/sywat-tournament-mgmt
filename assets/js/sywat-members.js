@@ -4,7 +4,7 @@
  * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, Household Link Overlays, Edit Board Member Position Overlays, Head of Household Edit Overlays with URL query state preservation, and Collapsible Standalone Account Conversion Drawers), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
  * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.2.0
  */
 
 /**
@@ -297,6 +297,7 @@ function sywatCloseEditPrimaryModal() {
     if (modal) {
         modal.classList.remove('active');
     }
+    // We intentionally DO NOT strip URL parameters here so the dashboard state is preserved.
 }
 
 // 3. Add Family Member Sub-Profile Modal
@@ -320,6 +321,9 @@ function sywatCloseEditDependentModal() {
     if (modal) {
         modal.classList.remove('active');
     }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('edit_system_id');
+    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 5. Legacy Edit Standalone Member Profile Modal Cleanup
@@ -328,6 +332,11 @@ function sywatCloseEditMemberModal() {
     if (modal) {
         modal.classList.remove('active');
     }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('edit_member_id');
+    url.searchParams.delete('edit_system_id');
+    url.searchParams.delete('action_mode');
+    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 6. Assign Board Member Modal
@@ -351,6 +360,10 @@ function sywatCloseEditBoardModal() {
     if (modal) {
         modal.classList.remove('active');
     }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('edit_board_id');
+    url.searchParams.delete('edit_board_user_id');
+    window.history.replaceState({}, document.title, url.toString());
 }
 
 // 8. Historical Archers Batch Spreadsheet Import Modal
