@@ -5,7 +5,7 @@
  * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter, and household sub-profile management utilities.
  * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -189,8 +189,15 @@ if ( ! function_exists( 'sywat_get_user_board_position_labels' ) ) {
  * Sort board member record array by strict TFAA organizational hierarchy rank.
  * Highest position rank wins when a member holds multiple positions.
  *
- * Order: President (1), Vice President (2), Secretary (3), Treasurer (4),
- * Social Media (5), Webmaster (6), Tournament Director (7), Field Governors 1-7 (8-14).
+ * Hierarchy Order:
+ * 1. President (Weight 1)
+ * 2. Vice President (Weight 2)
+ * 3. Secretary (Weight 3)
+ * 4. Treasurer (Weight 4)
+ * 5. Social Media (Weight 5)
+ * 6. Webmaster (Weight 6)
+ * 7. Tournament Director (Weight 7)
+ * 8-14. Field Governors District 1 through 7 (Weights 8 - 14)
  *
  * @param array $board_members Array of board member objects or associative arrays.
  * @return array Sorted board members array.
@@ -201,7 +208,7 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
             return array();
         }
 
-        // Canonical hierarchy weight map for executive officers
+        // Executive Officer canonical rank weights
         $base_weights = array(
             'tfaa_president'             => 1,  'president'           => 1,
             'tfaa_vice_president'        => 2,  'vice_president'      => 2,
@@ -217,22 +224,21 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
                 $id  = is_object( $item ) ? ( isset( $item->ID ) ? $item->ID : 0 ) : ( isset( $item['ID'] ) ? $item['ID'] : 0 );
                 $pos = is_object( $item ) && isset( $item->positions ) ? (array) $item->positions : ( is_array( $item ) && isset( $item['positions'] ) ? (array) $item['positions'] : array() );
 
-                // Fallback to meta array and roles if explicitly passed positions array is empty
-                if ( empty( $pos ) && $id > 0 ) {
+                // Fallback to user meta & roles if position array is missing
+                if ( $id > 0 ) {
                     $meta_pos = get_user_meta( $id, 'sywat_board_positions', true );
                     if ( ! empty( $meta_pos ) && is_array( $meta_pos ) ) {
-                        $pos = $meta_pos;
-                    } else {
-                        $u_obj = get_userdata( $id );
-                        $pos   = $u_obj ? (array) $u_obj->roles : array();
+                        $pos = array_merge( $pos, $meta_pos );
                     }
-                }
-
-                // Append human-readable position labels if user ID is present
-                if ( $id > 0 && function_exists( 'sywat_get_user_board_position_labels' ) ) {
-                    $formatted_labels = sywat_get_user_board_position_labels( $id );
-                    if ( ! empty( $formatted_labels ) ) {
-                        $pos = array_merge( $pos, array_keys( $formatted_labels ), array_values( $formatted_labels ) );
+                    $u_obj = get_userdata( $id );
+                    if ( $u_obj && ! empty( $u_obj->roles ) ) {
+                        $pos = array_merge( $pos, (array) $u_obj->roles );
+                    }
+                    if ( function_exists( 'sywat_get_user_board_position_labels' ) ) {
+                        $formatted_labels = sywat_get_user_board_position_labels( $id );
+                        if ( ! empty( $formatted_labels ) ) {
+                            $pos = array_merge( $pos, array_keys( $formatted_labels ), array_values( $formatted_labels ) );
+                        }
                     }
                 }
 
@@ -240,21 +246,21 @@ if ( ! function_exists( 'sywat_sort_board_members_by_hierarchy' ) ) {
                 foreach ( $pos as $p ) {
                     $p_clean = strtolower( trim( (string) $p ) );
 
-                    // Check Executive / Officer base weights (Weights 1 - 7)
+                    // Evaluate Executive Officers (Weights 1 - 7)
                     if ( isset( $base_weights[$p_clean] ) && $base_weights[$p_clean] < $min_weight ) {
                         $min_weight = $base_weights[$p_clean];
                         continue;
                     }
 
-                    // Check Field Governor District 1 - 7 pattern matches (Weights 8 - 14)
+                    // Evaluate Field Governor Districts 1 - 7 (Weights 8 - 14)
                     if ( preg_match( '/(?:field[_\-\s]*governor|district)[_\-\s]*([1-7])/i', $p_clean, $matches ) ) {
                         $district_num = intval( $matches[1] );
-                        $dist_weight  = 7 + $district_num; // District 1 = 8, District 7 = 14
+                        $dist_weight  = 7 + $district_num; // District 1 = 8 ... District 7 = 14
                         if ( $dist_weight < $min_weight ) {
                             $min_weight = $dist_weight;
                         }
                     } elseif ( strpos( $p_clean, 'field_governor' ) !== false || strpos( $p_clean, 'governor' ) !== false ) {
-                        // Generic Field Governor fallback (Weight 15)
+                        // Generic Field Governor Fallback (Weight 15)
                         if ( 15 < $min_weight ) {
                             $min_weight = 15;
                         }
