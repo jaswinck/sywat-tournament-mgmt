@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated board position role-syncing, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits, high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 4.6.0
+ * Version: 4.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -487,6 +487,23 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
                 $user_obj = new WP_User( $user_id );
                 if ( $user_obj->exists() && ! empty( $submitted_roles ) ) {
+                    // Protected Board Roles List
+                    $officer_roles = array(
+                        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+                        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+                        'tfaa_tournament_director', 'tfaa_field_governor'
+                    );
+
+                    // Preserve active board roles based on user's assigned board positions
+                    $active_board_pos = get_user_meta( $user_id, 'sywat_board_positions', true );
+                    if ( ! empty( $active_board_pos ) && is_array( $active_board_pos ) ) {
+                        foreach ( $officer_roles as $o_role ) {
+                            if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $submitted_roles, true ) ) {
+                                $submitted_roles[] = $o_role;
+                            }
+                        }
+                    }
+
                     foreach ( (array) $user_obj->roles as $old_role ) {
                         if ( ! in_array( $old_role, $submitted_roles, true ) ) {
                             $user_obj->remove_role( $old_role );
@@ -684,10 +701,22 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
 
             $user_obj = new WP_User( $user_id );
+            $officer_roles = array(
+                'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+                'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+                'tfaa_tournament_director', 'tfaa_field_governor'
+            );
 
             if ( empty( $positions ) ) {
                 delete_user_meta( $user_id, 'sywat_board_positions' );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions removed for member.</div>';
+                if ( $user_obj->exists() ) {
+                    foreach ( $officer_roles as $o_role ) {
+                        if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
+                            $user_obj->remove_role( $o_role );
+                        }
+                    }
+                }
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions and officer roles removed for member.</div>';
             }
 
             // Save position meta array
@@ -695,7 +724,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
             // Single-Action Role Binding: Automate WordPress User Role sync from assigned Board Positions
             if ( $user_obj->exists() ) {
-                $pos_to_role_map = array(
+                $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array(
                     'tfaa_president'             => 'tfaa_president',
                     'president'                  => 'tfaa_president',
                     'tfaa_vice_president'        => 'tfaa_vice_president',
@@ -714,20 +743,27 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 );
 
                 // Collect target officer/governor roles matching assigned positions
-                $target_roles = array( 'tfaa_member' ); // Baseline member role
+                $target_board_roles = array();
                 foreach ( $positions as $p_key ) {
                     $p_clean = strtolower( trim( $p_key ) );
                     if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
-                        $target_roles[] = $pos_to_role_map[ $p_clean ];
+                        $target_board_roles[] = $pos_to_role_map[ $p_clean ];
                     } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
-                        $target_roles[] = 'tfaa_field_governor';
+                        $target_board_roles[] = 'tfaa_field_governor';
                     }
                 }
 
-                // Automatically grant required roles to user object
-                foreach ( array_unique( $target_roles ) as $r_slug ) {
+                // Add newly assigned board roles
+                foreach ( array_unique( $target_board_roles ) as $r_slug ) {
                     if ( ! in_array( $r_slug, (array) $user_obj->roles, true ) ) {
                         $user_obj->add_role( $r_slug );
+                    }
+                }
+
+                // Remove any officer roles no longer matching assigned positions
+                foreach ( $officer_roles as $o_role ) {
+                    if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $target_board_roles, true ) ) {
+                        $user_obj->remove_role( $o_role );
                     }
                 }
             }
@@ -742,7 +778,20 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
 
             if ( $user ) {
                 delete_user_meta( $user_id, 'sywat_board_positions' );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">"<strong>' . esc_html( $user->display_name ) . '</strong>" has been removed from the Board of Directors.</div>';
+                $user_obj = new WP_User( $user_id );
+                if ( $user_obj->exists() ) {
+                    $officer_roles = array(
+                        'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+                        'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+                        'tfaa_tournament_director', 'tfaa_field_governor'
+                    );
+                    foreach ( $officer_roles as $o_role ) {
+                        if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
+                            $user_obj->remove_role( $o_role );
+                        }
+                    }
+                }
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">"<strong>' . esc_html( $user->display_name ) . '</strong>" has been removed from the Board of Directors and board roles revoked.</div>';
             }
         }
 
