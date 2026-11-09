@@ -5,7 +5,7 @@
  * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, board position handling in primary profile forms with automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings), high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 5.2.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -90,6 +90,90 @@ if ( ! function_exists( 'sywat_get_protected_user_map' ) ) {
         }
 
         return $protected_map;
+    }
+}
+
+if ( ! function_exists( 'sywat_sync_user_board_roles' ) ) {
+    /**
+     * Synchronizes WordPress user roles based on assigned TFAA Board Positions.
+     * Acts as the single source of truth for officer role binding across all form submissions.
+     *
+     * @param int   $user_id   WordPress User ID.
+     * @param array $positions Array of board position keys.
+     */
+    function sywat_sync_user_board_roles( $user_id, $positions ) {
+        $user_id = intval( $user_id );
+        if ( $user_id <= 0 ) return;
+
+        $user_obj = new WP_User( $user_id );
+        if ( ! $user_obj->exists() ) return;
+
+        $officer_roles = array(
+            'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
+            'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
+            'tfaa_tournament_director', 'tfaa_field_governor'
+        );
+
+        if ( empty( $positions ) ) {
+            delete_user_meta( $user_id, 'sywat_board_positions' );
+            foreach ( $officer_roles as $o_role ) {
+                if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
+                    $user_obj->remove_role( $o_role );
+                }
+            }
+            return;
+        }
+
+        update_user_meta( $user_id, 'sywat_board_positions', $positions );
+
+        $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array(
+            'tfaa_president'             => 'tfaa_president',
+            'president'                  => 'tfaa_president',
+            'tfaa_vice_president'        => 'tfaa_vice_president',
+            'vice_president'             => 'tfaa_vice_president',
+            'tfaa_secretary'             => 'tfaa_secretary',
+            'secretary'                  => 'tfaa_secretary',
+            'tfaa_treasurer'             => 'tfaa_treasurer',
+            'treasurer'                  => 'tfaa_treasurer',
+            'tfaa_social_media_director' => 'tfaa_social_media_director',
+            'tfaa_social_media'          => 'tfaa_social_media_director',
+            'social_media'               => 'tfaa_social_media_director',
+            'tfaa_webmaster'             => 'tfaa_webmaster',
+            'webmaster'                  => 'tfaa_webmaster',
+            'tfaa_tournament_director'   => 'tfaa_tournament_director',
+            'tournament_director'        => 'tfaa_tournament_director',
+            'tfaa_field_governor'        => 'tfaa_field_governor',
+            'field_governor'             => 'tfaa_field_governor',
+            'field_governor_1'           => 'tfaa_field_governor',
+            'field_governor_2'           => 'tfaa_field_governor',
+            'field_governor_3'           => 'tfaa_field_governor',
+            'field_governor_4'           => 'tfaa_field_governor',
+            'field_governor_5'           => 'tfaa_field_governor',
+            'field_governor_6'           => 'tfaa_field_governor',
+            'field_governor_7'           => 'tfaa_field_governor',
+        );
+
+        $target_board_roles = array();
+        foreach ( $positions as $p_key ) {
+            $p_clean = strtolower( trim( $p_key ) );
+            if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
+                $target_board_roles[] = $pos_to_role_map[ $p_clean ];
+            } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
+                $target_board_roles[] = 'tfaa_field_governor';
+            }
+        }
+
+        foreach ( array_unique( $target_board_roles ) as $r_slug ) {
+            if ( ! in_array( $r_slug, (array) $user_obj->roles, true ) ) {
+                $user_obj->add_role( $r_slug );
+            }
+        }
+
+        foreach ( $officer_roles as $o_role ) {
+            if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $target_board_roles, true ) ) {
+                $user_obj->remove_role( $o_role );
+            }
+        }
     }
 }
 
@@ -353,28 +437,16 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             }
 
             $new_user_obj = new WP_User( $user_id );
-
-            // Process board position assignments & single-action role binding if present
-            if ( ! empty( $submitted_board ) ) {
-                update_user_meta( $user_id, 'sywat_board_positions', $submitted_board );
-
-                $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array();
-                foreach ( $submitted_board as $p_key ) {
-                    $p_clean = strtolower( trim( $p_key ) );
-                    if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
-                        $submitted_roles[] = $pos_to_role_map[ $p_clean ];
-                    } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
-                        $submitted_roles[] = 'tfaa_field_governor';
-                    }
-                }
-            }
-
             if ( $new_user_obj->exists() ) {
                 $submitted_roles = array_unique( $submitted_roles );
                 $new_user_obj->set_role( reset( $submitted_roles ) );
                 foreach ( $submitted_roles as $r_slug ) {
                     $new_user_obj->add_role( $r_slug );
                 }
+            }
+
+            if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
+                sywat_sync_user_board_roles( $user_id, $submitted_board );
             }
 
             $system_id = function_exists( 'sywat_get_user_system_id' ) ? sywat_get_user_system_id( $user_id ) : '';
@@ -506,13 +578,12 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 // Process assigned board positions input if posted by admin
                 if ( current_user_can( 'administrator' ) && isset( $_POST['board_positions'] ) ) {
                     $submitted_positions = is_array( $_POST['board_positions'] ) ? array_map( 'sanitize_text_field', $_POST['board_positions'] ) : array();
-                    if ( ! empty( $submitted_positions ) ) {
-                        update_user_meta( $user_id, 'sywat_board_positions', $submitted_positions );
-                    } else {
-                        delete_user_meta( $user_id, 'sywat_board_positions' );
+                    if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
+                        sywat_sync_user_board_roles( $user_id, $submitted_positions );
                     }
                 }
 
+                // Sync standard system roles (excluding officer roles mapped by the sync function)
                 $user_obj = new WP_User( $user_id );
                 if ( $user_obj->exists() ) {
                     $officer_roles = array(
@@ -521,45 +592,13 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         'tfaa_tournament_director', 'tfaa_field_governor'
                     );
 
-                    // Collect active board position keys & derive matching target officer roles
-                    $active_board_pos   = get_user_meta( $user_id, 'sywat_board_positions', true );
-                    $target_board_roles = array();
-                    if ( ! empty( $active_board_pos ) && is_array( $active_board_pos ) ) {
-                        $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array();
-                        foreach ( $active_board_pos as $p_key ) {
-                            $p_clean = strtolower( trim( $p_key ) );
-                            if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
-                                $target_board_roles[] = $pos_to_role_map[ $p_clean ];
-                            } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
-                                $target_board_roles[] = 'tfaa_field_governor';
-                            }
-                        }
-                    }
-
-                    // Preserve active officer roles matching board positions
-                    foreach ( array_unique( $target_board_roles ) as $b_role ) {
-                        if ( ! in_array( $b_role, $submitted_roles, true ) ) {
-                            $submitted_roles[] = $b_role;
-                        }
-                    }
-
-                    // If board positions were explicitly posted by admin, revoke unassigned officer roles
-                    if ( current_user_can( 'administrator' ) && isset( $_POST['board_positions'] ) ) {
-                        foreach ( $officer_roles as $o_role ) {
-                            if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $target_board_roles, true ) ) {
-                                $user_obj->remove_role( $o_role );
-                            }
-                        }
-                    }
-
-                    // Synchronize system and officer roles
                     foreach ( (array) $user_obj->roles as $old_role ) {
-                        if ( ! in_array( $old_role, $submitted_roles, true ) && ! in_array( $old_role, $target_board_roles, true ) ) {
+                        if ( ! in_array( $old_role, $submitted_roles, true ) && ! in_array( $old_role, $officer_roles, true ) ) {
                             $user_obj->remove_role( $old_role );
                         }
                     }
                     foreach ( array_unique( $submitted_roles ) as $new_role ) {
-                        if ( ! in_array( $new_role, (array) $user_obj->roles, true ) ) {
+                        if ( ! in_array( $new_role, (array) $user_obj->roles, true ) && ! in_array( $new_role, $officer_roles, true ) ) {
                             $user_obj->add_role( $new_role );
                         }
                     }
@@ -749,83 +788,15 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid member to assign to the Board.</div>';
             }
 
-            $user_obj = new WP_User( $user_id );
-            $officer_roles = array(
-                'tfaa_president', 'tfaa_vice_president', 'tfaa_secretary', 
-                'tfaa_treasurer', 'tfaa_social_media_director', 'tfaa_webmaster', 
-                'tfaa_tournament_director', 'tfaa_field_governor'
-            );
-
+            if ( function_exists( 'sywat_sync_user_board_roles' ) ) {
+                sywat_sync_user_board_roles( $user_id, $positions );
+            }
+            
             if ( empty( $positions ) ) {
-                delete_user_meta( $user_id, 'sywat_board_positions' );
-                if ( $user_obj->exists() ) {
-                    foreach ( $officer_roles as $o_role ) {
-                        if ( in_array( $o_role, (array) $user_obj->roles, true ) ) {
-                            $user_obj->remove_role( $o_role );
-                        }
-                    }
-                }
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions and officer roles removed for member.</div>';
             }
 
-            // Save position meta array
-            update_user_meta( $user_id, 'sywat_board_positions', $positions );
-
-            // Single-Action Role Binding: Automate WordPress User Role sync from assigned Board Positions
-            if ( $user_obj->exists() ) {
-                $pos_to_role_map = function_exists( 'sywat_get_board_position_role_map' ) ? sywat_get_board_position_role_map() : array(
-                    'tfaa_president'             => 'tfaa_president',
-                    'president'                  => 'tfaa_president',
-                    'tfaa_vice_president'        => 'tfaa_vice_president',
-                    'vice_president'             => 'tfaa_vice_president',
-                    'tfaa_secretary'             => 'tfaa_secretary',
-                    'secretary'                  => 'tfaa_secretary',
-                    'tfaa_treasurer'             => 'tfaa_treasurer',
-                    'treasurer'                  => 'tfaa_treasurer',
-                    'tfaa_social_media_director' => 'tfaa_social_media_director',
-                    'tfaa_social_media'          => 'tfaa_social_media_director',
-                    'social_media'               => 'tfaa_social_media_director',
-                    'tfaa_webmaster'             => 'tfaa_webmaster',
-                    'webmaster'                  => 'tfaa_webmaster',
-                    'tfaa_tournament_director'   => 'tfaa_tournament_director',
-                    'tournament_director'        => 'tfaa_tournament_director',
-                    'tfaa_field_governor'        => 'tfaa_field_governor',
-                    'field_governor'             => 'tfaa_field_governor',
-                    'field_governor_1'           => 'tfaa_field_governor',
-                    'field_governor_2'           => 'tfaa_field_governor',
-                    'field_governor_3'           => 'tfaa_field_governor',
-                    'field_governor_4'           => 'tfaa_field_governor',
-                    'field_governor_5'           => 'tfaa_field_governor',
-                    'field_governor_6'           => 'tfaa_field_governor',
-                    'field_governor_7'           => 'tfaa_field_governor',
-                );
-
-                // Collect target officer/governor roles matching assigned positions
-                $target_board_roles = array();
-                foreach ( $positions as $p_key ) {
-                    $p_clean = strtolower( trim( $p_key ) );
-                    if ( isset( $pos_to_role_map[ $p_clean ] ) ) {
-                        $target_board_roles[] = $pos_to_role_map[ $p_clean ];
-                    } elseif ( strpos( $p_clean, 'governor' ) !== false || strpos( $p_clean, 'district' ) !== false ) {
-                        $target_board_roles[] = 'tfaa_field_governor';
-                    }
-                }
-
-                // Add newly assigned board roles
-                foreach ( array_unique( $target_board_roles ) as $r_slug ) {
-                    if ( ! in_array( $r_slug, (array) $user_obj->roles, true ) ) {
-                        $user_obj->add_role( $r_slug );
-                    }
-                }
-
-                // Remove any officer roles no longer matching assigned positions
-                foreach ( $officer_roles as $o_role ) {
-                    if ( in_array( $o_role, (array) $user_obj->roles, true ) && ! in_array( $o_role, $target_board_roles, true ) ) {
-                        $user_obj->remove_role( $o_role );
-                    }
-                }
-            }
-
+            $user_obj = get_userdata( $user_id );
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Board positions updated and user roles automatically synchronized for "<strong>' . esc_html( $user_obj->display_name ) . '</strong>"!</div>';
         }
 
