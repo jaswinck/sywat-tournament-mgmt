@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Modals
  * Path: includes/members/members-modals.php
- * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, archer-specific Unlink & Delete actions, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, compact horizontal action buttons, collapsible Standalone Account conversion drawers, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
+ * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, isolated standalone account conversion drawer, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -555,7 +555,7 @@ function sywat_members_render_modals( $data ) {
         </div>
     <?php endif; ?>
 
-    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE, UNLINK, DELETE & STANDALONE ACCOUNT CONVERSION -->
+    <!-- MODAL 4: EDIT FAMILY SUB-PROFILE & STANDALONE ACCOUNT CONVERSION -->
     <div class="sywat-modal-backdrop <?php echo $open_edit_dependent_modal ? 'active' : ''; ?>" id="sywat_edit_dependent_modal">
         <?php if ( $edit_user_obj && $edit_dep_subprofile ): ?>
             <?php 
@@ -693,27 +693,11 @@ function sywat_members_render_modals( $data ) {
 
                     <hr class="sywat-hr-divider sywat-mt-4 sywat-mb-3">
 
-                    <!-- COMPACT 3-BUTTON ACTION STRIP -->
-                    <div class="sywat-form-grid-3 sywat-mt-3">
-                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Unlink <?php echo esc_js( $d_name ); ?> from this household? Their record will be detached and preserved.');" class="sywat-m-0">
-                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                            <input type="hidden" name="sywat_action" value="unlink_dependent">
-                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-w-100">🔗 Unlink Member</button>
-                        </form>
-
-                        <button type="button" class="sywat-btn sywat-btn-primary sywat-w-100" onclick="sywatTogglePromoteSection()">
-                            🔄 Convert to Standalone
+                    <!-- ISOLATED STANDALONE ACCOUNT PROMOTION BUTTON -->
+                    <div class="sywat-mt-3">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-w-100" onclick="sywatTogglePromoteSection()">
+                            🔄 Convert to Standalone Account (18+)
                         </button>
-
-                        <form method="post" action="<?php echo esc_url( $parent_edit_url ); ?>" onsubmit="return confirm('Are you sure you want to PERMANENTLY DELETE <?php echo esc_js( $d_name ); ?>? This action cannot be undone.');" class="sywat-m-0">
-                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                            <input type="hidden" name="sywat_action" value="delete_member">
-                            <input type="hidden" name="primary_user_id" value="<?php echo $edit_user_obj->ID; ?>">
-                            <input type="hidden" name="target_system_id" value="<?php echo esc_attr( $d_sys_id ); ?>">
-                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-w-100">🗑️ Permanently Delete</button>
-                        </form>
                     </div>
 
                     <!-- COLLAPSIBLE CONVERSION CREDENTIAL DRAWER -->
