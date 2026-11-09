@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust dependent system ID fallback for sub-profile edit links, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -221,7 +221,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
 
                                 <!-- ROWS 2+: HOUSEHOLD DEPENDENTS & LINKED ARCHERS -->
                                 <?php if ( is_array( $linked_dependents ) ): ?>
-                                    <?php foreach ( $linked_dependents as $dep ): ?>
+                                    <?php foreach ( $linked_dependents as $dep_key => $dep ): ?>
                                         <?php 
                                             $dep_fname  = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
                                             $dep_lname  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
@@ -232,7 +232,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                             $dep_is_pro = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes';
                                             $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false, 'has_membership_role' => true );
                                             $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
-                                            $dep_sys_id = isset( $dep['system_id'] ) ? $dep['system_id'] : '';
+                                            $dep_sys_id = ! empty( $dep['system_id'] ) ? $dep['system_id'] : $dep_key;
                                             $dep_n_id   = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
                                             $dep_name   = isset( $dep['display_name'] ) ? $dep['display_name'] : ( ! empty( $dep_fname ) ? trim( $dep_fname . ' ' . $dep_lname ) : 'Unnamed' );
                                             $dep_first  = ! empty( $dep_fname ) ? $dep_fname : $dep_name;
