@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -205,7 +205,7 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
 }
 
 /**
- * Validates uploaded schedule rows against master Shop Directory & prohibits database duplicates.
+ * Validates uploaded schedule rows against master Shop Directory & prohibits database date overlaps.
  *
  * @param array  $raw_rows       Imported raw spreadsheet rows.
  * @param string $target_season  Slug of target season.
@@ -251,7 +251,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             $end_date_formatted   = ! empty( $row['end_date'] ) ? sywat_format_imported_date( $row['end_date'] ) : $start_date_formatted;
 
             // -------------------------------------------------------------
-            // DUPLICATE GUARD: Prohibit duplicate event on same date & shop
+            // OVERLAP GUARD: Prohibit overlapping event dates per host shop
             // -------------------------------------------------------------
             $is_duplicate   = false;
             $duplicate_name = '';
@@ -264,23 +264,28 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 
                 $ex_shop  = ! empty( $ex['shop_name'] ) ? strtolower( trim( $ex['shop_name'] ) ) : ( ! empty( $ex['official_shop_name'] ) ? strtolower( trim( $ex['official_shop_name'] ) ) : '' );
                 $ex_start = ! empty( $ex['start_date'] ) ? $ex['start_date'] : '';
+                $ex_end   = ! empty( $ex['end_date'] ) ? $ex['end_date'] : $ex_start;
 
-                // Match local shop name & start date
+                // Match host shop name & date range overlap (Start1 <= End2 AND End1 >= Start2)
                 if ( ! empty( $raw_host_city ) && isset( $known_shops[ strtolower( $raw_host_city ) ] ) ) {
-                    if ( strtolower( $known_shops[ strtolower( $raw_host_city ) ] ) === $ex_shop && $start_date_formatted === $ex_start ) {
-                        $is_duplicate   = true;
-                        $duplicate_name = isset( $ex['name'] ) ? $ex['name'] : $t_key;
-                        break;
+                    if ( strtolower( $known_shops[ strtolower( $raw_host_city ) ] ) === $ex_shop ) {
+                        if ( $start_date_formatted <= $ex_end && $end_date_formatted >= $ex_start ) {
+                            $is_duplicate   = true;
+                            $duplicate_name = isset( $ex['name'] ) ? $ex['name'] : $t_key;
+                            break;
+                        }
                     }
                 }
 
-                // Match National Event Title & start date
+                // Match National Event Title & date range overlap
                 if ( strcasecmp( $event_type, 'National' ) === 0 && ! empty( $national_title ) ) {
                     $ex_title = isset( $ex['name'] ) ? $ex['name'] : $t_key;
-                    if ( strtolower( trim( $ex_title ) ) === strtolower( trim( $national_title ) ) && $start_date_formatted === $ex_start ) {
-                        $is_duplicate   = true;
-                        $duplicate_name = $ex_title;
-                        break;
+                    if ( strtolower( trim( $ex_title ) ) === strtolower( trim( $national_title ) ) ) {
+                        if ( $start_date_formatted <= $ex_end && $end_date_formatted >= $ex_start ) {
+                            $is_duplicate   = true;
+                            $duplicate_name = $ex_title;
+                            break;
+                        }
                     }
                 }
             }
@@ -289,7 +294,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 $rejected_rows[] = array(
                     'row_num'   => $index + 2,
                     'shop_name' => $raw_host_city,
-                    'reason'    => 'DUPLICATE PROHIBITED: "' . $duplicate_name . '" already exists on ' . $start_date_formatted . ' in season ' . $target_season . '.',
+                    'reason'    => 'DATE OVERLAP PROHIBITED: Host shop already has "' . $duplicate_name . '" scheduled during ' . $start_date_formatted . ' to ' . $end_date_formatted . ' in season ' . $target_season . '.',
                 );
                 continue;
             }
@@ -798,6 +803,37 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
             if ( empty( $resolved_shop_name ) && function_exists( 'sywat_get_tournament_shop_name' ) ) {
                 $resolved_shop_name = sywat_get_tournament_shop_name( array( 'shop_id' => $assigned_shop_id ), $t_name, $all_shops );
+            }
+
+            // -------------------------------------------------------------
+            // MANUAL SAVE OVERLAP GUARD: Prohibit overlapping shop event dates
+            // -------------------------------------------------------------
+            $target_shop_norm = strtolower( trim( $resolved_shop_name ) );
+            foreach ( $tournaments as $ex_key => $ex_data ) {
+                if ( ! empty( $old_name ) && $ex_key === $old_name ) {
+                    continue; // Skip self when editing
+                }
+
+                $ex_season = isset( $ex_data['season_slug'] ) ? $ex_data['season_slug'] : ( isset( $ex_data['season'] ) ? $ex_data['season'] : '' );
+                if ( ! empty( $season_slug ) && ! empty( $ex_season ) && $ex_season !== $season_slug ) {
+                    continue;
+                }
+
+                $ex_shop_id   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $ex_data ) : ( isset( $ex_data['shop_id'] ) ? $ex_data['shop_id'] : '' );
+                $ex_shop_name = isset( $ex_data['shop_name'] ) ? strtolower( trim( $ex_data['shop_name'] ) ) : ( isset( $ex_data['official_shop_name'] ) ? strtolower( trim( $ex_data['official_shop_name'] ) ) : '' );
+
+                $is_same_shop = ( ! empty( $assigned_shop_id ) && $ex_shop_id === $assigned_shop_id ) 
+                             || ( ! empty( $target_shop_norm ) && $ex_shop_name === $target_shop_norm );
+
+                if ( $is_same_shop ) {
+                    $ex_start = isset( $ex_data['start_date'] ) ? $ex_data['start_date'] : '';
+                    $ex_end   = ! empty( $ex_data['end_date'] ) ? $ex_data['end_date'] : $ex_start;
+
+                    if ( ! empty( $ex_start ) && $start_date <= $ex_end && $end_date >= $ex_start ) {
+                        $ex_dates_formatted = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $ex_start, $ex_end ) : $ex_start;
+                        return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Date Overlap Prohibited:</strong> Host shop already has <strong>"' . esc_html( $ex_key ) . '"</strong> scheduled from ' . esc_html( $ex_dates_formatted ) . '. Overlapping event dates are not allowed.</div>';
+                    }
+                }
             }
 
             $formatted_dates = sywat_format_tournament_dates( $start_date, $end_date );
