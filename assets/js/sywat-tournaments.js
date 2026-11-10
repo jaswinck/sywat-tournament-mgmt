@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -50,6 +50,20 @@ function closeAddTournamentModal() {
     const url = new URL(window.location.href);
     url.searchParams.delete('open_add_tournament');
     url.searchParams.delete('edit_tournament_modal');
+    window.history.replaceState({}, document.title, url.toString());
+}
+
+function openAddSeasonModal() {
+    const modal = document.getElementById('sywat_add_season_modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeAddSeasonModal() {
+    const modal = document.getElementById('sywat_add_season_modal');
+    if (modal) modal.classList.remove('active');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('edit_season');
+    url.searchParams.delete('open_add_season');
     window.history.replaceState({}, document.title, url.toString());
 }
 
@@ -239,5 +253,17 @@ document.addEventListener("DOMContentLoaded", function() {
             notice.style.opacity = "0";
             setTimeout(function() { notice.remove(); }, 500);
         }, 5000);
+    }
+
+    const seasonSearchInput = document.getElementById('sywat_season_search_input');
+    if (seasonSearchInput) {
+        seasonSearchInput.addEventListener('input', function() {
+            const filter = this.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('.sywat-season-row');
+            rows.forEach(row => {
+                const searchStr = (row.getAttribute('data-search') || '').toLowerCase();
+                row.style.display = searchStr.includes(filter) ? '' : 'none';
+            });
+        });
     }
 });
