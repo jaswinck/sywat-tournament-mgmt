@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -12,8 +12,9 @@ function sywatMarkNameAsCustomized() {
 }
 
 function sywatAutoGenerateTournamentName() {
-    const shopSelect = document.getElementById('sywat_modal_shop_id');
-    const nameInput  = document.getElementById('sywat_modal_tournament_name');
+    const shopSelect     = document.getElementById('sywat_modal_shop_id');
+    const startDateInput = document.getElementById('sywat_modal_start_date');
+    const nameInput      = document.getElementById('sywat_modal_tournament_name');
 
     if (!shopSelect || !nameInput) return;
 
@@ -24,12 +25,37 @@ function sywatAutoGenerateTournamentName() {
     if (!selectedOption || !selectedOption.value) return;
 
     const shopName = selectedOption.getAttribute('data-name') || selectedOption.text || '';
-    const currentCount = parseInt(selectedOption.getAttribute('data-count') || '0', 10);
-    const nextNum = currentCount + 1;
+    if (!shopName) return;
 
-    if (shopName) {
-        nameInput.value = `${shopName.trim()} - ${nextNum}`;
+    const rawEvents = selectedOption.getAttribute('data-events');
+    let events = [];
+    if (rawEvents) {
+        try {
+            events = JSON.parse(rawEvents);
+        } catch (e) {
+            events = [];
+        }
     }
+
+    const newDate = startDateInput ? startDateInput.value.trim() : '';
+
+    if (!newDate) {
+        // Fallback if no date selected yet
+        const currentCount = parseInt(selectedOption.getAttribute('data-count') || '0', 10);
+        const nextNum = currentCount + 1;
+        nameInput.value = `${shopName.trim()} - ${nextNum}`;
+        return;
+    }
+
+    // Determine chronological sequence position based on start date
+    let seqNum = 1;
+    for (let evt of events) {
+        if (evt.start_date && newDate > evt.start_date) {
+            seqNum++;
+        }
+    }
+
+    nameInput.value = `${shopName.trim()} - ${seqNum}`;
 }
 
 function openAddTournamentModal() {
