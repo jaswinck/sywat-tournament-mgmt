@@ -159,6 +159,9 @@ function openAddTournamentModal() {
     if (nameInput && !nameInput.value) {
         sywatTournamentNameIsCustomized = false;
     }
+
+    // Immediately synchronize capacity inputs with the pre-selected host shop's defaults
+    sywatSyncShopCapacities();
 }
 
 function closeAddTournamentModal() {
