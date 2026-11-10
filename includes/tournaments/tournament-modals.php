@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,7 +59,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             $default_lines = array(
                 array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
                 array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
                 array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
             );
         }
@@ -133,7 +133,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <input type="hidden" name="sywat_action" value="save_tournament">
                         <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
 
-                        <!-- ROW 1 (RE-ORDERED): HOST SHOP (LEFT) | DATES (RIGHT) -->
+                        <!-- ROW 1: HOST SHOP (LEFT) | DATES (RIGHT) -->
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
@@ -187,7 +187,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         </div>
 
-                        <!-- ROW 2 (RE-ORDERED): SEASON (LEFT) | TOURNAMENT NAME WITH LOCK TOGGLE (RIGHT) -->
+                        <!-- ROW 2: SEASON (LEFT) | TOURNAMENT NAME WITH INLINE LOCK (RIGHT) -->
                         <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
                                 <label>Competition Season *</label>
@@ -206,20 +206,25 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
 
                             <div class="sywat-field-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                    <label style="margin: 0;">Tournament Name * <span class="sywat-label-subtext" id="sywat_name_status_label">(Auto-generated)</span></label>
+                                <label>Tournament Name * <span class="sywat-label-subtext" id="sywat_name_status_label">(Auto-generated)</span></label>
+                                <div class="sywat-input-group" style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="text" 
+                                           name="tournament_name" 
+                                           id="sywat_modal_tournament_name" 
+                                           value="<?php echo esc_attr( $edit_t_target ); ?>" 
+                                           placeholder="Select shop and date to auto-generate..." 
+                                           oninput="sywatMarkNameAsCustomized()" 
+                                           <?php echo ( $is_edit_mode ? ( ! $can_manage_seasons ? 'readonly class="sywat-input-disabled-calc"' : '' ) : 'readonly class="sywat-input-disabled-calc"' ); ?> 
+                                           style="flex: 1;"
+                                           required>
                                     <?php if ( ! $is_edit_mode && $can_manage_seasons ): ?>
-                                        <button type="button" id="sywat_toggle_name_lock_btn" class="sywat-btn sywat-btn-xs sywat-btn-secondary" onclick="sywatToggleTournamentNameLock()" style="padding: 2px 8px; font-size: 11px;">🔒 Locked</button>
+                                        <button type="button" 
+                                                id="sywat_toggle_name_lock_btn" 
+                                                class="sywat-btn sywat-btn-secondary" 
+                                                onclick="sywatToggleTournamentNameLock(this)" 
+                                                style="white-space: nowrap; height: 38px; line-height: 1; padding: 0 12px; min-width: 95px;">🔒 Locked</button>
                                     <?php endif; ?>
                                 </div>
-                                <input type="text" 
-                                       name="tournament_name" 
-                                       id="sywat_modal_tournament_name" 
-                                       value="<?php echo esc_attr( $edit_t_target ); ?>" 
-                                       placeholder="Select shop and date to auto-generate..." 
-                                       oninput="sywatMarkNameAsCustomized()" 
-                                       <?php echo ( $is_edit_mode ? ( ! $can_manage_seasons ? 'readonly class="sywat-input-disabled-calc"' : '' ) : 'readonly class="sywat-input-disabled-calc"' ); ?> 
-                                       required>
                             </div>
                         </div>
 
@@ -304,8 +309,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         var sywatNameIsCustomized = false;
         var sywatNameIsUnlocked   = false;
 
-        function sywatToggleTournamentNameLock() {
-            var inputBtn   = document.getElementById('sywat_toggle_name_lock_btn');
+        function sywatToggleTournamentNameLock(btnElem) {
+            var inputBtn   = btnElem || document.getElementById('sywat_toggle_name_lock_btn');
             var inputName  = document.getElementById('sywat_modal_tournament_name');
             var statusLabel= document.getElementById('sywat_name_status_label');
             
@@ -330,6 +335,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 if (statusLabel) statusLabel.innerHTML = '(Auto-generated)';
                 sywatNameIsCustomized = false;
                 sywatAutoGenerateTournamentName(true); // Force re-generate
+            }
+
+            // Immediately clear focus highlight ring from button
+            if (inputBtn && typeof inputBtn.blur === 'function') {
+                inputBtn.blur();
             }
         }
 
