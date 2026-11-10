@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.9.0
+ * Version: 7.10.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -131,16 +131,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         </div>
 
                         <!-- TOP PAGE ACTION CONTROLS & SEASON SWITCHER -->
-                        <div class="sywat-header-inline-controls" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <div class="sywat-header-inline-controls" style="display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap;">
                             <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
                                 <?php
                                 $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : '';
                                 ?>
                                 <form method="get" class="sywat-filter-inline-form" style="margin: 0;">
                                     <input type="hidden" name="page" value="sywat-manage-tournaments">
-                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: row; align-items: center; gap: 6px;">
-                                        <label for="sywat_select_season" style="margin: 0; white-space: nowrap; color: #1e293b;"><strong>Season:</strong></label>
-                                        <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();" style="margin: 0;">
+                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: column; align-items: flex-start;">
+                                        <label for="sywat_select_season" style="display: block; margin-bottom: 4px; text-align: left; font-weight: bold; color: #1e293b; line-height: 1;">Season:</label>
+                                        <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();" style="margin: 0; height: 28px;">
                                             <option value="">All Seasons</option>
                                             <?php foreach ( $seasons as $s_slug => $s_data ): ?>
                                                 <?php 
@@ -155,8 +155,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </form>
                             <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()" style="margin: 0;">Bulk Import Schedule</button>
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()" style="margin: 0;">Add Tournament</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()" style="margin: 0; height: 28px;">Bulk Import Schedule</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()" style="margin: 0; height: 28px;">Add Tournament</button>
                         </div>
                     </div>
 
@@ -164,13 +164,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     <div class="sywat-table-header-bar">
                         <h2>Configured Events</h2>
 
-                        <div class="sywat-table-header-controls" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <div class="sywat-table-header-filters" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <div class="sywat-table-header-controls" style="display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;">
+                            <div class="sywat-table-header-filters" style="display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin: 0;">
                                 <!-- District Dropdown Filter -->
                                 <?php if ( count( $filter_districts ) > 0 ): ?>
-                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: row; align-items: center; gap: 6px;">
-                                        <label for="sywat_tournament_district_filter" style="margin: 0; white-space: nowrap; color: #1e293b;"><strong>District:</strong></label>
-                                        <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()" style="margin: 0;">
+                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: column; align-items: flex-start;">
+                                        <label for="sywat_tournament_district_filter" style="display: block; margin-bottom: 4px; text-align: left; font-weight: bold; color: #1e293b; line-height: 1;">District:</label>
+                                        <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()" style="margin: 0; height: 28px;">
                                             <option value="all">All Districts</option>
                                             <?php foreach ( $filter_districts as $dist ): ?>
                                                 <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
@@ -181,9 +181,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                 <!-- Shop Dropdown Filter -->
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: row; align-items: center; gap: 6px;">
-                                        <label for="sywat_tournament_shop_filter" style="margin: 0; white-space: nowrap; color: #1e293b;"><strong>Shop:</strong></label>
-                                        <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="margin: 0;">
+                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: column; align-items: flex-start;">
+                                        <label for="sywat_tournament_shop_filter" style="display: block; margin-bottom: 4px; text-align: left; font-weight: bold; color: #1e293b; line-height: 1;">Shop:</label>
+                                        <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()" style="margin: 0; height: 28px;">
                                             <option value="all">All Shops</option>
                                             <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
                                                 <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
@@ -192,27 +192,27 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </div>
                                 <?php endif; ?>
 
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }" style="margin: 0;">
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }" style="margin: 0; height: 28px;">
 
-                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()" style="margin: 0;">Clear</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()" style="margin: 0; height: 28px;">Clear</button>
                             </div>
 
-                            <div class="sywat-table-header-actions" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <div class="sywat-table-header-actions" style="display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin: 0;">
                                 <!-- Option 1: Deactivate All Hubs Form -->
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');" style="margin: 0;">
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');" style="margin: 0; display: flex;">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
-                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset" style="margin: 0;">⚪ Deactivate All Hubs</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset" style="margin: 0; height: 28px;">⚪ Deactivate All Hubs</button>
                                     </form>
                                 <?php endif; ?>
 
                                 <!-- Push Standings Form -->
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');" style="margin: 0;">
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');" style="margin: 0; display: flex;">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="global_push_standings">
-                                        <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="margin: 0;">Push Weekend Standings</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push" style="margin: 0; height: 28px;">Push Weekend Standings</button>
                                     </form>
                                 <?php endif; ?>
                             </div>
