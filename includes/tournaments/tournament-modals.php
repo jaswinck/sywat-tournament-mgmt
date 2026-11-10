@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.0.1-DEBUG
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,18 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
     function sywat_render_add_edit_tournament_modal( $data ) {
-        
-        // --- TEMPORARY DEBUG BLOCK START ---
-        echo '<div style="background:#fff; padding:20px; border:3px solid red; position:relative; z-index:99999; color:#000; margin-bottom: 20px;">';
-        echo '<h3>🔍 DEBUG: CINNAMON CREEK SHOP ARRAY</h3><pre>';
-        if ( isset( $data['all_shops']['shop_cinnamon-creek-ranch'] ) ) {
-            print_r( $data['all_shops']['shop_cinnamon-creek-ranch'] );
-        } else {
-            echo "Key 'shop_cinnamon-creek-ranch' not found in all_shops array.";
-        }
-        echo '</pre></div>';
-        // --- TEMPORARY DEBUG BLOCK END ---
-
         $tournaments        = $data['tournaments'];
         $can_manage_seasons = $data['can_manage_seasons'];
         $user_shop_id       = $data['user_shop_id'];
@@ -54,18 +42,20 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             $target_shop_key = reset( $shop_keys );
         }
 
+        $init_shop_data = ( ! empty( $target_shop_key ) && isset( $all_shops[$target_shop_key] ) ) ? $all_shops[$target_shop_key] : array();
+
         if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
-            $shop_caps       = sywat_get_shop_capacity_defaults( $target_shop_key );
+            // Pass the direct array, not the string ID!
+            $shop_caps       = sywat_get_shop_capacity_defaults( $init_shop_data );
             $default_cap_20  = $shop_caps['cap_20yd'];
             $default_cap_cub = $shop_caps['cap_cub'];
         } else {
-            $init_shop_data  = ( ! empty( $target_shop_key ) && isset( $all_shops[$target_shop_key] ) ) ? $all_shops[$target_shop_key] : array();
             $default_cap_20  = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20yd'] ) ) ? $init_shop_data['cap_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_20yd'] ) ) ? $init_shop_data['capacity_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20'] ) ) ? $init_shop_data['cap_20'] : 20 ) );
             $default_cap_cub = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_cub'] ) ) ? $init_shop_data['cap_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_cub'] ) ) ? $init_shop_data['capacity_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cub_cap'] ) ) ? $init_shop_data['cub_cap'] : 5 ) );
         }
 
         if ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
-            $default_lines = sywat_get_default_tournament_lines( $target_shop_key );
+            $default_lines = sywat_get_default_tournament_lines( $init_shop_data );
         } else {
             $default_lines = array(
                 array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
@@ -161,8 +151,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 $s_title     = is_array( $s_name ) && isset( $s_name['name'] ) ? $s_name['name'] : ( is_string( $s_name ) ? $s_name : '' );
 
                                                 if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
-                                                    // Pass $s_id to resolve capacity defaults from master shop directory
-                                                    $s_caps   = sywat_get_shop_capacity_defaults( $s_id );
+                                                    // Pass the array data instead of the string ID!
+                                                    $s_caps   = sywat_get_shop_capacity_defaults( $s_name );
                                                     $s_cap20  = $s_caps['cap_20yd'];
                                                     $s_capcub = $s_caps['cap_cub'];
                                                 } else {
