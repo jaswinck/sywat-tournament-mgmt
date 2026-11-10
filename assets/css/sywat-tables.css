@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.4.0
+   Version: 7.5.0
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -32,12 +32,13 @@
 
 .sywat-header-inline-controls .sywat-field-group label,
 .sywat-table-header-filters .sywat-field-group label {
-    display: block;
-    text-align: left;
-    margin-bottom: 4px;
-    font-weight: 700;
-    color: #1e293b;
-    line-height: 1;
+    display: block !important;
+    text-align: left !important;
+    width: 100% !important;
+    margin-bottom: 4px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    line-height: 1 !important;
 }
 
 /* Base Responsive Tables */
