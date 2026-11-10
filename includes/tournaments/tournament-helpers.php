@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Permission Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 6.3.1
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -282,12 +282,21 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
             $registrations = sywat_get_registrations();
         }
 
-        // Filter Tournaments by Shop Scoping & Collect Unique Shops for Filter Dropdown
+        // Filter Tournaments by Shop Scoping, Season Filtering & Collect Unique Shops
         $scoped_tournaments = array();
         $filter_shops       = array();
 
+        $selected_season = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( $_REQUEST['filter_season'] ) : '';
+
         foreach ( $tournaments as $t_name => $t_data ) {
-            $t_shop = sywat_get_tournament_shop_id( $t_data );
+            $t_shop   = sywat_get_tournament_shop_id( $t_data );
+            $t_season = sywat_get_tournament_season_slug( $t_data );
+
+            // Filter out tournaments that do not match the selected season parameter
+            if ( ! empty( $selected_season ) && $t_season !== $selected_season ) {
+                continue;
+            }
+
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
                 $scoped_tournaments[$t_name] = $t_data;
                 if ( isset( $all_shops[$t_shop]['name'] ) ) {
