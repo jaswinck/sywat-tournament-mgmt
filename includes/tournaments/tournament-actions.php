@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -146,7 +146,7 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
  * @return array                Array of structured line slot definitions.
  */
 if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
-    function sywat_parse_imported_line_schedule( $line_str, $default_20yd = 28, $default_cub = 4 ) {
+    function sywat_parse_imported_line_schedule( $line_str, $default_20yd = 20, $default_cub = 5 ) {
         $lines = array();
         if ( empty( trim( $line_str ) ) ) {
             return array(
@@ -213,15 +213,18 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
  */
 if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
     function sywat_process_schedule_import_rows( $raw_rows, $target_season ) {
-        $all_shops   = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
-        $known_shops = array();
+        $all_shops        = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops', get_option( 'sywat_shops_list', array() ) ) );
+        $known_shops      = array();
+        $shop_lookup_data = array();
 
         // Multi-Key Shop Directory Extraction ('name', 'shop_name', 'title')
         foreach ( $all_shops as $s_id => $s_data ) {
             if ( is_array( $s_data ) ) {
                 $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
                 if ( ! empty( $title ) ) {
-                    $known_shops[ strtolower( trim( $title ) ) ] = trim( $title );
+                    $norm_key                    = strtolower( trim( $title ) );
+                    $known_shops[$norm_key]      = trim( $title );
+                    $shop_lookup_data[$norm_key] = $s_data;
                 }
             }
         }
@@ -310,8 +313,14 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 
             // Branch 2: TFAA State Championship
             if ( strcasecmp( $event_type, 'TFAA State' ) === 0 ) {
-                $norm_shop = strtolower( $raw_host_city );
+                $norm_shop     = strtolower( $raw_host_city );
                 $official_shop = isset( $known_shops[$norm_shop] ) ? $known_shops[$norm_shop] : $raw_host_city;
+                $target_shop   = isset( $shop_lookup_data[$norm_shop] ) ? $shop_lookup_data[$norm_shop] : $raw_host_city;
+                
+                $caps = function_exists( 'sywat_get_shop_capacity_defaults' ) 
+                    ? sywat_get_shop_capacity_defaults( $target_shop ) 
+                    : array( 'cap_20yd' => 20, 'cap_cub' => 5 );
+
                 $valid_tournaments[] = array(
                     'tournament_name'      => 'TFAA State Indoor Championship',
                     'official_shop_name'   => $official_shop,
@@ -319,7 +328,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                     'start_date_formatted' => $start_date_formatted,
                     'end_date_formatted'   => $end_date_formatted,
                     'event_type'           => 'TFAA State',
-                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '' ),
+                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '', $caps['cap_20yd'], $caps['cap_cub'] ),
                     'registration_enabled' => true,
                     'notes'                => $notes,
                 );
@@ -337,6 +346,11 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 $tournament_name = $official_shop . '-' . $shop_counters[$official_shop];
                 $shop_counters[$official_shop]++;
 
+                $target_shop = isset( $shop_lookup_data[$norm_shop] ) ? $shop_lookup_data[$norm_shop] : $official_shop;
+                $caps        = function_exists( 'sywat_get_shop_capacity_defaults' ) 
+                    ? sywat_get_shop_capacity_defaults( $target_shop ) 
+                    : array( 'cap_20yd' => 20, 'cap_cub' => 5 );
+
                 $valid_tournaments[] = array(
                     'tournament_name'      => $tournament_name,
                     'official_shop_name'   => $official_shop,
@@ -344,7 +358,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                     'start_date_formatted' => $start_date_formatted,
                     'end_date_formatted'   => $end_date_formatted,
                     'event_type'           => 'SYWAT',
-                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '' ),
+                    'line_slots'           => sywat_parse_imported_line_schedule( isset( $row['line_times'] ) ? $row['line_times'] : '', $caps['cap_20yd'], $caps['cap_cub'] ),
                     'registration_enabled' => true,
                     'notes'                => $notes,
                 );
