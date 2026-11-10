@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 6.3.0
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -782,14 +782,16 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Save / Edit Tournament Config
         if ( $action === 'save_tournament' ) {
-            $t_name      = sanitize_text_field( $_POST['tournament_name'] );
-            $old_name    = sanitize_text_field( $_POST['original_tournament_name'] );
-            $season_slug = sanitize_text_field( $_POST['season_slug'] );
-            $new_slug    = sanitize_title( $t_name );
+            $t_name        = sanitize_text_field( $_POST['tournament_name'] );
+            $old_name      = sanitize_text_field( $_POST['original_tournament_name'] );
+            $season_slug   = sanitize_text_field( $_POST['season_slug'] );
+            $new_slug      = sanitize_title( $t_name );
 
-            $start_date  = sanitize_text_field( $_POST['start_date'] );
-            $end_date    = sanitize_text_field( $_POST['end_date'] );
+            $start_date    = sanitize_text_field( $_POST['start_date'] );
+            $end_date      = sanitize_text_field( $_POST['end_date'] );
             if ( empty( $end_date ) ) $end_date = $start_date;
+
+            $tfaa_event_id = isset( $_POST['tfaa_event_id'] ) ? sanitize_text_field( trim( $_POST['tfaa_event_id'] ) ) : '';
 
             $assigned_shop_id = $can_manage_seasons ? sanitize_text_field( $_POST['shop_id'] ) : $user_shop_id;
             if ( empty( $assigned_shop_id ) ) $assigned_shop_id = $user_shop_id;
@@ -925,6 +927,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 'season'               => $season_slug,
                 'start_date'           => $start_date,
                 'end_date'             => $end_date,
+                'tfaa_event_id'        => $tfaa_event_id,
                 'lines'                => $new_lines,
                 'scores_published'     => $is_scores_pub,
             );
