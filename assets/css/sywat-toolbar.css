@@ -1,3 +1,8 @@
+/* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
+.sywat-card {
+    min-height: 520px;
+}
+
 /* Top Full-Width Authentication Header */
 .sywat-auth-bar { width: 100%; background: #0f172a; color: #ffffff; margin: 0 0 24px 0; padding: 14px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); box-sizing: border-box; }
 .sywat-auth-bar-inner { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; flex-wrap: wrap; gap: 10px; }
@@ -23,13 +28,13 @@
 .sywat-header-inline-controls form { margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
 
 /* Table Sub-Header Toolbar & Control Alignment Blueprint */
-.sywat-table-header-bar { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+.sywat-table-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; margin-bottom: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; width: 100%; box-sizing: border-box; }
 .sywat-table-header-bar h2 { margin: 0; white-space: nowrap; }
 
 /* Left Toolbar Group (Stacked Status Filter + Inline Stat Badges) */
-.sywat-table-header-left { display: inline-flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.sywat-table-header-left { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
-/* Right Toolbar Group (Search Input + Clear Button) */
+/* Right Toolbar Group (Search Input + Action Buttons) */
 .sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; margin-left: auto; box-sizing: border-box; }
 .sywat-table-header-controls .sywat-field-group, .sywat-table-header-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
 
