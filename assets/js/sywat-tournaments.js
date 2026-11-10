@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -233,12 +233,14 @@ function validateTournamentLines() {
 
 function sywatApplyTournamentFilters() {
     const districtSelect = document.getElementById('sywat_tournament_district_filter');
-    const shopSelect     = document.getElementById('sywat_tournament_shop_filter');
     const searchInput    = document.getElementById('sywat_tournament_search_input');
 
     const districtFilter = districtSelect ? districtSelect.value.toLowerCase().trim() : 'all';
-    const shopFilter     = shopSelect ? shopSelect.value.toLowerCase().trim() : 'all';
     const searchFilter   = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    if (searchInput) {
+        sessionStorage.setItem('sywat_tournament_search', searchInput.value);
+    }
 
     const rows = document.querySelectorAll('.sywat-tournament-row');
 
@@ -249,10 +251,9 @@ function sywatApplyTournamentFilters() {
         const fullText = row.textContent.toLowerCase();
 
         const districtMatch = (districtFilter === 'all' || district === districtFilter || district.includes(districtFilter));
-        const shopMatch     = (shopFilter === 'all' || shop === shopFilter || shop.includes(shopFilter));
         const searchMatch   = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter) || district.includes(searchFilter) || fullText.includes(searchFilter));
 
-        if (districtMatch && shopMatch && searchMatch) {
+        if (districtMatch && searchMatch) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
@@ -262,12 +263,13 @@ function sywatApplyTournamentFilters() {
 
 function sywatResetTournamentFilters() {
     const districtSelect = document.getElementById('sywat_tournament_district_filter');
-    const shopSelect     = document.getElementById('sywat_tournament_shop_filter');
     const searchInput    = document.getElementById('sywat_tournament_search_input');
 
     if (districtSelect) districtSelect.value = 'all';
-    if (shopSelect) shopSelect.value = 'all';
     if (searchInput) searchInput.value = '';
+
+    sessionStorage.removeItem('sywat_tournament_search');
+
     sywatApplyTournamentFilters();
 }
 
@@ -291,5 +293,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 row.style.display = searchStr.includes(filter) ? '' : 'none';
             });
         });
+    }
+
+    // Restore search persistence from sessionStorage
+    const searchInput = document.getElementById('sywat_tournament_search_input');
+    if (searchInput) {
+        const savedSearch = sessionStorage.getItem('sywat_tournament_search');
+        if (savedSearch !== null && savedSearch !== undefined) {
+            searchInput.value = savedSearch;
+            sywatApplyTournamentFilters();
+        }
     }
 });
