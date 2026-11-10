@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-actions.php
  * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and 3-layer TFAA event score scraper.
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -169,7 +169,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $spaced_html = str_replace( '>', '> ', $event_html );
         $spaced_html = str_replace( '<', ' <', $spaced_html );
         $clean_html  = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_html );
-        $lines       = explode( "\n", wp_strip_all_tags( $clean_html ) );
+        $raw_lines   = explode( "\n", wp_strip_all_tags( $clean_html ) );
 
         $parsed_entries = array();
         $curr_div       = '';
@@ -180,8 +180,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $cnt_20yd = 0;
         $cnt_cub  = 0;
 
-        foreach ( $lines as $raw_line ) {
-            $line = trim( preg_replace( '/\s+/', ' ', $raw_line ) );
+        foreach ( $raw_lines as $raw_line ) {
+            // Decode HTML entities and sanitize whitespace
+            $line = trim( preg_replace( '/\s+/', ' ', html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
             if ( empty( $line ) ) continue;
 
             if ( function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
@@ -202,15 +203,15 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 }
             }
 
-            // Match row format: Rank + Space + "Last, First" + Space + Score + (Optional X count)
-            if ( preg_match( '/^\d+\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)\s+(\d{1,3})(?:\s+(\d{1,2})X?)?/i', $line, $matches ) ) {
+            // Match row format: Optional leading non-digits + Rank + Space + "Last, First" + Space + Score + (Optional X count)
+            if ( preg_match( '/(?:^|\s)(\d{1,3})\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)\s+(\d{1,3})(?:\s+(\d{1,2})X?)?/i', $line, $matches ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
-                $raw_name = trim( $matches[1] );
+                $raw_name = trim( $matches[2] );
                 $parts    = explode( ',', $raw_name, 2 );
                 $name     = trim( $parts[1] ) . ' ' . trim( $parts[0] );
-                $score    = intval( $matches[2] );
-                $xs       = isset( $matches[3] ) ? intval( $matches[3] ) : 0;
+                $score    = intval( $matches[3] );
+                $xs       = isset( $matches[4] ) ? intval( $matches[4] ) : 0;
                 $dist     = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
 
                 if ( $dist === 'Cub' ) $cnt_cub++;
