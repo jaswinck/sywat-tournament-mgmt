@@ -5,7 +5,7 @@
  * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.4.0
+ * Version: 5.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -202,7 +202,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="lost_password">
 
-                        <div class="sywat-field-group sywat-mb-3">
+                        <div class="sywat-field-group sywat-auth-field-group">
                             <label>Username or Email Address</label>
                             <input type="text" name="sywat_user_login" required class="sywat-w-100">
                         </div>
@@ -230,12 +230,12 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="rp_key" value="<?php echo esc_attr( $rp_key ); ?>">
                         <input type="hidden" name="rp_login" value="<?php echo esc_attr( $rp_login ); ?>">
 
-                        <div class="sywat-field-group sywat-mb-3">
+                        <div class="sywat-field-group sywat-auth-field-group">
                             <label>New Password</label>
                             <input type="password" name="pass1" required autocomplete="new-password" class="sywat-w-100">
                         </div>
 
-                        <div class="sywat-field-group sywat-mb-3">
+                        <div class="sywat-field-group sywat-auth-field-group">
                             <label>Confirm New Password</label>
                             <input type="password" name="pass2" required autocomplete="new-password" class="sywat-w-100">
                         </div>
@@ -258,12 +258,12 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                         <input type="hidden" name="sywat_auth_action" value="login">
                         <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
 
-                        <div class="sywat-field-group sywat-mb-3">
+                        <div class="sywat-field-group sywat-auth-field-group">
                             <label>Username or Email Address</label>
                             <input type="text" name="sywat_user_login" required autocomplete="username" class="sywat-w-100">
                         </div>
 
-                        <div class="sywat-field-group sywat-mb-3">
+                        <div class="sywat-field-group sywat-auth-field-group">
                             <label>Password</label>
                             <input type="password" name="sywat_user_pass" required autocomplete="current-password" class="sywat-w-100">
                         </div>
