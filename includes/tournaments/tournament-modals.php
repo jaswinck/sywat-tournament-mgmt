@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,7 +168,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                 </div>
                                 <div class="sywat-field-group">
                                     <label>End Date (Optional)</label>
-                                    <input type="date" name="end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
+                                    <input type="date" name="end_date" id="sywat_modal_end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
                                 </div>
                             </div>
                         </div>
