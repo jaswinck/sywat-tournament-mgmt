@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -162,47 +162,51 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <h2>Configured Events</h2>
 
                         <div class="sywat-table-header-controls">
-                            <!-- District Dropdown Filter -->
-                            <?php if ( count( $filter_districts ) > 0 ): ?>
-                                <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
-                                    <option value="all">All Districts</option>
-                                    <?php foreach ( $filter_districts as $dist ): ?>
-                                        <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            <?php endif; ?>
+                            <div class="sywat-table-header-filters">
+                                <!-- District Dropdown Filter -->
+                                <?php if ( count( $filter_districts ) > 0 ): ?>
+                                    <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
+                                        <option value="all">All Districts</option>
+                                        <?php foreach ( $filter_districts as $dist ): ?>
+                                            <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
 
-                            <!-- Shop Dropdown Filter -->
-                            <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
-                                    <option value="all">All Shops</option>
-                                    <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            <?php endif; ?>
+                                <!-- Shop Dropdown Filter -->
+                                <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
+                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
+                                        <option value="all">All Shops</option>
+                                        <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                            <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
 
-                            <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
+                            </div>
 
-                            <!-- Option 1: Deactivate All Hubs Form -->
-                            <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
-                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                    <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
-                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">⚪ Deactivate All Hubs</button>
-                                </form>
-                            <?php endif; ?>
+                            <div class="sywat-table-header-actions">
+                                <!-- Option 1: Deactivate All Hubs Form -->
+                                <?php if ( $can_manage_seasons ): ?>
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
+                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                        <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
+                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">⚪ Deactivate All Hubs</button>
+                                    </form>
+                                <?php endif; ?>
 
-                            <!-- Push Standings Form -->
-                            <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
-                                    <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                    <input type="hidden" name="sywat_action" value="global_push_standings">
-                                    <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
-                                </form>
-                            <?php endif; ?>
+                                <!-- Push Standings Form -->
+                                <?php if ( $can_manage_seasons ): ?>
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                        <input type="hidden" name="sywat_action" value="global_push_standings">
+                                        <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
 
