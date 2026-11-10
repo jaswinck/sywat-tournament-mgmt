@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 6.0.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -400,5 +400,11 @@ document.addEventListener("DOMContentLoaded", function() {
             searchInput.value = savedSearch;
             sywatApplyTournamentFilters();
         }
+    }
+
+    // Automatically synchronize capacity inputs if modal is active on page paint
+    const activeTournModal = document.getElementById('sywat_add_tourn_modal');
+    if (activeTournModal && activeTournModal.classList.contains('active')) {
+        sywatSyncShopCapacities();
     }
 });
