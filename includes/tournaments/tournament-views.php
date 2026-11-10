@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -138,17 +138,20 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 ?>
                                 <form method="get" class="sywat-filter-inline-form">
                                     <input type="hidden" name="page" value="sywat-manage-tournaments">
-                                    <select name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
-                                        <option value="">All Seasons</option>
-                                        <?php foreach ( $seasons as $s_slug => $s_data ): ?>
-                                            <?php 
-                                            $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
-                                            ?>
-                                            <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
-                                                <?php echo esc_html( $s_name ); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="sywat-field-group">
+                                        <label for="sywat_select_season"><strong>Season:</strong></label>
+                                        <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
+                                            <option value="">All Seasons</option>
+                                            <?php foreach ( $seasons as $s_slug => $s_data ): ?>
+                                                <?php 
+                                                $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
+                                                ?>
+                                                <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
+                                                    <?php echo esc_html( $s_name ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </form>
                             <?php endif; ?>
 
@@ -165,25 +168,34 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-table-header-filters">
                                 <!-- District Dropdown Filter -->
                                 <?php if ( count( $filter_districts ) > 0 ): ?>
-                                    <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
-                                        <option value="all">All Districts</option>
-                                        <?php foreach ( $filter_districts as $dist ): ?>
-                                            <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="sywat-field-group">
+                                        <label for="sywat_tournament_district_filter"><strong>District:</strong></label>
+                                        <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
+                                            <option value="all">All Districts</option>
+                                            <?php foreach ( $filter_districts as $dist ): ?>
+                                                <option value="<?php echo esc_attr( strtolower( $dist ) ); ?>"><?php echo esc_html( $dist ); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 <?php endif; ?>
 
                                 <!-- Shop Dropdown Filter -->
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
-                                        <option value="all">All Shops</option>
-                                        <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                            <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="sywat-field-group">
+                                        <label for="sywat_tournament_shop_filter"><strong>Shop:</strong></label>
+                                        <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
+                                            <option value="all">All Shops</option>
+                                            <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
+                                                <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 <?php endif; ?>
 
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <div class="sywat-field-group">
+                                    <label for="sywat_tournament_search_input"><strong>Search:</strong></label>
+                                    <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                </div>
 
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
