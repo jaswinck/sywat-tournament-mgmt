@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -192,10 +192,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </div>
                                 <?php endif; ?>
 
-                                <div class="sywat-field-group">
-                                    <label for="sywat_tournament_search_input"><strong>Search:</strong></label>
-                                    <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                                </div>
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
