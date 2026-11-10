@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.6.0
+ * Version: 5.7.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -11,7 +11,46 @@ function sywatMarkNameAsCustomized() {
     sywatTournamentNameIsCustomized = true;
 }
 
+/**
+ * Calculates and auto-populates the End Date field with the first Sunday on or after the Start Date.
+ */
+function sywatAutoPopulateEndDate() {
+    const startDateInput = document.getElementById('sywat_modal_start_date');
+    const endDateInput   = document.getElementById('sywat_modal_end_date');
+
+    if (!startDateInput || !endDateInput) return;
+
+    const startVal = startDateInput.value.trim();
+    if (!startVal) return;
+
+    const parts = startVal.split('-');
+    if (parts.length !== 3) return;
+
+    const year  = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day   = parseInt(parts[2], 10);
+
+    const startDate = new Date(year, month, day);
+    if (isNaN(startDate.getTime())) return;
+
+    // Day of week: 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+    const dayOfWeek = startDate.getDay();
+    const daysUntilSunday = (7 - dayOfWeek) % 7;
+
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + daysUntilSunday);
+
+    const endYear  = endDate.getFullYear();
+    const endMonth = String(endDate.getMonth() + 1).padStart(2, '0');
+    const endDay   = String(endDate.getDate()).padStart(2, '0');
+
+    endDateInput.value = `${endYear}-${endMonth}-${endDay}`;
+}
+
 function sywatAutoGenerateTournamentName() {
+    // Auto-populate End Date to the first Sunday following Start Date
+    sywatAutoPopulateEndDate();
+
     const shopSelect     = document.getElementById('sywat_modal_shop_id');
     const startDateInput = document.getElementById('sywat_modal_start_date');
     const nameInput      = document.getElementById('sywat_modal_tournament_name');
