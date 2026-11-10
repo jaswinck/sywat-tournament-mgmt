@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -47,9 +47,62 @@ function sywatAutoPopulateEndDate() {
     endDateInput.value = `${endYear}-${endMonth}-${endDay}`;
 }
 
+/**
+ * Retrieves default line capacity limits (20yd and Cub) for the currently selected shop in the modal.
+ */
+function sywatGetSelectedShopCapacities() {
+    const shopSelect = document.getElementById('sywat_modal_shop_id');
+    let cap20 = 20;
+    let capCub = 5;
+
+    if (!shopSelect) {
+        return { cap20, capCub };
+    }
+
+    if (shopSelect.tagName.toLowerCase() === 'select') {
+        const selectedOption = shopSelect.options[shopSelect.selectedIndex];
+        if (selectedOption) {
+            const raw20  = selectedOption.getAttribute('data-cap20');
+            const rawCub = selectedOption.getAttribute('data-capcub');
+            if (raw20)  cap20  = parseInt(raw20, 10) || 20;
+            if (rawCub) capCub = parseInt(rawCub, 10) || 5;
+        }
+    } else if (shopSelect.tagName.toLowerCase() === 'input') {
+        const raw20  = shopSelect.getAttribute('data-cap20');
+        const rawCub = shopSelect.getAttribute('data-capcub');
+        if (raw20)  cap20  = parseInt(raw20, 10) || 20;
+        if (rawCub) capCub = parseInt(rawCub, 10) || 5;
+    }
+
+    return { cap20, capCub };
+}
+
+/**
+ * Updates all repeater table line capacity input fields with the active shop's default limits.
+ */
+function sywatSyncShopCapacities() {
+    const { cap20, capCub } = sywatGetSelectedShopCapacities();
+    const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
+    if (!tableBody) return;
+
+    const cap20Inputs  = tableBody.querySelectorAll('input[name="cap_20yd[]"]');
+    const capCubInputs = tableBody.querySelectorAll('input[name="cap_cub[]"]');
+
+    cap20Inputs.forEach(input => {
+        input.value = cap20;
+    });
+
+    capCubInputs.forEach(input => {
+        input.value = capCub;
+    });
+}
+
 function sywatAutoGenerateTournamentName() {
     // Auto-populate End Date to the first Sunday following Start Date
     sywatAutoPopulateEndDate();
+
+    // Synchronize shooting line capacity inputs with the selected host shop's defaults
+    sywatSyncShopCapacities();
 
     const shopSelect     = document.getElementById('sywat_modal_shop_id');
     const startDateInput = document.getElementById('sywat_modal_start_date');
@@ -194,6 +247,8 @@ function addTournamentLineRow() {
     const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
     if (!tableBody) return;
 
+    const { cap20, capCub } = sywatGetSelectedShopCapacities();
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td>
@@ -213,12 +268,12 @@ function addTournamentLineRow() {
         </td>
         <td>
             <div class="sywat-field-group">
-                <input type="number" name="cap_20yd[]" value="20" min="0" required>
+                <input type="number" name="cap_20yd[]" value="${cap20}" min="0" required>
             </div>
         </td>
         <td>
             <div class="sywat-field-group">
-                <input type="number" name="cap_cub[]" value="5" min="0" required>
+                <input type="number" name="cap_cub[]" value="${capCub}" min="0" required>
             </div>
         </td>
         <td class="sywat-col-center">
