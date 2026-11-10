@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Presentation Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -58,6 +58,7 @@ if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
         }
 
         if ( is_array( $shop_data ) && ! empty( $shop_data ) ) {
+            // 1. Check top-level legacy keys first
             if ( isset( $shop_data['cap_20yd'] ) && ! empty( $shop_data['cap_20yd'] ) ) {
                 $cap_20yd = intval( $shop_data['cap_20yd'] );
             } elseif ( isset( $shop_data['capacity_20yd'] ) && ! empty( $shop_data['capacity_20yd'] ) ) {
@@ -78,6 +79,17 @@ if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
                 $cap_cub = intval( $shop_data['cub_cap'] );
             } elseif ( isset( $shop_data['max_cub'] ) && ! empty( $shop_data['max_cub'] ) ) {
                 $cap_cub = intval( $shop_data['max_cub'] );
+            }
+
+            // 2. Check nested 'default_lines' configuration (Takes precedence)
+            if ( isset( $shop_data['default_lines'] ) && is_array( $shop_data['default_lines'] ) && isset( $shop_data['default_lines'][0] ) ) {
+                $first_line = $shop_data['default_lines'][0];
+                if ( isset( $first_line['cap_20yd'] ) && $first_line['cap_20yd'] !== '' ) {
+                    $cap_20yd = intval( $first_line['cap_20yd'] );
+                }
+                if ( isset( $first_line['cap_cub'] ) && $first_line['cap_cub'] !== '' ) {
+                    $cap_cub = intval( $first_line['cap_cub'] );
+                }
             }
         }
 
