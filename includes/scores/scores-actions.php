@@ -2,7 +2,7 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA event score scraper.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and 3-layer TFAA event score scraper.
  * Author: SYWAT Archery
  * Version: 6.5.0
  */
@@ -47,9 +47,9 @@ if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
 }
 
 /**
- * Core Parser: Scrapes TFAA event results page, registers missing archers,
- * sets checked_in = 1, auto-expands line capacities, enriches gender cache, and injects scores.
- * Uses O(1) single-key hashtable pre-indexing for enterprise batch performance.
+ * Core Parser: Scrapes TFAA event results page using 3-layer precision matching
+ * (Layer 1: Manual Override ID/URL, Layer 2: Season Parameter Filter, Layer 3: Date Range & Title Matching),
+ * registers missing archers, auto-expands line capacities, enriches gender cache, and injects scores.
  *
  * @param string $t_name Target tournament title.
  * @return array Execution response array with success status, count, and message.
@@ -67,9 +67,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         $t_data = $all_tournaments[$t_name];
         $t_slug = sanitize_title( $t_name );
+        $event_url = '';
 
-        // 1. Fetch main TFAA results page to resolve target event URL
-        $results_main_url = 'https://texasfieldarchery.org/results';
         $http_args = array(
             'timeout'   => 25,
             'sslverify' => false,
@@ -78,24 +77,73 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             )
         );
 
-        $main_resp = wp_remote_get( $results_main_url, $http_args );
-        if ( is_wp_error( $main_resp ) ) {
-            return array( 'success' => false, 'message' => 'Failed to reach TFAA site: ' . $main_resp->get_error_message() );
+        // LAYER 1: Check for Manual TFAA Event ID / Direct URL Override
+        $tfaa_override = '';
+        if ( ! empty( $t_data['tfaa_event_id'] ) ) {
+            $tfaa_override = trim( $t_data['tfaa_event_id'] );
+        } elseif ( ! empty( $t_data['tfaa_results_url'] ) ) {
+            $tfaa_override = trim( $t_data['tfaa_results_url'] );
         }
 
-        $main_html = wp_remote_retrieve_body( $main_resp );
-        $event_url = '';
+        if ( ! empty( $tfaa_override ) ) {
+            if ( is_numeric( $tfaa_override ) ) {
+                $event_url = 'https://texasfieldarchery.org/results/' . $tfaa_override;
+            } else {
+                $event_url = ( strpos( $tfaa_override, 'http' ) === 0 ) ? $tfaa_override : 'https://texasfieldarchery.org' . ( strpos( $tfaa_override, '/' ) === 0 ? '' : '/' ) . $tfaa_override;
+            }
+        }
 
-        // Normalize spaces and dashes for fuzzy title matching
-        $clean_t_name = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $t_name ) );
-        
-        if ( preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $main_html, $matches, PREG_SET_ORDER ) ) {
-            foreach ( $matches as $m ) {
-                $link_href = trim( $m[1] );
-                $link_text = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', wp_strip_all_tags( $m[2] ) ) );
-                if ( stripos( $link_text, trim( $clean_t_name ) ) !== false || stripos( trim( $clean_t_name ), $link_text ) !== false ) {
-                    $event_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
-                    break;
+        // LAYERS 2 & 3: Scrape Index with Season Parameter + Date & Title Verification
+        if ( empty( $event_url ) ) {
+            $season_param = '';
+            if ( ! empty( $t_data['season'] ) ) {
+                $season_param = '?season=' . urlencode( trim( $t_data['season'] ) );
+            }
+
+            $results_main_url = 'https://texasfieldarchery.org/results' . $season_param;
+            $main_resp        = wp_remote_get( $results_main_url, $http_args );
+
+            if ( is_wp_error( $main_resp ) ) {
+                return array( 'success' => false, 'message' => 'Failed to reach TFAA site: ' . $main_resp->get_error_message() );
+            }
+
+            $main_html    = wp_remote_retrieve_body( $main_resp );
+            $clean_t_name = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $t_name ) );
+
+            // Parse HTML table rows matching dates + links
+            if ( preg_match_all( '/<tr[^>]*>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>\s*<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $main_html, $matches, PREG_SET_ORDER ) ) {
+                foreach ( $matches as $m ) {
+                    $row_date  = trim( wp_strip_all_tags( $m[1] ) );
+                    $link_href = trim( $m[2] );
+                    $link_text = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', wp_strip_all_tags( $m[3] ) ) );
+
+                    $name_match = ( stripos( $link_text, trim( $clean_t_name ) ) !== false || stripos( trim( $clean_t_name ), $link_text ) !== false );
+                    
+                    // Cross-verify year/month if tournament start_date is set
+                    $date_match = true;
+                    if ( ! empty( $t_data['start_date'] ) ) {
+                        $t_year = date( 'Y', strtotime( $t_data['start_date'] ) );
+                        if ( ! empty( $t_year ) && strpos( $row_date, $t_year ) === false ) {
+                            $date_match = false;
+                        }
+                    }
+
+                    if ( $name_match && $date_match ) {
+                        $event_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
+                        break;
+                    }
+                }
+            }
+
+            // Fallback general link matching if row-based match was omitted
+            if ( empty( $event_url ) && preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $main_html, $matches, PREG_SET_ORDER ) ) {
+                foreach ( $matches as $m ) {
+                    $link_href = trim( $m[1] );
+                    $link_text = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', wp_strip_all_tags( $m[2] ) ) );
+                    if ( stripos( $link_text, trim( $clean_t_name ) ) !== false || stripos( trim( $clean_t_name ), $link_text ) !== false ) {
+                        $event_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
+                        break;
+                    }
                 }
             }
         }
@@ -104,7 +152,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'Could not find a published TFAA results page matching \'' . esc_html( $t_name ) . '\'.' );
         }
 
-        // 2. Fetch specific event detail results page
+        // Fetch target event detail results page
         $event_resp = wp_remote_get( $event_url, $http_args );
         if ( is_wp_error( $event_resp ) ) {
             return array( 'success' => false, 'message' => 'Failed to retrieve event results: ' . $event_resp->get_error_message() );
@@ -117,7 +165,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'TFAA event page has 0 published entries yet.' );
         }
 
-        // 3. Extract division, style, gender, and score rows
+        // Extract division, style, gender, and score rows
         $spaced_html = str_replace( '>', '> ', $event_html );
         $spaced_html = str_replace( '<', ' <', $spaced_html );
         $clean_html  = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_html );
@@ -184,12 +232,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'No valid archer score rows could be extracted from the TFAA page.' );
         }
 
-        // 4. Auto-Expand Line 0 Capacity if incoming counts exceed configured limits
+        // Auto-Expand Line 0 Capacity if incoming counts exceed limits
         $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
         $line_0_idx = ! empty( $t_lines ) ? key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
 
-        // 5. Pre-Fetch and Index Roster Data into O(1) Single-Key Hashtable
+        // Pre-Fetch and Index Roster Data into O(1) Single-Key Hashtable
         $registrations = get_option( 'sywat_registrations', array() );
         if ( ! is_array( $registrations ) ) $registrations = array();
 
@@ -202,7 +250,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) $gender_cache = array();
 
-        // Single-key hashtable lookup map by [normalized_name] -> registration array index
         $reg_lookup = array();
         foreach ( $registrations as $idx => $r ) {
             if ( isset( $r['tournament'], $r['name'] ) && strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) === 0 ) {
@@ -219,7 +266,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm_name = strtolower( trim( $name ) );
             $target_id = '';
 
-            // O(1) Constant-time Hashtable Lookup
             if ( isset( $reg_lookup[$norm_name] ) ) {
                 $r_idx = $reg_lookup[$norm_name];
                 $target_id = $registrations[$r_idx]['id'];
@@ -232,7 +278,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $registrations[$r_idx], false );
                 $master_regs[$target_id] = $registrations[$r_idx];
             } else {
-                // Auto-create missing archer as checked-in walk-in
                 $target_id = uniqid( 'reg_' );
                 $new_reg = array(
                     'id'          => $target_id,
@@ -257,16 +302,13 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $master_regs[$target_id] = $new_reg;
                 $registrations[]         = $new_reg;
 
-                // Update hashtable for subsequent rows
                 $reg_lookup[$norm_name] = count( $registrations ) - 1;
             }
 
-            // Enrich Gender Cache
             if ( ! empty( $entry['gender'] ) ) {
                 $gender_cache[$norm_name] = $entry['gender'];
             }
 
-            // Inject Score & X Count
             $scores[$target_id] = array(
                 'score'    => $entry['score'],
                 'xs'       => $entry['xs'],
@@ -276,7 +318,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $synced_count++;
         }
 
-        // Batch Store Payload Key Updates
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_registrations', $registrations, false );
         update_option( 'sywat_scores_' . $t_slug, $scores, false );
@@ -330,7 +371,6 @@ if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
 
                 update_option( $opt_key, $reg, false );
 
-                // Synchronize single score to master tournament scores hash map
                 $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
                 if ( ! is_array( $scores_map ) ) $scores_map = array();
                 $scores_map[$clean_id] = array(
