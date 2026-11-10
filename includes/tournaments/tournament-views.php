@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.13.0
+ * Version: 7.14.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -77,15 +77,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
         // Build list of unique TFAA districts across scoped tournaments
         $filter_districts = array();
-        foreach ( $scoped_tournaments as $t_info ) {
+        foreach ( $scoped_tournaments as $t_name => $t_info ) {
             $s_id   = sywat_get_tournament_shop_id( $t_info );
             $d_name = '';
 
             if ( ! empty( $s_id ) && isset( $all_shops[$s_id]['district'] ) && ! empty( $all_shops[$s_id]['district'] ) ) {
                 $d_name = $all_shops[$s_id]['district'];
             } else {
-                $target_name = ! empty( $t_info['shop_name'] ) ? $t_info['shop_name'] : ( ! empty( $t_info['official_shop_name'] ) ? $t_info['official_shop_name'] : ( ! empty( $t_info['location_display'] ) ? $t_info['location_display'] : '' ) );
-                $norm_target = strtolower( trim( $target_name ) );
+                $resolved_name = function_exists( 'sywat_get_tournament_shop_name' )
+                    ? sywat_get_tournament_shop_name( $t_info, $t_name, $all_shops )
+                    : ( ! empty( $t_info['shop_name'] ) ? $t_info['shop_name'] : '' );
+                $norm_target = strtolower( trim( $resolved_name ) );
                 if ( ! empty( $norm_target ) && isset( $shop_lookup_map[$norm_target] ) ) {
                     $d_name = $shop_lookup_map[$norm_target]['district'];
                 }
@@ -226,19 +228,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $t_season_slug = sywat_get_tournament_season_slug( $t_data );
                                             $t_season_name = isset( $seasons[$t_season_slug]['name'] ) ? $seasons[$t_season_slug]['name'] : 'Active Season';
                                             
-                                            // Dynamic Host Shop Name & District Resolution
-                                            $t_shop_name = '';
-                                            if ( is_array( $t_data ) && ! empty( $t_data['shop_name'] ) ) {
-                                                $t_shop_name = $t_data['shop_name'];
-                                            } elseif ( is_array( $t_data ) && ! empty( $t_data['official_shop_name'] ) ) {
-                                                $t_shop_name = $t_data['official_shop_name'];
-                                            } elseif ( is_array( $t_data ) && ! empty( $t_data['location_display'] ) ) {
-                                                $t_shop_name = $t_data['location_display'];
-                                            } elseif ( ! empty( $t_shop_id ) && isset( $all_shops[$t_shop_id]['name'] ) ) {
-                                                $t_shop_name = $all_shops[$t_shop_id]['name'];
-                                            } else {
-                                                $t_shop_name = 'Host Archery Shop';
-                                            }
+                                            // Dynamic Host Shop Name Resolution via 4-Tier Waterfall
+                                            $t_shop_name = function_exists( 'sywat_get_tournament_shop_name' )
+                                                ? sywat_get_tournament_shop_name( $t_data, $t_name, $all_shops )
+                                                : ( is_array( $t_data ) && ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : 'Host Archery Shop' );
 
                                             // Resolve District via Direct Shop ID or Name Lookup Fallback
                                             $t_district = '';
