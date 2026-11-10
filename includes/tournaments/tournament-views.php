@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.12.0
+ * Version: 7.13.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -179,20 +179,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </div>
                                 <?php endif; ?>
 
-                                <!-- Shop Dropdown Filter -->
-                                <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <div class="sywat-field-group">
-                                        <label for="sywat_tournament_shop_filter">Shop:</label>
-                                        <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
-                                            <option value="all">All Shops</option>
-                                            <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
-                                                <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                <?php endif; ?>
-
-                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                <input type="text" id="sywat_tournament_search_input" oninput="sywatApplyTournamentFilters()" placeholder="Search events..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
 
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetTournamentFilters()">Clear</button>
                             </div>
