@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -365,6 +365,129 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 }
 
 /**
+ * Re-sequences tournaments chronologically for a specific shop and season.
+ * Updates tournament names (e.g. "Shop Name - 1", "Shop Name - 2") based on start_date order,
+ * and updates associated registration option keys and active hub lists if names change.
+ *
+ * @param string $shop_id             Shop ID or normalized shop key.
+ * @param string $season_slug         Season slug.
+ * @param array  $tournaments         Reference to tournaments array.
+ * @param array  $active_tournaments Reference to active tournaments array.
+ * @param array  $registrations       Reference to registrations array.
+ */
+if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
+    function sywat_resequence_shop_tournaments( $shop_id, $season_slug, &$tournaments, &$active_tournaments, &$registrations ) {
+        if ( empty( $shop_id ) ) return;
+
+        $all_shops       = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : array() );
+        $shop_name       = isset( $all_shops[$shop_id]['name'] ) ? $all_shops[$shop_id]['name'] : '';
+        
+        $shop_lookup_map = array();
+        foreach ( $all_shops as $s_id => $s_data ) {
+            if ( is_array( $s_data ) ) {
+                $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                if ( ! empty( $title ) ) {
+                    $shop_lookup_map[ strtolower( trim( $title ) ) ] = $s_id;
+                }
+            }
+        }
+
+        // Collect all standard circuit tournaments belonging to this shop & season
+        $shop_tournaments = array();
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : '';
+            if ( empty( $t_shop ) || ! isset( $all_shops[$t_shop] ) ) {
+                $raw_shop = ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : ( ! empty( $t_data['official_shop_name'] ) ? $t_data['official_shop_name'] : '' );
+                $norm     = strtolower( trim( $raw_shop ) );
+                if ( ! empty( $norm ) && isset( $shop_lookup_map[$norm] ) ) {
+                    $t_shop = $shop_lookup_map[$norm];
+                }
+            }
+
+            $t_season   = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
+            $event_type = isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT';
+
+            // Only re-sequence standard SYWAT circuit events for this shop
+            if ( $t_shop === $shop_id && ( empty( $season_slug ) || $t_season === $season_slug ) && strcasecmp( $event_type, 'SYWAT' ) === 0 ) {
+                $shop_tournaments[] = array(
+                    'old_name'   => $t_name,
+                    'start_date' => isset( $t_data['start_date'] ) ? $t_data['start_date'] : '',
+                    'data'       => $t_data,
+                );
+            }
+        }
+
+        if ( empty( $shop_tournaments ) ) return;
+
+        // Sort chronologically by start date
+        usort( $shop_tournaments, function( $a, $b ) {
+            return strcmp( $a['start_date'], $b['start_date'] );
+        });
+
+        // Determine base title
+        if ( empty( $shop_name ) ) {
+            $first_data = $shop_tournaments[0]['data'];
+            $shop_name  = ! empty( $first_data['shop_name'] ) ? $first_data['shop_name'] : ( ! empty( $first_data['official_shop_name'] ) ? $first_data['official_shop_name'] : '' );
+        }
+
+        if ( empty( $shop_name ) ) return;
+
+        $renamed_map = array();
+        foreach ( $shop_tournaments as $idx => $item ) {
+            $expected_name = trim( $shop_name ) . ' - ' . ( $idx + 1 );
+            $old_name      = $item['old_name'];
+
+            if ( $old_name !== $expected_name ) {
+                $renamed_map[$old_name] = $expected_name;
+            }
+        }
+
+        if ( empty( $renamed_map ) ) return;
+
+        // Apply renames
+        foreach ( $renamed_map as $old_name => $new_name ) {
+            if ( isset( $tournaments[$old_name] ) ) {
+                $t_data = $tournaments[$old_name];
+                unset( $tournaments[$old_name] );
+
+                $t_data['name']        = $new_name;
+                $tournaments[$new_name] = $t_data;
+
+                $old_slug = sanitize_title( $old_name );
+                $new_slug = sanitize_title( $new_name );
+
+                // Move dates option
+                $dates = get_option( 'sywat_dates_' . $old_slug );
+                if ( $dates ) {
+                    update_option( 'sywat_dates_' . $new_slug, $dates );
+                    delete_option( 'sywat_dates_' . $old_slug );
+                }
+
+                // Update active tournaments array
+                if ( in_array( $old_name, $active_tournaments ) ) {
+                    $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
+                    $active_tournaments[] = $new_name;
+                }
+
+                // Migrate registrations
+                foreach ( $registrations as &$reg ) {
+                    if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
+                        delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
+                        $reg['tournament'] = $new_name;
+                        update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
+                    }
+                }
+                unset( $reg );
+            }
+        }
+
+        $active_tournaments = array_values( array_unique( $active_tournaments ) );
+        update_option( 'sywat_tournaments_list', $tournaments );
+        update_option( 'sywat_active_tournaments', $active_tournaments );
+    }
+}
+
+/**
  * Master Controller Function for Tournament & Season POST Actions.
  *
  * @param array  $tournaments         Reference to tournaments array.
@@ -417,7 +540,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators and TFAA webmasters can configure seasons.</div>';
             }
 
-            $seasons     = sywat_get_seasons();
+            $seasons     = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
             $orig_slug   = isset( $_POST['original_season_slug'] ) ? sanitize_text_field( $_POST['original_season_slug'] ) : '';
             $s_type      = sanitize_text_field( $_POST['season_type'] );
             $start_date  = sanitize_text_field( $_POST['start_date'] );
@@ -721,6 +844,9 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             update_option( 'sywat_active_tournaments', array_values( array_unique( $active_tournaments ) ) );
             update_option( 'sywat_current_tournament', $t_name );
             update_option( 'sywat_line_config', $new_lines );
+
+            // Re-sequence shop tournaments chronologically by start date
+            sywat_resequence_shop_tournaments( $assigned_shop_id, $season_slug, $tournaments, $active_tournaments, $registrations );
 
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully!</div>';
         }
