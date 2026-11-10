@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Presentation Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,6 +15,66 @@ if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
         $user = wp_get_current_user();
         $allowed_roles = array( 'administrator', 'tfaa_webmaster', 'tfaa_admin' );
         return (bool) array_intersect( $allowed_roles, (array) $user->roles );
+    }
+}
+
+/**
+ * Resolves standard line capacity defaults (20yd and Cub) for a given shop dataset array.
+ *
+ * @param array $shop_data Shop dataset array.
+ * @return array Array containing 'cap_20yd' and 'cap_cub'.
+ */
+if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
+    function sywat_get_shop_capacity_defaults( $shop_data ) {
+        $cap_20yd = 20;
+        $cap_cub  = 5;
+
+        if ( is_array( $shop_data ) ) {
+            if ( isset( $shop_data['cap_20yd'] ) && ! empty( $shop_data['cap_20yd'] ) ) {
+                $cap_20yd = intval( $shop_data['cap_20yd'] );
+            } elseif ( isset( $shop_data['capacity_20yd'] ) && ! empty( $shop_data['capacity_20yd'] ) ) {
+                $cap_20yd = intval( $shop_data['capacity_20yd'] );
+            } elseif ( isset( $shop_data['lanes_20yd'] ) && ! empty( $shop_data['lanes_20yd'] ) ) {
+                $cap_20yd = intval( $shop_data['lanes_20yd'] );
+            } elseif ( isset( $shop_data['max_20yd'] ) && ! empty( $shop_data['max_20yd'] ) ) {
+                $cap_20yd = intval( $shop_data['max_20yd'] );
+            } elseif ( isset( $shop_data['cap_20'] ) && ! empty( $shop_data['cap_20'] ) ) {
+                $cap_20yd = intval( $shop_data['cap_20'] );
+            }
+
+            if ( isset( $shop_data['cap_cub'] ) && ! empty( $shop_data['cap_cub'] ) ) {
+                $cap_cub = intval( $shop_data['cap_cub'] );
+            } elseif ( isset( $shop_data['capacity_cub'] ) && ! empty( $shop_data['capacity_cub'] ) ) {
+                $cap_cub = intval( $shop_data['capacity_cub'] );
+            } elseif ( isset( $shop_data['cub_cap'] ) && ! empty( $shop_data['cub_cap'] ) ) {
+                $cap_cub = intval( $shop_data['cub_cap'] );
+            } elseif ( isset( $shop_data['max_cub'] ) && ! empty( $shop_data['max_cub'] ) ) {
+                $cap_cub = intval( $shop_data['max_cub'] );
+            }
+        }
+
+        return array(
+            'cap_20yd' => $cap_20yd,
+            'cap_cub'  => $cap_cub,
+        );
+    }
+}
+
+/**
+ * Builds the default 4-line template using host shop capacity limits.
+ *
+ * @param array $shop_data Optional shop dataset array.
+ * @return array Default lines template.
+ */
+if ( ! function_exists( 'sywat_get_default_tournament_lines' ) ) {
+    function sywat_get_default_tournament_lines( $shop_data = array() ) {
+        $caps = sywat_get_shop_capacity_defaults( $shop_data );
+        return array(
+            array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+        );
     }
 }
 
