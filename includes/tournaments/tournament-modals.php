@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -45,7 +45,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $init_shop_data = ( ! empty( $target_shop_key ) && isset( $all_shops[$target_shop_key] ) ) ? $all_shops[$target_shop_key] : array();
 
         if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
-            // Pass the direct array, not the string ID!
             $shop_caps       = sywat_get_shop_capacity_defaults( $init_shop_data );
             $default_cap_20  = $shop_caps['cap_20yd'];
             $default_cap_cub = $shop_caps['cap_cub'];
@@ -60,7 +59,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             $default_lines = array(
                 array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
                 array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
+                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cub ),
                 array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
             );
         }
@@ -85,7 +84,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             }
         }
 
-        // Calculate existing tournament counts & collect start dates per shop for auto-naming & chronological position logic
+        // Calculate existing tournament counts & collect start dates per shop for auto-naming logic
         $shop_counts = array();
         $shop_events = array();
         foreach ( $tournaments as $t_name => $t_info ) {
@@ -134,7 +133,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <input type="hidden" name="sywat_action" value="save_tournament">
                         <input type="hidden" name="original_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>">
 
-                        <!-- ROW 1: SHOP (LEFT) | SEASON (RIGHT) -->
+                        <!-- ROW 1 (RE-ORDERED): HOST SHOP (LEFT) | DATES (RIGHT) -->
                         <div class="sywat-form-grid-2">
                             <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
@@ -151,7 +150,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 $s_title     = is_array( $s_name ) && isset( $s_name['name'] ) ? $s_name['name'] : ( is_string( $s_name ) ? $s_name : '' );
 
                                                 if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
-                                                    // Pass the array data instead of the string ID!
                                                     $s_caps   = sywat_get_shop_capacity_defaults( $s_name );
                                                     $s_cap20  = $s_caps['cap_20yd'];
                                                     $s_capcub = $s_caps['cap_cub'];
@@ -177,6 +175,20 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                 <?php endif; ?>
                             </div>
 
+                            <div class="sywat-form-grid-2 sywat-grid-compact">
+                                <div class="sywat-field-group">
+                                    <label>Start Date *</label>
+                                    <input type="date" name="start_date" id="sywat_modal_start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" onchange="sywatAutoGenerateTournamentName()" required>
+                                </div>
+                                <div class="sywat-field-group">
+                                    <label>End Date (Optional)</label>
+                                    <input type="date" name="end_date" id="sywat_modal_end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ROW 2 (RE-ORDERED): SEASON (LEFT) | TOURNAMENT NAME WITH LOCK TOGGLE (RIGHT) -->
+                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
                                 <label>Competition Season *</label>
                                 <?php if ( $is_edit_mode ): ?>
@@ -192,24 +204,22 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     </select>
                                 <?php endif; ?>
                             </div>
-                        </div>
 
-                        <!-- ROW 2: NAME (LEFT) | DATES (RIGHT) -->
-                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
-                                <label>Tournament Name * <?php if ( ! $is_edit_mode ): ?><span class="sywat-label-subtext">(Auto-generated, editable)</span><?php endif; ?></label>
-                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop and date to auto-generate..." oninput="sywatMarkNameAsCustomized()" <?php echo ( $is_edit_mode && ! $can_manage_seasons ) ? 'readonly class="sywat-input-disabled-calc"' : 'required'; ?>>
-                            </div>
-
-                            <div class="sywat-form-grid-2 sywat-grid-compact">
-                                <div class="sywat-field-group">
-                                    <label>Start Date *</label>
-                                    <input type="date" name="start_date" id="sywat_modal_start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" onchange="sywatAutoGenerateTournamentName()" required>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <label style="margin: 0;">Tournament Name * <span class="sywat-label-subtext" id="sywat_name_status_label">(Auto-generated)</span></label>
+                                    <?php if ( ! $is_edit_mode && $can_manage_seasons ): ?>
+                                        <button type="button" id="sywat_toggle_name_lock_btn" class="sywat-btn sywat-btn-xs sywat-btn-secondary" onclick="sywatToggleTournamentNameLock()" style="padding: 2px 8px; font-size: 11px;">🔒 Locked</button>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="sywat-field-group">
-                                    <label>End Date (Optional)</label>
-                                    <input type="date" name="end_date" id="sywat_modal_end_date" value="<?php echo esc_attr( $edit_t_end ); ?>">
-                                </div>
+                                <input type="text" 
+                                       name="tournament_name" 
+                                       id="sywat_modal_tournament_name" 
+                                       value="<?php echo esc_attr( $edit_t_target ); ?>" 
+                                       placeholder="Select shop and date to auto-generate..." 
+                                       oninput="sywatMarkNameAsCustomized()" 
+                                       <?php echo ( $is_edit_mode ? ( ! $can_manage_seasons ? 'readonly class="sywat-input-disabled-calc"' : '' ) : 'readonly class="sywat-input-disabled-calc"' ); ?> 
+                                       required>
                             </div>
                         </div>
 
@@ -289,6 +299,83 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 </form>
             </div>
         </div>
+
+        <script>
+        var sywatNameIsCustomized = false;
+        var sywatNameIsUnlocked   = false;
+
+        function sywatToggleTournamentNameLock() {
+            var inputBtn   = document.getElementById('sywat_toggle_name_lock_btn');
+            var inputName  = document.getElementById('sywat_modal_tournament_name');
+            var statusLabel= document.getElementById('sywat_name_status_label');
+            
+            if (!inputName || !inputBtn) return;
+
+            sywatNameIsUnlocked = !sywatNameIsUnlocked;
+
+            if (sywatNameIsUnlocked) {
+                inputName.removeAttribute('readonly');
+                inputName.classList.remove('sywat-input-disabled-calc');
+                inputBtn.innerHTML = '🔓 Unlocked';
+                inputBtn.classList.remove('sywat-btn-secondary');
+                inputBtn.classList.add('sywat-btn-warning');
+                if (statusLabel) statusLabel.innerHTML = '(Custom name active)';
+                sywatNameIsCustomized = true;
+            } else {
+                inputName.setAttribute('readonly', 'readonly');
+                inputName.classList.add('sywat-input-disabled-calc');
+                inputBtn.innerHTML = '🔒 Locked';
+                inputBtn.classList.remove('sywat-btn-warning');
+                inputBtn.classList.add('sywat-btn-secondary');
+                if (statusLabel) statusLabel.innerHTML = '(Auto-generated)';
+                sywatNameIsCustomized = false;
+                sywatAutoGenerateTournamentName(true); // Force re-generate
+            }
+        }
+
+        function sywatMarkNameAsCustomized() {
+            sywatNameIsCustomized = true;
+        }
+
+        function sywatAutoGenerateTournamentName(force) {
+            if (sywatNameIsCustomized && !force) return;
+
+            var shopSelect = document.getElementById('sywat_modal_shop_id');
+            var startDate  = document.getElementById('sywat_modal_start_date');
+            var nameInput  = document.getElementById('sywat_modal_tournament_name');
+            if (!shopSelect || !startDate || !nameInput) return;
+
+            var shopName = '';
+            if (shopSelect.tagName.toLowerCase() === 'select') {
+                var selectedOption = shopSelect.options[shopSelect.selectedIndex];
+                if (selectedOption && selectedOption.dataset.name) {
+                    shopName = selectedOption.dataset.name;
+                }
+            } else {
+                shopName = shopSelect.dataset.name || '';
+            }
+
+            if (!shopName || !startDate.value) return;
+
+            // Auto sequence calculation
+            var existingEvents = [];
+            if (shopSelect.options && shopSelect.selectedIndex >= 0) {
+                try {
+                    existingEvents = JSON.parse(shopSelect.options[shopSelect.selectedIndex].dataset.events || '[]');
+                } catch(e) {}
+            }
+
+            var newStart = startDate.value;
+            var seq = 1;
+            for (var i = 0; i < existingEvents.length; i++) {
+                if (existingEvents[i].start_date < newStart) {
+                    seq++;
+                }
+            }
+
+            nameInput.value = shopName.trim() + ' - ' + seq;
+        }
+        </script>
         <?php
     }
 }
