@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -32,17 +32,37 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $edit_t_start  = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end    = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
 
-        // Resolve active shop's default line capacity limits from master shop directory
-        $init_shop_data  = ( ! empty( $edit_t_shop ) && isset( $all_shops[$edit_t_shop] ) ) ? $all_shops[$edit_t_shop] : array();
-        $default_cap_20  = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20yd'] ) ) ? $init_shop_data['cap_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_20yd'] ) ) ? $init_shop_data['capacity_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20'] ) ) ? $init_shop_data['cap_20'] : 20 ) );
-        $default_cap_cub = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_cub'] ) ) ? $init_shop_data['cap_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_cub'] ) ) ? $init_shop_data['capacity_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cub_cap'] ) ) ? $init_shop_data['cub_cap'] : 5 ) );
+        // Resolve active target shop dataset for initial capacity defaults fallback
+        $target_shop_id = $edit_t_shop;
+        if ( empty( $target_shop_id ) && ! empty( $user_shop_id ) ) {
+            $target_shop_id = $user_shop_id;
+        }
+        if ( empty( $target_shop_id ) && ! empty( $all_shops ) && is_array( $all_shops ) ) {
+            $shop_keys      = array_keys( $all_shops );
+            $target_shop_id = reset( $shop_keys );
+        }
 
-        $default_lines = array(
-            array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-            array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-            array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-            array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-        );
+        $init_shop_data = ( ! empty( $target_shop_id ) && isset( $all_shops[$target_shop_id] ) ) ? $all_shops[$target_shop_id] : array();
+
+        if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
+            $shop_caps       = sywat_get_shop_capacity_defaults( $init_shop_data );
+            $default_cap_20  = $shop_caps['cap_20yd'];
+            $default_cap_cub = $shop_caps['cap_cub'];
+        } else {
+            $default_cap_20  = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20yd'] ) ) ? $init_shop_data['cap_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_20yd'] ) ) ? $init_shop_data['capacity_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20'] ) ) ? $init_shop_data['cap_20'] : 20 ) );
+            $default_cap_cub = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_cub'] ) ) ? $init_shop_data['cap_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_cub'] ) ) ? $init_shop_data['capacity_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cub_cap'] ) ) ? $init_shop_data['cub_cap'] : 5 ) );
+        }
+
+        if ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
+            $default_lines = sywat_get_default_tournament_lines( $init_shop_data );
+        } else {
+            $default_lines = array(
+                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
+                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
+                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
+                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
+            );
+        }
 
         $edit_t_lines = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
         if ( empty( $edit_t_lines ) || ! is_array( $edit_t_lines ) ) {
@@ -128,8 +148,15 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 $count       = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] : 0; 
                                                 $events_json = isset( $shop_events[$s_id] ) ? esc_attr( wp_json_encode( $shop_events[$s_id] ) ) : '[]';
                                                 $s_title     = is_array( $s_name ) && isset( $s_name['name'] ) ? $s_name['name'] : ( is_string( $s_name ) ? $s_name : '' );
-                                                $s_cap20     = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? $s_name['cap_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? $s_name['capacity_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? $s_name['cap_20'] : 20 ) );
-                                                $s_capcub    = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? $s_name['cap_cub'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? $s_name['capacity_cub'] : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? $s_name['cub_cap'] : 5 ) );
+
+                                                if ( function_exists( 'sywat_get_shop_capacity_defaults' ) && is_array( $s_name ) ) {
+                                                    $s_caps   = sywat_get_shop_capacity_defaults( $s_name );
+                                                    $s_cap20  = $s_caps['cap_20yd'];
+                                                    $s_capcub = $s_caps['cap_cub'];
+                                                } else {
+                                                    $s_cap20  = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? $s_name['cap_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? $s_name['capacity_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? $s_name['cap_20'] : 20 ) );
+                                                    $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? $s_name['cap_cub'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? $s_name['capacity_cub'] : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? $s_name['cub_cap'] : 5 ) );
+                                                }
                                             ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>" 
                                                     data-name="<?php echo esc_attr( $s_title ); ?>" 
