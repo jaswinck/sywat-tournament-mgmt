@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.1.0
+   Version: 7.2.0
    ========================================================================== */
 
 .sywat-table-responsive {
@@ -94,6 +94,14 @@
 .sywat-table-header-filters .sywat-field-group {
     margin: 0 !important;
     width: auto !important;
+    text-align: left !important;
+}
+
+.sywat-filter-inline-form label,
+.sywat-table-header-filters label {
+    display: block !important;
+    text-align: left !important;
+    margin-bottom: 3px !important;
 }
 
 /* Action Cell Alignment & Vertical Stacking Support */
