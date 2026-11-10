@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -47,12 +47,48 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $shop_display_name   = isset( $all_shops[$edit_t_shop]['name'] ) ? $all_shops[$edit_t_shop]['name'] : ( isset( $edit_t_data['shop_name'] ) ? $edit_t_data['shop_name'] : 'Host Archery Shop' );
         $season_display_name = isset( $seasons[$edit_t_season]['name'] ) ? $seasons[$edit_t_season]['name'] : $edit_t_season;
 
-        // Calculate existing tournament counts per shop for auto-naming logic
+        // Build shop lookup mapping to resolve shop ID by shop name variations
+        $shop_lookup_map = array();
+        foreach ( $all_shops as $s_id => $s_data ) {
+            if ( is_array( $s_data ) ) {
+                $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                if ( ! empty( $title ) ) {
+                    $shop_lookup_map[ strtolower( trim( $title ) ) ] = $s_id;
+                }
+            }
+        }
+
+        // Calculate existing tournament counts & collect start dates per shop for auto-naming & chronological position logic
         $shop_counts = array();
+        $shop_events = array();
         foreach ( $tournaments as $t_name => $t_info ) {
             $s_id = sywat_get_tournament_shop_id( $t_info );
-            $shop_counts[$s_id] = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] + 1 : 1;
+            if ( empty( $s_id ) || ! isset( $all_shops[$s_id] ) ) {
+                $shop_name = ! empty( $t_info['shop_name'] ) ? $t_info['shop_name'] : ( ! empty( $t_info['official_shop_name'] ) ? $t_info['official_shop_name'] : '' );
+                $norm_name = strtolower( trim( $shop_name ) );
+                if ( ! empty( $norm_name ) && isset( $shop_lookup_map[$norm_name] ) ) {
+                    $s_id = $shop_lookup_map[$norm_name];
+                }
+            }
+            if ( ! empty( $s_id ) ) {
+                $shop_counts[$s_id] = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] + 1 : 1;
+                $start = ! empty( $t_info['start_date'] ) ? $t_info['start_date'] : '';
+                if ( ! empty( $start ) ) {
+                    $shop_events[$s_id][] = array(
+                        'name'       => $t_name,
+                        'start_date' => $start,
+                    );
+                }
+            }
         }
+
+        // Sort events chronologically per shop
+        foreach ( $shop_events as $s_id => &$evts ) {
+            usort( $evts, function( $a, $b ) {
+                return strcmp( $a['start_date'], $b['start_date'] );
+            });
+        }
+        unset( $evts );
         ?>
         <div class="sywat-modal-backdrop <?php echo $open_tourn_modal ? 'active' : ''; ?>" id="sywat_add_tourn_modal">
             <div class="sywat-modal-content sywat-modal-lg">
@@ -82,10 +118,14 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     <select name="shop_id" id="sywat_modal_shop_id" onchange="sywatAutoGenerateTournamentName()" required>
                                         <option value="" <?php selected( empty( $edit_t_shop ), true ); ?>>Select Shop</option>
                                         <?php foreach ( $all_shops as $s_id => $s_name ): ?>
-                                            <?php $count = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] : 0; ?>
+                                            <?php 
+                                                $count       = isset( $shop_counts[$s_id] ) ? $shop_counts[$s_id] : 0; 
+                                                $events_json = isset( $shop_events[$s_id] ) ? esc_attr( wp_json_encode( $shop_events[$s_id] ) ) : '[]';
+                                            ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>" 
                                                     data-name="<?php echo esc_attr( $s_name['name'] ); ?>" 
                                                     data-count="<?php echo $count; ?>" 
+                                                    data-events="<?php echo $events_json; ?>"
                                                     <?php selected( $edit_t_shop, $s_id ); ?>>
                                                 <?php echo esc_html( $s_name['name'] ); ?>
                                             </option>
@@ -118,13 +158,13 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <div class="sywat-form-grid-2 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
                                 <label>Tournament Name * <?php if ( ! $is_edit_mode ): ?><span class="sywat-label-subtext">(Auto-generated, editable)</span><?php endif; ?></label>
-                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop to auto-generate..." oninput="sywatMarkNameAsCustomized()" <?php echo ( $is_edit_mode && ! $can_manage_seasons ) ? 'readonly class="sywat-input-disabled-calc"' : 'required'; ?>>
+                                <input type="text" name="tournament_name" id="sywat_modal_tournament_name" value="<?php echo esc_attr( $edit_t_target ); ?>" placeholder="Select shop and date to auto-generate..." oninput="sywatMarkNameAsCustomized()" <?php echo ( $is_edit_mode && ! $can_manage_seasons ) ? 'readonly class="sywat-input-disabled-calc"' : 'required'; ?>>
                             </div>
 
                             <div class="sywat-form-grid-2 sywat-grid-compact">
                                 <div class="sywat-field-group">
                                     <label>Start Date *</label>
-                                    <input type="date" name="start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" required>
+                                    <input type="date" name="start_date" id="sywat_modal_start_date" value="<?php echo esc_attr( $edit_t_start ); ?>" onchange="sywatAutoGenerateTournamentName()" required>
                                 </div>
                                 <div class="sywat-field-group">
                                     <label>End Date (Optional)</label>
