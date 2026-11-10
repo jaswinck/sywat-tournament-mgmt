@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -677,8 +677,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $tournaments[$t_name] = array(
                     'name'                 => $t_name,
                     'season'               => $target_season,
+                    'season_slug'          => $target_season,
                     'shop_id'              => $assoc_id,
                     'shop_name'            => $official,
+                    'official_shop_name'   => $official,
                     'location_display'     => $t['location_display'],
                     'start_date'           => $t['start_date_formatted'],
                     'end_date'             => $t['end_date_formatted'],
@@ -787,11 +789,22 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $assigned_shop_id = $can_manage_seasons ? sanitize_text_field( $_POST['shop_id'] ) : $user_shop_id;
             if ( empty( $assigned_shop_id ) ) $assigned_shop_id = $user_shop_id;
             
+            // Resolve shop name metadata from master shop list
+            $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops', get_option( 'sywat_shops_list', array() ) ) );
+            $resolved_shop_name = '';
+            if ( ! empty( $assigned_shop_id ) && isset( $all_shops[$assigned_shop_id] ) && is_array( $all_shops[$assigned_shop_id] ) ) {
+                $s_info             = $all_shops[$assigned_shop_id];
+                $resolved_shop_name = ! empty( $s_info['name'] ) ? $s_info['name'] : ( ! empty( $s_info['shop_name'] ) ? $s_info['shop_name'] : ( ! empty( $s_info['title'] ) ? $s_info['title'] : '' ) );
+            }
+            if ( empty( $resolved_shop_name ) && function_exists( 'sywat_get_tournament_shop_name' ) ) {
+                $resolved_shop_name = sywat_get_tournament_shop_name( array( 'shop_id' => $assigned_shop_id ), $t_name, $all_shops );
+            }
+
             $formatted_dates = sywat_format_tournament_dates( $start_date, $end_date );
             update_option( 'sywat_dates_' . $new_slug, $formatted_dates );
 
             // Process Dynamic Shooting Lines Repeater (Split Day & Time + Deduplication)
-            $new_lines = array();
+            $new_lines   = array();
             $seen_combos = array();
 
             if ( ! empty( $_POST['line_days'] ) && is_array( $_POST['line_days'] ) ) {
@@ -867,12 +880,17 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $tournaments[$storage_key] = array(
-                'shop_id'          => $assigned_shop_id,
-                'season_slug'      => $season_slug,
-                'start_date'       => $start_date,
-                'end_date'         => $end_date,
-                'lines'            => $new_lines,
-                'scores_published' => $is_scores_pub,
+                'name'                 => $t_name,
+                'shop_id'              => $assigned_shop_id,
+                'shop_name'            => $resolved_shop_name,
+                'official_shop_name'   => $resolved_shop_name,
+                'location_display'     => $resolved_shop_name,
+                'season_slug'          => $season_slug,
+                'season'               => $season_slug,
+                'start_date'           => $start_date,
+                'end_date'             => $end_date,
+                'lines'                => $new_lines,
+                'scores_published'     => $is_scores_pub,
             );
 
             if ( ! empty( $published_at ) ) {
