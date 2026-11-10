@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.3.2
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -218,10 +218,12 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $remaining_open_slots[$key] = max(0, $max_cap - $curr_cnt);
         }
 
-        $added_count        = 0;
-        $waitlisted_count   = 0;
-        $skipped_duplicates = array();
-        $skipped_full       = array();
+        $added_count             = 0;
+        $waitlisted_count        = 0;
+        $skipped_duplicates      = array();
+        $skipped_full            = array();
+        $family_primary_assigned = array();
+        $remaining_payment       = $amount_paid;
 
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
         if ( ! is_array( $master_regs ) ) {
@@ -286,9 +288,34 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             // Enforce Family Cap threshold: Only assign 'Family' rate if group on this line has >= 3 archers AND raw total >= $75.00
             $is_family_eligible = (isset($line_group_stats[$l_idx]) && $line_group_stats[$l_idx]['count'] >= 3 && $line_group_stats[$l_idx]['raw_sum'] >= 75.00);
 
-            $reg_status  = $is_waitlist ? 'Waitlist' : 'Pre-Reg';
-            $paid_status = $is_waitlist ? 'Waitlist' : ($is_family_eligible ? 'Family' : $archer['paid_tier']);
-            $due_amount  = $is_waitlist ? 0.00 : ($archer['paid_tier'] === 'Youth' ? 25.00 : 30.00);
+            if ($is_waitlist) {
+                $reg_status  = 'Waitlist';
+                $paid_status = 'Waitlist';
+                $initial_fee = 0.00;
+                $due_amount  = 0.00;
+            } else {
+                $reg_status = 'Pre-Reg';
+                if ($is_family_eligible) {
+                    $paid_status = 'Family';
+                    if (empty($family_primary_assigned[$l_idx])) {
+                        $initial_fee = 75.00;
+                        $family_primary_assigned[$l_idx] = true;
+                    } else {
+                        $initial_fee = 0.00;
+                    }
+                } else {
+                    $paid_status = $archer['paid_tier'];
+                    $initial_fee = ($archer['paid_tier'] === 'Youth' ? 25.00 : 30.00);
+                }
+
+                if ($remaining_payment >= $initial_fee) {
+                    $due_amount = 0.00;
+                    $remaining_payment -= $initial_fee;
+                } else {
+                    $due_amount = $initial_fee - $remaining_payment;
+                    $remaining_payment = 0.00;
+                }
+            }
 
             $new_reg = array(
                 'id'          => uniqid( 'reg_' ),
@@ -302,7 +329,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'gender'      => '',
                 'style'       => '',
                 'paid'        => $paid_status,
-                'family_id'   => 'fam_' . $t_slug . '_' . sanitize_title($family_base_name),
+                'family_id'   => 'fam_' . $t_slug . '_l' . sanitize_title($l_idx) . '_' . sanitize_title($family_base_name),
                 'family_name' => $family_base_name,
                 'balance_due' => $due_amount,
                 'status'      => $reg_status,
