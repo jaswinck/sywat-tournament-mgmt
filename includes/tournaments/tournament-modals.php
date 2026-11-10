@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.0.1-DEBUG
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,6 +15,18 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
     function sywat_render_add_edit_tournament_modal( $data ) {
+        
+        // --- TEMPORARY DEBUG BLOCK START ---
+        echo '<div style="background:#fff; padding:20px; border:3px solid red; position:relative; z-index:99999; color:#000; margin-bottom: 20px;">';
+        echo '<h3>🔍 DEBUG: CINNAMON CREEK SHOP ARRAY</h3><pre>';
+        if ( isset( $data['all_shops']['shop_cinnamon-creek-ranch'] ) ) {
+            print_r( $data['all_shops']['shop_cinnamon-creek-ranch'] );
+        } else {
+            echo "Key 'shop_cinnamon-creek-ranch' not found in all_shops array.";
+        }
+        echo '</pre></div>';
+        // --- TEMPORARY DEBUG BLOCK END ---
+
         $tournaments        = $data['tournaments'];
         $can_manage_seasons = $data['can_manage_seasons'];
         $user_shop_id       = $data['user_shop_id'];
@@ -149,7 +161,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 $s_title     = is_array( $s_name ) && isset( $s_name['name'] ) ? $s_name['name'] : ( is_string( $s_name ) ? $s_name : '' );
 
                                                 if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
-                                                    // Pass $s_id or $s_name to resolve capacity defaults from master shop directory
+                                                    // Pass $s_id to resolve capacity defaults from master shop directory
                                                     $s_caps   = sywat_get_shop_capacity_defaults( $s_id );
                                                     $s_cap20  = $s_caps['cap_20yd'];
                                                     $s_capcub = $s_caps['cap_cub'];
