@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 6.8.0
+   Version: 6.9.0
    ========================================================================== */
 
 .sywat-table-responsive {
@@ -74,6 +74,15 @@
     justify-content: center !important;
     margin: 0 auto !important;
     text-align: center !important;
+}
+
+/* Table Sub-Header Controls & Single-Row Flex Containers */
+.sywat-table-header-filters,
+.sywat-table-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
 }
 
 /* Action Cell Alignment & Vertical Stacking Support */
@@ -543,6 +552,11 @@
     /* Keep table totally locked even on mobile */
     .sywat-modal-body .sywat-table-responsive { overflow-x: hidden !important; }
     .sywat-modal-repeater-table { table-layout: fixed !important; }
+    .sywat-table-header-filters,
+    .sywat-table-header-actions {
+        flex-wrap: wrap !important;
+        width: 100% !important;
+    }
 }
 
 /* Print Engine & Invoice Layout */
