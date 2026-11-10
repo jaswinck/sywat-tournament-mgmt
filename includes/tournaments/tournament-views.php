@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -168,8 +168,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-table-header-filters" style="align-items: flex-end !important;">
                                 <!-- District Dropdown Filter -->
                                 <?php if ( count( $filter_districts ) > 0 ): ?>
-                                    <div class="sywat-field-group" style="margin: 0; text-align: left;">
-                                        <label for="sywat_tournament_district_filter" style="display: block; text-align: left;"><strong>District:</strong></label>
+                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: column; align-items: flex-start;">
+                                        <label for="sywat_tournament_district_filter" style="margin-bottom: 3px; text-align: left;"><strong>District:</strong></label>
                                         <select id="sywat_tournament_district_filter" onchange="sywatApplyTournamentFilters()">
                                             <option value="all">All Districts</option>
                                             <?php foreach ( $filter_districts as $dist ): ?>
@@ -181,8 +181,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                 <!-- Shop Dropdown Filter -->
                                 <?php if ( $can_manage_seasons && count( $filter_shops ) > 1 ): ?>
-                                    <div class="sywat-field-group" style="margin: 0; text-align: left;">
-                                        <label for="sywat_tournament_shop_filter" style="display: block; text-align: left;"><strong>Shop:</strong></label>
+                                    <div class="sywat-field-group" style="margin: 0; display: flex; flex-direction: column; align-items: flex-start;">
+                                        <label for="sywat_tournament_shop_filter" style="margin-bottom: 3px; text-align: left;"><strong>Shop:</strong></label>
                                         <select id="sywat_tournament_shop_filter" onchange="sywatApplyTournamentFilters()">
                                             <option value="all">All Shops</option>
                                             <?php foreach ( $filter_shops as $s_id => $s_name ): ?>
