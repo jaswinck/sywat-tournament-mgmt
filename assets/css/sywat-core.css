@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.4.0
+   Version: 7.5.0
    ========================================================================== */
 
 /* Page Resets & Outer Layout Wrappers */
@@ -95,11 +95,14 @@ body {
 
 .sywat-login-card-header h2,
 .sywat-login-card-header h1,
+.sywat-login-card-header h3,
 .sywat-login-card-header .sywat-login-title,
 .sywat-login-card > header h2,
 .sywat-login-card > header h1,
+.sywat-login-card > header h3,
 .sywat-login-card > h2,
-.sywat-login-card > h1 {
+.sywat-login-card > h1,
+.sywat-login-card > h3 {
     font-size: 17px !important;
     font-weight: 700 !important;
     color: #ffffff !important;
@@ -119,8 +122,9 @@ body {
     padding: 0 !important;
 }
 
-/* Form Paragraph & Field Container Spacing */
-.sywat-login-card form p {
+/* Form Field & Component Spacing */
+.sywat-login-card .sywat-auth-field-group,
+.sywat-login-card .sywat-field-group {
     margin: 0 0 24px 0 !important;
     padding: 0 !important;
     clear: both !important;
@@ -162,10 +166,10 @@ body {
     outline: none !important;
 }
 
-/* Remember Me Checkbox & Float Clear Rules */
+/* Remember Me Row & Checkbox Rules */
+.sywat-login-card .sywat-login-remember-row,
 .sywat-login-card p.forgetmenot,
-.sywat-login-card .forgetmenot,
-.sywat-login-card .login-remember {
+.sywat-login-card .forgetmenot {
     float: none !important;
     clear: both !important;
     display: block !important;
@@ -177,11 +181,12 @@ body {
     line-height: 1.4 !important;
 }
 
-.sywat-login-card .forgetmenot label,
-.sywat-login-card .login-remember label {
+.sywat-login-card .sywat-checkbox-label,
+.sywat-login-card .forgetmenot label {
     display: inline-flex !important;
     align-items: center !important;
     gap: 8px !important;
+    font-size: 12px !important;
     font-weight: 600 !important;
     color: #334155 !important;
     margin: 0 !important;
@@ -206,7 +211,8 @@ body {
 
 .sywat-login-card input[type="submit"],
 .sywat-login-card .button-primary,
-.sywat-login-card button[type="submit"] {
+.sywat-login-card button[type="submit"],
+.sywat-login-card .sywat-btn-primary {
     width: 100% !important;
     min-height: 42px !important;
     height: 42px !important;
@@ -225,7 +231,8 @@ body {
 
 .sywat-login-card input[type="submit"]:hover,
 .sywat-login-card .button-primary:hover,
-.sywat-login-card button[type="submit"]:hover {
+.sywat-login-card button[type="submit"]:hover,
+.sywat-login-card .sywat-btn-primary:hover {
     background-color: #0369a1 !important;
     border-color: #075985 !important;
 }
