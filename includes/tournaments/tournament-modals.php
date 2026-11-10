@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -27,10 +27,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         
         $edit_t_data      = ( $is_edit_mode && isset( $tournaments[$edit_t_target] ) ) ? $tournaments[$edit_t_target] : null;
 
-        $edit_t_shop   = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( ! empty( $user_shop_id ) ? $user_shop_id : '' );
-        $edit_t_season = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
-        $edit_t_start  = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
-        $edit_t_end    = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
+        $edit_t_shop    = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( ! empty( $user_shop_id ) ? $user_shop_id : '' );
+        $edit_t_season  = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
+        $edit_t_start   = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
+        $edit_t_end     = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
+        $edit_tfaa_val   = ( is_array( $edit_t_data ) && isset( $edit_t_data['tfaa_event_id'] ) ) ? $edit_t_data['tfaa_event_id'] : '';
 
         // Resolve target shop key for fallback initialization
         $target_shop_key = $edit_t_shop;
@@ -225,6 +226,19 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 style="white-space: nowrap; height: 38px; line-height: 1; padding: 0 12px; min-width: 95px;">🔒 Locked</button>
                                     <?php endif; ?>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- ROW 3: OPTIONAL TFAA EVENT ID / DIRECT RESULTS URL OVERRIDE -->
+                        <div class="sywat-form-grid-1 sywat-modal-row-spacing">
+                            <div class="sywat-field-group">
+                                <label for="sywat_modal_tfaa_event_id">TFAA Results Event ID / Direct URL <span class="sywat-label-subtext">(Optional Override)</span></label>
+                                <input type="text" 
+                                       name="tfaa_event_id" 
+                                       id="sywat_modal_tfaa_event_id" 
+                                       value="<?php echo esc_attr( $edit_tfaa_val ); ?>" 
+                                       placeholder="e.g. 76 or https://texasfieldarchery.org/results/76">
+                                <span class="sywat-meta-subtext">Optional direct link or numeric ID from the TFAA results site. If left blank, score sync automatically matches by season, dates, and title.</span>
                             </div>
                         </div>
 
