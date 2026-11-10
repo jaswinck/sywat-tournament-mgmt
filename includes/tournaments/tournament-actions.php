@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.9.0
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -444,41 +444,51 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
         if ( empty( $renamed_map ) ) return;
 
-        // Apply renames
+        // Apply renames cleanly using a two-pass process to avoid key collisions
+        $temp_rebuilt = array();
         foreach ( $renamed_map as $old_name => $new_name ) {
             if ( isset( $tournaments[$old_name] ) ) {
                 $t_data = $tournaments[$old_name];
                 unset( $tournaments[$old_name] );
-
-                $t_data['name']        = $new_name;
-                $tournaments[$new_name] = $t_data;
-
-                $old_slug = sanitize_title( $old_name );
-                $new_slug = sanitize_title( $new_name );
-
-                // Move dates option
-                $dates = get_option( 'sywat_dates_' . $old_slug );
-                if ( $dates ) {
-                    update_option( 'sywat_dates_' . $new_slug, $dates );
-                    delete_option( 'sywat_dates_' . $old_slug );
-                }
-
-                // Update active tournaments array
-                if ( in_array( $old_name, $active_tournaments ) ) {
-                    $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
-                    $active_tournaments[] = $new_name;
-                }
-
-                // Migrate registrations
-                foreach ( $registrations as &$reg ) {
-                    if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
-                        delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
-                        $reg['tournament'] = $new_name;
-                        update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
-                    }
-                }
-                unset( $reg );
+                $t_data['name'] = $new_name;
+                $temp_rebuilt[$new_name] = array(
+                    'old_name' => $old_name,
+                    'data'     => $t_data,
+                );
             }
+        }
+
+        foreach ( $temp_rebuilt as $new_name => $item ) {
+            $old_name = $item['old_name'];
+            $t_data   = $item['data'];
+
+            $tournaments[$new_name] = $t_data;
+
+            $old_slug = sanitize_title( $old_name );
+            $new_slug = sanitize_title( $new_name );
+
+            // Move dates option
+            $dates = get_option( 'sywat_dates_' . $old_slug );
+            if ( $dates ) {
+                update_option( 'sywat_dates_' . $new_slug, $dates );
+                delete_option( 'sywat_dates_' . $old_slug );
+            }
+
+            // Update active tournaments array
+            if ( in_array( $old_name, $active_tournaments ) ) {
+                $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
+                $active_tournaments[] = $new_name;
+            }
+
+            // Migrate registrations
+            foreach ( $registrations as &$reg ) {
+                if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
+                    delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
+                    $reg['tournament'] = $new_name;
+                    update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
+                }
+            }
+            unset( $reg );
         }
 
         $active_tournaments = array_values( array_unique( $active_tournaments ) );
@@ -836,7 +846,13 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 }
             }
 
-            $tournaments[$t_name] = array(
+            // Avoid key collision when adding a new tournament whose generated name already exists in $tournaments
+            $storage_key = $t_name;
+            if ( empty( $old_name ) && isset( $tournaments[$t_name] ) ) {
+                $storage_key = $t_name . '-temp-' . uniqid();
+            }
+
+            $tournaments[$storage_key] = array(
                 'shop_id'          => $assigned_shop_id,
                 'season_slug'      => $season_slug,
                 'start_date'       => $start_date,
@@ -846,7 +862,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             );
 
             if ( ! empty( $published_at ) ) {
-                $tournaments[$t_name]['published_at'] = $published_at;
+                $tournaments[$storage_key]['published_at'] = $published_at;
             }
 
             update_option( 'sywat_tournaments_list', $tournaments );
