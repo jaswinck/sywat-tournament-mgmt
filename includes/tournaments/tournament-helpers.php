@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers & Presentation Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -234,7 +234,78 @@ if ( ! function_exists( 'sywat_get_tournament_shop_id' ) ) {
         if ( is_array( $t_data ) && isset( $t_data['shop_id'] ) && ! empty( $t_data['shop_id'] ) ) {
             return $t_data['shop_id'];
         }
-        return 'shop_ccr';
+        return '';
+    }
+}
+
+/**
+ * Resolves host archery shop display name with smart waterfall resolution.
+ *
+ * @param array  $t_data    Tournament configuration array.
+ * @param string $t_name    Optional tournament title.
+ * @param array  $all_shops Optional master shops array.
+ * @return string Resolved shop display name.
+ */
+if ( ! function_exists( 'sywat_get_tournament_shop_name' ) ) {
+    function sywat_get_tournament_shop_name( $t_data, $t_name = '', $all_shops = array() ) {
+        if ( empty( $all_shops ) && function_exists( 'sywat_get_all_shops' ) ) {
+            $all_shops = sywat_get_all_shops();
+        }
+        if ( empty( $all_shops ) ) {
+            $all_shops = get_option( 'sywat_shops', get_option( 'sywat_shops_list', array() ) );
+        }
+        if ( ! is_array( $all_shops ) ) {
+            $all_shops = array();
+        }
+
+        // 1. Direct shop_id lookup in $all_shops
+        $s_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : ( is_array( $t_data ) && isset( $t_data['shop_id'] ) ? $t_data['shop_id'] : '' );
+        if ( ! empty( $s_id ) && isset( $all_shops[$s_id] ) && is_array( $all_shops[$s_id] ) ) {
+            $s_info = $all_shops[$s_id];
+            $name   = ! empty( $s_info['name'] ) ? $s_info['name'] : ( ! empty( $s_info['shop_name'] ) ? $s_info['shop_name'] : ( ! empty( $s_info['title'] ) ? $s_info['title'] : '' ) );
+            if ( ! empty( $name ) ) return $name;
+        }
+
+        // 2. Stored explicit shop name metadata in tournament data
+        if ( is_array( $t_data ) ) {
+            if ( ! empty( $t_data['official_shop_name'] ) ) return $t_data['official_shop_name'];
+            if ( ! empty( $t_data['shop_name'] ) ) return $t_data['shop_name'];
+            if ( ! empty( $t_data['location_display'] ) ) return $t_data['location_display'];
+        }
+
+        // Build shop lookup map by title
+        $shop_map = array();
+        foreach ( $all_shops as $id => $info ) {
+            if ( is_array( $info ) ) {
+                $title = ! empty( $info['name'] ) ? $info['name'] : ( ! empty( $info['shop_name'] ) ? $info['shop_name'] : ( ! empty( $info['title'] ) ? $info['title'] : '' ) );
+                if ( ! empty( $title ) ) {
+                    $shop_map[ strtolower( trim( $title ) ) ] = $title;
+                }
+            }
+        }
+
+        // 3. Fallback: Parse shop name from tournament title (e.g. "Archery HQ-1" -> "Archery HQ")
+        $title_to_parse = ! empty( $t_name ) ? $t_name : ( is_array( $t_data ) && isset( $t_data['name'] ) ? $t_data['name'] : '' );
+        if ( ! empty( $title_to_parse ) ) {
+            $base_title = preg_replace( '/\s*[\-\#]\s*\d+$/i', '', trim( $title_to_parse ) );
+            $norm_base  = strtolower( trim( $base_title ) );
+
+            if ( isset( $shop_map[$norm_base] ) ) {
+                return $shop_map[$norm_base];
+            }
+
+            foreach ( $shop_map as $norm_shop => $official_title ) {
+                if ( ! empty( $norm_shop ) && strpos( $norm_base, $norm_shop ) !== false ) {
+                    return $official_title;
+                }
+            }
+
+            if ( ! empty( $base_title ) && strcasecmp( $base_title, 'TFAA State Indoor Championship' ) !== 0 ) {
+                return $base_title;
+            }
+        }
+
+        return 'Host Archery Shop';
     }
 }
 
@@ -242,6 +313,9 @@ if ( ! function_exists( 'sywat_get_tournament_season_slug' ) ) {
     function sywat_get_tournament_season_slug( $t_data ) {
         if ( is_array( $t_data ) && isset( $t_data['season_slug'] ) && ! empty( $t_data['season_slug'] ) ) {
             return $t_data['season_slug'];
+        }
+        if ( is_array( $t_data ) && isset( $t_data['season'] ) && ! empty( $t_data['season'] ) ) {
+            return $t_data['season'];
         }
         $active_season = function_exists('sywat_get_active_season') ? sywat_get_active_season() : array();
         return isset( $active_season['slug'] ) ? $active_season['slug'] : 'indoor-2026-2027';
