@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
