@@ -3,7 +3,7 @@
  * Sub-Module: Volunteer Hub Portal View Renderer
  * Path: includes/tournaments/volunteer-hub.php
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,38 +17,22 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
         }
 
         ob_start();
-        global $wpdb;
 
-        $tournaments = get_option( 'sywat_tournaments_list', array() );
-        if ( ! is_array( $tournaments ) ) $tournaments = array();
+        // Fetch central data bundle from Data Access Engine (No direct DB queries in View layer)
+        $data = function_exists( 'sywat_get_master_portal_data' ) ? sywat_get_master_portal_data() : array();
 
-        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
-        if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
-
-        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
-        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $tournaments        = isset( $data['tournaments'] ) ? $data['tournaments'] : array();
+        $active_tournaments = isset( $data['active_tournaments'] ) ? $data['active_tournaments'] : array();
+        $user_shop_id       = isset( $data['user_shop_id'] ) ? $data['user_shop_id'] : 'shop_ccr';
+        $can_manage_seasons = ! empty( $data['can_manage_seasons'] );
+        $registrations      = isset( $data['registrations'] ) ? $data['registrations'] : array();
 
         $display_tournaments = array();
-        foreach ($tournaments as $t_name => $t_data) {
-            $t_shop = sywat_get_tournament_shop_id( $t_data );
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( in_array( $t_name, $active_tournaments ) && ( $can_manage_seasons || $t_shop === $user_shop_id ) ) {
-                $display_tournaments[$t_name] = sywat_get_tournament_lines( $t_data );
+                $display_tournaments[$t_name] = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : array();
             }
-        }
-
-        $registrations = array();
-        $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
-        if ( is_array( $results ) ) {
-            foreach ($results as $row) {
-                $reg_data = maybe_unserialize($row->option_value);
-                if (is_array($reg_data) && isset($reg_data['id'])) {
-                    $registrations[] = $reg_data;
-                }
-            }
-        }
-
-        if ( empty( $registrations ) && function_exists( 'sywat_get_registrations' ) ) {
-            $registrations = sywat_get_registrations();
         }
 
         $count_checked_in = function( $t_name, $l_idx ) use ( &$registrations ) {
@@ -67,7 +51,7 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
         <div class="sywat-wrap">
             <?php if ( empty( $display_tournaments ) ): ?>
                 <div class="sywat-card">
-                    <p style="color:#646970; font-style:italic; margin:0;">No active tournaments currently enabled for the Volunteer Hub.</p>
+                    <p class="sywat-empty-text">No active tournaments currently enabled for the Volunteer Hub.</p>
                 </div>
             <?php else: ?>
                 <?php foreach ( $display_tournaments as $t_name => $t_lines ): ?>
@@ -96,7 +80,7 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
                             ?>
 
                             <?php foreach ( $day_groups as $day_label => $group_item_list ): ?>
-                                <div style="font-size: 1.05em; font-weight: 700; color: #1e293b; margin: 15px 0 10px 0; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                <div class="sywat-day-group-header">
                                     📅 <?php echo esc_html( $day_label ); ?> Lines
                                 </div>
                                 <div class="sywat-tracker-grid">
@@ -127,20 +111,20 @@ if ( ! function_exists( 'render_sywat_volunteer_hub' ) ) {
                                                     <span class="sywat-badge sywat-badge-open"><?php echo $c_in . ' / ' . $tot_reg . ' Checked In'; ?></span>
                                                 </div>
                                                 <div class="sywat-tracker-card-stats">
-                                                    <div><strong>20yd:</strong> <strong><?php echo $c_20 . '/' . $m_20; ?></strong> <span style="color:<?php echo ($rem_20 > 0) ? '#008a20' : '#d63638'; ?>; font-weight:600;">(<?php echo $rem_20; ?> open)</span></div>
-                                                    <div><strong>Cub:</strong> <strong><?php echo $c_cub . '/' . $m_cub; ?></strong> <span style="color:<?php echo ($rem_cub > 0) ? '#008a20' : '#d63638'; ?>; font-weight:600;">(<?php echo $rem_cub; ?> open)</span></div>
+                                                    <div><strong>20yd:</strong> <strong><?php echo $c_20 . '/' . $m_20; ?></strong> <span class="<?php echo ($rem_20 > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_20; ?> open)</span></div>
+                                                    <div><strong>Cub:</strong> <strong><?php echo $c_cub . '/' . $m_cub; ?></strong> <span class="<?php echo ($rem_cub > 0) ? 'sywat-text-open' : 'sywat-text-closed'; ?>">(<?php echo $rem_cub; ?> open)</span></div>
                                                 </div>
                                             </div>
                                             <div class="sywat-tracker-card-actions">
-                                                <a href="<?php echo esc_url($checkin_url); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" style="flex:1; text-align:center;">Check-In Desk</a>
-                                                <a href="<?php echo esc_url($scores_url); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" style="flex:1; text-align:center;">Enter Scores</a>
+                                                <a href="<?php echo esc_url($checkin_url); ?>" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin sywat-btn-flex-1">Check-In Desk</a>
+                                                <a href="<?php echo esc_url($scores_url); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-flex-1">Enter Scores</a>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <p style="color:#646970; font-style:italic; margin:0;">No shooting lines configured for this tournament.</p>
+                            <p class="sywat-empty-text">No shooting lines configured for this tournament.</p>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
