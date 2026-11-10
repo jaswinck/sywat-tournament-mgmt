@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 5.8.0
+ * Version: 5.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -643,6 +643,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 }
             }
 
+            $affected_shops = array();
             foreach ( $processed['valid_tournaments'] as $t ) {
                 $t_name   = $t['tournament_name'];
                 $official = $t['official_shop_name'];
@@ -665,12 +666,20 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     'created_at'           => current_time( 'mysql' ),
                 );
 
-                // Note: Tournaments start with Volunteer Hub OFF by default
+                if ( ! empty( $assoc_id ) && ! in_array( $assoc_id, $affected_shops ) ) {
+                    $affected_shops[] = $assoc_id;
+                }
+
                 $created_count++;
             }
 
             update_option( 'sywat_tournaments_list', $tournaments );
             delete_transient( $transient_key );
+
+            // Re-sequence all host shops affected by bulk import
+            foreach ( $affected_shops as $s_id ) {
+                sywat_resequence_shop_tournaments( $s_id, $target_season, $tournaments, $active_tournaments, $registrations );
+            }
 
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Schedule Imported Successfully!</strong> Created ' . intval( $created_count ) . ' new tournament(s) for season <strong>' . esc_html( $target_season ) . '</strong>.</div>';
         }
@@ -855,6 +864,9 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         if ( $action === 'delete_tournament' ) {
             $del_tournament = sanitize_text_field( $_POST['tournament_name'] );
             if ( isset( $tournaments[$del_tournament] ) ) {
+                $del_shop_id     = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $tournaments[$del_tournament] ) : '';
+                $del_season_slug = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $tournaments[$del_tournament] ) : '';
+
                 unset( $tournaments[$del_tournament] );
                 update_option( 'sywat_tournaments_list', $tournaments );
 
@@ -873,6 +885,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $registrations = array_values( array_filter( $registrations, function( $reg ) use ( $del_tournament ) {
                     return ! ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $del_tournament ) === 0 );
                 }) );
+
+                // Re-sequence remaining shop tournaments to collapse sequence gaps
+                if ( ! empty( $del_shop_id ) ) {
+                    sywat_resequence_shop_tournaments( $del_shop_id, $del_season_slug, $tournaments, $active_tournaments, $registrations );
+                }
 
                 $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted tournament <strong>' . esc_html( $del_tournament ) . '</strong> and purged all archers.</div>';
             }
