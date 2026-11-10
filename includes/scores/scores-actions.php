@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and 3-layer TFAA event score scraper.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and legacy-proven 3-layer TFAA event score scraper.
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 6.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -47,7 +47,7 @@ if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
 }
 
 /**
- * Core Parser: Scrapes TFAA event results page using 3-layer precision matching
+ * Core Parser: Scrapes TFAA event results page using 3-layer precision matching and legacy-proven regex engine
  * (Layer 1: Manual Override ID/URL, Layer 2: Season Parameter Filter, Layer 3: Date Range & Title Matching),
  * registers missing archers, auto-expands line capacities, enriches gender cache, and injects scores.
  *
@@ -73,7 +73,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             'timeout'   => 25,
             'sslverify' => false,
             'headers'   => array(
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
             )
         );
 
@@ -161,15 +162,34 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $event_html = wp_remote_retrieve_body( $event_resp );
         $event_html = str_replace( array( "\r", "\n" ), ' ', $event_html );
 
+        // Legacy auto-season query fallback if page returned 0 entries
+        if ( stripos( $event_html, '0 Entries' ) !== false || ( stripos( $event_html, 'Cub Male' ) === false && stripos( $event_html, 'Adult Male' ) === false ) ) {
+            if ( preg_match_all( '/<option[^>]*value=["\']([^"\']+)["\'][^>]*>([^<]+)<\/option>/i', $event_html, $opt_matches, PREG_SET_ORDER ) ) {
+                foreach ( $opt_matches as $om ) {
+                    $val = trim( $om[1] );
+                    if ( ! empty( $val ) && stripos( $val, 'Select' ) === false && preg_match( '/\d{4}/', $val ) ) {
+                        $season_url = $event_url . ( strpos( $event_url, '?' ) === false ? '?' : '&' ) . 'Season=' . urlencode( $val );
+                        $resp2 = wp_remote_get( $season_url, $http_args );
+                        if ( ! is_wp_error( $resp2 ) ) {
+                            $event_html = wp_remote_retrieve_body( $resp2 );
+                            $event_html = str_replace( array( "\r", "\n" ), ' ', $event_html );
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
         if ( stripos( $event_html, '0 Entries' ) !== false ) {
             return array( 'success' => false, 'message' => 'TFAA event page has 0 published entries yet.' );
         }
 
-        // Extract division, style, gender, and score rows
+        // Standardized Legacy Spacing & Tag Stripping Protocol
         $spaced_html = str_replace( '>', '> ', $event_html );
         $spaced_html = str_replace( '<', ' <', $spaced_html );
         $clean_html  = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_html );
-        $raw_lines   = explode( "\n", wp_strip_all_tags( $clean_html ) );
+        $plain_text  = wp_strip_all_tags( $clean_html );
+        $raw_lines   = explode( "\n", $plain_text );
 
         $parsed_entries = array();
         $curr_div       = '';
@@ -181,9 +201,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $cnt_cub  = 0;
 
         foreach ( $raw_lines as $raw_line ) {
-            // Decode HTML entities and sanitize whitespace
             $line = trim( preg_replace( '/\s+/', ' ', html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
             if ( empty( $line ) ) continue;
+
+            if ( stripos( $line, 'Filters:' ) !== false || stripos( $line, 'Search' ) !== false || stripos( $line, 'Entries' ) !== false ) {
+                continue;
+            }
 
             if ( function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
                 $div_check = sywat_parse_tfaa_div_gen( $line );
@@ -203,15 +226,15 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 }
             }
 
-            // Match row format: Optional leading non-digits + Rank + Space + "Last, First" + Space + Score + (Optional X count)
-            if ( preg_match( '/(?:^|\s)(\d{1,3})\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)\s+(\d{1,3})(?:\s+(\d{1,2})X?)?/i', $line, $matches ) ) {
+            // Legacy-proven name lookahead engine: Number + Space + (Last Name, First Name) + Space + Score + (Optional X count)
+            if ( preg_match( '/^\d+\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)(?=\s+\d|$)\s+(\d{1,3})(?:\s+(\d{1,2})X?)?/i', $line, $matches ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
-                $raw_name = trim( $matches[2] );
+                $raw_name = trim( $matches[1] );
                 $parts    = explode( ',', $raw_name, 2 );
                 $name     = trim( $parts[1] ) . ' ' . trim( $parts[0] );
-                $score    = intval( $matches[3] );
-                $xs       = isset( $matches[4] ) ? intval( $matches[4] ) : 0;
+                $score    = isset( $matches[2] ) ? intval( $matches[2] ) : 0;
+                $xs       = isset( $matches[3] ) ? intval( $matches[3] ) : 0;
                 $dist     = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
 
                 if ( $dist === 'Cub' ) $cnt_cub++;
