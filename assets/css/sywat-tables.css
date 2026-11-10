@@ -1,9 +1,46 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 6.9.0
+   Version: 7.4.0
    ========================================================================== */
 
+/* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
+.sywat-header-inline-controls,
+.sywat-table-header-controls,
+.sywat-table-header-filters,
+.sywat-table-header-actions {
+    display: flex;
+    align-items: flex-end !important;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sywat-filter-inline-form,
+.sywat-table-header-actions form {
+    margin: 0;
+    display: flex;
+    align-items: flex-end;
+}
+
+.sywat-header-inline-controls .sywat-field-group,
+.sywat-table-header-filters .sywat-field-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start !important;
+    margin: 0;
+}
+
+.sywat-header-inline-controls .sywat-field-group label,
+.sywat-table-header-filters .sywat-field-group label {
+    display: block;
+    text-align: left;
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1;
+}
+
+/* Base Responsive Tables */
 .sywat-table-responsive {
     width: 100%;
     overflow-x: auto;
@@ -74,15 +111,6 @@
     justify-content: center !important;
     margin: 0 auto !important;
     text-align: center !important;
-}
-
-/* Table Sub-Header Controls & Single-Row Flex Containers */
-.sywat-table-header-filters,
-.sywat-table-header-actions {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
 }
 
 /* Action Cell Alignment & Vertical Stacking Support */
@@ -552,11 +580,6 @@
     /* Keep table totally locked even on mobile */
     .sywat-modal-body .sywat-table-responsive { overflow-x: hidden !important; }
     .sywat-modal-repeater-table { table-layout: fixed !important; }
-    .sywat-table-header-filters,
-    .sywat-table-header-actions {
-        flex-wrap: wrap !important;
-        width: 100% !important;
-    }
 }
 
 /* Print Engine & Invoice Layout */
