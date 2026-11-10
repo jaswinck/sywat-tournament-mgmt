@@ -2,9 +2,9 @@
 /**
  * Module: Tournament Configuration, Master Portal & Volunteer Hub Loader Shell
  * Path: includes/tournaments/class-sywat-tournament-config.php
- * Description: Main loader binding helpers, season CRUD, action handlers, portal views, and volunteer hub.
+ * Description: Main loader binding data layer, helpers, season CRUD, action handlers, portal views, and volunteer hub.
  * Author: SYWAT Archery
- * Version: 2.6.0
+ * Version: 2.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -28,6 +28,7 @@ function sywat_enqueue_tournament_scripts() {
 add_action( 'wp_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
 
 // Include Sub-Module Files
+require_once plugin_dir_path( __FILE__ ) . 'tournament-data.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-helpers.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-seasons.php';
 require_once plugin_dir_path( __FILE__ ) . 'tournament-actions.php';
