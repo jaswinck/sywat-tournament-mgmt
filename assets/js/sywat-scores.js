@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -18,19 +18,23 @@ document.addEventListener("DOMContentLoaded", function() {
     const currentTourn = currentTournInput ? currentTournInput.value : '';
     const nonceVal     = nonceInput ? nonceInput.value : '';
 
-    // 2. Real-Time Search Filter (Class-Driven, No Inline Styles)
+    // 2. Real-Time Search Filter (Dual-Layer: Inline Display + Class-Driven)
     const searchInput = document.getElementById('sywat_score_search_input');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const filter = this.value.trim().toLowerCase();
+        function filterRows() {
+            const filter = searchInput.value.trim().toLowerCase();
             const rows   = document.querySelectorAll('.sywat-score-row');
 
             rows.forEach(function(row) {
-                const name = row.getAttribute('data-name');
-                if (name && name.includes(filter)) {
+                const name        = row.getAttribute('data-name') || '';
+                const textContent = (row.textContent || row.innerText || '').toLowerCase();
+
+                if (!filter || name.includes(filter) || textContent.includes(filter)) {
                     row.classList.remove('sywat-hidden');
+                    row.style.display = '';
                 } else {
                     row.classList.add('sywat-hidden');
+                    row.style.display = 'none';
                 }
             });
 
@@ -38,10 +42,13 @@ document.addEventListener("DOMContentLoaded", function() {
             hiddenSearches.forEach(function(hidden) {
                 hidden.value = searchInput.value;
             });
-        });
+        }
+
+        searchInput.addEventListener('input', filterRows);
+        searchInput.addEventListener('keyup', filterRows);
 
         // Initialize search state
-        searchInput.dispatchEvent(new Event('input'));
+        filterRows();
     }
 
     // 3. Helper: Status Badge Class & Text Updater
