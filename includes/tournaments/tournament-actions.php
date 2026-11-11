@@ -3,40 +3,33 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.10.4
+ * Version: 7.10.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Master Controller Function for Tournament & Season POST Actions.
- *
- * @param array  $tournaments         Reference to tournaments array.
- * @param array  $active_tournaments  Reference to active tournaments array.
- * @param array  $registrations       Reference to registrations array.
- * @param bool   $can_manage_seasons  Capability flag for season configuration.
- * @param string $user_shop_id        Shop ID of current logged in user.
- * @return string                     HTML alert notice markup.
+ * Early Init Interceptor for Asynchronous JSON TFAA Score Sync Requests.
+ * Executes prior to theme HTML rendering to guarantee a pure JSON payload.
  */
-if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
-    function sywat_handle_tournament_post_actions( &$tournaments, &$active_tournaments, &$registrations, $can_manage_seasons, $user_shop_id ) {
-        $notice = '';
-        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
-
-        // =====================================================================
-        // ASYNC JSON ENDPOINT: Direct Page Request Intercept for Batch Sync
-        // =====================================================================
-        if ( $action === 'sync_tfaa_single_json' ) {
+add_action( 'init', 'sywat_async_tfaa_sync_interceptor' );
+if ( ! function_exists( 'sywat_async_tfaa_sync_interceptor' ) ) {
+    function sywat_async_tfaa_sync_interceptor() {
+        if ( isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'sync_tfaa_single_json' ) {
             // Clean output buffers to ensure pure JSON response
             while ( ob_get_level() ) {
                 ob_end_clean();
             }
 
-            if ( ! $can_manage_seasons ) {
+            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_desk_action' ) ) {
+                wp_send_json_error( array( 'message' => 'Security token expired. Please refresh the page.' ) );
+            }
+
+            if ( ! function_exists( 'sywat_can_manage_tournaments' ) || ! sywat_can_manage_tournaments() ) {
                 wp_send_json_error( array( 'message' => 'Access denied. Management permission required.' ) );
             }
 
-            $target_t = isset( $_POST['tournament_name'] ) ? sanitize_text_field( $_POST['tournament_name'] ) : '';
+            $target_t = isset( $_POST['tournament_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) ) : '';
 
             if ( empty( $target_t ) ) {
                 wp_send_json_error( array( 'message' => 'No target tournament specified for TFAA sync.' ) );
@@ -64,10 +57,24 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             } else {
                 wp_send_json_error( array( 'message' => 'TFAA sync engine function unavailable.' ) );
             }
-            
-            // wp_send_json_success/error automatically calls wp_die() and terminates the script.
         }
-        // =====================================================================
+    }
+}
+
+/**
+ * Master Controller Function for Tournament & Season POST Actions.
+ *
+ * @param array  $tournaments         Reference to tournaments array.
+ * @param array  $active_tournaments  Reference to active tournaments array.
+ * @param array  $registrations       Reference to registrations array.
+ * @param bool   $can_manage_seasons  Capability flag for season configuration.
+ * @param string $user_shop_id        Shop ID of current logged in user.
+ * @return string                     HTML alert notice markup.
+ */
+if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
+    function sywat_handle_tournament_post_actions( &$tournaments, &$active_tournaments, &$registrations, $can_manage_seasons, $user_shop_id ) {
+        $notice = '';
+        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
 
         // Action: Register Shooter Intake Form
         if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
@@ -103,7 +110,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Bulk Sync Season TFAA Direct URLs (Dynamic Debug Toggle Support)
         if ( $action === 'sync_season_tfaa_urls' ) {
-            $target_s = isset( $_POST['season_slug'] ) ? sanitize_text_field( $_POST['season_slug'] ) : '';
+            $target_s = isset( $_POST['season_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['season_slug'] ) ) : '';
             $res      = function_exists( 'sywat_sync_season_tfaa_urls' ) ? sywat_sync_season_tfaa_urls( $target_s ) : array( 'success' => false, 'message' => 'Sync function missing.' );
             
             $is_debug = ! empty( $res['debug'] );
@@ -128,11 +135,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $seasons     = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
-            $orig_slug   = isset( $_POST['original_season_slug'] ) ? sanitize_text_field( $_POST['original_season_slug'] ) : '';
-            $s_type      = sanitize_text_field( $_POST['season_type'] );
-            $start_date  = sanitize_text_field( $_POST['start_date'] );
-            $end_date    = sanitize_text_field( $_POST['end_date'] );
-            $s_status    = sanitize_text_field( $_POST['season_status'] );
+            $orig_slug   = isset( $_POST['original_season_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['original_season_slug'] ) ) : '';
+            $s_type      = sanitize_text_field( wp_unslash( $_POST['season_type'] ) );
+            $start_date  = sanitize_text_field( wp_unslash( $_POST['start_date'] ) );
+            $end_date    = sanitize_text_field( wp_unslash( $_POST['end_date'] ) );
+            $s_status    = sanitize_text_field( wp_unslash( $_POST['season_status'] ) );
             $s_best_n    = intval( $_POST['season_best_n'] );
 
             // Validate Season Type Selection
@@ -195,7 +202,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid schedule file (.csv or .xlsx) to upload.</div>';
             }
 
-            $target_season = isset( $_POST['import_target_season'] ) ? sanitize_text_field( $_POST['import_target_season'] ) : '2026-2027 Indoor';
+            $target_season = isset( $_POST['import_target_season'] ) ? sanitize_text_field( wp_unslash( $_POST['import_target_season'] ) ) : '2026-2027 Indoor';
             $file_path     = $_FILES['schedule_file']['tmp_name'];
             $file_name     = $_FILES['schedule_file']['name'];
 
@@ -298,7 +305,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Sync Single TFAA Tournament Scorecard (Fallback UI handler)
         if ( $action === 'sync_tfaa_single' ) {
-            $target_t = isset( $_POST['target_tournament'] ) ? sanitize_text_field( $_POST['target_tournament'] ) : '';
+            $target_t = isset( $_POST['target_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['target_tournament'] ) ) : '';
 
             if ( empty( $target_t ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No target tournament specified for TFAA sync.</div>';
@@ -380,7 +387,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Toggle Volunteer Hub Display
         if ( $action === 'toggle_active_tournament' ) {
-            $target_t = sanitize_text_field( $_POST['tournament_name'] );
+            $target_t = sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) );
             if ( in_array( $target_t, $active_tournaments ) ) {
                 $active_tournaments = array_diff( $active_tournaments, array( $target_t ) );
             } else {
@@ -418,7 +425,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Toggle Push / Publish Scores to Season Standings (Single Event Fallback)
         if ( $action === 'toggle_publish_standings' ) {
-            $t_name = sanitize_text_field( $_POST['tournament_name'] );
+            $t_name = sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) );
             if ( isset( $tournaments[$t_name] ) ) {
                 $is_published = ! empty( $tournaments[$t_name]['scores_published'] );
                 $tournaments[$t_name]['scores_published'] = ! $is_published;
@@ -437,18 +444,18 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Save / Edit Tournament Config
         if ( $action === 'save_tournament' ) {
-            $t_name        = sanitize_text_field( $_POST['tournament_name'] );
-            $old_name      = sanitize_text_field( $_POST['original_tournament_name'] );
-            $season_slug   = sanitize_text_field( $_POST['season_slug'] );
+            $t_name        = sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) );
+            $old_name      = sanitize_text_field( wp_unslash( $_POST['original_tournament_name'] ) );
+            $season_slug   = sanitize_text_field( wp_unslash( $_POST['season_slug'] ) );
             $new_slug      = sanitize_title( $t_name );
 
-            $start_date    = sanitize_text_field( $_POST['start_date'] );
-            $end_date      = sanitize_text_field( $_POST['end_date'] );
+            $start_date    = sanitize_text_field( wp_unslash( $_POST['start_date'] ) );
+            $end_date      = sanitize_text_field( wp_unslash( $_POST['end_date'] ) );
             if ( empty( $end_date ) ) $end_date = $start_date;
 
-            $tfaa_event_id = isset( $_POST['tfaa_event_id'] ) ? sanitize_text_field( trim( $_POST['tfaa_event_id'] ) ) : '';
+            $tfaa_event_id = isset( $_POST['tfaa_event_id'] ) ? sanitize_text_field( trim( wp_unslash( $_POST['tfaa_event_id'] ) ) ) : '';
 
-            $assigned_shop_id = $can_manage_seasons ? sanitize_text_field( $_POST['shop_id'] ) : $user_shop_id;
+            $assigned_shop_id = $can_manage_seasons ? sanitize_text_field( wp_unslash( $_POST['shop_id'] ) ) : $user_shop_id;
             if ( empty( $assigned_shop_id ) ) $assigned_shop_id = $user_shop_id;
             
             // Resolve shop name metadata from master shop list
@@ -502,8 +509,8 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
             if ( ! empty( $_POST['line_days'] ) && is_array( $_POST['line_days'] ) ) {
                 foreach ( $_POST['line_days'] as $index => $day ) {
-                    $clean_day  = trim( sanitize_text_field( $day ) );
-                    $clean_time = isset( $_POST['line_times'][$index] ) ? trim( sanitize_text_field( $_POST['line_times'][$index] ) ) : '';
+                    $clean_day  = trim( sanitize_text_field( wp_unslash( $day ) ) );
+                    $clean_time = isset( $_POST['line_times'][$index] ) ? trim( sanitize_text_field( wp_unslash( $_POST['line_times'][$index] ) ) ) : '';
                     if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
                         $formatted_time = function_exists( 'sywat_format_line_time_token' ) ? sywat_format_line_time_token( $clean_time ) : $clean_time;
                         $combo_key      = strtolower( $clean_day . '_' . $formatted_time );
@@ -522,7 +529,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             } elseif ( ! empty( $_POST['line_names'] ) && is_array( $_POST['line_names'] ) ) {
                 // Fallback for legacy single line string POSTs
                 foreach ( $_POST['line_names'] as $index => $name ) {
-                    $clean_name = trim( sanitize_text_field( $name ) );
+                    $clean_name = trim( sanitize_text_field( wp_unslash( $name ) ) );
                     if ( ! empty( $clean_name ) ) {
                         $parts          = explode( ' ', $clean_name, 2 );
                         $formatted_time = isset( $parts[1] ) ? ( function_exists( 'sywat_format_line_time_token' ) ? sywat_format_line_time_token( $parts[1] ) : $parts[1] ) : '';
@@ -617,7 +624,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
         // Action: Delete Tournament
         if ( $action === 'delete_tournament' ) {
-            $del_tournament = sanitize_text_field( $_POST['tournament_name'] );
+            $del_tournament = sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) );
             if ( isset( $tournaments[$del_tournament] ) ) {
                 $del_shop_id     = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $tournaments[$del_tournament] ) : '';
                 $del_season_slug = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $tournaments[$del_tournament] ) : '';
