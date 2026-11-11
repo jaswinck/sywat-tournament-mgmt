@@ -4,7 +4,7 @@
  * Path: includes/common/sywat-tfaa-sync.php
  * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -146,7 +146,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $body = wp_remote_retrieve_body( $event_resp );
         $body = str_replace( array( "\r", "\n" ), " ", $body );
 
-        if ( stripos( $body, '0 Entries' ) !== false ) {
+        if ( preg_match( '/\b0\s+Entries\b/i', $body ) ) {
             return array( 'success' => false, 'message' => 'TFAA event page has 0 published entries yet.' );
         }
 
