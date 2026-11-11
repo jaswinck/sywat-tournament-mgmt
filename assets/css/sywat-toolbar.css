@@ -22,9 +22,10 @@
 .sywat-auth-dropdown-menu a:hover { background-color: #1e293b; color: #38bdf8; }
 .sywat-auth-dropdown:hover .sywat-auth-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); transition-delay: 0s; }
 
-/* Header Inline Controls Bar */
+/* Header Inline Controls Bar & Direct Child Normalization */
 .sywat-card-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; width: 100%; box-sizing: border-box; }
 .sywat-header-inline-controls { display: flex !important; align-items: center !important; justify-content: flex-end !important; gap: 10px !important; flex-wrap: wrap !important; margin-left: auto !important; }
+.sywat-header-inline-controls > * { margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; flex-shrink: 0 !important; }
 .sywat-header-inline-controls form { margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
 .sywat-header-inline-controls .sywat-field-group { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin: 0 !important; }
 .sywat-header-inline-controls .sywat-field-group label { margin: 0 !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; }
