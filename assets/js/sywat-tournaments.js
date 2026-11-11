@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 7.10.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -412,6 +412,139 @@ function sywatResetTournamentFilters() {
     sessionStorage.removeItem('sywat_tournament_search');
 
     sywatApplyTournamentFilters();
+}
+
+/**
+ * Open the TFAA Scorecards Batch Sync Progress Modal & Start Asynchronous Queue
+ */
+function sywatOpenTfaaSyncModal() {
+    const modal = document.getElementById('sywat_tfaa_sync_modal');
+    if (!modal) return;
+
+    const logConsole   = document.getElementById('sywat_tfaa_sync_log_console');
+    const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
+    const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
+
+    if (logConsole) logConsole.innerHTML = '';
+    if (progressFill) progressFill.style.width = '0%';
+    if (statusText) statusText.textContent = 'Initialising tournament queue...';
+
+    modal.classList.add('active');
+
+    // Collect tournament names from active table rows
+    const tournamentRows = document.querySelectorAll('.sywat-tournament-row');
+    const tournamentList = [];
+
+    tournamentRows.forEach(row => {
+        const titleElem = row.querySelector('.sywat-tourn-title');
+        if (titleElem && titleElem.textContent.trim()) {
+            tournamentList.push(titleElem.textContent.trim());
+        }
+    });
+
+    if (tournamentList.length === 0) {
+        if (statusText) statusText.textContent = 'No tournaments found in table to sync.';
+        return;
+    }
+
+    const nonceElem = document.querySelector('input[name="sywat_nonce"]');
+    const nonce     = nonceElem ? nonceElem.value : '';
+
+    sywatRunTfaaBatchSync(tournamentList, nonce);
+}
+
+/**
+ * Sequentially executes single-tournament TFAA score sync AJAX calls.
+ *
+ * @param {Array}  tournaments List of tournament names.
+ * @param {string} nonce       WordPress security nonce.
+ */
+async function sywatRunTfaaBatchSync(tournaments, nonce) {
+    const logConsole   = document.getElementById('sywat_tfaa_sync_log_console');
+    const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
+    const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
+    const ajaxUrl      = window.ajaxurl || '/wp-admin/admin-ajax.php';
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (let i = 0; i < tournaments.length; i++) {
+        const tName = tournaments[i];
+        const step  = i + 1;
+
+        if (statusText) {
+            statusText.textContent = `Syncing tournament ${step} of ${tournaments.length}: "${tName}"...`;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'sywat_sync_single_tfaa_tournament');
+        formData.append('tournament_name', tName);
+        formData.append('nonce', nonce);
+
+        try {
+            const response = await fetch(ajaxUrl, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+            const percent = Math.round((step / tournaments.length) * 100);
+
+            if (progressFill) {
+                progressFill.style.width = `${percent}%`;
+            }
+
+            const logItem = document.createElement('div');
+            logItem.className = 'sywat-log-item';
+
+            if (result && result.success) {
+                successCount++;
+                logItem.classList.add('sywat-log-success');
+                logItem.innerHTML = `🟢 <strong>${tName}:</strong> ${result.data.message || 'Synced successfully.'}`;
+            } else {
+                failureCount++;
+                logItem.classList.add('sywat-log-error');
+                const errMsg = (result && result.data && result.data.message) ? result.data.message : 'Sync failed or target URL unreachable.';
+                logItem.innerHTML = `⚠️ <strong>${tName}:</strong> ${errMsg}`;
+            }
+
+            if (logConsole) {
+                logConsole.appendChild(logItem);
+                logConsole.scrollTop = logConsole.scrollHeight;
+            }
+
+        } catch (err) {
+            failureCount++;
+            const percent = Math.round((step / tournaments.length) * 100);
+
+            if (progressFill) {
+                progressFill.style.width = `${percent}%`;
+            }
+
+            const logItem = document.createElement('div');
+            logItem.className = 'sywat-log-item sywat-log-error';
+            logItem.innerHTML = `⚠️ <strong>${tName}:</strong> Request timeout or server connection error.`;
+
+            if (logConsole) {
+                logConsole.appendChild(logItem);
+                logConsole.scrollTop = logConsole.scrollHeight;
+            }
+        }
+    }
+
+    if (statusText) {
+        statusText.textContent = `Batch sync complete! ${successCount} succeeded, ${failureCount} failed across ${tournaments.length} tournament(s).`;
+    }
+}
+
+/**
+ * Close the TFAA Scores Batch Sync Progress Modal
+ */
+function sywatCloseTfaaSyncModal() {
+    const modal = document.getElementById('sywat_tfaa_sync_modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
 }
 
 document.addEventListener("DOMContentLoaded", function() {
