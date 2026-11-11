@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 6.9.3
+ * Version: 6.9.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -160,11 +160,19 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
 
-        // Resolve Preview TFAA Target URL ONCE for the single active tournament
-        $preview_tfaa_url = function_exists( 'sywat_get_tfaa_event_url' ) ? sywat_get_tfaa_event_url( $selected_tournament, $t_master ) : 'https://texasfieldarchery.org/results';
+        // Read target URL directly from saved tournament database record
+        $preview_tfaa_url = 'https://texasfieldarchery.org/results';
+        if ( ! empty( $t_master['tfaa_results_url'] ) ) {
+            $preview_tfaa_url = trim( $t_master['tfaa_results_url'] );
+        } elseif ( ! empty( $t_master['tfaa_event_id'] ) ) {
+            $t_override = trim( $t_master['tfaa_event_id'] );
+            $preview_tfaa_url = is_numeric( $t_override ) ? 'https://texasfieldarchery.org/results/' . $t_override : $t_override;
+        } elseif ( ! empty( $t_master['season'] ) ) {
+            $preview_tfaa_url = 'https://texasfieldarchery.org/results?season=' . urlencode( trim( $t_master['season'] ) );
+        }
 
         // Enqueue client score interactive JavaScript asset (Directive Section IV.1)
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.0.0', true );
+        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '6.6.0', true );
         ?>
 
         <div class="sywat-wrap">
