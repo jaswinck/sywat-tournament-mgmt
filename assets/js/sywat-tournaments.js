@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 7.10.2
+ * Version: 7.10.3
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -447,10 +447,9 @@ function sywatOpenTfaaSyncModal() {
         return;
     }
 
-    // Use localized nonce with fallback for compatibility
-    const nonce = (typeof sywat_ajax !== 'undefined' && sywat_ajax.nonce) 
-                  ? sywat_ajax.nonce 
-                  : (document.querySelector('input[name="sywat_nonce"]') ? document.querySelector('input[name="sywat_nonce"]').value : '');
+    // Capture the primary desk action nonce directly from the page
+    const nonceElem = document.querySelector('input[name="sywat_nonce"]');
+    const nonce = nonceElem ? nonceElem.value : '';
 
     sywatRunTfaaBatchSync(tournamentList, nonce);
 }
@@ -466,10 +465,8 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
     const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
     const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
     
-    // Use localized URL with fallback for compatibility
-    const ajaxUrl = (typeof sywat_ajax !== 'undefined' && sywat_ajax.ajax_url) 
-                    ? sywat_ajax.ajax_url 
-                    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+    // DIRECT PAGE BYPASS: Route traffic to the current page URL to hit our JSON interceptor hook
+    const requestUrl = window.location.href;
 
     let successCount = 0;
     let failureCount = 0;
@@ -483,12 +480,12 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
         }
 
         const formData = new FormData();
-        formData.append('action', 'sywat_sync_single_tfaa_tournament');
+        formData.append('sywat_action', 'sync_tfaa_single_json');
         formData.append('tournament_name', tName);
-        formData.append('nonce', nonce);
+        formData.append('sywat_nonce', nonce);
 
         try {
-            const response = await fetch(ajaxUrl, {
+            const response = await fetch(requestUrl, {
                 method: 'POST',
                 body: formData,
             });
@@ -519,15 +516,13 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
                 logItem.classList.add('sywat-log-error');
                 let errMsg = '';
 
-                // Explicitly intercept WordPress missing-action "0" response
-                if (rawText.trim() === '0') {
-                    errMsg = 'AJAX action hook missing or unregistered (WordPress returned 0).';
-                } else if (result && result.data && result.data.message) {
+                if (result && result.data && result.data.message) {
                     errMsg = result.data.message;
                 } else if (!response.ok) {
                     errMsg = `HTTP ${response.status} ${response.statusText || 'Error'}`;
                 } else if (rawText) {
-                    errMsg = `Server response: ${rawText.slice(0, 100)}`;
+                    // Truncate raw response text in case it's an HTML page or long error trace
+                    errMsg = `Server response: ${rawText.slice(0, 100)}...`;
                 } else {
                     errMsg = 'Unknown server response.';
                 }
