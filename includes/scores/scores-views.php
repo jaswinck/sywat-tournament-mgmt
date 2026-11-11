@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
+ * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button with pre-cached deep link resolution.
  * Author: SYWAT Archery
- * Version: 6.8.0
+ * Version: 6.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -160,23 +160,8 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
 
-        // Resolve Preview TFAA Target URL for Selected Tournament
-        $preview_tfaa_url = '';
-        if ( ! empty( $t_master['tfaa_results_url'] ) ) {
-            $preview_tfaa_url = trim( $t_master['tfaa_results_url'] );
-        } elseif ( ! empty( $t_master['tfaa_event_id'] ) ) {
-            $t_override = trim( $t_master['tfaa_event_id'] );
-            if ( is_numeric( $t_override ) ) {
-                $preview_tfaa_url = 'https://texasfieldarchery.org/results/' . $t_override;
-            } else {
-                $preview_tfaa_url = ( strpos( $t_override, 'http' ) === 0 ) ? $t_override : 'https://texasfieldarchery.org' . ( strpos( $t_override, '/' ) === 0 ? '' : '/' ) . $t_override;
-            }
-        }
-
-        if ( empty( $preview_tfaa_url ) ) {
-            $season_param     = ! empty( $t_master['season'] ) ? '?season=' . urlencode( trim( $t_master['season'] ) ) : '';
-            $preview_tfaa_url = 'https://texasfieldarchery.org/results' . $season_param;
-        }
+        // Resolve Preview TFAA Target URL using central fast transient/override helper
+        $preview_tfaa_url = function_exists( 'sywat_get_tfaa_event_url' ) ? sywat_get_tfaa_event_url( $selected_tournament, $t_master ) : 'https://texasfieldarchery.org/results';
 
         // Enqueue client score interactive JavaScript asset (Directive Section IV.1)
         wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '6.6.0', true );
@@ -215,7 +200,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <label for="selected_tournament_val">Active Tournament:</label>
                                 <select name="selected_tournament" id="selected_tournament_val" class="sywat-select-tournament" onchange="document.getElementById('sywat_score_filter_form').submit();">
                                     <?php foreach ( $tournaments as $t_name => $t_lines ): ?>
-                                        <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
+                                        <?php 
+                                            $opt_master = ( is_array( $all_tournaments ) && isset( $all_tournaments[$t_name] ) ) ? $all_tournaments[$t_name] : array();
+                                            $opt_url    = function_exists( 'sywat_get_tfaa_event_url' ) ? sywat_get_tfaa_event_url( $t_name, $opt_master ) : 'https://texasfieldarchery.org/results';
+                                        ?>
+                                        <option value="<?php echo esc_attr( $t_name ); ?>" data-tfaa-url="<?php echo esc_url( $opt_url ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
                                             <?php echo esc_html( $t_name ); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -370,7 +359,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </div>
 
                                 <!-- Dynamic View TFAA Page Preview Link -->
-                                <a href="<?php echo esc_url( $preview_tfaa_url ); ?>" target="_blank" rel="noopener" class="sywat-btn sywat-btn-secondary sywat-btn-icon-external" title="Open TFAA Event Results page in a new tab to verify before syncing">
+                                <a href="<?php echo esc_url( $preview_tfaa_url ); ?>" id="sywat_tfaa_preview_btn" target="_blank" rel="noopener" class="sywat-btn sywat-btn-secondary sywat-btn-icon-external" title="Open TFAA Event Results page in a new tab to verify before syncing">
                                     View TFAA Page ↗
                                 </a>
 
