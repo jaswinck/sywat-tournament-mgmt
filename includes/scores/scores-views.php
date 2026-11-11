@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -148,7 +148,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
 
         // Enqueue client score interactive JavaScript asset (Directive Section IV.1)
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '6.5.0', true );
+        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '6.6.0', true );
         ?>
 
         <div class="sywat-wrap">
@@ -335,12 +335,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <!-- Live Search Input Group -->
                                 <div class="sywat-search-input-group">
                                     <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off">
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="var inp=document.getElementById('sywat_score_search_input'); if(inp){inp.value=''; inp.dispatchEvent(new Event('input'));}">Clear</button>
                                 </div>
 
-                                <!-- 🔄 Sync TFAA Event Scores Trigger -->
-                                <button type="submit" name="sywat_action" value="sync_tfaa_scores" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" onclick="return confirm('🔄 Sync scores for \'<?php echo esc_js($selected_tournament); ?>\' directly from TFAA?');">
-                                    🔄 Sync TFAA Scores
+                                <!-- Sync TFAA Event Scores Trigger -->
+                                <button type="submit" name="sywat_action" value="sync_tfaa_scores" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" onclick="return confirm('Sync scores for \'<?php echo esc_js($selected_tournament); ?>\' directly from TFAA?');">
+                                    Sync TFAA Scores
                                 </button>
 
                                 <!-- Export CSV Button (Admin & Shop Managers) -->
@@ -427,7 +427,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
                             </div>
                         <?php else: ?>
-                            <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection. Click <strong>🔄 Sync TFAA Scores</strong> to pull archers and scores from TFAA.</p>
+                            <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection. Click <strong>Sync TFAA Scores</strong> to pull archers and scores from TFAA.</p>
                         <?php endif; ?>
                     </form>
                 </div>
