@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 6.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -45,11 +45,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             $all_tournaments = array( $single_name => get_option( 'sywat_line_config', array() ) );
         }
 
-        $tournaments = array();
+        $raw_tournaments = array();
         foreach ( $all_tournaments as $t_name => $t_data ) {
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( $is_admin || $t_shop === $user_shop_id ) {
-                $tournaments[$t_name] = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : $t_data;
+                $raw_tournaments[$t_name] = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : $t_data;
             }
         }
 
@@ -60,7 +60,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         // ALWAYS prefer global active tournament first when GET/POST is empty
         if ( empty( $selected_tournament ) ) {
             $global_curr = get_option( 'sywat_current_tournament', '' );
-            if ( ! empty( $global_curr ) && isset( $tournaments[$global_curr] ) ) {
+            if ( ! empty( $global_curr ) && isset( $raw_tournaments[$global_curr] ) ) {
                 $selected_tournament = $global_curr;
             }
         }
@@ -68,18 +68,31 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         // Secondary Fallback: User Meta Preference
         if ( empty( $selected_tournament ) && $user->ID ) {
             $saved_t = get_user_meta( $user->ID, 'sywat_desk_selected_tournament', true );
-            if ( ! empty( $saved_t ) && isset( $tournaments[$saved_t] ) ) {
+            if ( ! empty( $saved_t ) && isset( $raw_tournaments[$saved_t] ) ) {
                 $selected_tournament = $saved_t;
             }
         }
 
-        if ( empty( $selected_tournament ) && ! empty( $tournaments ) ) {
-            reset( $tournaments );
-            $selected_tournament = key( $tournaments );
+        if ( empty( $selected_tournament ) && ! empty( $raw_tournaments ) ) {
+            reset( $raw_tournaments );
+            $selected_tournament = key( $raw_tournaments );
         }
 
         if ( $user->ID && ! empty( $selected_tournament ) ) {
             update_user_meta( $user->ID, 'sywat_desk_selected_tournament', $selected_tournament );
+        }
+
+        // Hybrid Tournament Sorting: Sort A-Z, Pin Active Tournament to Top Position (#0)
+        uksort( $raw_tournaments, 'strcasecmp' );
+
+        $tournaments = array();
+        if ( ! empty( $selected_tournament ) && isset( $raw_tournaments[$selected_tournament] ) ) {
+            $tournaments[$selected_tournament] = $raw_tournaments[$selected_tournament];
+        }
+        foreach ( $raw_tournaments as $t_name => $t_lines ) {
+            if ( $t_name !== $selected_tournament ) {
+                $tournaments[$t_name] = $t_lines;
+            }
         }
 
         $lines         = isset( $tournaments[$selected_tournament] ) ? $tournaments[$selected_tournament] : array();
