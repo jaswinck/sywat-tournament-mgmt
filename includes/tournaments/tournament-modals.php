@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -31,7 +31,15 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $edit_t_season  = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists('sywat_get_active_season') ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start   = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end     = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
-        $edit_tfaa_val   = ( is_array( $edit_t_data ) && isset( $edit_t_data['tfaa_event_id'] ) ) ? $edit_t_data['tfaa_event_id'] : '';
+        
+        $edit_tfaa_val = '';
+        if ( is_array( $edit_t_data ) ) {
+            if ( ! empty( $edit_t_data['tfaa_event_id'] ) ) {
+                $edit_tfaa_val = $edit_t_data['tfaa_event_id'];
+            } elseif ( ! empty( $edit_t_data['tfaa_results_url'] ) ) {
+                $edit_tfaa_val = $edit_t_data['tfaa_results_url'];
+            }
+        }
 
         // Resolve target shop key for fallback initialization
         $target_shop_key = $edit_t_shop;
