@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -287,7 +287,7 @@ if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
         $shop_data = array();
 
         if ( is_string( $shop_data_or_id ) && ! empty( $shop_data_or_id ) ) {
-            $master_shops = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : get_option( 'sywat_shops', array() );
+            $master_shops = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : ( function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array() );
             if ( ! is_array( $master_shops ) ) {
                 $master_shops = array();
             }
@@ -506,9 +506,8 @@ if ( ! function_exists( 'sywat_get_tournament_shop_name' ) ) {
     function sywat_get_tournament_shop_name( $t_data, $t_name = '', $all_shops = array() ) {
         if ( empty( $all_shops ) && function_exists( 'sywat_get_all_shops' ) ) {
             $all_shops = sywat_get_all_shops();
-        }
-        if ( empty( $all_shops ) ) {
-            $all_shops = get_option( 'sywat_shops', get_option( 'sywat_shops_list', array() ) );
+        } elseif ( empty( $all_shops ) && function_exists( 'sywat_get_shops' ) ) {
+            $all_shops = sywat_get_shops();
         }
         if ( ! is_array( $all_shops ) ) {
             $all_shops = array();
