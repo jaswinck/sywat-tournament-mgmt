@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -209,15 +209,23 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'No event links found on TFAA page.' );
         }
 
+        // Bulletproof Season Comparison Stripping
+        $clean_target_slug = strtolower( preg_replace('/[^a-z0-9]/i', '', $target_slug) );
+        $clean_target_name = strtolower( preg_replace('/[^a-z0-9]/i', '', $target_name) );
+
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
-            if ( ! empty( $t_data['tfaa_event_id'] ) ) continue;
+            // Skip if the user typed in a direct override
+            if ( ! empty( $t_data['tfaa_event_id'] ) && strpos( $t_data['tfaa_event_id'], 'http' ) === 0 ) {
+                continue;
+            }
 
             $t_season = isset( $t_data['season'] ) ? $t_data['season'] : ( isset( $t_data['season_slug'] ) ? $t_data['season_slug'] : '' );
+            $clean_t_season = strtolower( preg_replace('/[^a-z0-9]/i', '', $t_season) );
 
-            // 3. Relaxed Matching: Accept match against EITHER the slug or the formatted name
-            if ( ! empty( $target_slug ) && ! empty( $t_season ) ) {
-                if ( strcasecmp( trim( $t_season ), trim( $target_slug ) ) !== 0 && strcasecmp( trim( $t_season ), trim( $target_name ) ) !== 0 ) {
+            // 3. Relaxed Database Matching: Compare alphanumeric stripped strings
+            if ( ! empty( $clean_target_slug ) && ! empty( $clean_t_season ) ) {
+                if ( $clean_t_season !== $clean_target_slug && $clean_t_season !== $clean_target_name ) {
                     continue;
                 }
             }
@@ -230,7 +238,10 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                     continue;
                 }
 
-                if ( function_exists( 'sywat_match_tfaa_tournament_name' ) && sywat_match_tfaa_tournament_name( $t_name, $link_text ) ) {
+                // 4. Strip prepended date strings from TFAA link text (e.g. "10/31/2026 - 11/01/2026 | ")
+                $clean_link_text = preg_replace('/^\s*\d{2}\/\d{2}\/\d{4}(?:\s*-\s*\d{2}\/\d{2}\/\d{4})?\s*(?:\||-)?\s*/', '', $link_text);
+
+                if ( function_exists( 'sywat_match_tfaa_tournament_name' ) && sywat_match_tfaa_tournament_name( $t_name, $clean_link_text ) ) {
                     if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
                         $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
                     } else {
