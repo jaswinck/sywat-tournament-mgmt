@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button with pre-cached deep link resolution.
+ * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 6.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
