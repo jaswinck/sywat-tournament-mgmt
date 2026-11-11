@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -166,7 +166,10 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
         }
 
-        $season_param = ! empty( $target_season ) ? '?season=' . urlencode( $target_season ) : '';
+        // Normalize typographical en-dash to standard hyphen for the TFAA server request
+        $request_season = str_replace( array( '–', '—' ), '-', $target_season );
+
+        $season_param = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
         $index_url    = 'https://texasfieldarchery.org/results' . $season_param;
 
         $http_args = array(
