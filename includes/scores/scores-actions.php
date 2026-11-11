@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Universal Token Matcher, Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Universal Token Matcher, Auto-remembered TFAA URL persistence, Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
  * Author: SYWAT Archery
- * Version: 9.3.0
+ * Version: 9.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -240,6 +240,16 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         if ( empty( $event_url ) ) {
             return array( 'success' => false, 'message' => 'Could not find a published TFAA results page matching \'' . esc_html( $t_name ) . '\'.' );
+        }
+
+        // AUTO-REMEMBER: Persist the resolved event URL to tournament database record for future instant desk lookups
+        if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $event_url ) {
+            $t_data['tfaa_results_url'] = $event_url;
+            $all_tournaments = get_option( 'sywat_tournaments_list', array() );
+            if ( is_array( $all_tournaments ) ) {
+                $all_tournaments[$t_name] = $t_data;
+                update_option( 'sywat_tournaments_list', $all_tournaments, false );
+            }
         }
 
         // Fetch target event detail results page
