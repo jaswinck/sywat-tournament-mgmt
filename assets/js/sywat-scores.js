@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter (Dual-Layer: Inline Display + Class-Driven)
+    // 3. Real-Time Search Filter (Pure Class-Driven Utility Toggle)
     const searchInput = document.getElementById('sywat_score_search_input');
     if (searchInput) {
         function filterRows() {
@@ -44,16 +44,11 @@ document.addEventListener("DOMContentLoaded", function() {
             const rows   = document.querySelectorAll('.sywat-score-row');
 
             rows.forEach(function(row) {
-                const name        = row.getAttribute('data-name') || '';
+                const name        = (row.getAttribute('data-name') || '').toLowerCase();
                 const textContent = (row.textContent || row.innerText || '').toLowerCase();
 
-                if (!filter || name.includes(filter) || textContent.includes(filter)) {
-                    row.classList.remove('sywat-hidden');
-                    row.style.display = '';
-                } else {
-                    row.classList.add('sywat-hidden');
-                    row.style.display = 'none';
-                }
+                const isMatch = !filter || name.includes(filter) || textContent.includes(filter);
+                row.classList.toggle('sywat-hidden', !isMatch);
             });
 
             const hiddenSearches = document.querySelectorAll('.sywat-hidden-search');
