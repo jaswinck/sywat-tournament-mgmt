@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.7.0
+ * Version: 7.10.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -603,6 +603,44 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
                             }
                         ?>
                     <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+}
+
+/**
+ * Render TFAA Scores Batch Sync Progress Modal
+ *
+ * @param array $data Central data bundle from data engine.
+ */
+if ( ! function_exists( 'sywat_render_tfaa_sync_progress_modal' ) ) {
+    function sywat_render_tfaa_sync_progress_modal( $data ) {
+        ?>
+        <!-- TFAA SCORES BATCH SYNC PROGRESS MODAL -->
+        <div class="sywat-modal-backdrop" id="sywat_tfaa_sync_modal">
+            <div class="sywat-modal-content sywat-modal-lg">
+                <div class="sywat-modal-header no-print">
+                    <div>
+                        <h3>🔄 TFAA Scorecards Batch Sync</h3>
+                        <div class="sywat-subtitle">Real-time progress and event scorecard sync activity log.</div>
+                    </div>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseTfaaSyncModal()">&times;</button>
+                </div>
+                <div class="sywat-modal-body">
+                    <div class="sywat-progress-bar-track">
+                        <div class="sywat-progress-bar-fill" id="sywat_tfaa_sync_progress_fill"></div>
+                    </div>
+                    <div id="sywat_tfaa_sync_status_text" class="sywat-subtitle sywat-mt-3">Initialising sync queue...</div>
+
+                    <div class="sywat-table-header-bar sywat-modal-section-header">
+                        <h2>📋 Live Activity Log</h2>
+                    </div>
+                    <div id="sywat_tfaa_sync_log_console" class="sywat-log-console"></div>
+                </div>
+                <div class="sywat-modal-footer">
+                    <button type="button" class="sywat-btn sywat-btn-secondary" id="sywat_tfaa_sync_close_btn" onclick="sywatCloseTfaaSyncModal()">Close</button>
                 </div>
             </div>
         </div>
