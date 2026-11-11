@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
+ * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 6.7.0
+ * Version: 6.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -159,6 +159,24 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $active_hubs    = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
+
+        // Resolve Preview TFAA Target URL for Selected Tournament
+        $preview_tfaa_url = '';
+        if ( ! empty( $t_master['tfaa_results_url'] ) ) {
+            $preview_tfaa_url = trim( $t_master['tfaa_results_url'] );
+        } elseif ( ! empty( $t_master['tfaa_event_id'] ) ) {
+            $t_override = trim( $t_master['tfaa_event_id'] );
+            if ( is_numeric( $t_override ) ) {
+                $preview_tfaa_url = 'https://texasfieldarchery.org/results/' . $t_override;
+            } else {
+                $preview_tfaa_url = ( strpos( $t_override, 'http' ) === 0 ) ? $t_override : 'https://texasfieldarchery.org' . ( strpos( $t_override, '/' ) === 0 ? '' : '/' ) . $t_override;
+            }
+        }
+
+        if ( empty( $preview_tfaa_url ) ) {
+            $season_param     = ! empty( $t_master['season'] ) ? '?season=' . urlencode( trim( $t_master['season'] ) ) : '';
+            $preview_tfaa_url = 'https://texasfieldarchery.org/results' . $season_param;
+        }
 
         // Enqueue client score interactive JavaScript asset (Directive Section IV.1)
         wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '6.6.0', true );
@@ -350,6 +368,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off">
                                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="var inp=document.getElementById('sywat_score_search_input'); if(inp){inp.value=''; inp.dispatchEvent(new Event('input'));}">Clear</button>
                                 </div>
+
+                                <!-- Dynamic View TFAA Page Preview Link -->
+                                <a href="<?php echo esc_url( $preview_tfaa_url ); ?>" target="_blank" rel="noopener" class="sywat-btn sywat-btn-secondary sywat-btn-icon-external" title="Open TFAA Event Results page in a new tab to verify before syncing">
+                                    View TFAA Page ↗
+                                </a>
 
                                 <!-- Sync TFAA Event Scores Trigger -->
                                 <button type="submit" name="sywat_action" value="sync_tfaa_scores" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" onclick="return confirm('Sync scores for \'<?php echo esc_js($selected_tournament); ?>\' directly from TFAA?');">
