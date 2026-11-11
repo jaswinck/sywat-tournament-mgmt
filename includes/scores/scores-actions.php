@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-actions.php
  * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and legacy-matched state-machine TFAA event score scraper.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -48,8 +48,6 @@ if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
 
 /**
  * Core Parser: Scrapes TFAA event results page using 3-layer precision matching and legacy state-machine line parser
- * (Layer 1: Manual Override ID/URL, Layer 2: Season Parameter Filter, Layer 3: Date Range & Title Matching),
- * registers missing archers, auto-expands line capacities, enriches gender cache, and injects scores.
  *
  * @param string $t_name Target tournament title.
  * @return array Execution response array with success status, count, and message.
@@ -147,7 +145,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         $event_html = wp_remote_retrieve_body( $event_resp );
         
-        // Remove literal return characters
+        // Remove literal returns
         $body = str_replace( array( "\r", "\n" ), " ", $event_html );
 
         // Legacy auto-season query fallback if page returned 0 entries
@@ -183,7 +181,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $plain_text = wp_strip_all_tags( $clean_html );
         
         // 4. Break into clean line array
-        $lines = explode( "\n", $plain_text );
+        $raw_lines = explode( "\n", $plain_text );
 
         $parsed_entries = array();
         $curr_div       = '';
@@ -193,8 +191,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $cnt_20yd       = 0;
         $cnt_cub        = 0;
 
-        foreach ( $lines as $raw_line ) {
-            $line = trim( preg_replace( '/\s+/', ' ', html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+        foreach ( $raw_lines as $raw_line ) {
+            // Decodes entities & safely replaces unicode non-breaking spaces before spacing evaluation
+            $decoded = html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+            $decoded = str_replace( "\xC2\xA0", ' ', $decoded );
+            $line    = trim( preg_replace( '/\s+/u', ' ', $decoded ) );
+            
             if ( empty( $line ) ) continue;
 
             if ( stripos( $line, 'Filters:' ) !== false || stripos( $line, 'Search' ) !== false || stripos( $line, 'Entries' ) !== false ) {
@@ -221,16 +223,23 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 }
             }
 
-            // Extended Legacy Archer Match: Rank + "Last, First" + Score + (Optional X Count)
-            if ( preg_match( '/^\d+\s+([A-Za-z\-\.\'\s]+,\s*[A-Za-z\-\.\'\s]+?)\s+(\d{1,3})(?:\s+(\d{1,2})X?)?/i', $line, $matches ) ) {
+            // Exactly matching the legacy lookahead regex (supports [GUEST] and [INC] bracket names)
+            if ( preg_match( '/^(\d+)\s+([A-Za-z\-\.\'\[\]\s]+,\s*[A-Za-z\-\.\'\[\]\s]+?)(?=\s+\d|$)/iu', $line, $matches ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
-                $raw_name = trim( $matches[1] );
-                $parts    = explode( ',', $raw_name, 2 );
-                $name     = ( count( $parts ) === 2 ) ? trim( $parts[1] ) . ' ' . trim( $parts[0] ) : trim( $raw_name );
-                $score    = isset( $matches[2] ) ? intval( $matches[2] ) : 0;
-                $xs       = isset( $matches[3] ) ? intval( $matches[3] ) : 0;
-                $dist     = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
+                $raw_name = trim( $matches[2] );
+                
+                // Flip "Last, First" safely
+                $parts = explode( ',', $raw_name, 2 );
+                $name  = ( count( $parts ) === 2 ) ? trim( $parts[1] ) . ' ' . trim( $parts[0] ) : trim( $raw_name );
+                
+                // Extract score and Xs from the remainder of the line (handles any trailing columns like I/Os)
+                $rest        = trim( substr( $line, strlen( $matches[0] ) ) );
+                $score_parts = explode( ' ', $rest );
+                
+                $score = isset( $score_parts[0] ) ? intval( $score_parts[0] ) : 0;
+                $xs    = isset( $score_parts[1] ) ? intval( $score_parts[1] ) : 0;
+                $dist  = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
 
                 if ( $dist === 'Cub' ) $cnt_cub++;
                 else $cnt_20yd++;
@@ -256,7 +265,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $line_0_idx = ! empty( $t_lines ) ? key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
 
-        // Pre-Fetch and Index Roster Data into O(1) Single-Key Hashtable
+        // Pre-Fetch and Index Roster Data
         $registrations = get_option( 'sywat_registrations', array() );
         if ( ! is_array( $registrations ) ) $registrations = array();
 
