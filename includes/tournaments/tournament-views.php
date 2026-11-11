@@ -147,11 +147,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-subtitle">Set up upcoming events, configure shooting lines, and print desk rosters.</div>
                         </div>
 
-                        <!-- TOP PAGE ACTION CONTROLS & SEASON SWITCHER -->
-                        <div class="sywat-header-inline-controls">
-                            <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
-                                <div class="sywat-table-header-filters">
-                                    <form method="get" class="sywat-filter-inline-form">
+                        <!-- 
+                            EXACT MATCH WITH BOTTOM ROW: 
+                            Using .sywat-table-header-controls instead of custom inline controls to inherit perfect spacing 
+                        -->
+                        <div class="sywat-table-header-controls">
+                            
+                            <!-- Sub-wrapper 1: Filters (Season Dropdown) -->
+                            <div class="sywat-table-header-filters">
+                                <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
+                                    <form method="get">
                                         <input type="hidden" name="page" value="sywat-manage-tournaments">
                                         <div class="sywat-field-group">
                                             <label for="sywat_select_season">Season:</label>
@@ -167,13 +172,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             </select>
                                         </div>
                                     </form>
-                                </div>
-                            <?php endif; ?>
+                                <?php endif; ?>
+                            </div>
 
+                            <!-- Sub-wrapper 2: Action Buttons (Stripped of custom form classes) -->
                             <div class="sywat-table-header-actions">
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
-                                    <!-- Explicit POST Action Trigger for Season Links Sync -->
-                                    <form method="post" class="sywat-table-action-form">
+                                    <form method="post">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
                                         <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
@@ -181,9 +186,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </form>
                                 <?php endif; ?>
 
-                                <!-- Global Bulk Sync Tournaments with Configured Results Links -->
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
+                                    <form method="post" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
                                         <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
@@ -193,6 +197,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">Bulk Import Schedule</button>
                                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
                             </div>
+
                         </div>
                     </div>
 
