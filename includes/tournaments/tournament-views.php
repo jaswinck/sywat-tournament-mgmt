@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.17.0
+ * Version: 7.17.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -176,12 +176,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 </form>
                             <?php endif; ?>
 
-                            <!-- Global Bulk Sync Active Weekend Tournaments -->
+                            <!-- Global Bulk Sync Tournaments with Configured Results Links -->
                             <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL ACTIVE WEEKEND TOURNAMENTS?\n\nThis will pull the latest scores from TFAA for ALL host locations running this weekend.');">
+                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
                                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                     <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
-                                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all active weekend tournaments">Sync All Active Weekend Tournaments</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
                                 </form>
                             <?php endif; ?>
 
