@@ -150,43 +150,49 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <!-- TOP PAGE ACTION CONTROLS & SEASON SWITCHER -->
                         <div class="sywat-header-inline-controls">
                             <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
-                                <form method="get" class="sywat-filter-inline-form">
-                                    <input type="hidden" name="page" value="sywat-manage-tournaments">
-                                    <div class="sywat-field-group">
-                                        <label for="sywat_select_season">Season:</label>
-                                        <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
-                                            <?php foreach ( $seasons as $s_slug => $s_data ): ?>
-                                                <?php 
-                                                $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
-                                                ?>
-                                                <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
-                                                    <?php echo esc_html( $s_name ); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </form>
-
-                                <!-- Explicit POST Action Trigger for Season Links Sync -->
-                                <form method="post" class="sywat-table-action-form">
-                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                    <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
-                                    <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
-                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">Sync TFAA Links</button>
-                                </form>
+                                <div class="sywat-table-header-filters">
+                                    <form method="get" class="sywat-filter-inline-form">
+                                        <input type="hidden" name="page" value="sywat-manage-tournaments">
+                                        <div class="sywat-field-group">
+                                            <label for="sywat_select_season">Season:</label>
+                                            <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
+                                                <?php foreach ( $seasons as $s_slug => $s_data ): ?>
+                                                    <?php 
+                                                    $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
+                                                    ?>
+                                                    <option value="<?php echo esc_attr( $s_slug ); ?>" <?php selected( $s_slug, $selected_season ); ?>>
+                                                        <?php echo esc_html( $s_name ); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </form>
+                                </div>
                             <?php endif; ?>
 
-                            <!-- Global Bulk Sync Tournaments with Configured Results Links -->
-                            <?php if ( $can_manage_seasons ): ?>
-                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
-                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                    <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
-                                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
-                                </form>
-                            <?php endif; ?>
+                            <div class="sywat-table-header-actions">
+                                <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
+                                    <!-- Explicit POST Action Trigger for Season Links Sync -->
+                                    <form method="post" class="sywat-table-action-form">
+                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                        <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
+                                        <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
+                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">Sync TFAA Links</button>
+                                    </form>
+                                <?php endif; ?>
 
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">Bulk Import Schedule</button>
-                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
+                                <!-- Global Bulk Sync Tournaments with Configured Results Links -->
+                                <?php if ( $can_manage_seasons ): ?>
+                                    <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
+                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                        <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
+                                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">Bulk Import Schedule</button>
+                                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openAddTournamentModal()">Add Tournament</button>
+                            </div>
                         </div>
                     </div>
 
