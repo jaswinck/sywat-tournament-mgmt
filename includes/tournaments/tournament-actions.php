@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.8.1
+ * Version: 7.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -248,6 +248,72 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = ! empty( $res['success'] ) 
                 ? '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 <strong>TFAA Standings Synced!</strong> Successfully cached ' . intval( $res['count'] ) . ' active shooters from TFAA.</div>'
                 : '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
+        }
+
+        // Action: Sync Single TFAA Tournament Scorecard
+        if ( $action === 'sync_tfaa_single' ) {
+            $target_t = isset( $_POST['target_tournament'] ) ? sanitize_text_field( $_POST['target_tournament'] ) : '';
+
+            if ( empty( $target_t ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No target tournament specified for TFAA sync.</div>';
+            }
+
+            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+                require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
+            }
+
+            if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
+                $res = sywat_sync_tfaa_event_scores( $target_t );
+                if ( ! empty( $res['success'] ) ) {
+                    $tournaments   = get_option( 'sywat_tournaments_list', array() );
+                    $registrations = get_option( 'sywat_registrations', array() );
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
+                } else {
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
+                }
+            }
+        }
+
+        // Action: Bulk Sync All Active Weekend Host Locations
+        if ( $action === 'sync_all_tfaa_weekend' ) {
+            $active_hubs = ! empty( $active_tournaments ) ? $active_tournaments : get_option( 'sywat_active_tournaments', array() );
+
+            if ( empty( $active_hubs ) || ! is_array( $active_hubs ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No active weekend tournaments found to sync.</div>';
+            }
+
+            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+                require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
+            }
+
+            $total_updated = 0;
+            $synced_names  = array();
+            $errors        = array();
+
+            foreach ( $active_hubs as $t_name ) {
+                if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
+                    $res = sywat_sync_tfaa_event_scores( $t_name );
+                    if ( ! empty( $res['success'] ) ) {
+                        $total_updated += intval( isset( $res['count'] ) ? $res['count'] : 0 );
+                        $synced_names[] = esc_html( $t_name );
+                    } else {
+                        $errors[] = esc_html( $t_name ) . ': ' . esc_html( $res['message'] );
+                    }
+                }
+            }
+
+            $tournaments   = get_option( 'sywat_tournaments_list', array() );
+            $registrations = get_option( 'sywat_registrations', array() );
+
+            $msg = '';
+            if ( ! empty( $synced_names ) ) {
+                $msg .= '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ <strong>Bulk Sync Complete!</strong> Updated ' . $total_updated . ' total archer score record(s) across: ' . implode( ', ', $synced_names ) . '</div>';
+            }
+            if ( ! empty( $errors ) ) {
+                $msg .= '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ Some locations failed to sync:<br>' . implode( '<br>', $errors ) . '</div>';
+            }
+
+            return $msg;
         }
 
         // Action: Toggle Volunteer Hub Display
