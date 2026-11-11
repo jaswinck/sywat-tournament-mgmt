@@ -3,10 +3,15 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 8.0.0
+ * Version: 8.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+// DEBUG TOGGLE: Set to true to inspect scraping logs; set to false for production.
+if ( ! defined( 'SYWAT_DEBUG_SYNC' ) ) {
+    define( 'SYWAT_DEBUG_SYNC', false );
+}
 
 /**
  * Retrieves all competition seasons sorted chronologically descending by start date.
@@ -135,7 +140,11 @@ if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
 if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
     function sywat_sync_season_tfaa_urls( $season_name_or_slug = '' ) {
         $debug_log = array();
-        $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER (DOMDocument) ---";
+        $is_debug  = defined( 'SYWAT_DEBUG_SYNC' ) && SYWAT_DEBUG_SYNC;
+
+        if ( $is_debug ) {
+            $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER (DOMDocument) ---";
+        }
 
         $all_tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( empty( $all_tournaments ) || ! is_array( $all_tournaments ) ) {
@@ -168,13 +177,17 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
         }
 
-        $debug_log[] = "Resolved Target Input: '{$target_input}' => Name: '{$target_name}', Slug: '{$target_slug}'";
+        if ( $is_debug ) {
+            $debug_log[] = "Resolved Target Input: '{$target_input}' => Name: '{$target_name}', Slug: '{$target_slug}'";
+        }
 
         $request_season = str_replace( array( '–', '—' ), '-', $target_name );
         $season_param   = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
         $index_url      = 'https://texasfieldarchery.org/results' . $season_param;
 
-        $debug_log[] = "Requesting Remote URL: {$index_url}";
+        if ( $is_debug ) {
+            $debug_log[] = "Requesting Remote URL: {$index_url}";
+        }
 
         $http_args = array(
             'timeout'   => 20,
@@ -191,21 +204,22 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         }
 
         $http_code = wp_remote_retrieve_response_code($index_resp);
-        $debug_log[] = "HTTP Response Code: {$http_code}";
+        if ( $is_debug ) {
+            $debug_log[] = "HTTP Response Code: {$http_code}";
+        }
 
         $html = wp_remote_retrieve_body( $index_resp );
         if ( empty( $html ) ) {
             return array( 'success' => false, 'message' => 'Empty response received from TFAA index.' );
         }
 
-        // Bulletproof DOM parsing
         $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
         @$dom->loadHTML($html);
         $xpath = new DOMXPath($dom);
         
-        $rows = $xpath->query('//table//tr');
+        $rows          = $xpath->query('//table//tr');
         $remote_events = array();
 
         if ($rows->length > 0) {
@@ -213,7 +227,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                 $cells = $xpath->query('.//td', $row);
                 if ($cells->length >= 2) {
                     $name_cell = $cells->item(1);
-                    $link = $xpath->query('.//a', $name_cell);
+                    $link      = $xpath->query('.//a', $name_cell);
                     
                     if ($link->length > 0) {
                         $remote_events[] = array(
@@ -231,7 +245,6 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                 }
             }
         } else {
-            // Fallback if no table is found, just grab all links
             $links = $dom->getElementsByTagName('a');
             foreach ($links as $link) {
                 $href = trim($link->getAttribute('href'));
@@ -246,18 +259,22 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         }
         libxml_clear_errors();
 
-        $debug_log[] = "DOM Parser found " . count($remote_events) . " tournament rows on the page.";
+        if ( $is_debug ) {
+            $debug_log[] = "DOM Parser found " . count($remote_events) . " tournament rows on the page.";
+        }
 
         $target_year = preg_replace('/[^0-9]/', '', $target_name);
         $target_type = stripos($target_name, 'indoor') !== false ? 'indoor' : 'outdoor';
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
-            $debug_log[] = "--------------------------------------------------";
-            $debug_log[] = "Evaluating Local DB Tournament: '{$t_name}'";
+            if ( $is_debug ) {
+                $debug_log[] = "--------------------------------------------------";
+                $debug_log[] = "Evaluating Local DB Tournament: '{$t_name}'";
+            }
 
             if ( ! empty( $t_data['tfaa_event_id'] ) && strpos( $t_data['tfaa_event_id'], 'http' ) === 0 ) {
-                $debug_log[] = " -> SKIP: Manual URL override already exists.";
+                if ( $is_debug ) $debug_log[] = " -> SKIP: Manual URL override already exists.";
                 continue;
             }
 
@@ -266,12 +283,12 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             $t_type   = stripos($t_season, 'indoor') !== false ? 'indoor' : 'outdoor';
             
             if ( $target_year !== $t_year || $target_type !== $t_type ) {
-                $debug_log[] = " -> SKIP: Season mismatch.";
+                if ( $is_debug ) $debug_log[] = " -> SKIP: Season mismatch.";
                 continue;
             }
 
             $simple_local_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
-            $matched = false;
+            $matched           = false;
 
             foreach ( $remote_events as $remote ) {
                 $simple_remote_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $remote['text']));
@@ -289,19 +306,19 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                         if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
                             $t_data['tfaa_results_url'] = $resolved_url;
                             $updated_count++;
-                            $debug_log[] = "    -> [MATCH SUCCESS]: Saved URL: {$resolved_url}";
+                            if ( $is_debug ) $debug_log[] = "    -> [MATCH SUCCESS]: Saved URL: {$resolved_url}";
                         } else {
-                            $debug_log[] = "    -> [MATCH SUCCESS]: URL already up to date.";
+                            if ( $is_debug ) $debug_log[] = "    -> [MATCH SUCCESS]: URL already up to date.";
                         }
                     } else {
-                        $debug_log[] = "    -> [MATCH FOUND BUT NO LINK YET]: The TFAA site lists this tournament, but results are not posted yet (no <a> tag).";
+                        if ( $is_debug ) $debug_log[] = "    -> [MATCH FOUND BUT NO LINK YET]: Results not posted yet.";
                     }
                     $matched = true;
                     break;
                 }
             }
 
-            if ( ! $matched ) {
+            if ( ! $matched && $is_debug ) {
                 $debug_log[] = " -> FAILED TO MATCH against any of the remote rows.";
             }
         }
@@ -311,11 +328,15 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             update_option( 'sywat_tournaments_list', $all_tournaments, false );
         }
 
-        $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; text-align: left; max-height: 400px; overflow-y: auto;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap; margin-top: 10px; color: #333;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+        $debug_html = '';
+        if ( $is_debug ) {
+            $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; text-align: left; max-height: 400px; overflow-y: auto;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap; margin-top: 10px; color: #333;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+        }
 
         return array(
             'success' => true,
             'count'   => $updated_count,
+            'debug'   => $is_debug,
             'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'." . $debug_html
         );
     }
