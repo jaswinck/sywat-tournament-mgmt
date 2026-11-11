@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Unified Button System Spec
    Path: assets/css/sywat-buttons.css
-   Version: 6.5.0
+   Version: 6.5.1
    ========================================================================== */
 
 /* Universal Button Base (38px Standard Height) */
@@ -34,23 +34,14 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Color Tier Variants (SYWAT Action Blue Design Tokens) */
-.sywat-btn-primary {
-    background-color: #0284c7;
-    border: 1px solid #0284c7;
-    color: #ffffff !important;
-}
-.sywat-btn-primary:hover {
-    background-color: #0369a1;
-    border-color: #0369a1;
-    color: #ffffff !important;
-}
-
+/* Color Tier Variants (SYWAT Action Blue Design Tokens - Outline Default) */
+.sywat-btn-primary,
 .sywat-btn-secondary {
     background-color: #ffffff;
     border: 1px solid #0284c7;
     color: #0284c7 !important;
 }
+.sywat-btn-primary:hover,
 .sywat-btn-secondary:hover {
     background-color: #0284c7;
     border-color: #0284c7;
