@@ -2,15 +2,15 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA event score scraper with Guest duplicate & Style inheritance support.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and bulletproof TFAA scraper with Sequential Line Routing for multi-entry archers.
  * Author: SYWAT Archery
- * Version: 8.2.0
+ * Version: 9.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * Auto-expands physical line capacity on Line 0/1 if imported TFAA batch exceeds limits.
+ * Auto-expands physical line capacity if imported TFAA batch exceeds limits.
  */
 if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
     function sywat_auto_expand_line_capacity( &$t_data, $line_idx, $req_20yd, $req_cub, $t_name ) {
@@ -96,7 +96,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
- * Core Parser: TFAA Event Score Engine with Support for Bracketed Tags, Guests, & Line Shift
+ * Core Parser: TFAA Event Score Engine
  */
 if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
     function sywat_sync_tfaa_event_scores( $t_name ) {
@@ -197,75 +197,90 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $spaced_body = str_replace( '<', ' <', $spaced_body );
         $clean_html  = preg_replace( '/<\/?(?:tr|h[1-6]|div|p|br|li|ul|table)[^>]*>/is', "\n", $spaced_body );
         $plain_text  = wp_strip_all_tags( $clean_html );
-        $lines       = explode( "\n", $plain_text );
+        $raw_lines   = explode( "\n", $plain_text );
 
         $parsed_entries = array();
-        $current_div   = '';
-        $current_gen   = 'Male';
-        $current_style = '';
+        $curr_div   = '';
+        $curr_gen   = 'Male';
+        $curr_style = '';
         
         $cnt_20yd = 0;
         $cnt_cub  = 0;
 
-        foreach ( $lines as $raw_line ) {
-            $line = trim( preg_replace( '/\s+/', ' ', html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
-            if ( empty( $line ) ) continue;
+        foreach ( $raw_lines as $raw_line ) {
+            // Restore unicode spaces before stripping
+            $decoded = html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+            $decoded = str_replace( "\xC2\xA0", ' ', $decoded );
+            $line    = trim( preg_replace( '/\s+/u', ' ', $decoded ) );
 
-            if ( stripos( $line, 'Filters:' ) !== false || stripos( $line, 'Search' ) !== false || stripos( $line, 'Entries' ) !== false ) {
+            if ( empty( $line ) || stripos( $line, 'Filters:' ) !== false || stripos( $line, 'Search' ) !== false || stripos( $line, 'Entries' ) !== false ) {
                 continue;
             }
 
-            $div_check = sywat_parse_tfaa_div_gen( $line );
-            if ( ! empty( $div_check['division'] ) ) {
-                $current_div = $div_check['division'];
-                $current_gen = $div_check['gender'];
-                continue;
-            }
+            // --- 1. ARCHER MATCH FIRST ---
+            // If the line starts with a rank number, evaluate as archer and bypass style checkers
+            if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
+                if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
-            $style_check = sywat_parse_tfaa_style( $line );
-            if ( ! empty( $style_check ) ) {
-                $current_style = $style_check;
-                if ( stripos( $line, 'Pro' ) !== false && $current_style === 'FS – Freestyle' ) {
-                    $current_style = 'FS Pro – Freestyle Pro';
-                }
-                continue;
-            }
-
-            // Expanded Regex: Matches rank + name block (including bracketed tags like [GUEST] and [INC])
-            if ( preg_match( '/^\d+\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
-                if ( empty( $current_div ) || empty( $current_style ) ) continue;
-
-                $raw_name = trim( $matches[1] );
-                $is_guest = ( stripos( $raw_name, '[GUEST]' ) !== false || stripos( $line, '[GUEST]' ) !== false || $current_style === 'Guest' );
+                $raw_name = trim( $matches[2] );
+                $is_guest = ( stripos( $raw_name, '[GUEST]' ) !== false || stripos( $line, '[GUEST]' ) !== false || $curr_style === 'Guest' );
+                $is_inc   = ( stripos( $raw_name, '[INC]' ) !== false || stripos( $line, '[INC]' ) !== false );
                 
-                // Strip bracketed tags [GUEST], [INC], etc.
+                // Strip bracketed tags to get pure name
                 $clean_raw_name = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
 
                 // Flip "Last, First" to "First Last"
-                $parts = explode( ',', $clean_raw_name, 2 );
-                $name  = ( count( $parts ) === 2 ) ? trim( $parts[1] ) . ' ' . trim( $parts[0] ) : trim( $clean_raw_name );
+                $parts      = explode( ',', $clean_raw_name, 2 );
+                $clean_name = ( count( $parts ) === 2 ) ? trim( $parts[1] ) . ' ' . trim( $parts[0] ) : trim( $clean_raw_name );
 
-                // Extract score and Xs from remainder of line
+                // Format display name for roster
+                $display_name = $clean_name;
+                if ( $is_guest ) $display_name .= ' (Guest)';
+                if ( $is_inc )   $display_name .= ' (INC)';
+
+                // Extract score and Xs
                 $rest        = trim( substr( $line, strlen( $matches[0] ) ) );
                 $score_parts = explode( ' ', $rest );
                 
                 $score = isset( $score_parts[0] ) ? intval( $score_parts[0] ) : 0;
                 $xs    = isset( $score_parts[1] ) ? intval( $score_parts[1] ) : 0;
 
-                $dist = ( stripos( $current_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
+                $dist = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
                 if ( $dist === 'Cub' ) $cnt_cub++;
                 else $cnt_20yd++;
 
                 $parsed_entries[] = array(
-                    'name'     => $name,
-                    'division' => $current_div,
-                    'gender'   => $current_gen,
-                    'style'    => $current_style,
-                    'distance' => $dist,
-                    'score'    => $score,
-                    'xs'       => $xs,
-                    'is_guest' => $is_guest,
+                    'clean_name'   => $clean_name,
+                    'display_name' => $display_name,
+                    'division'     => $curr_div,
+                    'gender'       => $curr_gen,
+                    'style'        => $curr_style,
+                    'distance'     => $dist,
+                    'score'        => $score,
+                    'xs'           => $xs,
+                    'is_guest'     => $is_guest,
+                    'is_inc'       => $is_inc
                 );
+
+                continue; // IMPORTANT: Skip to next line so archer name doesn't false-trigger Style/Div
+            }
+
+            // --- 2. DIVISION CHECK ---
+            $div_check = sywat_parse_tfaa_div_gen( $line );
+            if ( ! empty( $div_check['division'] ) ) {
+                $curr_div = $div_check['division'];
+                $curr_gen = $div_check['gender'];
+                continue;
+            }
+
+            // --- 3. STYLE CHECK ---
+            $style_check = sywat_parse_tfaa_style( $line );
+            if ( ! empty( $style_check ) ) {
+                $curr_style = $style_check;
+                if ( stripos( $line, 'Pro' ) !== false && $curr_style === 'FS – Freestyle' ) {
+                    $curr_style = 'FS Pro – Freestyle Pro';
+                }
+                continue;
             }
         }
 
@@ -273,12 +288,11 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'No valid archer score rows extracted.' );
         }
 
-        // Auto-Expand Line Capacity
+        // Available Tournament Lines
         $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
         $line_0_idx = ! empty( $t_lines ) ? key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
 
-        // Pre-Fetch and Index Roster Data into O(1) Single-Key Hashtable
         $registrations = get_option( 'sywat_registrations', array() );
         if ( ! is_array( $registrations ) ) $registrations = array();
 
@@ -291,44 +305,93 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) $gender_cache = array();
 
+        // 1. Map existing registrations & occupied lines
         $reg_lookup = array();
+        $occupied_lines = array();
         foreach ( $registrations as $idx => $r ) {
             if ( isset( $r['tournament'], $r['name'] ) && strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) === 0 ) {
-                $norm_key = strtolower( trim( $r['name'] ) );
-                $reg_lookup[$norm_key] = $idx;
+                // Strip database tagging from lookup key to match pure name
+                $norm_key = strtolower( trim( preg_replace( '/\(.*?\)/', '', $r['name'] ) ) );
+                $reg_lookup[$norm_key][] = $idx;
+                $occupied_lines[$norm_key][] = (string)$r['line_index'];
             }
         }
 
-        $synced_count = 0;
-        $line_0_name  = isset( $t_lines[$line_0_idx]['name'] ) ? $t_lines[$line_0_idx]['name'] : 'Line 1';
+        $processed_reg_ids = array();
+        $primary_styles    = array();
+        $synced_count      = 0;
 
         foreach ( $parsed_entries as $entry ) {
-            $name      = $entry['name'];
-            $norm_name = strtolower( trim( $name ) );
-            $is_guest  = ! empty( $entry['is_guest'] );
+            $norm_name = strtolower( trim( $entry['clean_name'] ) );
+            
+            // Record primary style if this is their main score block
+            if ( ! $entry['is_guest'] && ! $entry['is_inc'] && empty( $primary_styles[$norm_name] ) ) {
+                $primary_styles[$norm_name] = $entry['style'];
+            }
 
-            if ( $is_guest ) {
-                // GUEST ENTRY LOGIC: Duplicate protection, Style inheritance, & Line Shift
-                $primary_reg = isset( $reg_lookup[$norm_name] ) ? $registrations[$reg_lookup[$norm_name]] : null;
+            // Inherit Style if Guest
+            $final_style = $entry['style'];
+            if ( $entry['is_guest'] || $final_style === 'Guest' ) {
+                $final_style = ! empty( $primary_styles[$norm_name] ) ? $primary_styles[$norm_name] : 'Guest';
+            }
+
+            // Find an unprocessed primary registration record for this archer
+            $target_r_idx = -1;
+            if ( isset( $reg_lookup[$norm_name] ) ) {
+                foreach ( $reg_lookup[$norm_name] as $idx ) {
+                    $id = $registrations[$idx]['id'];
+                    if ( ! in_array( $id, $processed_reg_ids ) ) {
+                        $target_r_idx = $idx;
+                        break;
+                    }
+                }
+            }
+
+            if ( $target_r_idx !== -1 ) {
+                // RECORD FOUND: Safely update existing record on its current line
+                $target_id = $registrations[$target_r_idx]['id'];
+                $processed_reg_ids[] = $target_id;
+
+                $registrations[$target_r_idx]['checked_in'] = 1;
+                $registrations[$target_r_idx]['name']       = $entry['display_name']; // Apply tags if applicable
                 
-                $guest_style = ( $entry['style'] !== 'Guest' ) ? $entry['style'] : ( ( $primary_reg && ! empty( $primary_reg['style'] ) ) ? $primary_reg['style'] : 'Guest' );
-                $primary_line_idx = $primary_reg ? intval( $primary_reg['line_index'] ) : intval( $line_0_idx );
-                $guest_line_idx   = (string)( $primary_line_idx + 1 );
-                $guest_line_name  = isset( $t_lines[$guest_line_idx]['name'] ) ? $t_lines[$guest_line_idx]['name'] : 'Line ' . ( $primary_line_idx + 2 );
+                if ( empty( $registrations[$target_r_idx]['division'] ) ) $registrations[$target_r_idx]['division'] = $entry['division'];
+                if ( empty( $registrations[$target_r_idx]['gender'] ) )   $registrations[$target_r_idx]['gender']   = $entry['gender'];
+                if ( empty( $registrations[$target_r_idx]['style'] ) )    $registrations[$target_r_idx]['style']    = $final_style;
 
-                $target_id = uniqid( 'reg_guest_' );
-                $guest_reg = array(
+                update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $registrations[$target_r_idx], false );
+                $master_regs[$target_id] = $registrations[$target_r_idx];
+
+            } else {
+                // DUPLICATE / NO RECORD FOUND: Route to sequential available line
+                if ( ! isset( $occupied_lines[$norm_name] ) ) {
+                    $occupied_lines[$norm_name] = array();
+                }
+
+                $assigned_line_idx = $line_0_idx;
+                foreach ( $t_lines as $l_idx => $l_data ) {
+                    if ( ! in_array( (string)$l_idx, $occupied_lines[$norm_name] ) ) {
+                        $assigned_line_idx = (string)$l_idx;
+                        break;
+                    }
+                }
+
+                $line_name = isset( $t_lines[$assigned_line_idx]['name'] ) ? $t_lines[$assigned_line_idx]['name'] : 'Line ' . ( $assigned_line_idx + 1 );
+                $target_id = uniqid( 'reg_seq_' );
+                $new_type  = $entry['is_guest'] ? 'Guest' : 'Walk-In';
+
+                $new_reg = array(
                     'id'          => $target_id,
                     'tournament'  => $t_name,
-                    'line_index'  => $guest_line_idx,
-                    'line_name'   => $guest_line_name,
-                    'name'        => $name . ' (Guest)',
+                    'line_index'  => $assigned_line_idx,
+                    'line_name'   => $line_name,
+                    'name'        => $entry['display_name'],
                     'phone'       => '',
                     'distance'    => $entry['distance'],
-                    'type'        => 'Guest',
+                    'type'        => $new_type,
                     'division'    => $entry['division'],
                     'gender'      => $entry['gender'],
-                    'style'       => $guest_style,
+                    'style'       => $final_style,
                     'paid'        => ( $entry['distance'] === 'Cub' ? 'Youth' : 'Adult' ),
                     'balance_due' => 0.00,
                     'status'      => 'Pre-Reg',
@@ -336,71 +399,26 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'created_at'  => current_time( 'mysql' ),
                 );
 
-                update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $guest_reg, false );
-                $master_regs[$target_id] = $guest_reg;
-                $registrations[]         = $guest_reg;
+                update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
+                $master_regs[$target_id] = $new_reg;
+                $registrations[]         = $new_reg;
 
-                $scores[$target_id] = array(
-                    'score'    => $entry['score'],
-                    'xs'       => $entry['xs'],
-                    'saved_at' => current_time( 'mysql' ),
-                );
-
-                $synced_count++;
-            } else {
-                // PRIMARY / INC ENTRY LOGIC
-                $target_id = '';
-                if ( isset( $reg_lookup[$norm_name] ) ) {
-                    $r_idx = $reg_lookup[$norm_name];
-                    $target_id = $registrations[$r_idx]['id'];
-
-                    $registrations[$r_idx]['checked_in'] = 1;
-                    if ( empty( $registrations[$r_idx]['division'] ) ) $registrations[$r_idx]['division'] = $entry['division'];
-                    if ( empty( $registrations[$r_idx]['gender'] ) )   $registrations[$r_idx]['gender']   = $entry['gender'];
-                    if ( empty( $registrations[$r_idx]['style'] ) )    $registrations[$r_idx]['style']    = $entry['style'];
-
-                    update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $registrations[$r_idx], false );
-                    $master_regs[$target_id] = $registrations[$r_idx];
-                } else {
-                    $target_id = uniqid( 'reg_' );
-                    $new_reg = array(
-                        'id'          => $target_id,
-                        'tournament'  => $t_name,
-                        'line_index'  => (string)$line_0_idx,
-                        'line_name'   => $line_0_name,
-                        'name'        => $name,
-                        'phone'       => '',
-                        'distance'    => $entry['distance'],
-                        'type'        => 'Walk-In',
-                        'division'    => $entry['division'],
-                        'gender'      => $entry['gender'],
-                        'style'       => $entry['style'],
-                        'paid'        => ( $entry['distance'] === 'Cub' ? 'Youth' : 'Adult' ),
-                        'balance_due' => 0.00,
-                        'status'      => 'Pre-Reg',
-                        'checked_in'  => 1,
-                        'created_at'  => current_time( 'mysql' ),
-                    );
-
-                    update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
-                    $master_regs[$target_id] = $new_reg;
-                    $registrations[]         = $new_reg;
-
-                    $reg_lookup[$norm_name] = count( $registrations ) - 1;
-                }
-
-                if ( ! empty( $entry['gender'] ) ) {
-                    $gender_cache[$norm_name] = $entry['gender'];
-                }
-
-                $scores[$target_id] = array(
-                    'score'    => $entry['score'],
-                    'xs'       => $entry['xs'],
-                    'saved_at' => current_time( 'mysql' ),
-                );
-
-                $synced_count++;
+                $processed_reg_ids[]          = $target_id;
+                $occupied_lines[$norm_name][] = $assigned_line_idx;
+                $reg_lookup[$norm_name][]     = count( $registrations ) - 1;
             }
+
+            if ( ! empty( $entry['gender'] ) ) {
+                $gender_cache[$norm_name] = $entry['gender'];
+            }
+
+            $scores[$target_id] = array(
+                'score'    => $entry['score'],
+                'xs'       => $entry['xs'],
+                'saved_at' => current_time( 'mysql' ),
+            );
+
+            $synced_count++;
         }
 
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
