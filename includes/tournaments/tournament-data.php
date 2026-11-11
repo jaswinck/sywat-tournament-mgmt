@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 8.1.0
+ * Version: 8.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -330,7 +330,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
 
         $debug_html = '';
         if ( $is_debug ) {
-            $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; text-align: left; max-height: 400px; overflow-y: auto;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap; margin-top: 10px; color: #333;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+            $debug_html = '<details class="sywat-debug-log-details"><summary class="sywat-debug-log-summary">View Diagnostic Log</summary><pre class="sywat-debug-log-pre">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
         }
 
         return array(
