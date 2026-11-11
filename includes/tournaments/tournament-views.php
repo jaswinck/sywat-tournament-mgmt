@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.16.0
+ * Version: 7.16.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -172,7 +172,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                     <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
                                     <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
-                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">🔗 Sync TFAA Links</button>
+                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">Sync TFAA Links</button>
                                 </form>
                             <?php endif; ?>
 
@@ -211,7 +211,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
                                         <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                         <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
-                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">⚪ Deactivate All Hubs</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">Deactivate All Hubs</button>
                                     </form>
                                 <?php endif; ?>
 
