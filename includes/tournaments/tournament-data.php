@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.9.5
+ * Version: 7.9.8
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -41,7 +41,6 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
         $seasons = get_option( 'sywat_seasons_list', $default_seasons );
         if ( ! is_array( $seasons ) ) $seasons = $default_seasons;
 
-        // Sort seasons from newest to oldest by start date (descending)
         uasort( $seasons, function( $a, $b ) {
             $a_date = ! empty( $a['start_date'] ) ? $a['start_date'] : ( ! empty( $a['end_date'] ) ? $a['end_date'] : '' );
             $b_date = ! empty( $b['start_date'] ) ? $b['start_date'] : ( ! empty( $b['end_date'] ) ? $b['end_date'] : '' );
@@ -57,8 +56,6 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
 
 /**
  * Retrieves the current active season configuration array.
- *
- * @return array Active season payload array.
  */
 if ( ! function_exists( 'sywat_get_active_season' ) ) {
     function sywat_get_active_season() {
@@ -74,9 +71,6 @@ if ( ! function_exists( 'sywat_get_active_season' ) ) {
 
 /**
  * Retrieves archer registrations from database storage.
- *
- * @param string $t_name Optional tournament name filter.
- * @return array List of registration data records.
  */
 if ( ! function_exists( 'sywat_get_registrations' ) ) {
     function sywat_get_registrations( $t_name = '' ) {
@@ -104,10 +98,6 @@ if ( ! function_exists( 'sywat_get_registrations' ) ) {
 
 /**
  * Performs a partial search query against the cached TFAA member roster database option.
- *
- * @param string $query Archer search query term.
- * @param int    $limit Maximum result count limit.
- * @return array Matching TFAA member records.
  */
 if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
     function sywat_search_tfaa_shooters( $query, $limit = 10 ) {
@@ -143,12 +133,12 @@ if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
 
 /**
  * Bulk Season Scraper: Scrapes TFAA season index ONCE and populates all direct tournament URLs into DB.
- *
- * @param string $season_name_or_slug Active season name or slug filter.
- * @return array Status array with success flag, count of updated URLs, and message.
  */
 if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
     function sywat_sync_season_tfaa_urls( $season_name_or_slug = '' ) {
+        $debug_log = array();
+        $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER ---";
+
         $all_tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( empty( $all_tournaments ) || ! is_array( $all_tournaments ) ) {
             return array( 'success' => false, 'message' => 'No tournaments configured in database.' );
@@ -180,9 +170,13 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
         }
 
+        $debug_log[] = "Resolved Target Input: '{$target_input}' => Name: '{$target_name}', Slug: '{$target_slug}'";
+
         $request_season = str_replace( array( '–', '—' ), '-', $target_name );
         $season_param   = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
         $index_url      = 'https://texasfieldarchery.org/results' . $season_param;
+
+        $debug_log[] = "Requesting Remote URL: {$index_url}";
 
         $http_args = array(
             'timeout'   => 20,
@@ -198,22 +192,33 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'Failed to connect to TFAA: ' . $index_resp->get_error_message() );
         }
 
+        $http_code = wp_remote_retrieve_response_code($index_resp);
+        $debug_log[] = "HTTP Response Code: {$http_code}";
+
         $html = wp_remote_retrieve_body( $index_resp );
         if ( empty( $html ) ) {
             return array( 'success' => false, 'message' => 'Empty response received from TFAA index.' );
         }
 
         if ( ! preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
-            return array( 'success' => false, 'message' => 'No event links found on TFAA page.' );
+            $debug_log[] = "Regex failed to find ANY <a> tags on the page.";
+            $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+            return array( 'success' => false, 'message' => 'No event links found on TFAA page.' . $debug_html );
         }
 
-        // Extremely loose season matching: Just extract the year digits and "indoor/outdoor"
+        $debug_log[] = "Found " . count($matches) . " <a> links on the TFAA page.";
+
         $target_year = preg_replace('/[^0-9]/', '', $target_name);
         $target_type = stripos($target_name, 'indoor') !== false ? 'indoor' : 'outdoor';
+        $debug_log[] = "Parsed Active Season Filter -> Year: '{$target_year}', Type: '{$target_type}'";
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
+            $debug_log[] = "--------------------------------------------------";
+            $debug_log[] = "Evaluating Local DB Tournament: '{$t_name}'";
+
             if ( ! empty( $t_data['tfaa_event_id'] ) && strpos( $t_data['tfaa_event_id'], 'http' ) === 0 ) {
+                $debug_log[] = " -> SKIP: Manual URL override already exists.";
                 continue;
             }
 
@@ -221,14 +226,15 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             $t_year   = preg_replace('/[^0-9]/', '', $t_season);
             $t_type   = stripos($t_season, 'indoor') !== false ? 'indoor' : 'outdoor';
             
-            // Only skip if the core year/type fundamental mismatches (e.g. comparing 2026 indoor to 2025 outdoor)
             if ( $target_year !== $t_year || $target_type !== $t_type ) {
+                $debug_log[] = " -> SKIP: Season mismatch. DB has ({$t_year} {$t_type}), but we are syncing ({$target_year} {$target_type}).";
                 continue;
             }
 
-            // Raw brutal alphanumeric strip of local tournament name
             $simple_local_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
+            $debug_log[] = " -> Stripped Local Name to compare: '{$simple_local_name}'";
 
+            $matched = false;
             foreach ( $matches as $m ) {
                 $link_href = trim( $m[1] );
                 $link_text = trim( wp_strip_all_tags( $m[2] ) );
@@ -237,20 +243,18 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                     continue;
                 }
 
-                // Raw brutal alphanumeric strip of remote link text
                 $simple_link_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $link_text));
                 
                 $is_match = false;
-
-                // STRATEGY 1: Exact Substring match (Your solution: "archeryhq1" is in "1023202610252026archeryhq1")
                 if ( ! empty( $simple_local_name ) && strpos( $simple_link_text, $simple_local_name ) !== false ) {
                     $is_match = true;
+                    $debug_log[] = "    -> [MATCH SUCCESS]: Found '{$simple_local_name}' inside remote string '{$simple_link_text}' (Original: '{$link_text}')";
                 } 
-                // STRATEGY 2: Fallback to old token matcher if formatted weirdly
                 elseif ( function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
                     $clean_link_text = preg_replace('/^\s*\d{1,2}\/\d{1,2}\/\d{4}(?:\s*-\s*\d{1,2}\/\d{1,2}\/\d{4})?\s*(?:\||-)?\s*/', '', $link_text);
                     if ( sywat_match_tfaa_tournament_name( $t_name, $clean_link_text ) ) {
                         $is_match = true;
+                        $debug_log[] = "    -> [MATCH SUCCESS]: Legacy Token Matcher matched '{$t_name}' to '{$clean_link_text}'";
                     }
                 }
 
@@ -264,9 +268,17 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                     if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
                         $t_data['tfaa_results_url'] = $resolved_url;
                         $updated_count++;
+                        $debug_log[] = "    -> Saved URL: {$resolved_url}";
+                    } else {
+                        $debug_log[] = "    -> URL already up to date.";
                     }
+                    $matched = true;
                     break;
                 }
+            }
+
+            if ( ! $matched ) {
+                $debug_log[] = " -> FAILED TO MATCH against any of the remote links.";
             }
         }
         unset( $t_data );
@@ -275,20 +287,18 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             update_option( 'sywat_tournaments_list', $all_tournaments, false );
         }
 
+        $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; text-align: left; max-height: 400px; overflow-y: auto;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap; margin-top: 10px; color: #333;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+
         return array(
             'success' => true,
             'count'   => $updated_count,
-            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'."
+            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'." . $debug_html
         );
     }
 }
 
 /**
- * Validates uploaded schedule rows against master Shop Directory & prohibits database date overlaps.
- *
- * @param array  $raw_rows       Imported raw spreadsheet rows.
- * @param string $target_season  Slug of target season.
- * @return array                 Structured array containing valid tournaments and rejected rows.
+ * Validates uploaded schedule rows against master Shop Directory.
  */
 if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
     function sywat_process_schedule_import_rows( $raw_rows, $target_season ) {
