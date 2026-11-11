@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.9.0
+ * Version: 7.9.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -160,7 +160,6 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
 
         $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
 
-        // 1. Resolve exact season name and slug safely
         if ( empty( $target_input ) ) {
             $active_s    = sywat_get_active_season();
             $target_slug = isset( $active_s['slug'] ) ? $active_s['slug'] : '';
@@ -181,7 +180,6 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
         }
 
-        // 2. Normalize typographical en-dash to standard hyphen for the TFAA server request
         $request_season = str_replace( array( '–', '—' ), '-', $target_name );
         $season_param   = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
         $index_url      = 'https://texasfieldarchery.org/results' . $season_param;
@@ -209,25 +207,27 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'No event links found on TFAA page.' );
         }
 
-        // Parse baseline target metrics to ensure foolproof season matching
+        // Extremely loose season matching: Just extract the year digits and "indoor/outdoor"
         $target_year = preg_replace('/[^0-9]/', '', $target_name);
         $target_type = stripos($target_name, 'indoor') !== false ? 'indoor' : 'outdoor';
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
-            // Skip if the user typed in a direct override
             if ( ! empty( $t_data['tfaa_event_id'] ) && strpos( $t_data['tfaa_event_id'], 'http' ) === 0 ) {
                 continue;
             }
 
-            // 3. Foolproof Season Verification (Bypasses exact string match traps)
             $t_season = isset( $t_data['season'] ) ? $t_data['season'] : ( isset( $t_data['season_slug'] ) ? $t_data['season_slug'] : '' );
             $t_year   = preg_replace('/[^0-9]/', '', $t_season);
             $t_type   = stripos($t_season, 'indoor') !== false ? 'indoor' : 'outdoor';
             
+            // Only skip if the core year/type fundamental mismatches (e.g. comparing 2026 indoor to 2025 outdoor)
             if ( $target_year !== $t_year || $target_type !== $t_type ) {
                 continue;
             }
+
+            // Raw brutal alphanumeric strip of local tournament name
+            $simple_local_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
 
             foreach ( $matches as $m ) {
                 $link_href = trim( $m[1] );
@@ -237,18 +237,21 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                     continue;
                 }
 
-                // Strip leading dates (e.g. "02/27/2027 - 02/28/2027 | ")
-                $clean_link_text = preg_replace('/^\s*\d{1,2}\/\d{1,2}\/\d{4}(?:\s*-\s*\d{1,2}\/\d{1,2}\/\d{4})?\s*(?:\||-)?\s*/', '', $link_text);
-
-                // Setup fallback matcher
-                $stripped_t_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
-                $stripped_l_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $clean_link_text));
+                // Raw brutal alphanumeric strip of remote link text
+                $simple_link_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $link_text));
                 
                 $is_match = false;
-                if ( function_exists( 'sywat_match_tfaa_tournament_name' ) && sywat_match_tfaa_tournament_name( $t_name, $clean_link_text ) ) {
+
+                // STRATEGY 1: Exact Substring match (Your solution: "archeryhq1" is in "1023202610252026archeryhq1")
+                if ( ! empty( $simple_local_name ) && strpos( $simple_link_text, $simple_local_name ) !== false ) {
                     $is_match = true;
-                } elseif ( strpos( $stripped_l_name, $stripped_t_name ) !== false ) {
-                    $is_match = true;
+                } 
+                // STRATEGY 2: Fallback to old token matcher if formatted weirdly
+                elseif ( function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
+                    $clean_link_text = preg_replace('/^\s*\d{1,2}\/\d{1,2}\/\d{4}(?:\s*-\s*\d{1,2}\/\d{1,2}\/\d{4})?\s*(?:\||-)?\s*/', '', $link_text);
+                    if ( sywat_match_tfaa_tournament_name( $t_name, $clean_link_text ) ) {
+                        $is_match = true;
+                    }
                 }
 
                 if ( $is_match ) {
@@ -262,7 +265,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                         $t_data['tfaa_results_url'] = $resolved_url;
                         $updated_count++;
                     }
-                    break; // Move to the next tournament once matched
+                    break;
                 }
             }
         }
@@ -293,7 +296,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
         $known_shops      = array();
         $shop_lookup_data = array();
 
-        // Multi-Key Shop Directory Extraction ('name', 'shop_name', 'title')
         foreach ( $all_shops as $s_id => $s_data ) {
             if ( is_array( $s_data ) ) {
                 $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
@@ -318,7 +320,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             $national_title = trim( isset( $row['national_event_title'] ) ? $row['national_event_title'] : '' );
             $notes          = trim( isset( $row['notes'] ) ? $row['notes'] : '' );
 
-            // Silent Skip: Holiday placeholders or blank rows
             if ( empty( $start_date ) || in_array( strtolower( $raw_host_city ), $holiday_keywords ) ) {
                 continue;
             }
@@ -326,9 +327,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             $start_date_formatted = function_exists( 'sywat_format_imported_date' ) ? sywat_format_imported_date( $start_date ) : $start_date;
             $end_date_formatted   = ! empty( $row['end_date'] ) ? ( function_exists( 'sywat_format_imported_date' ) ? sywat_format_imported_date( $row['end_date'] ) : $row['end_date'] ) : $start_date_formatted;
 
-            // -------------------------------------------------------------
-            // OVERLAP GUARD: Prohibit overlapping event dates per host shop
-            // -------------------------------------------------------------
             $is_duplicate   = false;
             $duplicate_name = '';
 
@@ -342,7 +340,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 $ex_start = ! empty( $ex['start_date'] ) ? $ex['start_date'] : '';
                 $ex_end   = ! empty( $ex['end_date'] ) ? $ex['end_date'] : $ex_start;
 
-                // Match host shop name & date range overlap (Start1 <= End2 AND End1 >= Start2)
                 if ( ! empty( $raw_host_city ) && isset( $known_shops[ strtolower( $raw_host_city ) ] ) ) {
                     if ( strtolower( $known_shops[ strtolower( $raw_host_city ) ] ) === $ex_shop ) {
                         if ( $start_date_formatted <= $ex_end && $end_date_formatted >= $ex_start ) {
@@ -353,7 +350,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                     }
                 }
 
-                // Match National Event Title & date range overlap
                 if ( strcasecmp( $event_type, 'National' ) === 0 && ! empty( $national_title ) ) {
                     $ex_title = isset( $ex['name'] ) ? $ex['name'] : $t_key;
                     if ( strtolower( trim( $ex_title ) ) === strtolower( trim( $national_title ) ) ) {
@@ -375,7 +371,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 continue;
             }
 
-            // Branch 1: National / External Events
             if ( strcasecmp( $event_type, 'National' ) === 0 ) {
                 $final_title = ! empty( $national_title ) ? $national_title : $raw_host_city;
                 $valid_tournaments[] = array(
@@ -392,7 +387,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 continue;
             }
 
-            // Branch 2: TFAA State Championship
             if ( strcasecmp( $event_type, 'TFAA State' ) === 0 ) {
                 $norm_shop     = strtolower( $raw_host_city );
                 $official_shop = isset( $known_shops[$norm_shop] ) ? $known_shops[$norm_shop] : $raw_host_city;
@@ -420,7 +414,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                 continue;
             }
 
-            // Branch 3: Standard SYWAT Circuit Shoots
             $norm_shop = strtolower( $raw_host_city );
             if ( isset( $known_shops[$norm_shop] ) ) {
                 $official_shop = $known_shops[$norm_shop];
@@ -469,14 +462,6 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 
 /**
  * Re-sequences tournaments chronologically for a specific shop and season.
- * Updates tournament names (e.g. "Shop Name - 1", "Shop Name - 2") based on start_date order,
- * and updates associated registration option keys and active hub lists if names change.
- *
- * @param string $shop_id             Shop ID or normalized shop key.
- * @param string $season_slug         Season slug.
- * @param array  $tournaments         Reference to tournaments array.
- * @param array  $active_tournaments Reference to active tournaments array.
- * @param array  $registrations       Reference to registrations array.
  */
 if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
     function sywat_resequence_shop_tournaments( $shop_id, $season_slug, &$tournaments, &$active_tournaments, &$registrations ) {
@@ -495,7 +480,6 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             }
         }
 
-        // Collect all standard circuit tournaments belonging to this shop & season
         $shop_tournaments = array();
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : '';
@@ -510,7 +494,6 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             $t_season   = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
             $event_type = isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT';
 
-            // Only re-sequence standard SYWAT circuit events for this shop
             if ( $t_shop === $shop_id && ( empty( $season_slug ) || $t_season === $season_slug ) && strcasecmp( $event_type, 'SYWAT' ) === 0 ) {
                 $shop_tournaments[] = array(
                     'old_name'   => $t_name,
@@ -522,12 +505,10 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
         if ( empty( $shop_tournaments ) ) return;
 
-        // Sort chronologically by start date
         usort( $shop_tournaments, function( $a, $b ) {
             return strcmp( $a['start_date'], $b['start_date'] );
         });
 
-        // Determine base title
         if ( empty( $shop_name ) ) {
             $first_data = $shop_tournaments[0]['data'];
             $shop_name  = ! empty( $first_data['shop_name'] ) ? $first_data['shop_name'] : ( ! empty( $first_data['official_shop_name'] ) ? $first_data['official_shop_name'] : '' );
@@ -547,7 +528,6 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
         if ( empty( $renamed_map ) ) return;
 
-        // Apply renames cleanly using a two-pass process to avoid key collisions
         $temp_rebuilt = array();
         foreach ( $renamed_map as $old_name => $new_name ) {
             if ( isset( $tournaments[$old_name] ) ) {
@@ -570,20 +550,17 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             $old_slug = sanitize_title( $old_name );
             $new_slug = sanitize_title( $new_name );
 
-            // Move dates option
             $dates = get_option( 'sywat_dates_' . $old_slug );
             if ( $dates ) {
                 update_option( 'sywat_dates_' . $new_slug, $dates );
                 delete_option( 'sywat_dates_' . $old_slug );
             }
 
-            // Update active tournaments array
             if ( in_array( $old_name, $active_tournaments ) ) {
                 $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
                 $active_tournaments[] = $new_name;
             }
 
-            // Migrate registrations
             foreach ( $registrations as &$reg ) {
                 if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
                     delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
@@ -602,8 +579,6 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
 /**
  * Master Data Retrieval Engine for Admin Portal & Views
- *
- * @return array Aggregated portal data payload array.
  */
 if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
     function sywat_get_master_portal_data() {
@@ -623,7 +598,6 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         $active_tournaments = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
 
-        // Load Registrations from DB with Master Roster Fallback
         $registrations = array();
         $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
         if ( is_array( $results ) ) {
@@ -635,22 +609,18 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
             }
         }
 
-        // Fallback: Query master registration options if single option keys return empty
         if ( empty( $registrations ) ) {
             $registrations = sywat_get_registrations();
         }
 
-        // Filter Tournaments by Shop Scoping, Season Filtering & Collect Unique Shops
         $scoped_tournaments = array();
         $filter_shops       = array();
-
-        $selected_season = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( $_REQUEST['filter_season'] ) : '';
+        $selected_season    = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( $_REQUEST['filter_season'] ) : '';
 
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             $t_season = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : 'indoor-2026-2027';
 
-            // Filter out tournaments that do not match the selected season parameter
             if ( ! empty( $selected_season ) && $t_season !== $selected_season ) {
                 continue;
             }
@@ -664,7 +634,6 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         }
         asort( $filter_shops );
 
-        // Sort tournaments chronologically by Start Date (Soonest first)
         uasort( $scoped_tournaments, function( $a, $b ) {
             $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
             $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
