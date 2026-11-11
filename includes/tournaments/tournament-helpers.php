@@ -1,20 +1,276 @@
 <?php
 /**
- * Sub-Module: Tournament Configuration Helpers & Presentation Engines
+ * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Central Permission Checker for Season/Shop Administration
+/**
+ * Central Permission Checker for Season/Shop Administration
+ */
 if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
     function sywat_can_manage_seasons() {
         if ( ! is_user_logged_in() ) return false;
         $user = wp_get_current_user();
         $allowed_roles = array( 'administrator', 'tfaa_webmaster', 'tfaa_admin' );
         return (bool) array_intersect( $allowed_roles, (array) $user->roles );
+    }
+}
+
+/**
+ * Converts Excel Serial Dates or standard date strings to 'YYYY-MM-DD'
+ *
+ * @param string|int $val Raw date value from spreadsheet
+ * @return string Formatted date string
+ */
+if ( ! function_exists( 'sywat_format_imported_date' ) ) {
+    function sywat_format_imported_date( $val ) {
+        $val = trim( (string) $val );
+        if ( empty( $val ) ) return '';
+
+        // Handle Excel Date Serial Numbers (e.g. 46318 -> 2026-10-23)
+        if ( is_numeric( $val ) && intval( $val ) > 30000 ) {
+            $unix = ( intval( $val ) - 25569 ) * 86400;
+            return date( 'Y-m-d', $unix );
+        }
+
+        $time = strtotime( $val );
+        return ( $time !== false ) ? date( 'Y-m-d', $time ) : $val;
+    }
+}
+
+/**
+ * Formats line time tokens cleanly (e.g. "6" or "6:00" -> "6PM", "6:30" -> "6:30PM", "10:00" -> "10AM").
+ * Enforces Archery rule: 6 o'clock lines are ALWAYS PM (never 6AM).
+ *
+ * @param string $token Time string token.
+ * @return string Formatted time token.
+ */
+if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
+    function sywat_format_line_time_token( $token ) {
+        $token = trim( (string) $token );
+        if ( empty( $token ) ) return '';
+
+        if ( preg_match( '/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i', $token, $m ) ) {
+            $hour     = intval( $m[1] );
+            $mins     = isset( $m[2] ) ? $m[2] : '';
+            $meridiem = isset( $m[3] ) ? strtoupper( $m[3] ) : '';
+
+            if ( $mins === '00' ) {
+                $mins = '';
+            }
+
+            $min_str = ! empty( $mins ) ? ':' . $mins : '';
+
+            if ( empty( $meridiem ) ) {
+                if ( $hour === 6 || $hour === 12 || ( $hour >= 1 && $hour <= 5 ) ) {
+                    $meridiem = 'PM';
+                } else {
+                    $meridiem = 'AM';
+                }
+            }
+
+            // Enforce Archery rule: 6 o'clock is ALWAYS PM (6PM or 6:30PM)
+            if ( $hour === 6 ) {
+                $meridiem = 'PM';
+            }
+
+            return $hour . $min_str . $meridiem;
+        }
+
+        return strtoupper( $token );
+    }
+}
+
+/**
+ * Universal Token & Qualifier Matcher for TFAA Tournament Names
+ * Resolves local short names (e.g., "Fort Grard - 1", "Archery HQ - 1") to official TFAA index strings.
+ */
+if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
+    function sywat_match_tfaa_tournament_name( $sywat_name, $tfaa_name ) {
+        $get_qualifier = function( $str ) {
+            if ( preg_match( '/(?:[\s\-\#]+)(\d+)\s*$/i', $str, $m ) ) {
+                return (int)$m[1];
+            }
+            return null;
+        };
+
+        $sywat_q = $get_qualifier( $sywat_name );
+        $tfaa_q  = $get_qualifier( $tfaa_name );
+
+        if ( $sywat_q !== null && $tfaa_q !== null && $sywat_q !== $tfaa_q ) {
+            return false;
+        }
+
+        $normalize_tokens = function( $str ) {
+            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str );
+            $str = strtolower( $str );
+            $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
+            
+            $noise  = array( 'archery', 'club', 'guns', 'outdoors', 'shop', 'shops', 'pro', 'academy', 'range', 'center', 'and' );
+            $words  = explode( ' ', $str );
+            $tokens = array();
+
+            foreach ( $words as $w ) {
+                $w = trim( $w );
+                if ( ! empty( $w ) && ! in_array( $w, $noise ) && strlen( $w ) > 1 ) {
+                    $tokens[] = $w;
+                }
+            }
+            return $tokens;
+        };
+
+        $sywat_tokens = $normalize_tokens( $sywat_name );
+        $tfaa_tokens  = $normalize_tokens( $tfaa_name );
+
+        if ( empty( $sywat_tokens ) ) {
+            $clean_s = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $sywat_name ) ) ) );
+            $clean_t = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $tfaa_name ) ) ) );
+            return ( stripos( $clean_t, $clean_s ) !== false || stripos( $clean_s, $clean_t ) !== false );
+        }
+
+        $raw_tfaa_lower = strtolower( $tfaa_name );
+        foreach ( $sywat_tokens as $token ) {
+            if ( strpos( $raw_tfaa_lower, $token ) === false && ! in_array( $token, $tfaa_tokens ) ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+/**
+ * Parses raw human line string into structured line slot arrays.
+ * Enforces standardized day labels and named slot titles.
+ *
+ * @param string $line_str      Raw schedule string from import file or input.
+ * @param int    $default_20yd  Default 20-yard line capacity.
+ * @param int    $default_cub   Default Cub line capacity.
+ * @return array                Array of structured line slot definitions.
+ */
+if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
+    function sywat_parse_imported_line_schedule( $line_str, $default_20yd = 20, $default_cub = 5 ) {
+        $lines = array();
+        if ( empty( trim( $line_str ) ) ) {
+            return array(
+                array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+                array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub ),
+            );
+        }
+
+        $lower = strtolower( $line_str );
+
+        // 1. Friday Line Check
+        $fri_match_str = '';
+        if ( preg_match( '/fri(?:day)?[\s\-]*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i', $line_str, $m ) ) {
+            $fri_match_str = $m[0];
+            $time          = sywat_format_line_time_token( $m[1] );
+            $lines[]       = array( 'day' => 'Friday', 'time' => $time, 'name' => 'Friday ' . $time, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+        }
+
+        // 2. Saturday & Sunday Checks
+        $has_sat = ( strpos( $lower, 'sat' ) !== false );
+        $has_sun = ( strpos( $lower, 'sun' ) !== false && strpos( $lower, 'no sunday' ) === false );
+
+        // Remove Friday clause to isolate Sat/Sun time tokens
+        $sat_sun_str = ! empty( $fri_match_str ) ? str_replace( $fri_match_str, '', $line_str ) : $line_str;
+
+        $times = array();
+        if ( preg_match_all( '/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i', $sat_sun_str, $time_matches ) ) {
+            foreach ( $time_matches[1] as $t ) {
+                $formatted = sywat_format_line_time_token( $t );
+                if ( ! empty( $formatted ) && ! in_array( $formatted, $times ) ) {
+                    $times[] = $formatted;
+                }
+            }
+        }
+
+        if ( empty( $times ) ) {
+            $times = array( '10AM', '2PM' );
+        }
+
+        if ( $has_sat ) {
+            foreach ( $times as $t ) {
+                $lines[] = array( 'day' => 'Saturday', 'time' => $t, 'name' => 'Saturday ' . $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            }
+        }
+
+        if ( $has_sun ) {
+            foreach ( $times as $t ) {
+                $lines[] = array( 'day' => 'Sunday', 'time' => $t, 'name' => 'Sunday ' . $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
+            }
+        }
+
+        return $lines;
+    }
+}
+
+/**
+ * Universal Spreadsheet File Parser (.xlsx via SimpleXLSX and .csv fallback)
+ *
+ * @param string $file_path Path to uploaded file
+ * @param string $file_name Original file name
+ * @return array Parsed row arrays
+ */
+if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
+    function sywat_parse_schedule_file_rows( $file_path, $file_name ) {
+        $raw_rows = array();
+        $ext      = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
+
+        // 1. Excel (.xlsx) Parser via includes/lib/SimpleXLSX.php
+        if ( $ext === 'xlsx' ) {
+            $lib_path = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
+            if ( file_exists( $lib_path ) && ! class_exists( 'SimpleXLSX' ) ) {
+                require_once $lib_path;
+            }
+
+            if ( class_exists( 'SimpleXLSX' ) && ( $xlsx = SimpleXLSX::parse( $file_path ) ) ) {
+                foreach ( $xlsx->rows() as $idx => $r ) {
+                    if ( $idx === 0 ) continue; // Skip header row
+                    if ( count( $r ) >= 3 ) {
+                        $raw_rows[] = array(
+                            'start_date'           => isset( $r[0] ) ? trim( (string) $r[0] ) : '',
+                            'end_date'             => isset( $r[1] ) ? trim( (string) $r[1] ) : '',
+                            'host_shop_city'       => isset( $r[2] ) ? trim( (string) $r[2] ) : '',
+                            'line_times'           => isset( $r[3] ) ? trim( (string) $r[3] ) : '',
+                            'event_type'           => isset( $r[4] ) ? trim( (string) $r[4] ) : '',
+                            'national_event_title' => isset( $r[5] ) ? trim( (string) $r[5] ) : '',
+                            'notes'                => isset( $r[6] ) ? trim( (string) $r[6] ) : '',
+                        );
+                    }
+                }
+                if ( ! empty( $raw_rows ) ) {
+                    return $raw_rows;
+                }
+            }
+        }
+
+        // 2. CSV Fallback
+        if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+            $header = fgetcsv( $handle, 1000, ',' );
+            while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
+                if ( count( $data ) >= 3 ) {
+                    $raw_rows[] = array(
+                        'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
+                        'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
+                        'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
+                        'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
+                        'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
+                        'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
+                        'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
+                    );
+                }
+            }
+            fclose( $handle );
+        }
+
+        return $raw_rows;
     }
 }
 
