@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.6.0
+ * Version: 7.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -154,23 +154,37 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'No tournaments configured in database.' );
         }
 
-        $target_season = trim( (string)$season_name_or_slug );
-        if ( empty( $target_season ) ) {
-            $active_s = sywat_get_active_season();
-            $target_season = ! empty( $active_s['name'] ) ? $active_s['name'] : ( isset( $active_s['slug'] ) ? $active_s['slug'] : '' );
+        $target_input = trim( (string)$season_name_or_slug );
+        $target_slug  = '';
+        $target_name  = '';
+
+        $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
+
+        // 1. Resolve exact season name and slug safely
+        if ( empty( $target_input ) ) {
+            $active_s    = sywat_get_active_season();
+            $target_slug = isset( $active_s['slug'] ) ? $active_s['slug'] : '';
+            $target_name = ! empty( $active_s['name'] ) ? $active_s['name'] : $target_slug;
         } else {
-            // Resolve slug to official name if slug was passed
-            $seasons = sywat_get_seasons();
-            if ( isset( $seasons[$target_season]['name'] ) ) {
-                $target_season = $seasons[$target_season]['name'];
+            if ( is_array( $seasons ) ) {
+                foreach ( $seasons as $s_slug => $s_data ) {
+                    if ( strcasecmp( $s_slug, $target_input ) === 0 || ( isset( $s_data['name'] ) && strcasecmp( $s_data['name'], $target_input ) === 0 ) ) {
+                        $target_slug = $s_slug;
+                        $target_name = isset( $s_data['name'] ) ? $s_data['name'] : $s_slug;
+                        break;
+                    }
+                }
+            }
+            if ( empty( $target_slug ) ) {
+                $target_slug = sanitize_title( $target_input );
+                $target_name = $target_input;
             }
         }
 
-        // Normalize typographical en-dash to standard hyphen for the TFAA server request
-        $request_season = str_replace( array( '–', '—' ), '-', $target_season );
-
-        $season_param = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
-        $index_url    = 'https://texasfieldarchery.org/results' . $season_param;
+        // 2. Normalize typographical en-dash to standard hyphen for the TFAA server request
+        $request_season = str_replace( array( '–', '—' ), '-', $target_name );
+        $season_param   = ! empty( $request_season ) ? '?season=' . urlencode( $request_season ) : '';
+        $index_url      = 'https://texasfieldarchery.org/results' . $season_param;
 
         $http_args = array(
             'timeout'   => 20,
@@ -201,9 +215,9 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
 
             $t_season = isset( $t_data['season'] ) ? $t_data['season'] : ( isset( $t_data['season_slug'] ) ? $t_data['season_slug'] : '' );
 
-            if ( ! empty( $target_season ) && ! empty( $t_season ) ) {
-                if ( strcasecmp( sanitize_title( $t_season ), sanitize_title( $target_season ) ) !== 0 
-                     && strcasecmp( trim( $t_season ), trim( $target_season ) ) !== 0 ) {
+            // 3. Relaxed Matching: Accept match against EITHER the slug or the formatted name
+            if ( ! empty( $target_slug ) && ! empty( $t_season ) ) {
+                if ( strcasecmp( trim( $t_season ), trim( $target_slug ) ) !== 0 && strcasecmp( trim( $t_season ), trim( $target_name ) ) !== 0 ) {
                     continue;
                 }
             }
@@ -240,7 +254,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         return array(
             'success' => true,
             'count'   => $updated_count,
-            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_season ) . "'."
+            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'."
         );
     }
 }
