@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 7.1.2
+ * Version: 7.1.3
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -36,25 +36,21 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter & Form Interception
+    // 3. Real-Time Search Filter (Aligned with Check-In Engine)
     const searchInput = document.getElementById('sywat_score_search_input');
     const clearBtn    = document.getElementById('sywat_score_search_clear');
 
     if (searchInput) {
-        function filterRows() {
-            const filter = searchInput.value.trim().toLowerCase();
+        searchInput.addEventListener('input', function() {
+            const filter = this.value.toLowerCase().trim();
             const rows   = document.querySelectorAll('.sywat-score-row');
 
             rows.forEach(function(row) {
-                const name        = (row.getAttribute('data-name') || '').toLowerCase();
-                const textContent = (row.textContent || row.innerText || '').toLowerCase();
-
-                if (!filter || name.includes(filter) || textContent.includes(filter)) {
+                const name = row.getAttribute('data-name');
+                if (name && name.includes(filter)) {
                     row.classList.remove('sywat-hidden');
-                    row.style.setProperty('display', '', '');
                 } else {
                     row.classList.add('sywat-hidden');
-                    row.style.setProperty('display', 'none', 'important');
                 }
             });
 
@@ -62,32 +58,29 @@ document.addEventListener("DOMContentLoaded", function() {
             hiddenSearches.forEach(function(hidden) {
                 hidden.value = searchInput.value;
             });
-        }
-
-        searchInput.addEventListener('input', filterRows);
-        searchInput.addEventListener('keyup', filterRows);
+        });
 
         // Prevent search input from submitting wrapping batch form on Enter key
         searchInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.keyCode === 13) {
                 e.preventDefault();
-                filterRows();
+                searchInput.dispatchEvent(new Event('input'));
                 return false;
             }
         });
 
-        // Clear button event binding
+        // Clear button event handler
         if (clearBtn) {
             clearBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 searchInput.value = '';
-                filterRows();
+                searchInput.dispatchEvent(new Event('input'));
                 searchInput.focus();
             });
         }
 
-        // Initialize search state on DOM ready
-        filterRows();
+        // Initial trigger on load to synchronize pre-filled query states
+        searchInput.dispatchEvent(new Event('input'));
     }
 
     // 4. Helper: Status Badge Class & Text Updater
