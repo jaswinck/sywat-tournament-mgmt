@@ -1,10 +1,10 @@
 <?php
 /**
- * Shared Module: TFAA Event Score Scraper & Sync Engine
+ * Shared Module: TFAA Event Score Scraper & Deduplicated Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
  * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -76,7 +76,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
 if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
     function sywat_parse_tfaa_style( $text ) {
         if ( strlen( $text ) > 80 ) return '';
-        $style = '';
+        $style  = '';
         $is_pro = ( stripos( $text, 'Pro' ) !== false );
 
         if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)';
@@ -96,13 +96,15 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
- * Core Universal TFAA Event Score Sync Engine
+ * Core Universal TFAA Event Score Sync Engine with Deduplication
  *
  * @param string $t_name Tournament Title/Key Name.
  * @return array Result payload array containing success boolean, count, and notice message.
  */
 if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
     function sywat_sync_tfaa_event_scores( $t_name ) {
+        global $wpdb;
+
         if ( empty( $t_name ) ) {
             return array( 'success' => false, 'message' => 'No active tournament selected.' );
         }
@@ -235,103 +237,171 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         // Auto-Expand Line Capacity
         $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
-        $line_0_idx = ! empty( $t_lines ) ? key( $t_lines ) : '0';
+        $line_0_idx = ! empty( $t_lines ) ? (string)key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
 
-        $registrations = get_option( 'sywat_registrations', array() );
-        if ( ! is_array( $registrations ) ) $registrations = array();
+        // FETCH ALL LIVE REGISTRATIONS DIRECTLY FROM WP_OPTIONS
+        $registrations = array();
+        $db_results    = $wpdb->get_results( $wpdb->prepare(
+            "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+            $wpdb->esc_like( 'sywat_t_' . $t_slug . '_' ) . '%'
+        ) );
 
-        $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
-        if ( ! is_array( $master_regs ) ) $master_regs = array();
+        foreach ( $db_results as $row ) {
+            $reg_data = maybe_unserialize( $row->option_value );
+            if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
+                $registrations[$reg_data['id']] = $reg_data;
+            }
+        }
 
-        $scores = get_option( 'sywat_scores_' . $t_slug, array() );
+        $normalize_str = function( $str ) {
+            $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', $str );
+            $n = preg_replace( '/[^a-zA-Z0-9\s]/', '', $n );
+            $n = preg_replace( '/\s+/', ' ', $n );
+            return strtolower( trim( $n ) );
+        };
+
+        $claimed_reg_ids = array();
+        $primary_styles  = array();
+        $stats_updated   = 0;
+        $stats_created   = 0;
+
+        $master_regs = array();
+        $scores      = get_option( 'sywat_scores_' . $t_slug, array() );
         if ( ! is_array( $scores ) ) $scores = array();
 
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) $gender_cache = array();
 
-        $normalize_key = function( $name ) {
-            $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', $name );
-            $n = preg_replace( '/[^a-zA-Z\s]/', '', $n );
-            $n = preg_replace( '/\s+/', ' ', $n );
-            return strtolower( trim( $n ) );
-        };
-
-        $reg_lookup = array();
-        $occupied_lines = array();
-        foreach ( $registrations as $idx => $r ) {
-            if ( isset( $r['tournament'], $r['name'] ) && strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) === 0 ) {
-                $norm_key = $normalize_key( $r['name'] );
-                $reg_lookup[$norm_key][] = $idx;
-                $occupied_lines[$norm_key][] = (string)$r['line_index'];
-            }
-        }
-
-        $processed_reg_ids = array();
-        $primary_styles    = array();
-        $stats_updated     = 0;
-        $stats_created     = 0;
-
         foreach ( $parsed_entries as $entry ) {
-            $norm_name = $normalize_key( $entry['clean_name'] );
-            
-            if ( ! $entry['is_guest'] && ! $entry['is_inc'] && empty( $primary_styles[$norm_name] ) ) {
+            $norm_name      = $normalize_str( $entry['clean_name'] );
+            $norm_div       = $normalize_str( $entry['division'] );
+            $norm_style     = $normalize_str( $entry['style'] );
+            $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
+
+            if ( ! $entry_is_guest && ! $entry['is_inc'] && empty( $primary_styles[$norm_name] ) ) {
                 $primary_styles[$norm_name] = $entry['style'];
             }
 
             $final_style = $entry['style'];
-            if ( $entry['is_guest'] || $final_style === 'Guest' ) {
+            if ( $entry_is_guest && $final_style === 'Guest' ) {
                 $final_style = ! empty( $primary_styles[$norm_name] ) ? $primary_styles[$norm_name] : 'Guest';
             }
 
-            $target_r_idx = -1;
-            if ( isset( $reg_lookup[$norm_name] ) ) {
-                foreach ( $reg_lookup[$norm_name] as $idx ) {
-                    $id = $registrations[$idx]['id'];
-                    if ( ! in_array( $id, $processed_reg_ids ) ) {
-                        $target_r_idx = $idx;
+            // Find best matching existing registration for this entry
+            $matched_reg_id = null;
+
+            // Pass 1: Match Name + Division + Style + Guest Status
+            foreach ( $registrations as $r_id => $r ) {
+                if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
+
+                $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
+                $r_div      = $normalize_str( isset( $r['division'] ) ? $r['division'] : '' );
+                $r_style    = $normalize_str( isset( $r['style'] ) ? $r['style'] : '' );
+                $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
+
+                if ( $r_name === $norm_name && $r_div === $norm_div && $r_style === $norm_style && $r_is_guest === $entry_is_guest ) {
+                    $matched_reg_id = $r_id;
+                    break;
+                }
+            }
+
+            // Pass 2: Match Name + Division + Guest Status
+            if ( ! $matched_reg_id ) {
+                foreach ( $registrations as $r_id => $r ) {
+                    if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
+
+                    $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
+                    $r_div      = $normalize_str( isset( $r['division'] ) ? $r['division'] : '' );
+                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
+
+                    if ( $r_name === $norm_name && $r_div === $norm_div && $r_is_guest === $entry_is_guest ) {
+                        $matched_reg_id = $r_id;
                         break;
                     }
                 }
             }
 
-            if ( $target_r_idx !== -1 ) {
-                $target_id = $registrations[$target_r_idx]['id'];
-                $processed_reg_ids[] = $target_id;
+            // Pass 3: Match Name + Guest Status (Incomplete pre-regs)
+            if ( ! $matched_reg_id ) {
+                foreach ( $registrations as $r_id => $r ) {
+                    if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
 
-                $registrations[$target_r_idx]['checked_in'] = 1;
-                $registrations[$target_r_idx]['name']       = $entry['clean_name'];
-                $registrations[$target_r_idx]['score']      = $entry['score'];
-                $registrations[$target_r_idx]['x_count']    = $entry['xs'];
+                    $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
+                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
 
-                if ( $entry['is_guest'] ) {
-                    $registrations[$target_r_idx]['type']   = 'Guest';
-                }
-                
-                if ( empty( $registrations[$target_r_idx]['division'] ) ) $registrations[$target_r_idx]['division'] = $entry['division'];
-                if ( empty( $registrations[$target_r_idx]['gender'] ) )   $registrations[$target_r_idx]['gender']   = $entry['gender'];
-                if ( empty( $registrations[$target_r_idx]['style'] ) )    $registrations[$target_r_idx]['style']    = $final_style;
-
-                update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $registrations[$target_r_idx], false );
-                $master_regs[$target_id] = $registrations[$target_r_idx];
-
-                $stats_updated++;
-            } else {
-                if ( ! isset( $occupied_lines[$norm_name] ) ) {
-                    $occupied_lines[$norm_name] = array();
-                }
-
-                $assigned_line_idx = $line_0_idx;
-                foreach ( $t_lines as $l_idx => $l_data ) {
-                    if ( ! in_array( (string)$l_idx, $occupied_lines[$norm_name] ) ) {
-                        $assigned_line_idx = (string)$l_idx;
+                    if ( $r_name === $norm_name && $r_is_guest === $entry_is_guest ) {
+                        $matched_reg_id = $r_id;
                         break;
                     }
                 }
+            }
 
-                $line_name = isset( $t_lines[$assigned_line_idx]['name'] ) ? $t_lines[$assigned_line_idx]['name'] : 'Line ' . ( $assigned_line_idx + 1 );
+            // Pass 4: Fallback Name Match
+            if ( ! $matched_reg_id ) {
+                foreach ( $registrations as $r_id => $r ) {
+                    if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
+
+                    $r_name = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
+
+                    if ( $r_name === $norm_name ) {
+                        $matched_reg_id = $r_id;
+                        break;
+                    }
+                }
+            }
+
+            if ( $matched_reg_id ) {
+                // UPDATE EXISTING REGISTRATION RECORD
+                $claimed_reg_ids[$matched_reg_id] = true;
+                $reg = $registrations[$matched_reg_id];
+
+                $reg['checked_in'] = 1;
+                $reg['name']       = $entry['clean_name'];
+                $reg['score']      = $entry['score'];
+                $reg['x_count']    = $entry['xs'];
+
+                if ( $entry_is_guest ) {
+                    $reg['type'] = 'Guest';
+                }
+
+                if ( empty( $reg['division'] ) || $reg['division'] === '—' ) $reg['division'] = $entry['division'];
+                if ( empty( $reg['gender'] )   || $reg['gender'] === '—' )   $reg['gender']   = $entry['gender'];
+                if ( empty( $reg['style'] )    || $reg['style'] === '—' )    $reg['style']    = $final_style;
+
+                $registrations[$matched_reg_id] = $reg;
+                update_option( 'sywat_t_' . $t_slug . '_' . $matched_reg_id, $reg, false );
+                $master_regs[$matched_reg_id] = $reg;
+
+                $scores[$matched_reg_id] = array(
+                    'score'    => $entry['score'],
+                    'xs'       => $entry['xs'],
+                    'saved_at' => current_time( 'mysql' ),
+                );
+
+                $stats_updated++;
+            } else {
+                // CREATE NEW REGISTRATION (Only if no match exists)
+                $assigned_line_idx = $line_0_idx;
+                $occupied = array();
+                foreach ( $registrations as $r ) {
+                    if ( $normalize_str( isset( $r['name'] ) ? $r['name'] : '' ) === $norm_name ) {
+                        if ( isset( $r['line_index'] ) ) $occupied[] = (string)$r['line_index'];
+                    }
+                }
+
+                if ( ! empty( $t_lines ) ) {
+                    foreach ( $t_lines as $l_idx => $l_data ) {
+                        if ( ! in_array( (string)$l_idx, $occupied, true ) ) {
+                            $assigned_line_idx = (string)$l_idx;
+                            break;
+                        }
+                    }
+                }
+
+                $line_name = isset( $t_lines[$assigned_line_idx]['name'] ) ? $t_lines[$assigned_line_idx]['name'] : 'Line ' . ( intval( $assigned_line_idx ) + 1 );
                 $target_id = uniqid( 'reg_seq_' );
-                $new_type  = $entry['is_guest'] ? 'Guest' : 'Walk-In';
+                $new_type  = $entry_is_guest ? 'Guest' : 'Walk-In';
 
                 $new_reg = array(
                     'id'          => $target_id,
@@ -354,13 +424,17 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'created_at'  => current_time( 'mysql' ),
                 );
 
+                $registrations[$target_id]   = $new_reg;
+                $claimed_reg_ids[$target_id] = true;
+
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
                 $master_regs[$target_id] = $new_reg;
-                $registrations[]         = $new_reg;
 
-                $processed_reg_ids[]          = $target_id;
-                $occupied_lines[$norm_name][] = $assigned_line_idx;
-                $reg_lookup[$norm_name][]     = count( $registrations ) - 1;
+                $scores[$target_id] = array(
+                    'score'    => $entry['score'],
+                    'xs'       => $entry['xs'],
+                    'saved_at' => current_time( 'mysql' ),
+                );
 
                 $stats_created++;
             }
@@ -368,23 +442,16 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             if ( ! empty( $entry['gender'] ) ) {
                 $gender_cache[$norm_name] = $entry['gender'];
             }
-
-            $scores[$target_id] = array(
-                'score'    => $entry['score'],
-                'xs'       => $entry['xs'],
-                'saved_at' => current_time( 'mysql' ),
-            );
         }
 
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
-        update_option( 'sywat_registrations', $registrations, false );
         update_option( 'sywat_scores_' . $t_slug, $scores, false );
         update_option( 'sywat_shooter_genders_cache', $gender_cache, false );
 
         return array(
             'success' => true,
             'count'   => ( $stats_updated + $stats_created ),
-            'message' => "Successfully synced <strong>" . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated {$stats_updated} existing records and created {$stats_created} new sequential records)."
+            'message' => "Successfully synced <strong>" . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated/verified {$stats_updated} existing records and created {$stats_created} new sequential records)."
         );
     }
 }
