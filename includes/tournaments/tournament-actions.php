@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.10.3
+ * Version: 7.10.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -22,6 +22,52 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
     function sywat_handle_tournament_post_actions( &$tournaments, &$active_tournaments, &$registrations, $can_manage_seasons, $user_shop_id ) {
         $notice = '';
         $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+
+        // =====================================================================
+        // ASYNC JSON ENDPOINT: Direct Page Request Intercept for Batch Sync
+        // =====================================================================
+        if ( $action === 'sync_tfaa_single_json' ) {
+            // Clean output buffers to ensure pure JSON response
+            while ( ob_get_level() ) {
+                ob_end_clean();
+            }
+
+            if ( ! $can_manage_seasons ) {
+                wp_send_json_error( array( 'message' => 'Access denied. Management permission required.' ) );
+            }
+
+            $target_t = isset( $_POST['tournament_name'] ) ? sanitize_text_field( $_POST['tournament_name'] ) : '';
+
+            if ( empty( $target_t ) ) {
+                wp_send_json_error( array( 'message' => 'No target tournament specified for TFAA sync.' ) );
+            }
+
+            $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
+            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( $tfaa_sync_file ) ) {
+                require_once $tfaa_sync_file;
+            } elseif ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+                require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
+            }
+
+            if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
+                $res = sywat_sync_tfaa_event_scores( $target_t );
+                if ( ! empty( $res['success'] ) ) {
+                    wp_send_json_success( array(
+                        'message' => isset( $res['message'] ) ? $res['message'] : 'Sync complete.',
+                        'count'   => isset( $res['count'] ) ? intval( $res['count'] ) : 0,
+                    ) );
+                } else {
+                    wp_send_json_error( array(
+                        'message' => isset( $res['message'] ) ? $res['message'] : 'Sync failed for unknown reason.',
+                    ) );
+                }
+            } else {
+                wp_send_json_error( array( 'message' => 'TFAA sync engine function unavailable.' ) );
+            }
+            
+            // wp_send_json_success/error automatically calls wp_die() and terminates the script.
+        }
+        // =====================================================================
 
         // Action: Register Shooter Intake Form
         if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
@@ -250,7 +296,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 : '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
         }
 
-        // Action: Sync Single TFAA Tournament Scorecard
+        // Action: Sync Single TFAA Tournament Scorecard (Fallback UI handler)
         if ( $action === 'sync_tfaa_single' ) {
             $target_t = isset( $_POST['target_tournament'] ) ? sanitize_text_field( $_POST['target_tournament'] ) : '';
 
@@ -277,7 +323,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
         }
 
-        // Action: Bulk Sync All Tournament Scores with Populated TFAA Results Links
+        // Action: Bulk Sync All Tournament Scores with Populated TFAA Results Links (Fallback)
         if ( $action === 'sync_all_tfaa_weekend' ) {
             $target_tournaments = array();
             
@@ -605,64 +651,5 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         }
 
         return $notice;
-    }
-}
-
-/**
- * AJAX Endpoint Handler: Sync Single Tournament TFAA Scorecard
- * Non-blocking asynchronous batch runner entry point.
- */
-add_action( 'wp_ajax_sywat_sync_single_tfaa_tournament', 'sywat_ajax_sync_single_tfaa_tournament' );
-add_action( 'wp_ajax_nopriv_sywat_sync_single_tfaa_tournament', 'sywat_ajax_sync_single_tfaa_tournament' );
-if ( ! function_exists( 'sywat_ajax_sync_single_tfaa_tournament' ) ) {
-    function sywat_ajax_sync_single_tfaa_tournament() {
-        if ( ! check_ajax_referer( 'sywat_desk_action', 'nonce', false ) ) {
-            wp_send_json_error( array(
-                'message' => 'Security nonce verification failed. Please refresh the page.',
-            ) );
-        }
-
-        if ( ! function_exists( 'sywat_can_manage_tournaments' ) || ! sywat_can_manage_tournaments() ) {
-            wp_send_json_error( array(
-                'message' => 'Access denied. Management permission required.',
-            ) );
-        }
-
-        $target_t = isset( $_POST['tournament_name'] ) ? sanitize_text_field( $_POST['tournament_name'] ) : '';
-
-        if ( empty( $target_t ) ) {
-            wp_send_json_error( array(
-                'message' => 'No target tournament specified for TFAA sync.',
-            ) );
-        }
-
-        $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
-        if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( $tfaa_sync_file ) ) {
-            require_once $tfaa_sync_file;
-        } elseif ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
-            require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
-        }
-
-        if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
-            $res = sywat_sync_tfaa_event_scores( $target_t );
-            if ( ! empty( $res['success'] ) ) {
-                $count = isset( $res['count'] ) ? intval( $res['count'] ) : 0;
-                wp_send_json_success( array(
-                    'tournament' => $target_t,
-                    'message'    => isset( $res['message'] ) ? $res['message'] : 'Sync complete.',
-                    'count'      => $count,
-                ) );
-            } else {
-                wp_send_json_error( array(
-                    'tournament' => $target_t,
-                    'message'    => isset( $res['message'] ) ? $res['message'] : 'Sync failed for unknown reason.',
-                ) );
-            }
-        } else {
-            wp_send_json_error( array(
-                'tournament' => $target_t,
-                'message'    => 'TFAA sync engine function unavailable.',
-            ) );
-        }
     }
 }
