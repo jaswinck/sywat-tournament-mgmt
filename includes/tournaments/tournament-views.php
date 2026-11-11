@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.14.0
+ * Version: 7.15.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -59,6 +59,30 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $scoped_tournaments = $data['scoped_tournaments'];
         $filter_shops       = $data['filter_shops'];
         $tfaa_count         = $data['tfaa_count'];
+
+        // Enforce active season selection (No "All Seasons" option)
+        $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : '';
+        if ( empty( $selected_season ) && ! empty( $seasons ) ) {
+            foreach ( $seasons as $s_slug => $s_data ) {
+                if ( is_array( $s_data ) && isset( $s_data['status'] ) && $s_data['status'] === 'active' ) {
+                    $selected_season = $s_slug;
+                    break;
+                }
+            }
+            if ( empty( $selected_season ) ) {
+                reset( $seasons );
+                $selected_season = key( $seasons );
+            }
+        }
+
+        // Trigger automatic season URL resolution on load if helper exists
+        if ( ! empty( $selected_season ) && function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
+            $season_display_name = isset( $seasons[$selected_season]['name'] ) ? $seasons[$selected_season]['name'] : $selected_season;
+            sywat_sync_season_tfaa_urls( $season_display_name );
+            // Refresh scoped tournaments from mutated option
+            $tournaments = get_option( 'sywat_tournaments_list', array() );
+            $scoped_tournaments = function_exists( 'sywat_get_scoped_tournaments' ) ? sywat_get_scoped_tournaments( $tournaments, $user_shop_id, $can_manage_seasons ) : $tournaments;
+        }
 
         // Build lookup map from normalized shop name to Shop ID & District
         $shop_lookup_map = array();
@@ -135,15 +159,11 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                         <!-- TOP PAGE ACTION CONTROLS & SEASON SWITCHER -->
                         <div class="sywat-header-inline-controls">
                             <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
-                                <?php
-                                $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : '';
-                                ?>
                                 <form method="get" class="sywat-filter-inline-form">
                                     <input type="hidden" name="page" value="sywat-manage-tournaments">
                                     <div class="sywat-field-group">
                                         <label for="sywat_select_season">Season:</label>
                                         <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
-                                            <option value="">All Seasons</option>
                                             <?php foreach ( $seasons as $s_slug => $s_data ): ?>
                                                 <?php 
                                                 $s_name = is_array( $s_data ) && isset( $s_data['name'] ) ? $s_data['name'] : $s_slug; 
@@ -256,6 +276,13 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $line_count    = is_array( $t_lines ) ? count( $t_lines ) : 0;
                                             $reg_count     = sywat_get_tournament_count( $t_name, $registrations );
                                             $is_active_hub = in_array( $t_name, $active_tournaments );
+
+                                            // Resolve TFAA Link Status Indicator
+                                            $tfaa_link = ! empty( $t_data['tfaa_results_url'] ) ? $t_data['tfaa_results_url'] : '';
+                                            if ( empty( $tfaa_link ) && ! empty( $t_data['tfaa_event_id'] ) ) {
+                                                $eid = trim( $t_data['tfaa_event_id'] );
+                                                $tfaa_link = is_numeric( $eid ) ? 'https://texasfieldarchery.org/results/' . $eid : $eid;
+                                            }
                                         ?>
                                         <tr class="sywat-tournament-row" data-name="<?php echo esc_attr(strtolower($t_name)); ?>" data-shop="<?php echo esc_attr(strtolower($t_shop_name)); ?>" data-district="<?php echo esc_attr(strtolower($t_district)); ?>">
                                             <!-- Column 1: Metadata & Volunteer Hub Toggle -->
@@ -265,6 +292,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 <div class="sywat-tourn-shop">📍 <?php echo esc_html( $t_shop_name ); ?><?php if ( ! empty( $t_district ) ): ?> <span class="sywat-label-subtext">(<?php echo esc_html( $t_district ); ?>)</span><?php endif; ?></div>
                                                 <div class="sywat-tourn-dates">📅 <?php echo esc_html( $disp_dates ); ?> (<?php echo $line_count . ' ' . ( $line_count === 1 ? 'line' : 'lines' ); ?>)</div>
                                                 
+                                                <?php if ( ! empty( $tfaa_link ) ): ?>
+                                                    <div class="sywat-tourn-tfaa-link">🔗 <a href="<?php echo esc_url( $tfaa_link ); ?>" target="_blank" rel="noopener">TFAA Direct Link ↗</a></div>
+                                                <?php else: ?>
+                                                    <div class="sywat-tourn-tfaa-link sywat-label-subtext">🔗 TFAA Link: Pending</div>
+                                                <?php endif; ?>
+
                                                 <!-- Volunteer Hub Toggle Chip -->
                                                 <div class="sywat-table-action-form">
                                                     <?php if ( $is_ccr ): ?>
