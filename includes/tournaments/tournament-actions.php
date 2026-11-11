@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.10.1
+ * Version: 7.10.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -258,7 +258,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No target tournament specified for TFAA sync.</div>';
             }
 
-            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+            $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
+            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( $tfaa_sync_file ) ) {
+                require_once $tfaa_sync_file;
+            } elseif ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
                 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
             }
 
@@ -292,7 +295,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No tournaments with configured TFAA result links were found. Please run <strong>"Sync TFAA Links"</strong> first or set valid TFAA Event IDs.</div>';
             }
 
-            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+            $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
+            if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( $tfaa_sync_file ) ) {
+                require_once $tfaa_sync_file;
+            } elseif ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
                 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
             }
 
@@ -629,7 +635,10 @@ if ( ! function_exists( 'sywat_ajax_sync_single_tfaa_tournament' ) ) {
             ) );
         }
 
-        if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+        $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
+        if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( $tfaa_sync_file ) ) {
+            require_once $tfaa_sync_file;
+        } elseif ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
             require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
         }
 
