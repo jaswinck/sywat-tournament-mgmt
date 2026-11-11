@@ -232,6 +232,26 @@
     box-sizing: border-box !important;
 }
 
+/* Input Group Container Layout */
+.sywat-input-group {
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+.sywat-input-group input[type="text"] {
+    flex: 1 !important;
+}
+.sywat-input-group .sywat-btn {
+    white-space: nowrap !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    line-height: 1 !important;
+    padding: 0 12px !important;
+    min-width: 95px !important;
+    margin: 0 !important;
+}
+
 .sywat-field-relative { position: relative !important; }
 .sywat-input-bold { font-weight: bold !important; }
 
@@ -488,7 +508,7 @@
 }
 
 .sywat-import-details { margin-top: 10px; }
-.sywat-import-summary { font-size: 12px; font-weight: 600; color: #2271b1; cursor: pointer; }
+.sywat-import-summary { font-size: 12px; font-weight: 600; color: #0284c7; cursor: pointer; }
 .sywat-import-textarea-wrap { margin-top: 8px; }
 .sywat-import-textarea { font-family: monospace; font-size: 12px; width: 100%; box-sizing: border-box; }
 
@@ -668,7 +688,7 @@
 
 .sywat-calculated-status-label {
     font-size: 13px;
-    color: #0073aa;
+    color: #0284c7;
     font-weight: 600;
 }
 
