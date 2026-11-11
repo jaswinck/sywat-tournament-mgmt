@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.8.0
+ * Version: 7.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -64,12 +64,12 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             if ( ! empty( $res['success'] ) ) {
                 $tournaments = get_option( 'sywat_tournaments_list', array() );
                 if ( $is_debug ) {
-                    return '<div id="sywat-debug-notice" style="background:#d4edda; color:#155724; border:1px solid #c3e6cb; padding:15px; margin-bottom:15px; border-radius:4px;">🟢 ' . $res['message'] . '</div>';
+                    return '<div id="sywat-debug-notice" class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
                 }
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
             } else {
                 if ( $is_debug ) {
-                    return '<div id="sywat-debug-notice" style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:15px; margin-bottom:15px; border-radius:4px;">⚠️ ' . $res['message'] . '</div>';
+                    return '<div id="sywat-debug-notice" class="sywat-alert sywat-alert-danger">⚠️ ' . $res['message'] . '</div>';
                 }
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ ' . $res['message'] . '</div>';
             }
