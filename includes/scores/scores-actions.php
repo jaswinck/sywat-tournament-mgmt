@@ -1,142 +1,13 @@
 <?php
 /**
- * Sub-Module: Scores Engine Action Handlers, Background Link Engine & TFAA Sync
+ * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, background WP-Cron TFAA URL discovery worker, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scorecard scraper.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scorecard scraper.
  * Author: SYWAT Archery
- * Version: 10.0.0
+ * Version: 11.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
-
-// Register WP-Cron Schedule Hook on Initialization
-add_action( 'init', 'sywat_register_tfaa_url_cron' );
-add_action( 'sywat_hourly_tfaa_url_sync', 'sywat_bg_sync_all_tfaa_urls' );
-
-function sywat_register_tfaa_url_cron() {
-    if ( ! wp_next_scheduled( 'sywat_hourly_tfaa_url_sync' ) ) {
-        wp_schedule_event( time(), 'hourly', 'sywat_hourly_tfaa_url_sync' );
-    }
-}
-
-/**
- * Background Worker: Scans TFAA Results Directory ONCE and updates all tournament URLs in DB.
- */
-function sywat_bg_sync_all_tfaa_urls() {
-    $all_tournaments = get_option( 'sywat_tournaments_list', array() );
-    if ( empty( $all_tournaments ) || ! is_array( $all_tournaments ) ) return;
-
-    $http_args = array(
-        'timeout'   => 20,
-        'sslverify' => false,
-        'headers'   => array(
-            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        )
-    );
-
-    // Fetch master TFAA results page
-    $index_resp = wp_remote_get( 'https://texasfieldarchery.org/results', $http_args );
-    if ( is_wp_error( $index_resp ) ) return;
-
-    $html = wp_remote_retrieve_body( $index_resp );
-    if ( empty( $html ) ) return;
-
-    if ( ! preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
-        return;
-    }
-
-    $updated = false;
-
-    foreach ( $all_tournaments as $t_name => $t_data ) {
-        // Skip if a direct numerical event ID or custom deep URL is manually defined
-        if ( ! empty( $t_data['tfaa_event_id'] ) ) continue;
-
-        foreach ( $matches as $m ) {
-            $link_href = trim( $m[1] );
-            $link_text = trim( wp_strip_all_tags( $m[2] ) );
-
-            if ( empty( $link_href ) || strpos( $link_href, '?season=' ) !== false || $link_href === '/results' ) {
-                continue;
-            }
-
-            if ( function_exists( 'sywat_match_tfaa_tournament_name' ) && sywat_match_tfaa_tournament_name( $t_name, $link_text ) ) {
-                if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
-                    $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
-                } else {
-                    $resolved_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
-                }
-
-                if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
-                    $all_tournaments[$t_name]['tfaa_results_url'] = $resolved_url;
-                    $updated = true;
-                }
-                break;
-            }
-        }
-    }
-
-    if ( $updated ) {
-        update_option( 'sywat_tournaments_list', $all_tournaments, false );
-    }
-}
-
-/**
- * Universal Token & Qualifier Matcher for TFAA Tournament Names
- */
-if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
-    function sywat_match_tfaa_tournament_name( $sywat_name, $tfaa_name ) {
-        $get_qualifier = function( $str ) {
-            if ( preg_match( '/(?:[\s\-\#]+)(\d+)\s*$/i', $str, $m ) ) {
-                return (int)$m[1];
-            }
-            return null;
-        };
-
-        $sywat_q = $get_qualifier( $sywat_name );
-        $tfaa_q  = $get_qualifier( $tfaa_name );
-
-        if ( $sywat_q !== null && $tfaa_q !== null && $sywat_q !== $tfaa_q ) {
-            return false;
-        }
-
-        $normalize_tokens = function( $str ) {
-            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str );
-            $str = strtolower( $str );
-            $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
-            
-            $noise  = array( 'archery', 'club', 'guns', 'outdoors', 'shop', 'shops', 'pro', 'academy', 'range', 'center', 'and' );
-            $words  = explode( ' ', $str );
-            $tokens = array();
-
-            foreach ( $words as $w ) {
-                $w = trim( $w );
-                if ( ! empty( $w ) && ! in_array( $w, $noise ) && strlen( $w ) > 1 ) {
-                    $tokens[] = $w;
-                }
-            }
-            return $tokens;
-        };
-
-        $sywat_tokens = $normalize_tokens( $sywat_name );
-        $tfaa_tokens  = $normalize_tokens( $tfaa_name );
-
-        if ( empty( $sywat_tokens ) ) {
-            $clean_s = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $sywat_name ) ) ) );
-            $clean_t = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $tfaa_name ) ) ) );
-            return ( stripos( $clean_t, $clean_s ) !== false || stripos( $clean_s, $clean_t ) !== false );
-        }
-
-        $raw_tfaa_lower = strtolower( $tfaa_name );
-        foreach ( $sywat_tokens as $token ) {
-            if ( strpos( $raw_tfaa_lower, $token ) === false && ! in_array( $token, $tfaa_tokens ) ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
 
 /**
  * Auto-expands physical line capacity if imported TFAA batch exceeds limits.
@@ -242,7 +113,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $t_slug    = sanitize_title( $t_name );
         $event_url = '';
 
-        // Read direct URL stored in DB by background cron or manual override
+        // Read direct URL pre-populated in database by Tournaments module or manual override
         if ( ! empty( $t_data['tfaa_event_id'] ) ) {
             $override  = trim( $t_data['tfaa_event_id'] );
             $event_url = is_numeric( $override ) ? 'https://texasfieldarchery.org/results/' . $override : $override;
@@ -251,16 +122,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         }
 
         if ( empty( $event_url ) ) {
-            // Trigger an immediate background sync run if missing
-            sywat_bg_sync_all_tfaa_urls();
-            $all_tournaments = get_option( 'sywat_tournaments_list', array() );
-            if ( ! empty( $all_tournaments[$t_name]['tfaa_results_url'] ) ) {
-                $event_url = $all_tournaments[$t_name]['tfaa_results_url'];
-            }
-        }
-
-        if ( empty( $event_url ) ) {
-            return array( 'success' => false, 'message' => 'Could not find a published TFAA results page matching \'' . esc_html( $t_name ) . '\'.' );
+            return array( 'success' => false, 'message' => 'No direct TFAA results link found for \'' . esc_html( $t_name ) . '\'. Please switch to Manage Tournaments to refresh season links.' );
         }
 
         $http_args = array(
