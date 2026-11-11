@@ -1,9 +1,9 @@
 <?php
 /**
- * Sub-Module: Action Handlers for Tournaments, Seasons, and Bulk Schedule Importer
+ * Sub-Module: Action Handlers for Tournaments, Seasons, Bulk Schedule Importer, and TFAA Link Engine
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -70,6 +70,166 @@ if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
         }
 
         return strtoupper( $token );
+    }
+}
+
+/**
+ * Universal Token & Qualifier Matcher for TFAA Tournament Names
+ * Resolves local short names (e.g., "Fort Grard - 1", "Archery HQ - 1") to official TFAA index strings.
+ */
+if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
+    function sywat_match_tfaa_tournament_name( $sywat_name, $tfaa_name ) {
+        $get_qualifier = function( $str ) {
+            if ( preg_match( '/(?:[\s\-\#]+)(\d+)\s*$/i', $str, $m ) ) {
+                return (int)$m[1];
+            }
+            return null;
+        };
+
+        $sywat_q = $get_qualifier( $sywat_name );
+        $tfaa_q  = $get_qualifier( $tfaa_name );
+
+        if ( $sywat_q !== null && $tfaa_q !== null && $sywat_q !== $tfaa_q ) {
+            return false;
+        }
+
+        $normalize_tokens = function( $str ) {
+            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str );
+            $str = strtolower( $str );
+            $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
+            
+            $noise  = array( 'archery', 'club', 'guns', 'outdoors', 'shop', 'shops', 'pro', 'academy', 'range', 'center', 'and' );
+            $words  = explode( ' ', $str );
+            $tokens = array();
+
+            foreach ( $words as $w ) {
+                $w = trim( $w );
+                if ( ! empty( $w ) && ! in_array( $w, $noise ) && strlen( $w ) > 1 ) {
+                    $tokens[] = $w;
+                }
+            }
+            return $tokens;
+        };
+
+        $sywat_tokens = $normalize_tokens( $sywat_name );
+        $tfaa_tokens  = $normalize_tokens( $tfaa_name );
+
+        if ( empty( $sywat_tokens ) ) {
+            $clean_s = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $sywat_name ) ) ) );
+            $clean_t = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $tfaa_name ) ) ) );
+            return ( stripos( $clean_t, $clean_s ) !== false || stripos( $clean_s, $clean_t ) !== false );
+        }
+
+        $raw_tfaa_lower = strtolower( $tfaa_name );
+        foreach ( $sywat_tokens as $token ) {
+            if ( strpos( $raw_tfaa_lower, $token ) === false && ! in_array( $token, $tfaa_tokens ) ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+/**
+ * Bulk Season Scraper: Scrapes TFAA season index ONCE and populates all direct tournament URLs into DB.
+ *
+ * @param string $season_name_or_slug Active season name or slug filter.
+ * @return array Status array with success flag, count of updated URLs, and message.
+ */
+if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
+    function sywat_sync_season_tfaa_urls( $season_name_or_slug = '' ) {
+        $all_tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( empty( $all_tournaments ) || ! is_array( $all_tournaments ) ) {
+            return array( 'success' => false, 'message' => 'No tournaments configured in database.' );
+        }
+
+        $target_season = trim( (string)$season_name_or_slug );
+        if ( empty( $target_season ) ) {
+            $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
+            if ( is_array( $seasons ) ) {
+                foreach ( $seasons as $s ) {
+                    if ( isset( $s['status'] ) && $s['status'] === 'active' ) {
+                        $target_season = ! empty( $s['name'] ) ? $s['name'] : ( isset( $s['slug'] ) ? $s['slug'] : '' );
+                        break;
+                    }
+                }
+            }
+        }
+
+        $season_param = ! empty( $target_season ) ? '?season=' . urlencode( $target_season ) : '';
+        $index_url    = 'https://texasfieldarchery.org/results' . $season_param;
+
+        $http_args = array(
+            'timeout'   => 20,
+            'sslverify' => false,
+            'headers'   => array(
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            )
+        );
+
+        $index_resp = wp_remote_get( $index_url, $http_args );
+        if ( is_wp_error( $index_resp ) ) {
+            return array( 'success' => false, 'message' => 'Failed to connect to TFAA: ' . $index_resp->get_error_message() );
+        }
+
+        $html = wp_remote_retrieve_body( $index_resp );
+        if ( empty( $html ) ) {
+            return array( 'success' => false, 'message' => 'Empty response received from TFAA index.' );
+        }
+
+        if ( ! preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
+            return array( 'success' => false, 'message' => 'No event links found on TFAA page.' );
+        }
+
+        $updated_count = 0;
+        foreach ( $all_tournaments as $t_name => &$t_data ) {
+            if ( ! empty( $t_data['tfaa_event_id'] ) ) continue;
+
+            $t_season = isset( $t_data['season'] ) ? $t_data['season'] : ( isset( $t_data['season_slug'] ) ? $t_data['season_slug'] : '' );
+
+            if ( ! empty( $target_season ) && ! empty( $t_season ) ) {
+                if ( strcasecmp( sanitize_title( $t_season ), sanitize_title( $target_season ) ) !== 0 
+                     && strcasecmp( trim( $t_season ), trim( $target_season ) ) !== 0 ) {
+                    continue;
+                }
+            }
+
+            foreach ( $matches as $m ) {
+                $link_href = trim( $m[1] );
+                $link_text = trim( wp_strip_all_tags( $m[2] ) );
+
+                if ( empty( $link_href ) || strpos( $link_href, '?season=' ) !== false || $link_href === '/results' ) {
+                    continue;
+                }
+
+                if ( sywat_match_tfaa_tournament_name( $t_name, $link_text ) ) {
+                    if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
+                        $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
+                    } else {
+                        $resolved_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
+                    }
+
+                    if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
+                        $t_data['tfaa_results_url'] = $resolved_url;
+                        $updated_count++;
+                    }
+                    break;
+                }
+            }
+        }
+        unset( $t_data );
+
+        if ( $updated_count > 0 ) {
+            update_option( 'sywat_tournaments_list', $all_tournaments, false );
+        }
+
+        return array(
+            'success' => true,
+            'count'   => $updated_count,
+            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_season ) . "'."
+        );
     }
 }
 
@@ -563,6 +723,17 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">⚪ <strong>All Volunteer Hubs Deactivated!</strong> Reset active status across all tournaments.</div>';
         }
 
+        // Action: Bulk Sync Season TFAA Direct URLs
+        if ( $action === 'sync_season_tfaa_urls' ) {
+            $target_s = isset( $_POST['season_slug'] ) ? sanitize_text_field( $_POST['season_slug'] ) : '';
+            $res      = sywat_sync_season_tfaa_urls( $target_s );
+            if ( ! empty( $res['success'] ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 ' . esc_html( $res['message'] ) . '</div>';
+            } else {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ ' . esc_html( $res['message'] ) . '</div>';
+            }
+        }
+
         // Action: Save Season Configuration
         if ( $action === 'save_season' ) {
             if ( ! $can_manage_seasons ) {
@@ -619,7 +790,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             );
 
             update_option( 'sywat_seasons_list', $seasons );
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully!</div>';
+            
+            // Auto-trigger season TFAA link sync on save
+            sywat_sync_season_tfaa_urls( $s_name );
+
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Season <strong>' . esc_html( $s_name ) . '</strong> saved successfully! Automatically synced TFAA tournament links.</div>';
         }
 
         // Action: Upload & Stage Bulk Schedule File (.xlsx or .csv)
@@ -712,7 +887,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 sywat_resequence_shop_tournaments( $s_id, $target_season, $tournaments, $active_tournaments, $registrations );
             }
 
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Schedule Imported Successfully!</strong> Created ' . intval( $created_count ) . ' new tournament(s) for season <strong>' . esc_html( $target_season ) . '</strong>.</div>';
+            // Auto-trigger bulk season link sync on import confirmation
+            sywat_sync_season_tfaa_urls( $target_season );
+
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Schedule Imported Successfully!</strong> Created ' . intval( $created_count ) . ' new tournament(s) for season <strong>' . esc_html( $target_season ) . '</strong> and resolved TFAA links.</div>';
         }
 
         // Action: Sync TFAA Cache
