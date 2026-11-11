@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-actions.php
  * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Index Map Transient Caching, Universal Token Matcher, Auto-remembered TFAA URL persistence, Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
  * Author: SYWAT Archery
- * Version: 9.5.0
+ * Version: 9.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -166,7 +166,7 @@ if ( ! function_exists( 'sywat_get_tfaa_index_map' ) ) {
         $transient_key = 'sywat_tfaa_map_' . sanitize_title( $season ? $season : 'default' );
         $cached_map    = get_transient( $transient_key );
 
-        if ( is_array( $cached_map ) ) {
+        if ( is_array( $cached_map ) && ! empty( $cached_map ) ) {
             return $cached_map;
         }
 
@@ -203,7 +203,9 @@ if ( ! function_exists( 'sywat_get_tfaa_index_map' ) ) {
             }
         }
 
-        set_transient( $transient_key, $map, 12 * HOUR_IN_SECONDS );
+        if ( ! empty( $map ) ) {
+            set_transient( $transient_key, $map, 12 * HOUR_IN_SECONDS );
+        }
         return $map;
     }
 }
@@ -222,7 +224,10 @@ if ( ! function_exists( 'sywat_get_tfaa_event_url' ) ) {
 
         // Layer 1: Check saved overrides or previously resolved deep link
         if ( ! empty( $t_data['tfaa_results_url'] ) ) {
-            return trim( $t_data['tfaa_results_url'] );
+            $saved_url = trim( $t_data['tfaa_results_url'] );
+            if ( strpos( $saved_url, '/results/' ) !== false || is_numeric( basename( parse_url( $saved_url, PHP_URL_PATH ) ) ) ) {
+                return $saved_url;
+            }
         }
         if ( ! empty( $t_data['tfaa_event_id'] ) ) {
             $override = trim( $t_data['tfaa_event_id'] );
@@ -243,7 +248,7 @@ if ( ! function_exists( 'sywat_get_tfaa_event_url' ) ) {
                 $name_match = sywat_match_tfaa_tournament_name( $t_name, $item['text'] );
                 $date_match = empty( $t_year ) || ( strpos( $item['date'], $t_year ) !== false );
 
-                if ( $name_match && $date_match ) {
+                if ( $name_match && $date_match && ! empty( $item['href'] ) ) {
                     return $item['href'];
                 }
             }
