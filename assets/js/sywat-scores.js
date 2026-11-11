@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 7.1.3
+ * Version: 7.2.0
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -36,51 +36,49 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter (Aligned with Check-In Engine)
+    // 3. Real-Time Search Filter (Aligned 1:1 with Check-In Engine)
     const searchInput = document.getElementById('sywat_score_search_input');
     const clearBtn    = document.getElementById('sywat_score_search_clear');
 
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const filter = this.value.toLowerCase().trim();
-            const rows   = document.querySelectorAll('.sywat-score-row');
+    function applyScoreSearchFilter(query) {
+        const cleanQuery = query.trim().toLowerCase();
+        const rows       = document.querySelectorAll('.sywat-score-row');
 
-            rows.forEach(function(row) {
-                const name = row.getAttribute('data-name');
-                if (name && name.includes(filter)) {
-                    row.classList.remove('sywat-hidden');
-                } else {
-                    row.classList.add('sywat-hidden');
-                }
-            });
+        rows.forEach(function(row) {
+            const dataName    = (row.getAttribute('data-name') || '').toLowerCase();
+            const textContent = (row.textContent || row.innerText || '').toLowerCase();
 
-            const hiddenSearches = document.querySelectorAll('.sywat-hidden-search');
-            hiddenSearches.forEach(function(hidden) {
-                hidden.value = searchInput.value;
-            });
-        });
-
-        // Prevent search input from submitting wrapping batch form on Enter key
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.keyCode === 13) {
-                e.preventDefault();
-                searchInput.dispatchEvent(new Event('input'));
-                return false;
+            if (!cleanQuery || dataName.includes(cleanQuery) || textContent.includes(cleanQuery)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
             }
         });
 
-        // Clear button event handler
+        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
+            hiddenInput.value = query;
+        });
+
+        if (query) {
+            sessionStorage.setItem('sywat_score_search_query', query);
+        } else {
+            sessionStorage.removeItem('sywat_score_search_query');
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            applyScoreSearchFilter(this.value);
+        });
+
         if (clearBtn) {
             clearBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 searchInput.value = '';
-                searchInput.dispatchEvent(new Event('input'));
+                applyScoreSearchFilter('');
                 searchInput.focus();
             });
         }
-
-        // Initial trigger on load to synchronize pre-filled query states
-        searchInput.dispatchEvent(new Event('input'));
     }
 
     // 4. Helper: Status Badge Class & Text Updater
