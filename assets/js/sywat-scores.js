@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 7.0.2
+ * Version: 7.1.2
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -36,8 +36,10 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter (Forced Important Display Override for Table Rows)
+    // 3. Real-Time Search Filter & Form Interception
     const searchInput = document.getElementById('sywat_score_search_input');
+    const clearBtn    = document.getElementById('sywat_score_search_clear');
+
     if (searchInput) {
         function filterRows() {
             const filter = searchInput.value.trim().toLowerCase();
@@ -65,7 +67,26 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.addEventListener('input', filterRows);
         searchInput.addEventListener('keyup', filterRows);
 
-        // Initialize search state
+        // Prevent search input from submitting wrapping batch form on Enter key
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                e.preventDefault();
+                filterRows();
+                return false;
+            }
+        });
+
+        // Clear button event binding
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                searchInput.value = '';
+                filterRows();
+                searchInput.focus();
+            });
+        }
+
+        // Initialize search state on DOM ready
         filterRows();
     }
 
