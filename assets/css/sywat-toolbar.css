@@ -22,22 +22,22 @@
 .sywat-auth-dropdown-menu a:hover { background-color: #1e293b; color: #38bdf8; }
 .sywat-auth-dropdown:hover .sywat-auth-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); transition-delay: 0s; }
 
-/* Header Inline Controls Bar (Exact Mirror of Configured Events Toolbar) */
+/* Header Inline Controls Bar */
 .sywat-card-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; width: 100%; box-sizing: border-box; }
-.sywat-header-inline-controls { display: flex !important; align-items: center !important; justify-content: flex-end !important; gap: 10px !important; flex-wrap: wrap !important; margin-left: auto !important; box-sizing: border-box !important; }
-.sywat-header-inline-controls .sywat-field-group, .sywat-header-inline-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
-.sywat-header-inline-controls .sywat-field-group label { margin: 0 6px 0 0 !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; }
+.sywat-header-inline-controls { display: flex !important; align-items: center !important; justify-content: flex-end !important; flex-wrap: wrap !important; margin-left: auto !important; box-sizing: border-box !important; }
 
-/* Baseline Height Parity (34px) & Button Padding for Header Controls */
-.sywat-header-inline-controls select, 
-.sywat-header-inline-controls .sywat-btn { 
-    height: 34px !important; 
-    min-height: 34px !important; 
-    box-sizing: border-box !important; 
-    margin: 0 !important; 
-}
-.sywat-header-inline-controls select { font-size: 13px !important; padding: 4px 10px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
-.sywat-header-inline-controls .sywat-btn { padding: 4px 12px !important; font-size: 13px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
+/* BULLETPROOF SPACING: Forcing explicit margins so buttons/forms CANNOT touch */
+.sywat-header-inline-controls > * { margin-left: 12px !important; }
+.sywat-header-inline-controls > *:first-child { margin-left: 0 !important; }
+
+/* Form wrappers and labels */
+.sywat-header-inline-controls form { padding: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; margin-right: 0 !important; display: inline-flex !important; align-items: center !important; }
+.sywat-header-inline-controls .sywat-field-group { display: inline-flex !important; align-items: center !important; margin: 0 !important; }
+.sywat-header-inline-controls .sywat-field-group label { margin: 0 8px 0 0 !important; font-size: 13px !important; font-weight: 600 !important; white-space: nowrap !important; line-height: 34px !important; }
+
+/* Baseline Height Parity (34px) & Button Padding */
+.sywat-header-inline-controls select { height: 34px !important; box-sizing: border-box !important; margin: 0 !important; font-size: 13px !important; padding: 4px 10px !important; border: 1px solid #cbd5e1 !important; border-radius: 4px !important; background-color: #ffffff !important; }
+.sywat-header-inline-controls .sywat-btn { height: 34px !important; min-height: 34px !important; box-sizing: border-box !important; margin: 0 !important; padding: 4px 12px !important; font-size: 13px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
 
 /* Table Sub-Header Toolbar & Control Alignment Blueprint */
 .sywat-table-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; margin-bottom: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; width: 100%; box-sizing: border-box; }
@@ -107,4 +107,5 @@
     .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
     .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
     .sywat-header-inline-controls, .sywat-table-header-controls { width: 100%; justify-content: flex-start; margin-left: 0; }
+    .sywat-header-inline-controls > * { margin-left: 0 !important; margin-bottom: 8px !important; }
 }
