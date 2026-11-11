@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and bulletproof TFAA scraper with Sequential Line Routing and Normalized Matching.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
  * Author: SYWAT Archery
- * Version: 9.1.0
+ * Version: 9.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -225,17 +225,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $is_guest = ( stripos( $raw_name, '[GUEST]' ) !== false || stripos( $line, '[GUEST]' ) !== false || $curr_style === 'Guest' );
                 $is_inc   = ( stripos( $raw_name, '[INC]' ) !== false || stripos( $line, '[INC]' ) !== false );
                 
-                // Strip bracketed tags to get pure name
+                // Strip bracketed tags to get pure clean name (e.g. "Malkan, Aanya")
                 $clean_raw_name = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
 
-                // Flip "Last, First" to "First Last"
+                // Flip "Last, First" to "First Last" (e.g. "Aanya Malkan")
                 $parts      = explode( ',', $clean_raw_name, 2 );
                 $clean_name = ( count( $parts ) === 2 ) ? trim( $parts[1] ) . ' ' . trim( $parts[0] ) : trim( $clean_raw_name );
-
-                // Format display name for roster
-                $display_name = $clean_name;
-                if ( $is_guest ) $display_name .= ' (Guest)';
-                if ( $is_inc )   $display_name .= ' (INC)';
 
                 // Extract score and Xs
                 $rest        = trim( substr( $line, strlen( $matches[0] ) ) );
@@ -249,16 +244,15 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 else $cnt_20yd++;
 
                 $parsed_entries[] = array(
-                    'clean_name'   => $clean_name,
-                    'display_name' => $display_name,
-                    'division'     => $curr_div,
-                    'gender'       => $curr_gen,
-                    'style'        => $curr_style,
-                    'distance'     => $dist,
-                    'score'        => $score,
-                    'xs'           => $xs,
-                    'is_guest'     => $is_guest,
-                    'is_inc'       => $is_inc
+                    'clean_name' => $clean_name,
+                    'division'   => $curr_div,
+                    'gender'     => $curr_gen,
+                    'style'      => $curr_style,
+                    'distance'   => $dist,
+                    'score'      => $score,
+                    'xs'         => $xs,
+                    'is_guest'   => $is_guest,
+                    'is_inc'     => $is_inc
                 );
 
                 continue;
@@ -304,7 +298,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) $gender_cache = array();
 
-        // Helper: Ultra-Normalized Key Generator for bulletproof matching
+        // Helper: Ultra-Normalized Key Generator for bulletproof deduplication
         $normalize_key = function( $name ) {
             $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', $name ); // Strip tags
             $n = preg_replace( '/[^a-zA-Z\s]/', '', $n );        // Strip punctuation
@@ -355,12 +349,18 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
 
             if ( $target_r_idx !== -1 ) {
-                // RECORD FOUND: Safely update existing record on its current line
+                // RECORD FOUND: Update existing record with pure clean name & explicit scores
                 $target_id = $registrations[$target_r_idx]['id'];
                 $processed_reg_ids[] = $target_id;
 
                 $registrations[$target_r_idx]['checked_in'] = 1;
-                $registrations[$target_r_idx]['name']       = $entry['display_name']; // Apply tags if applicable
+                $registrations[$target_r_idx]['name']       = $entry['clean_name']; // Pure clean name
+                $registrations[$target_r_idx]['score']      = $entry['score'];      // Explicit score (including 0)
+                $registrations[$target_r_idx]['x_count']    = $entry['xs'];         // Explicit Xs (including 0)
+
+                if ( $entry['is_guest'] ) {
+                    $registrations[$target_r_idx]['type']   = 'Guest';
+                }
                 
                 if ( empty( $registrations[$target_r_idx]['division'] ) ) $registrations[$target_r_idx]['division'] = $entry['division'];
                 if ( empty( $registrations[$target_r_idx]['gender'] ) )   $registrations[$target_r_idx]['gender']   = $entry['gender'];
@@ -393,7 +393,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'tournament'  => $t_name,
                     'line_index'  => $assigned_line_idx,
                     'line_name'   => $line_name,
-                    'name'        => $entry['display_name'],
+                    'name'        => $entry['clean_name'], // Pure clean name
                     'phone'       => '',
                     'distance'    => $entry['distance'],
                     'type'        => $new_type,
@@ -404,6 +404,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'balance_due' => 0.00,
                     'status'      => 'Pre-Reg',
                     'checked_in'  => 1,
+                    'score'       => $entry['score'],      // Explicit score (including 0)
+                    'x_count'     => $entry['xs'],         // Explicit Xs (including 0)
                     'created_at'  => current_time( 'mysql' ),
                 );
 
