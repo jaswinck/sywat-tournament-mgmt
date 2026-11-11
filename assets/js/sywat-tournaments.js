@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 7.10.0
+ * Version: 7.10.1
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -454,7 +454,7 @@ function sywatOpenTfaaSyncModal() {
 }
 
 /**
- * Sequentially executes single-tournament TFAA score sync AJAX calls.
+ * Sequentially executes single-tournament TFAA score sync AJAX calls with robust response validation.
  *
  * @param {Array}  tournaments List of tournament names.
  * @param {string} nonce       WordPress security nonce.
@@ -487,24 +487,42 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
                 body: formData,
             });
 
-            const result = await response.json();
             const percent = Math.round((step / tournaments.length) * 100);
-
             if (progressFill) {
                 progressFill.style.width = `${percent}%`;
+            }
+
+            const rawText = await response.text();
+            let result = null;
+
+            try {
+                result = JSON.parse(rawText);
+            } catch (jsonErr) {
+                result = null;
             }
 
             const logItem = document.createElement('div');
             logItem.className = 'sywat-log-item';
 
-            if (result && result.success) {
+            if (response.ok && result && result.success) {
                 successCount++;
                 logItem.classList.add('sywat-log-success');
                 logItem.innerHTML = `🟢 <strong>${tName}:</strong> ${result.data.message || 'Synced successfully.'}`;
             } else {
                 failureCount++;
                 logItem.classList.add('sywat-log-error');
-                const errMsg = (result && result.data && result.data.message) ? result.data.message : 'Sync failed or target URL unreachable.';
+                let errMsg = '';
+
+                if (result && result.data && result.data.message) {
+                    errMsg = result.data.message;
+                } else if (!response.ok) {
+                    errMsg = `HTTP ${response.status} ${response.statusText || 'Error'}`;
+                } else if (rawText) {
+                    errMsg = `Server response: ${rawText.slice(0, 100)}`;
+                } else {
+                    errMsg = 'Unknown server response.';
+                }
+
                 logItem.innerHTML = `⚠️ <strong>${tName}:</strong> ${errMsg}`;
             }
 
@@ -523,7 +541,7 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
 
             const logItem = document.createElement('div');
             logItem.className = 'sywat-log-item sywat-log-error';
-            logItem.innerHTML = `⚠️ <strong>${tName}:</strong> Request timeout or server connection error.`;
+            logItem.innerHTML = `⚠️ <strong>${tName}:</strong> Network connection error (${err.message || 'fetch failed'}).`;
 
             if (logConsole) {
                 logConsole.appendChild(logItem);
