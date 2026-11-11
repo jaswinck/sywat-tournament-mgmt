@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.15.0
+ * Version: 7.16.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -44,7 +44,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             }
         }
 
-        // 3. Fetch fresh master portal data bundle AFTER actions mutate database
+        // 3. Fetch fresh master portal data bundle AFTER actions mutate database (100% Pure Read-Only)
         $data = sywat_get_master_portal_data();
 
         $can_manage_seasons = $data['can_manage_seasons'];
@@ -73,15 +73,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                 reset( $seasons );
                 $selected_season = key( $seasons );
             }
-        }
-
-        // Trigger automatic season URL resolution on load if helper exists
-        if ( ! empty( $selected_season ) && function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
-            $season_display_name = isset( $seasons[$selected_season]['name'] ) ? $seasons[$selected_season]['name'] : $selected_season;
-            sywat_sync_season_tfaa_urls( $season_display_name );
-            // Refresh scoped tournaments from mutated option
-            $tournaments = get_option( 'sywat_tournaments_list', array() );
-            $scoped_tournaments = function_exists( 'sywat_get_scoped_tournaments' ) ? sywat_get_scoped_tournaments( $tournaments, $user_shop_id, $can_manage_seasons ) : $tournaments;
         }
 
         // Build lookup map from normalized shop name to Shop ID & District
@@ -174,6 +165,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+                                </form>
+
+                                <!-- Explicit POST Action Trigger for Season Links Sync -->
+                                <form method="post" class="sywat-table-action-form">
+                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                    <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
+                                    <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
+                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">🔗 Sync TFAA Links</button>
                                 </form>
                             <?php endif; ?>
 
