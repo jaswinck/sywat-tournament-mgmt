@@ -3,7 +3,7 @@
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 6.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -216,7 +216,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
                             <div class="sywat-field-group">
                                 <label>Tournament Name * <span class="sywat-label-subtext" id="sywat_name_status_label">(Auto-generated)</span></label>
-                                <div class="sywat-input-group" style="display: flex; gap: 8px; align-items: center;">
+                                <div class="sywat-input-group">
                                     <input type="text" 
                                            name="tournament_name" 
                                            id="sywat_modal_tournament_name" 
@@ -224,14 +224,12 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                            placeholder="Select shop and date to auto-generate..." 
                                            oninput="sywatMarkNameAsCustomized()" 
                                            <?php echo ( $is_edit_mode ? ( ! $can_manage_seasons ? 'readonly class="sywat-input-disabled-calc"' : '' ) : 'readonly class="sywat-input-disabled-calc"' ); ?> 
-                                           style="flex: 1;"
                                            required>
                                     <?php if ( ! $is_edit_mode && $can_manage_seasons ): ?>
                                         <button type="button" 
                                                 id="sywat_toggle_name_lock_btn" 
                                                 class="sywat-btn sywat-btn-secondary" 
-                                                onclick="sywatToggleTournamentNameLock(this)" 
-                                                style="white-space: nowrap; height: 38px; line-height: 1; padding: 0 12px; min-width: 95px;">🔒 Locked</button>
+                                                onclick="sywatToggleTournamentNameLock(this)">🔒 Locked</button>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -474,7 +472,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                     </div>
                     <div class="sywat-modal-footer">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="closeImportScheduleModal()">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-import">🔍 Preview & Validate Schedule</button>
+                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-import">Preview & Validate Schedule</button>
                     </div>
                 </form>
             </div>
@@ -544,7 +542,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                         <input type="hidden" name="sywat_action" value="confirm_schedule_import">
                         
                         <button type="submit" name="sywat_action" value="cancel_schedule_import" class="sywat-btn sywat-btn-secondary">Cancel</button>
-                        <button type="submit" name="sywat_action" value="confirm_schedule_import" class="sywat-btn sywat-btn-success sywat-btn-icon-save">🚀 Confirm & Create <?php echo count( $valid_list ); ?> Tournaments</button>
+                        <button type="submit" name="sywat_action" value="confirm_schedule_import" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Confirm & Create <?php echo count( $valid_list ); ?> Tournaments</button>
                     </form>
                 </div>
             </div>
