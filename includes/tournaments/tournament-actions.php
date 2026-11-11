@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.10.2
+ * Version: 7.10.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -613,6 +613,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
  * Non-blocking asynchronous batch runner entry point.
  */
 add_action( 'wp_ajax_sywat_sync_single_tfaa_tournament', 'sywat_ajax_sync_single_tfaa_tournament' );
+add_action( 'wp_ajax_nopriv_sywat_sync_single_tfaa_tournament', 'sywat_ajax_sync_single_tfaa_tournament' );
 if ( ! function_exists( 'sywat_ajax_sync_single_tfaa_tournament' ) ) {
     function sywat_ajax_sync_single_tfaa_tournament() {
         if ( ! check_ajax_referer( 'sywat_desk_action', 'nonce', false ) ) {
