@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.18.0
+ * Version: 7.18.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -177,6 +177,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                             <!-- Sub-wrapper 2: Action Buttons (Stripped of custom form classes) -->
                             <div class="sywat-table-header-actions">
+                                <!-- Global Master Desk Security Nonce Field for JS AJAX Engines -->
+                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
                                     <!-- Explicit POST Action Trigger for Season Links Sync -->
                                     <form method="post">
