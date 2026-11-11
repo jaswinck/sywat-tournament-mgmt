@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Universal Token Matcher, Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
  * Author: SYWAT Archery
- * Version: 9.2.0
+ * Version: 9.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -96,6 +96,69 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
+ * Universal Token & Qualifier Matcher for TFAA Tournament Names
+ * Resolves local short names (e.g., "Fort Grard - 1", "STX Archery - 2") to official TFAA index strings.
+ */
+if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
+    function sywat_match_tfaa_tournament_name( $sywat_name, $tfaa_name ) {
+        // 1. Extract Trailing Qualifier Number (e.g. "Fort Grard - 1" -> 1, "STX Archery-2" -> 2)
+        $get_qualifier = function( $str ) {
+            if ( preg_match( '/(?:[\s\-\#]+)(\d+)\s*$/i', $str, $m ) ) {
+                return (int)$m[1];
+            }
+            return null;
+        };
+
+        $sywat_q = $get_qualifier( $sywat_name );
+        $tfaa_q  = $get_qualifier( $tfaa_name );
+
+        // If SYWAT specifies a qualifier number, TFAA MUST match the exact same qualifier number
+        if ( $sywat_q !== null && $tfaa_q !== null && $sywat_q !== $tfaa_q ) {
+            return false;
+        }
+
+        // 2. Tokenize and remove generic noise words
+        $normalize_tokens = function( $str ) {
+            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str ); // Strip trailing qualifier
+            $str = strtolower( $str );
+            $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
+            
+            $noise  = array( 'archery', 'club', 'guns', 'outdoors', 'shop', 'shops', 'pro', 'academy', 'range', 'center', 'and' );
+            $words  = explode( ' ', $str );
+            $tokens = array();
+
+            foreach ( $words as $w ) {
+                $w = trim( $w );
+                if ( ! empty( $w ) && ! in_array( $w, $noise ) && strlen( $w ) > 1 ) {
+                    $tokens[] = $w;
+                }
+            }
+            return $tokens;
+        };
+
+        $sywat_tokens = $normalize_tokens( $sywat_name );
+        $tfaa_tokens  = $normalize_tokens( $tfaa_name );
+
+        if ( empty( $sywat_tokens ) ) {
+            // Fallback to substring check if tokenizing stripped everything
+            $clean_s = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $sywat_name ) ) ) );
+            $clean_t = strtolower( trim( preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $tfaa_name ) ) ) );
+            return ( stripos( $clean_t, $clean_s ) !== false || stripos( $clean_s, $clean_t ) !== false );
+        }
+
+        // 3. Verify every core token from local name exists inside the TFAA listing text
+        $raw_tfaa_lower = strtolower( $tfaa_name );
+        foreach ( $sywat_tokens as $token ) {
+            if ( strpos( $raw_tfaa_lower, $token ) === false && ! in_array( $token, $tfaa_tokens ) ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+/**
  * Core Parser: TFAA Event Score Engine
  */
 if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
@@ -138,7 +201,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
         }
 
-        // LAYERS 2 & 3: Scrape Index
+        // LAYERS 2 & 3: Universal Token & Qualifier Index Scraper
         if ( empty( $event_url ) ) {
             $season_param = ! empty( $t_data['season'] ) ? '?season=' . urlencode( trim( $t_data['season'] ) ) : '';
             $results_main_url = 'https://texasfieldarchery.org/results' . $season_param;
@@ -148,16 +211,16 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 return array( 'success' => false, 'message' => 'Failed to reach TFAA site: ' . $main_resp->get_error_message() );
             }
 
-            $main_html    = wp_remote_retrieve_body( $main_resp );
-            $clean_t_name = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', $t_name ) );
+            $main_html = wp_remote_retrieve_body( $main_resp );
 
             if ( preg_match_all( '/<tr[^>]*>\s*<td[^>]*>(.*?)<\/td>\s*<td[^>]*>\s*<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $main_html, $matches, PREG_SET_ORDER ) ) {
                 foreach ( $matches as $m ) {
                     $row_date  = trim( wp_strip_all_tags( $m[1] ) );
                     $link_href = trim( $m[2] );
-                    $link_text = preg_replace( '/\s+/', ' ', str_replace( '-', ' ', wp_strip_all_tags( $m[3] ) ) );
+                    $link_text = wp_strip_all_tags( $m[3] );
 
-                    $name_match = ( stripos( $link_text, trim( $clean_t_name ) ) !== false || stripos( trim( $clean_t_name ), $link_text ) !== false );
+                    // Universal Token & Qualifier Matcher
+                    $name_match = sywat_match_tfaa_tournament_name( $t_name, $link_text );
                     
                     $date_match = true;
                     if ( ! empty( $t_data['start_date'] ) ) {
@@ -519,7 +582,7 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
             $active_t_slug = sanitize_title( $selected_tournament );
 
-            // Action: 🔄 Sync TFAA Event Scores
+            // Action: Sync TFAA Event Scores
             if ( $action === 'sync_tfaa_scores' ) {
                 $res = sywat_sync_tfaa_event_scores( $selected_tournament );
                 if ( ! empty( $res['success'] ) ) {
