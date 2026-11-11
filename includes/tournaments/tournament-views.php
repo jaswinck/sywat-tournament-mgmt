@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.17.1
+ * Version: 7.18.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -178,6 +178,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <!-- Sub-wrapper 2: Action Buttons (Stripped of custom form classes) -->
                             <div class="sywat-table-header-actions">
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
+                                    <!-- Explicit POST Action Trigger for Season Links Sync -->
                                     <form method="post">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
@@ -186,12 +187,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     </form>
                                 <?php endif; ?>
 
+                                <!-- Global Bulk Sync Tournaments with Configured Results Links (Asynchronous Modal Launch) -->
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <form method="post" onsubmit="return confirm('SYNC ALL TFAA EVENT SCORES?\n\nThis will pull the latest scores from TFAA for ALL tournaments that have results links configured.');">
-                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                        <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
-                                        <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
-                                    </form>
+                                    <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" onclick="sywatOpenTfaaSyncModal()" title="Pull latest scores from TFAA for all tournaments with configured results links">Sync TFAA Scores</button>
                                 <?php endif; ?>
 
                                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-import" onclick="openImportScheduleModal()">Bulk Import Schedule</button>
@@ -436,6 +434,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             }
             if ( function_exists( 'sywat_render_delegated_modal_container' ) ) {
                 sywat_render_delegated_modal_container( $data );
+            }
+            if ( function_exists( 'sywat_render_tfaa_sync_progress_modal' ) ) {
+                sywat_render_tfaa_sync_progress_modal( $data );
             }
             ?>
         </div>
