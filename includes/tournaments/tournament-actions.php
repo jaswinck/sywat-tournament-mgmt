@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.9.0
+ * Version: 7.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -274,12 +274,22 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
         }
 
-        // Action: Bulk Sync All Active Weekend Host Locations
+        // Action: Bulk Sync All Tournament Scores with Populated TFAA Results Links
         if ( $action === 'sync_all_tfaa_weekend' ) {
-            $active_hubs = ! empty( $active_tournaments ) ? $active_tournaments : get_option( 'sywat_active_tournaments', array() );
+            $target_tournaments = array();
+            
+            if ( is_array( $tournaments ) ) {
+                foreach ( $tournaments as $t_name => $t_data ) {
+                    $has_url = ! empty( $t_data['tfaa_results_url'] );
+                    $has_id  = ! empty( $t_data['tfaa_event_id'] );
+                    if ( $has_url || $has_id ) {
+                        $target_tournaments[] = $t_name;
+                    }
+                }
+            }
 
-            if ( empty( $active_hubs ) || ! is_array( $active_hubs ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No active weekend tournaments found to sync.</div>';
+            if ( empty( $target_tournaments ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No tournaments with configured TFAA result links were found. Please run <strong>"Sync TFAA Links"</strong> first or set valid TFAA Event IDs.</div>';
             }
 
             if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
@@ -290,7 +300,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $synced_names  = array();
             $errors        = array();
 
-            foreach ( $active_hubs as $t_name ) {
+            foreach ( $target_tournaments as $t_name ) {
                 if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     $res = sywat_sync_tfaa_event_scores( $t_name );
                     if ( ! empty( $res['success'] ) ) {
@@ -307,7 +317,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
             $msg = '';
             if ( ! empty( $synced_names ) ) {
-                $msg .= '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ <strong>Bulk Sync Complete!</strong> Updated ' . $total_updated . ' total archer score record(s) across: ' . implode( ', ', $synced_names ) . '</div>';
+                $msg .= '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ <strong>Bulk Sync Complete!</strong> Updated ' . $total_updated . ' total archer score record(s) across ' . count( $synced_names ) . ' linked tournament(s): ' . implode( ', ', $synced_names ) . '</div>';
             }
             if ( ! empty( $errors ) ) {
                 $msg .= '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ Some locations failed to sync:<br>' . implode( '<br>', $errors ) . '</div>';
