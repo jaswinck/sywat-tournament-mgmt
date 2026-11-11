@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.9.1
+ * Version: 7.10.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -599,5 +599,56 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         }
 
         return $notice;
+    }
+}
+
+/**
+ * AJAX Endpoint Handler: Sync Single Tournament TFAA Scorecard
+ * Non-blocking asynchronous batch runner entry point.
+ */
+add_action( 'wp_ajax_sywat_sync_single_tfaa_tournament', 'sywat_ajax_sync_single_tfaa_tournament' );
+if ( ! function_exists( 'sywat_ajax_sync_single_tfaa_tournament' ) ) {
+    function sywat_ajax_sync_single_tfaa_tournament() {
+        check_ajax_referer( 'sywat_desk_action', 'nonce' );
+
+        if ( ! function_exists( 'sywat_can_manage_tournaments' ) || ! sywat_can_manage_tournaments() ) {
+            wp_send_json_error( array(
+                'message' => 'Access denied. Management permission required.',
+            ) );
+        }
+
+        $target_t = isset( $_POST['tournament_name'] ) ? sanitize_text_field( $_POST['tournament_name'] ) : '';
+
+        if ( empty( $target_t ) ) {
+            wp_send_json_error( array(
+                'message' => 'No target tournament specified for TFAA sync.',
+            ) );
+        }
+
+        if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
+            require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
+        }
+
+        if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
+            $res = sywat_sync_tfaa_event_scores( $target_t );
+            if ( ! empty( $res['success'] ) ) {
+                $count = isset( $res['count'] ) ? intval( $res['count'] ) : 0;
+                wp_send_json_success( array(
+                    'tournament' => $target_t,
+                    'message'    => isset( $res['message'] ) ? $res['message'] : 'Sync complete.',
+                    'count'      => $count,
+                ) );
+            } else {
+                wp_send_json_error( array(
+                    'tournament' => $target_t,
+                    'message'    => isset( $res['message'] ) ? $res['message'] : 'Sync failed for unknown reason.',
+                ) );
+            }
+        } else {
+            wp_send_json_error( array(
+                'tournament' => $target_t,
+                'message'    => 'TFAA sync engine function unavailable.',
+            ) );
+        }
     }
 }
