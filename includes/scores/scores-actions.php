@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Action Handlers & TFAA Event Sync Engine
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and bulletproof TFAA scraper with Sequential Line Routing for multi-entry archers.
+ * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and bulletproof TFAA scraper with Sequential Line Routing and Normalized Matching.
  * Author: SYWAT Archery
- * Version: 9.0.0
+ * Version: 9.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -218,7 +218,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
 
             // --- 1. ARCHER MATCH FIRST ---
-            // If the line starts with a rank number, evaluate as archer and bypass style checkers
             if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
@@ -262,7 +261,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'is_inc'       => $is_inc
                 );
 
-                continue; // IMPORTANT: Skip to next line so archer name doesn't false-trigger Style/Div
+                continue;
             }
 
             // --- 2. DIVISION CHECK ---
@@ -288,7 +287,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'No valid archer score rows extracted.' );
         }
 
-        // Available Tournament Lines
+        // Auto-Expand Line Capacity
         $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
         $line_0_idx = ! empty( $t_lines ) ? key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
@@ -305,13 +304,20 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) $gender_cache = array();
 
+        // Helper: Ultra-Normalized Key Generator for bulletproof matching
+        $normalize_key = function( $name ) {
+            $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', $name ); // Strip tags
+            $n = preg_replace( '/[^a-zA-Z\s]/', '', $n );        // Strip punctuation
+            $n = preg_replace( '/\s+/', ' ', $n );               // Flatten spaces
+            return strtolower( trim( $n ) );
+        };
+
         // 1. Map existing registrations & occupied lines
         $reg_lookup = array();
         $occupied_lines = array();
         foreach ( $registrations as $idx => $r ) {
             if ( isset( $r['tournament'], $r['name'] ) && strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) === 0 ) {
-                // Strip database tagging from lookup key to match pure name
-                $norm_key = strtolower( trim( preg_replace( '/\(.*?\)/', '', $r['name'] ) ) );
+                $norm_key = $normalize_key( $r['name'] );
                 $reg_lookup[$norm_key][] = $idx;
                 $occupied_lines[$norm_key][] = (string)$r['line_index'];
             }
@@ -319,10 +325,11 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         $processed_reg_ids = array();
         $primary_styles    = array();
-        $synced_count      = 0;
+        $stats_updated     = 0;
+        $stats_created     = 0;
 
         foreach ( $parsed_entries as $entry ) {
-            $norm_name = strtolower( trim( $entry['clean_name'] ) );
+            $norm_name = $normalize_key( $entry['clean_name'] );
             
             // Record primary style if this is their main score block
             if ( ! $entry['is_guest'] && ! $entry['is_inc'] && empty( $primary_styles[$norm_name] ) ) {
@@ -335,7 +342,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $final_style = ! empty( $primary_styles[$norm_name] ) ? $primary_styles[$norm_name] : 'Guest';
             }
 
-            // Find an unprocessed primary registration record for this archer
+            // Find an unprocessed registration record for this archer
             $target_r_idx = -1;
             if ( isset( $reg_lookup[$norm_name] ) ) {
                 foreach ( $reg_lookup[$norm_name] as $idx ) {
@@ -362,6 +369,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $registrations[$target_r_idx], false );
                 $master_regs[$target_id] = $registrations[$target_r_idx];
 
+                $stats_updated++;
             } else {
                 // DUPLICATE / NO RECORD FOUND: Route to sequential available line
                 if ( ! isset( $occupied_lines[$norm_name] ) ) {
@@ -406,6 +414,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $processed_reg_ids[]          = $target_id;
                 $occupied_lines[$norm_name][] = $assigned_line_idx;
                 $reg_lookup[$norm_name][]     = count( $registrations ) - 1;
+
+                $stats_created++;
             }
 
             if ( ! empty( $entry['gender'] ) ) {
@@ -417,8 +427,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 'xs'       => $entry['xs'],
                 'saved_at' => current_time( 'mysql' ),
             );
-
-            $synced_count++;
         }
 
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
@@ -428,8 +436,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         return array(
             'success' => true,
-            'count'   => $synced_count,
-            'message' => 'Successfully synced and checked in ' . $synced_count . ' archer scores from TFAA for \'' . esc_html( $t_name ) . '\'.'
+            'count'   => ( $stats_updated + $stats_created ),
+            'message' => "Successfully synced <strong>" . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated {$stats_updated} existing records and created {$stats_created} new sequential records)."
         );
     }
 }
@@ -513,7 +521,7 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
             if ( $action === 'sync_tfaa_scores' ) {
                 $res = sywat_sync_tfaa_event_scores( $selected_tournament );
                 if ( ! empty( $res['success'] ) ) {
-                    return '<div class="sywat-alert sywat-alert-success">🟢 ' . esc_html( $res['message'] ) . '</div>';
+                    return '<div class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
                 } else {
                     return '<div class="sywat-alert sywat-alert-danger">⚠️ Sync Failed: ' . esc_html( $res['message'] ) . '</div>';
                 }
