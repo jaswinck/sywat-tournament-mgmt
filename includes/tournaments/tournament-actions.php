@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.6.0
+ * Version: 7.6.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -55,15 +55,15 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">⚪ <strong>All Volunteer Hubs Deactivated!</strong> Reset active status across all tournaments.</div>';
         }
 
-        // Action: Bulk Sync Season TFAA Direct URLs
+        // Action: Bulk Sync Season TFAA Direct URLs (DEBUG BYPASS ENABLED)
         if ( $action === 'sync_season_tfaa_urls' ) {
             $target_s = isset( $_POST['season_slug'] ) ? sanitize_text_field( $_POST['season_slug'] ) : '';
             $res      = function_exists( 'sywat_sync_season_tfaa_urls' ) ? sywat_sync_season_tfaa_urls( $target_s ) : array( 'success' => false, 'message' => 'Sync function missing.' );
             if ( ! empty( $res['success'] ) ) {
                 $tournaments = get_option( 'sywat_tournaments_list', array() );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 ' . esc_html( $res['message'] ) . '</div>';
+                return '<div id="sywat-debug-notice" style="background:#d4edda; color:#155724; border:1px solid #c3e6cb; padding:15px; margin-bottom:15px; border-radius:4px;">🟢 ' . $res['message'] . '</div>';
             } else {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ ' . esc_html( $res['message'] ) . '</div>';
+                return '<div id="sywat-debug-notice" style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:15px; margin-bottom:15px; border-radius:4px;">⚠️ ' . $res['message'] . '</div>';
             }
         }
 
