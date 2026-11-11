@@ -2,13 +2,47 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 let sywatTournamentNameIsCustomized = false;
+let sywatTournamentNameIsUnlocked   = false;
 
 function sywatMarkNameAsCustomized() {
     sywatTournamentNameIsCustomized = true;
+}
+
+function sywatToggleTournamentNameLock(btnElem) {
+    const inputBtn    = btnElem || document.getElementById('sywat_toggle_name_lock_btn');
+    const inputName   = document.getElementById('sywat_modal_tournament_name');
+    const statusLabel = document.getElementById('sywat_name_status_label');
+
+    if (!inputName || !inputBtn) return;
+
+    sywatTournamentNameIsUnlocked = !sywatTournamentNameIsUnlocked;
+
+    if (sywatTournamentNameIsUnlocked) {
+        inputName.removeAttribute('readonly');
+        inputName.classList.remove('sywat-input-disabled-calc');
+        inputBtn.textContent = '🔓 Unlocked';
+        inputBtn.classList.remove('sywat-btn-secondary');
+        inputBtn.classList.add('sywat-btn-warning');
+        if (statusLabel) statusLabel.textContent = '(Custom name active)';
+        sywatTournamentNameIsCustomized = true;
+    } else {
+        inputName.setAttribute('readonly', 'readonly');
+        inputName.classList.add('sywat-input-disabled-calc');
+        inputBtn.textContent = '🔒 Locked';
+        inputBtn.classList.remove('sywat-btn-warning');
+        inputBtn.classList.add('sywat-btn-secondary');
+        if (statusLabel) statusLabel.textContent = '(Auto-generated)';
+        sywatTournamentNameIsCustomized = false;
+        sywatAutoGenerateTournamentName(true);
+    }
+
+    if (inputBtn && typeof inputBtn.blur === 'function') {
+        inputBtn.blur();
+    }
 }
 
 /**
@@ -97,7 +131,9 @@ function sywatSyncShopCapacities() {
     });
 }
 
-function sywatAutoGenerateTournamentName() {
+function sywatAutoGenerateTournamentName(force) {
+    if (sywatTournamentNameIsCustomized && !force) return;
+
     // Auto-populate End Date to the first Sunday following Start Date
     sywatAutoPopulateEndDate();
 
@@ -110,16 +146,22 @@ function sywatAutoGenerateTournamentName() {
 
     if (!shopSelect || !nameInput) return;
 
-    // Do not overwrite if user has manually typed a custom name
-    if (sywatTournamentNameIsCustomized && nameInput.value.trim() !== '') return;
+    let shopName = '';
+    if (shopSelect.tagName.toLowerCase() === 'select') {
+        const selectedOption = shopSelect.options[shopSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.name) {
+            shopName = selectedOption.dataset.name;
+        }
+    } else {
+        shopName = shopSelect.dataset.name || '';
+    }
 
-    const selectedOption = shopSelect.options[shopSelect.selectedIndex];
-    if (!selectedOption || !selectedOption.value) return;
-
-    const shopName = selectedOption.getAttribute('data-name') || selectedOption.text || '';
     if (!shopName) return;
 
-    const rawEvents = selectedOption.getAttribute('data-events');
+    let rawEvents = '';
+    if (shopSelect.tagName.toLowerCase() === 'select' && shopSelect.selectedIndex >= 0) {
+        rawEvents = shopSelect.options[shopSelect.selectedIndex].getAttribute('data-events');
+    }
     let events = [];
     if (rawEvents) {
         try {
@@ -132,8 +174,10 @@ function sywatAutoGenerateTournamentName() {
     const newDate = startDateInput ? startDateInput.value.trim() : '';
 
     if (!newDate) {
-        // Fallback if no date selected yet
-        const currentCount = parseInt(selectedOption.getAttribute('data-count') || '0', 10);
+        let currentCount = 0;
+        if (shopSelect.tagName.toLowerCase() === 'select' && shopSelect.selectedIndex >= 0) {
+            currentCount = parseInt(shopSelect.options[shopSelect.selectedIndex].getAttribute('data-count') || '0', 10);
+        }
         const nextNum = currentCount + 1;
         nameInput.value = `${shopName.trim()} - ${nextNum}`;
         return;
@@ -351,9 +395,9 @@ function sywatApplyTournamentFilters() {
         const searchMatch   = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter) || district.includes(searchFilter) || fullText.includes(searchFilter));
 
         if (districtMatch && searchMatch) {
-            row.style.display = '';
+            row.classList.remove('sywat-hidden');
         } else {
-            row.style.display = 'none';
+            row.classList.add('sywat-hidden');
         }
     });
 }
@@ -374,8 +418,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const notice = document.getElementById('sywat-notice');
     if (notice) {
         setTimeout(function() {
-            notice.style.transition = "opacity 0.5s ease";
-            notice.style.opacity = "0";
+            notice.classList.add('sywat-fade-out');
             setTimeout(function() { notice.remove(); }, 500);
         }, 5000);
     }
@@ -387,7 +430,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const rows = document.querySelectorAll('.sywat-season-row');
             rows.forEach(row => {
                 const searchStr = (row.getAttribute('data-search') || '').toLowerCase();
-                row.style.display = searchStr.includes(filter) ? '' : 'none';
+                row.classList.toggle('sywat-hidden', !searchStr.includes(filter));
             });
         });
     }
