@@ -4,7 +4,7 @@
  * Path: includes/tournaments/class-sywat-tournament-config.php
  * Description: Main loader binding data layer, helpers, season CRUD, action handlers, portal views, and volunteer hub.
  * Author: SYWAT Archery
- * Version: 2.7.0
+ * Version: 2.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -23,9 +23,16 @@ add_shortcode( 'sywat_volunteer_hub',      'render_sywat_volunteer_hub' );
 // Enqueue Module Scripts & Assets
 function sywat_enqueue_tournament_scripts() {
     $js_url = plugins_url( '../../assets/js/sywat-tournaments.js', __FILE__ );
-    wp_enqueue_script( 'sywat-tournaments-js', $js_url, array(), '1.0.0', true );
+    wp_enqueue_script( 'sywat-tournaments-js', $js_url, array(), '1.0.1', true );
+    
+    // Localize Script to pass AJAX URL and Security Nonce to client-side JS
+    wp_localize_script( 'sywat-tournaments-js', 'sywat_ajax', array(
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'nonce'    => wp_create_nonce( 'sywat_desk_action' ),
+    ) );
 }
 add_action( 'wp_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
+add_action( 'admin_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
 
 // Include Sub-Module Files
 require_once plugin_dir_path( __FILE__ ) . 'tournament-data.php';
