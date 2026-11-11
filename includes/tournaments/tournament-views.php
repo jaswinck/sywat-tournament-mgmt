@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.16.1
+ * Version: 7.17.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -173,6 +173,15 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                     <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
                                     <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
                                     <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" title="Scrape TFAA season index page and populate direct links for all scheduled events">Sync TFAA Links</button>
+                                </form>
+                            <?php endif; ?>
+
+                            <!-- Global Bulk Sync Active Weekend Tournaments -->
+                            <?php if ( $can_manage_seasons ): ?>
+                                <form method="post" class="sywat-table-action-form" onsubmit="return confirm('SYNC ALL ACTIVE WEEKEND TOURNAMENTS?\n\nThis will pull the latest scores from TFAA for ALL host locations running this weekend.');">
+                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                    <input type="hidden" name="sywat_action" value="sync_all_tfaa_weekend">
+                                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-sync" title="Pull latest scores from TFAA for all active weekend tournaments">Sync All Active Weekend Tournaments</button>
                                 </form>
                             <?php endif; ?>
 
@@ -377,6 +386,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
                                                     <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
+
+                                                    <?php if ( ! empty( $tfaa_link ) && $can_manage_seasons ): ?>
+                                                        <form method="post" class="sywat-table-action-form">
+                                                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                            <input type="hidden" name="sywat_action" value="sync_tfaa_single">
+                                                            <input type="hidden" name="target_tournament" value="<?php echo esc_attr( $t_name ); ?>">
+                                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync sywat-btn-full" title="Sync scores for this tournament directly from TFAA">Sync TFAA Scores</button>
+                                                        </form>
+                                                    <?php endif; ?>
+
                                                     <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Tournament</a>
                                                     
                                                     <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
