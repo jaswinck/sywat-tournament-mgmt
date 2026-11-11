@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 7.10.1
+ * Version: 7.10.2
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -447,8 +447,10 @@ function sywatOpenTfaaSyncModal() {
         return;
     }
 
-    const nonceElem = document.querySelector('input[name="sywat_nonce"]');
-    const nonce     = nonceElem ? nonceElem.value : '';
+    // Use localized nonce with fallback for compatibility
+    const nonce = (typeof sywat_ajax !== 'undefined' && sywat_ajax.nonce) 
+                  ? sywat_ajax.nonce 
+                  : (document.querySelector('input[name="sywat_nonce"]') ? document.querySelector('input[name="sywat_nonce"]').value : '');
 
     sywatRunTfaaBatchSync(tournamentList, nonce);
 }
@@ -463,7 +465,11 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
     const logConsole   = document.getElementById('sywat_tfaa_sync_log_console');
     const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
     const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
-    const ajaxUrl      = window.ajaxurl || '/wp-admin/admin-ajax.php';
+    
+    // Use localized URL with fallback for compatibility
+    const ajaxUrl = (typeof sywat_ajax !== 'undefined' && sywat_ajax.ajax_url) 
+                    ? sywat_ajax.ajax_url 
+                    : (window.ajaxurl || '/wp-admin/admin-ajax.php');
 
     let successCount = 0;
     let failureCount = 0;
@@ -513,7 +519,10 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
                 logItem.classList.add('sywat-log-error');
                 let errMsg = '';
 
-                if (result && result.data && result.data.message) {
+                // Explicitly intercept WordPress missing-action "0" response
+                if (rawText.trim() === '0') {
+                    errMsg = 'AJAX action hook missing or unregistered (WordPress returned 0).';
+                } else if (result && result.data && result.data.message) {
                     errMsg = result.data.message;
                 } else if (!response.ok) {
                     errMsg = `HTTP ${response.status} ${response.statusText || 'Error'}`;
