@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-scores.js
  * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 7.1.1
+ * Version: 7.0.1
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -36,10 +36,8 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter & Clear Handler (Pure Class Toggle)
+    // 3. Real-Time Search Filter (Restored Inline Display Override for Table Rows)
     const searchInput = document.getElementById('sywat_score_search_input');
-    const clearBtn    = document.getElementById('sywat_score_search_clear');
-
     if (searchInput) {
         function filterRows() {
             const filter = searchInput.value.trim().toLowerCase();
@@ -49,8 +47,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 const name        = (row.getAttribute('data-name') || '').toLowerCase();
                 const textContent = (row.textContent || row.innerText || '').toLowerCase();
 
-                const isMatch = !filter || name.includes(filter) || textContent.includes(filter);
-                row.classList.toggle('sywat-hidden', !isMatch);
+                if (!filter || name.includes(filter) || textContent.includes(filter)) {
+                    row.classList.remove('sywat-hidden');
+                    row.style.display = '';
+                } else {
+                    row.classList.add('sywat-hidden');
+                    row.style.display = 'none';
+                }
             });
 
             const hiddenSearches = document.querySelectorAll('.sywat-hidden-search');
@@ -62,15 +65,7 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.addEventListener('input', filterRows);
         searchInput.addEventListener('keyup', filterRows);
 
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function() {
-                searchInput.value = '';
-                filterRows();
-                searchInput.focus();
-            });
-        }
-
-        // Initialize search state on DOM ready
+        // Initialize search state
         filterRows();
     }
 
