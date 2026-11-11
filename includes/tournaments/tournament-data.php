@@ -3,15 +3,13 @@
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
  * Author: SYWAT Archery
- * Version: 7.9.8
+ * Version: 8.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Retrieves all competition seasons sorted chronologically descending by start date.
- *
- * @return array Multi-dimensional array of configured seasons.
  */
 if ( ! function_exists( 'sywat_get_seasons' ) ) {
     function sywat_get_seasons() {
@@ -137,7 +135,7 @@ if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
 if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
     function sywat_sync_season_tfaa_urls( $season_name_or_slug = '' ) {
         $debug_log = array();
-        $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER ---";
+        $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER (DOMDocument) ---";
 
         $all_tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( empty( $all_tournaments ) || ! is_array( $all_tournaments ) ) {
@@ -200,17 +198,58 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'Empty response received from TFAA index.' );
         }
 
-        if ( ! preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
-            $debug_log[] = "Regex failed to find ANY <a> tags on the page.";
-            $debug_html = '<details style="margin-top: 10px; background: #fff; padding: 10px; border: 1px solid #ccc; font-family: monospace; font-size: 11px;"><summary style="font-weight:bold; cursor:pointer;">View Diagnostic Log</summary><pre style="white-space:pre-wrap;">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
-            return array( 'success' => false, 'message' => 'No event links found on TFAA page.' . $debug_html );
-        }
+        // Bulletproof DOM parsing
+        $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument();
+        @$dom->loadHTML($html);
+        $xpath = new DOMXPath($dom);
+        
+        $rows = $xpath->query('//table//tr');
+        $remote_events = array();
 
-        $debug_log[] = "Found " . count($matches) . " <a> links on the TFAA page.";
+        if ($rows->length > 0) {
+            foreach ($rows as $row) {
+                $cells = $xpath->query('.//td', $row);
+                if ($cells->length >= 2) {
+                    $name_cell = $cells->item(1);
+                    $link = $xpath->query('.//a', $name_cell);
+                    
+                    if ($link->length > 0) {
+                        $remote_events[] = array(
+                            'has_link' => true,
+                            'href'     => trim($link->item(0)->getAttribute('href')),
+                            'text'     => trim($link->item(0)->textContent),
+                        );
+                    } else {
+                        $remote_events[] = array(
+                            'has_link' => false,
+                            'href'     => '',
+                            'text'     => trim($name_cell->textContent),
+                        );
+                    }
+                }
+            }
+        } else {
+            // Fallback if no table is found, just grab all links
+            $links = $dom->getElementsByTagName('a');
+            foreach ($links as $link) {
+                $href = trim($link->getAttribute('href'));
+                if (strpos($href, '/results/') !== false) {
+                    $remote_events[] = array(
+                        'has_link' => true,
+                        'href'     => $href,
+                        'text'     => trim($link->textContent),
+                    );
+                }
+            }
+        }
+        libxml_clear_errors();
+
+        $debug_log[] = "DOM Parser found " . count($remote_events) . " tournament rows on the page.";
 
         $target_year = preg_replace('/[^0-9]/', '', $target_name);
         $target_type = stripos($target_name, 'indoor') !== false ? 'indoor' : 'outdoor';
-        $debug_log[] = "Parsed Active Season Filter -> Year: '{$target_year}', Type: '{$target_type}'";
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
@@ -227,50 +266,35 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             $t_type   = stripos($t_season, 'indoor') !== false ? 'indoor' : 'outdoor';
             
             if ( $target_year !== $t_year || $target_type !== $t_type ) {
-                $debug_log[] = " -> SKIP: Season mismatch. DB has ({$t_year} {$t_type}), but we are syncing ({$target_year} {$target_type}).";
+                $debug_log[] = " -> SKIP: Season mismatch.";
                 continue;
             }
 
             $simple_local_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
-            $debug_log[] = " -> Stripped Local Name to compare: '{$simple_local_name}'";
-
             $matched = false;
-            foreach ( $matches as $m ) {
-                $link_href = trim( $m[1] );
-                $link_text = trim( wp_strip_all_tags( $m[2] ) );
 
-                if ( empty( $link_href ) || strpos( $link_href, '?season=' ) !== false || $link_href === '/results' ) {
-                    continue;
-                }
-
-                $simple_link_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $link_text));
+            foreach ( $remote_events as $remote ) {
+                $simple_remote_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $remote['text']));
                 
-                $is_match = false;
-                if ( ! empty( $simple_local_name ) && strpos( $simple_link_text, $simple_local_name ) !== false ) {
-                    $is_match = true;
-                    $debug_log[] = "    -> [MATCH SUCCESS]: Found '{$simple_local_name}' inside remote string '{$simple_link_text}' (Original: '{$link_text}')";
-                } 
-                elseif ( function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
-                    $clean_link_text = preg_replace('/^\s*\d{1,2}\/\d{1,2}\/\d{4}(?:\s*-\s*\d{1,2}\/\d{1,2}\/\d{4})?\s*(?:\||-)?\s*/', '', $link_text);
-                    if ( sywat_match_tfaa_tournament_name( $t_name, $clean_link_text ) ) {
-                        $is_match = true;
-                        $debug_log[] = "    -> [MATCH SUCCESS]: Legacy Token Matcher matched '{$t_name}' to '{$clean_link_text}'";
-                    }
-                }
+                if ( ! empty( $simple_local_name ) && strpos( $simple_remote_text, $simple_local_name ) !== false ) {
+                    if ( $remote['has_link'] && ! empty( $remote['href'] ) ) {
+                        $link_href = $remote['href'];
+                        
+                        if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
+                            $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
+                        } else {
+                            $resolved_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
+                        }
 
-                if ( $is_match ) {
-                    if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
-                        $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
+                        if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
+                            $t_data['tfaa_results_url'] = $resolved_url;
+                            $updated_count++;
+                            $debug_log[] = "    -> [MATCH SUCCESS]: Saved URL: {$resolved_url}";
+                        } else {
+                            $debug_log[] = "    -> [MATCH SUCCESS]: URL already up to date.";
+                        }
                     } else {
-                        $resolved_url = ( strpos( $link_href, 'http' ) === 0 ) ? $link_href : 'https://texasfieldarchery.org' . ( strpos( $link_href, '/' ) === 0 ? '' : '/' ) . $link_href;
-                    }
-
-                    if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
-                        $t_data['tfaa_results_url'] = $resolved_url;
-                        $updated_count++;
-                        $debug_log[] = "    -> Saved URL: {$resolved_url}";
-                    } else {
-                        $debug_log[] = "    -> URL already up to date.";
+                        $debug_log[] = "    -> [MATCH FOUND BUT NO LINK YET]: The TFAA site lists this tournament, but results are not posted yet (no <a> tag).";
                     }
                     $matched = true;
                     break;
@@ -278,7 +302,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
 
             if ( ! $matched ) {
-                $debug_log[] = " -> FAILED TO MATCH against any of the remote links.";
+                $debug_log[] = " -> FAILED TO MATCH against any of the remote rows.";
             }
         }
         unset( $t_data );
