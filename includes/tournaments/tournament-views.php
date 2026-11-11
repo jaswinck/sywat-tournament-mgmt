@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.18.1
+ * Version: 7.18.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -147,12 +147,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-subtitle">Set up upcoming events, configure shooting lines, and print desk rosters.</div>
                         </div>
 
-                        <!-- 
-                            EXACT MATCH WITH BOTTOM ROW: 
-                            Using .sywat-table-header-controls instead of custom inline controls to inherit perfect spacing 
-                        -->
                         <div class="sywat-table-header-controls">
-                            
                             <!-- Sub-wrapper 1: Filters (Season Dropdown) -->
                             <div class="sywat-table-header-filters">
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
@@ -175,13 +170,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <?php endif; ?>
                             </div>
 
-                            <!-- Sub-wrapper 2: Action Buttons (Stripped of custom form classes) -->
+                            <!-- Sub-wrapper 2: Action Buttons -->
                             <div class="sywat-table-header-actions">
                                 <!-- Global Master Desk Security Nonce Field for JS AJAX Engines -->
                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
 
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ): ?>
-                                    <!-- Explicit POST Action Trigger for Season Links Sync -->
                                     <form method="post">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
