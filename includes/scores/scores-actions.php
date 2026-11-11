@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-actions.php
  * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, dynamic line capacity expansion, line lock management, and TFAA scraper with Universal Token Matcher, direct URL DB persistence, Clean-Name deduplication, explicit zero-score persistence, and Guest/INC type tagging.
  * Author: SYWAT Archery
- * Version: 9.8.0
+ * Version: 9.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -97,11 +97,9 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 
 /**
  * Universal Token & Qualifier Matcher for TFAA Tournament Names
- * Resolves local short names (e.g., "Fort Grard - 1", "STX Archery - 2") to official TFAA index strings.
  */
 if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
     function sywat_match_tfaa_tournament_name( $sywat_name, $tfaa_name ) {
-        // 1. Extract Trailing Qualifier Number (e.g. "Fort Grard - 1" -> 1, "STX Archery-2" -> 2)
         $get_qualifier = function( $str ) {
             if ( preg_match( '/(?:[\s\-\#]+)(\d+)\s*$/i', $str, $m ) ) {
                 return (int)$m[1];
@@ -112,14 +110,12 @@ if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
         $sywat_q = $get_qualifier( $sywat_name );
         $tfaa_q  = $get_qualifier( $tfaa_name );
 
-        // If SYWAT specifies a qualifier number, TFAA MUST match the exact same qualifier number
         if ( $sywat_q !== null && $tfaa_q !== null && $sywat_q !== $tfaa_q ) {
             return false;
         }
 
-        // 2. Tokenize and remove generic noise words
         $normalize_tokens = function( $str ) {
-            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str ); // Strip trailing qualifier
+            $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str );
             $str = strtolower( $str );
             $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
             
@@ -145,7 +141,6 @@ if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
             return ( stripos( $clean_t, $clean_s ) !== false || stripos( $clean_s, $clean_t ) !== false );
         }
 
-        // 3. Verify every core token from local name exists inside the TFAA listing text
         $raw_tfaa_lower = strtolower( $tfaa_name );
         foreach ( $sywat_tokens as $token ) {
             if ( strpos( $raw_tfaa_lower, $token ) === false && ! in_array( $token, $tfaa_tokens ) ) {
@@ -184,31 +179,27 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             )
         );
 
-        // LAYER 1: Check Database for Manual Event ID or Previously Saved Direct URL
+        // 1. Check database for existing direct URL or manual Event ID override
         if ( ! empty( $t_data['tfaa_event_id'] ) ) {
-            $tfaa_override = trim( $t_data['tfaa_event_id'] );
-            if ( is_numeric( $tfaa_override ) ) {
-                $event_url = 'https://texasfieldarchery.org/results/' . $tfaa_override;
-            } else {
-                $event_url = ( strpos( $tfaa_override, 'http' ) === 0 ) ? $tfaa_override : 'https://texasfieldarchery.org' . ( strpos( $tfaa_override, '/' ) === 0 ? '' : '/' ) . $tfaa_override;
-            }
+            $override = trim( $t_data['tfaa_event_id'] );
+            $event_url = is_numeric( $override ) ? 'https://texasfieldarchery.org/results/' . $override : $override;
         } elseif ( ! empty( $t_data['tfaa_results_url'] ) ) {
             $event_url = trim( $t_data['tfaa_results_url'] );
         }
 
-        // LAYER 2: Scrape Index Page and Store Direct URL in DB
+        // 2. If not stored, scrape the main index once to locate the exact direct link
         if ( empty( $event_url ) ) {
             $season_param = ! empty( $t_data['season'] ) ? '?season=' . urlencode( trim( $t_data['season'] ) ) : '';
-            $results_main_url = 'https://texasfieldarchery.org/results' . $season_param;
-            $main_resp = wp_remote_get( $results_main_url, $http_args );
+            $index_url    = 'https://texasfieldarchery.org/results' . $season_param;
+            $index_resp   = wp_remote_get( $index_url, $http_args );
 
-            if ( is_wp_error( $main_resp ) ) {
-                return array( 'success' => false, 'message' => 'Failed to reach TFAA site: ' . $main_resp->get_error_message() );
+            if ( is_wp_error( $index_resp ) ) {
+                return array( 'success' => false, 'message' => 'Failed to reach TFAA site: ' . $index_resp->get_error_message() );
             }
 
-            $main_html = wp_remote_retrieve_body( $main_resp );
+            $html = wp_remote_retrieve_body( $index_resp );
 
-            if ( preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $main_html, $matches, PREG_SET_ORDER ) ) {
+            if ( preg_match_all( '/<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $matches, PREG_SET_ORDER ) ) {
                 foreach ( $matches as $m ) {
                     $link_href = trim( $m[1] );
                     $link_text = trim( wp_strip_all_tags( $m[2] ) );
@@ -229,12 +220,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'Could not find a published TFAA results page matching \'' . esc_html( $t_name ) . '\'.' );
         }
 
-        // PERMANENT DB SAVE: Store resolved link so the view button has it forever
+        // PERMANENT DB SAVE: Write resolved direct link to tournament database record
         $t_data['tfaa_results_url'] = $event_url;
-        $all_tournaments[$t_name] = $t_data;
+        $all_tournaments[$t_name]  = $t_data;
         update_option( 'sywat_tournaments_list', $all_tournaments, false );
 
-        // Fetch target event detail results page
+        // Fetch score detail page
         $event_resp = wp_remote_get( $event_url, $http_args );
         if ( is_wp_error( $event_resp ) ) {
             return array( 'success' => false, 'message' => 'Failed to retrieve event results: ' . $event_resp->get_error_message() );
