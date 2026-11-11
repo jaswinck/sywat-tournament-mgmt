@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 7.0.1
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -172,7 +172,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         }
 
         // Enqueue client score interactive JavaScript asset
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.1.1', true );
+        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.2.0', true );
         ?>
 
         <div class="sywat-wrap">
@@ -356,10 +356,10 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             <h2>Archer Scores</h2>
 
                             <div class="sywat-table-header-controls">
-                                <!-- Live Search Input Group -->
+                                <!-- Live Search Input Group (Aligned with Check-In Inline Enter Guard) -->
                                 <div class="sywat-search-input-group">
-                                    <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off">
-                                    <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear">Clear</button>
+                                    <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                    <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                                 </div>
 
                                 <!-- Dynamic View TFAA Page Preview Link -->
@@ -463,6 +463,57 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             <!-- Close Master Single Unified Desk Card -->
             </div>
         </div>
+
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const searchInput = document.getElementById('sywat_score_search_input');
+            
+            function applyScoreSearchFilter(query) {
+                const cleanQuery = query.trim().toLowerCase();
+                const rows = document.querySelectorAll('.sywat-score-row');
+                
+                rows.forEach(function(row) {
+                    const dataName = (row.getAttribute('data-name') || '').toLowerCase();
+                    const textContent = (row.textContent || row.innerText || '').toLowerCase();
+
+                    if (!cleanQuery || dataName.includes(cleanQuery) || textContent.includes(cleanQuery)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
+                    hiddenInput.value = query;
+                });
+
+                if (query) {
+                    sessionStorage.setItem('sywat_score_search_query', query);
+                } else {
+                    sessionStorage.removeItem('sywat_score_search_query');
+                }
+            }
+
+            if (searchInput) {
+                let initialQuery = searchInput.value;
+                if (!initialQuery) {
+                    const savedQuery = sessionStorage.getItem('sywat_score_search_query');
+                    if (savedQuery) {
+                        initialQuery = savedQuery;
+                        searchInput.value = savedQuery;
+                    }
+                }
+
+                if (initialQuery) {
+                    applyScoreSearchFilter(initialQuery);
+                }
+
+                searchInput.addEventListener('input', function() {
+                    applyScoreSearchFilter(this.value);
+                });
+            }
+        });
+        </script>
         <?php
         return ob_get_clean();
     }
