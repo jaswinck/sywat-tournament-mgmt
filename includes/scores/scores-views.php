@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 6.9.5
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
