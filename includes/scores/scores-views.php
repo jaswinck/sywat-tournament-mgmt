@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 6.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -160,7 +160,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
 
-        // Resolve Preview TFAA Target URL using central fast transient/override helper
+        // Resolve Preview TFAA Target URL ONCE for the single active tournament
         $preview_tfaa_url = function_exists( 'sywat_get_tfaa_event_url' ) ? sywat_get_tfaa_event_url( $selected_tournament, $t_master ) : 'https://texasfieldarchery.org/results';
 
         // Enqueue client score interactive JavaScript asset (Directive Section IV.1)
@@ -200,11 +200,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <label for="selected_tournament_val">Active Tournament:</label>
                                 <select name="selected_tournament" id="selected_tournament_val" class="sywat-select-tournament" onchange="document.getElementById('sywat_score_filter_form').submit();">
                                     <?php foreach ( $tournaments as $t_name => $t_lines ): ?>
-                                        <?php 
-                                            $opt_master = ( is_array( $all_tournaments ) && isset( $all_tournaments[$t_name] ) ) ? $all_tournaments[$t_name] : array();
-                                            $opt_url    = function_exists( 'sywat_get_tfaa_event_url' ) ? sywat_get_tfaa_event_url( $t_name, $opt_master ) : 'https://texasfieldarchery.org/results';
-                                        ?>
-                                        <option value="<?php echo esc_attr( $t_name ); ?>" data-tfaa-url="<?php echo esc_url( $opt_url ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
+                                        <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
                                             <?php echo esc_html( $t_name ); ?>
                                         </option>
                                     <?php endforeach; ?>
