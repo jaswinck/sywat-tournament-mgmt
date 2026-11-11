@@ -1,9 +1,9 @@
 /**
  * Client Script: Score Engine Interactivity & Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
+ * Description: Dynamic TFAA target URL switcher, real-time search filtering, range validation, local draft recovery, AJAX auto-save, offline sync, and batch concurrency protection.
  * Author: SYWAT Archery
- * Version: 6.6.0
+ * Version: 7.0.0
  */
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -18,7 +18,25 @@ document.addEventListener("DOMContentLoaded", function() {
     const currentTourn = currentTournInput ? currentTournInput.value : '';
     const nonceVal     = nonceInput ? nonceInput.value : '';
 
-    // 2. Real-Time Search Filter (Dual-Layer: Inline Display + Class-Driven)
+    // 2. Dynamic TFAA Preview Button URL Switcher
+    const tfaaPreviewBtn = document.getElementById('sywat_tfaa_preview_btn');
+    function updateTfaaPreviewUrl() {
+        if (!currentTournInput || !tfaaPreviewBtn) return;
+        const selectedOpt = currentTournInput.options[currentTournInput.selectedIndex];
+        if (selectedOpt) {
+            const tfaaUrl = selectedOpt.getAttribute('data-tfaa-url');
+            if (tfaaUrl) {
+                tfaaPreviewBtn.setAttribute('href', tfaaUrl);
+            }
+        }
+    }
+
+    if (currentTournInput && tfaaPreviewBtn) {
+        currentTournInput.addEventListener('change', updateTfaaPreviewUrl);
+        updateTfaaPreviewUrl();
+    }
+
+    // 3. Real-Time Search Filter (Dual-Layer: Inline Display + Class-Driven)
     const searchInput = document.getElementById('sywat_score_search_input');
     if (searchInput) {
         function filterRows() {
@@ -51,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function() {
         filterRows();
     }
 
-    // 3. Helper: Status Badge Class & Text Updater
+    // 4. Helper: Status Badge Class & Text Updater
     function setRowStatus(regId, state, customMsg) {
         const badge = document.getElementById('status_' + regId);
         if (!badge) return;
@@ -72,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // 4. Helper: Input Range & Format Validator
+    // 5. Helper: Input Range & Format Validator
     function validateInput(input) {
         if (!input) return true;
         const min    = parseInt(input.getAttribute('min'), 10) || 0;
@@ -94,12 +112,12 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // 5. Helper: Local Storage Key Generator
+    // 6. Helper: Local Storage Key Generator
     function getStorageKey(regId) {
         return 'sywat_draft_' + currentTourn.replace(/[^a-z0-9]/gi, '_') + '_' + regId;
     }
 
-    // 6. Restore Unsaved Local Drafts on Page Load
+    // 7. Restore Unsaved Local Drafts on Page Load
     document.querySelectorAll('.sywat-score-row').forEach(function(row) {
         const regId      = row.getAttribute('data-id');
         const savedDraft = localStorage.getItem(getStorageKey(regId));
@@ -121,7 +139,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // 7. Background Asynchronous Single-Score Saver
+    // 8. Background Asynchronous Single-Score Saver
     function performBackgroundSave(regId) {
         const row = document.querySelector('.sywat-score-row[data-id="' + regId + '"]');
         if (!row || row.classList.contains('locked-row')) return;
@@ -178,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 8. Dynamic Event Listeners for User Input & Blur
+    // 9. Dynamic Event Listeners for User Input & Blur
     document.addEventListener('input', function(e) {
         if (e.target && e.target.classList.contains('sywat-score-input') && !e.target.disabled) {
             const regId = e.target.getAttribute('data-id');
@@ -207,7 +225,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // 9. Sync Unsaved Local Drafts Automatically When Reconnecting Online
+    // 10. Sync Unsaved Local Drafts Automatically When Reconnecting Online
     window.addEventListener('online', function() {
         document.querySelectorAll('.sywat-score-row:not(.locked-row)').forEach(function(row) {
             const regId = row.getAttribute('data-id');
@@ -217,7 +235,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
-    // 10. Concurrency Protection & Local Storage Clear on Full Batch Submit
+    // 11. Concurrency Protection & Local Storage Clear on Full Batch Submit
     const batchForm = document.getElementById('sywat_batch_score_form');
     if (batchForm) {
         batchForm.addEventListener('submit', function(e) {
