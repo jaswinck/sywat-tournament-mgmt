@@ -383,6 +383,18 @@
         const target = e.target.closest('button, a');
         if (!target) return;
 
+        if (target.classList.contains('sywat-back-to-list-link')) {
+            confirmBackToList(e);
+            return;
+        }
+
+        const tabTarget = target.getAttribute('data-sywat-tab');
+        if (tabTarget) {
+            e.preventDefault();
+            switchEditShopTab(tabTarget);
+            return;
+        }
+
         if (target.id === 'sywat_shop_clear_btn') {
             e.preventDefault();
             resetShopFilters();
@@ -410,12 +422,21 @@
         }
 
         const action = target.getAttribute('data-sywat-action');
-        if (action === 'remove-shop-contact') {
+        if (action === 'add-shop-contact') {
+            e.preventDefault();
+            addShopContactRow();
+        } else if (action === 'remove-shop-contact') {
             e.preventDefault();
             removeShopContactRow(target);
+        } else if (action === 'add-indoor-line') {
+            e.preventDefault();
+            addShopIndoorLineRow();
         } else if (action === 'remove-indoor-line') {
             e.preventDefault();
             removeShopIndoorLineRow(target);
+        } else if (action === 'add-outdoor-line') {
+            e.preventDefault();
+            addShopOutdoorLineRow();
         } else if (action === 'remove-outdoor-line') {
             e.preventDefault();
             removeShopOutdoorLineRow(target);
@@ -432,7 +453,7 @@
         }
     });
 
-    // Delegated change/input listener for dynamic shooting line duplicate checks
+    // Delegated change listener for dynamic shooting line duplicate checks
     document.addEventListener('change', function(e) {
         const el = e.target;
         if (!el || !el.matches) return;
@@ -494,7 +515,7 @@
         }
     });
 
-    // Expose namespaced API + legacy compatibility aliases for remaining views until refactored
+    // Expose namespaced API + legacy compatibility aliases
     window.SYWAT.shops = {
         switchEditShopTab: switchEditShopTab,
         updateFacilityTabVisibility: updateFacilityTabVisibility,
