@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 7.10.3
+ * Version: 6.8.2
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -412,6 +412,10 @@ function sywatResetTournamentFilters() {
     sessionStorage.removeItem('sywat_tournament_search');
 
     sywatApplyTournamentFilters();
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+    }
 }
 
 /**
@@ -464,7 +468,7 @@ async function sywatRunTfaaBatchSync(tournaments, nonce) {
     const logConsole   = document.getElementById('sywat_tfaa_sync_log_console');
     const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
     const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
-    
+
     // DIRECT PAGE BYPASS: Route traffic to the current page URL to hit our JSON interceptor hook
     const requestUrl = window.location.href;
 
