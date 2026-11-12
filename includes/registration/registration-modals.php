@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.8.2
+ * Version: 6.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -385,6 +385,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                         'view_tournament' => $selected_tournament,
                                         'modal_action'    => 'manage',
                                         'filter_line_idx' => $idx,
+                                        'return_to'       => 'register',
                                     ),
                                     sywat_page_url( 'manage_tournaments' )
                                 );
