@@ -3,10 +3,167 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Helper: Filter scoped tournaments to active season(s) and build an ordered option map
+ * with the active/pinned tournament at the top and all remaining tournaments sorted A–Z.
+ *
+ * @param array  $scoped_tournaments  Shop-scoped tournaments array (name => config).
+ * @param string $requested_tourn     Unslashed requested tournament name from GET/POST.
+ * @param string $user_shop_id        Current user's assigned shop ID.
+ * @return array                      Associative array with 'ordered' (name => label) and 'selected' (string).
+ */
+if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
+    function sywat_registration_build_tournament_dropdown( $scoped_tournaments, $requested_tourn, $user_shop_id ) {
+        if ( empty( $scoped_tournaments ) || ! is_array( $scoped_tournaments ) ) {
+            return array(
+                'ordered'  => array(),
+                'selected' => '',
+            );
+        }
+
+        // Identify active season slugs/names so archived season events do not clutter the dropdown
+        $seasons            = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
+        $active_season_keys = array();
+        if ( is_array( $seasons ) ) {
+            foreach ( $seasons as $s_slug => $s_data ) {
+                if ( is_array( $s_data ) && isset( $s_data['status'] ) && $s_data['status'] === 'active' ) {
+                    $active_season_keys[] = strtolower( trim( (string) $s_slug ) );
+                    if ( ! empty( $s_data['name'] ) ) {
+                        $active_season_keys[] = strtolower( trim( (string) $s_data['name'] ) );
+                    }
+                }
+            }
+        }
+
+        // Filter pool to active season(s), always preserving an explicitly requested tournament if valid
+        $pool = array();
+        foreach ( $scoped_tournaments as $t_name => $t_data ) {
+            if ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 ) {
+                $pool[ $t_name ] = $t_data;
+                continue;
+            }
+            if ( empty( $active_season_keys ) ) {
+                $pool[ $t_name ] = $t_data;
+                continue;
+            }
+            $t_season = '';
+            if ( is_array( $t_data ) ) {
+                $t_season = ! empty( $t_data['season_slug'] ) ? $t_data['season_slug'] : ( ! empty( $t_data['season'] ) ? $t_data['season'] : '' );
+            }
+            if ( empty( $t_season ) || in_array( strtolower( trim( (string) $t_season ) ), $active_season_keys, true ) ) {
+                $pool[ $t_name ] = $t_data;
+            }
+        }
+
+        if ( empty( $pool ) ) {
+            $pool = $scoped_tournaments;
+        }
+
+        // Determine primary active tournament for top pinning
+        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
+        $current_t          = get_option( 'sywat_current_tournament', '' );
+        $pinned_active_key  = '';
+
+        if ( is_array( $active_tournaments ) && ! empty( $active_tournaments ) ) {
+            if ( ! empty( $user_shop_id ) ) {
+                foreach ( $active_tournaments as $act_name ) {
+                    if ( isset( $pool[ $act_name ] ) ) {
+                        $t_shop = function_exists( 'sywat_get_tournament_shop_id' )
+                            ? (string) sywat_get_tournament_shop_id( $pool[ $act_name ] )
+                            : ( isset( $pool[ $act_name ]['shop_id'] ) ? (string) $pool[ $act_name ]['shop_id'] : '' );
+                        if ( $t_shop === (string) $user_shop_id ) {
+                            $pinned_active_key = $act_name;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ( empty( $pinned_active_key ) ) {
+                foreach ( $active_tournaments as $act_name ) {
+                    if ( isset( $pool[ $act_name ] ) ) {
+                        $pinned_active_key = $act_name;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ( empty( $pinned_active_key ) && ! empty( $current_t ) && isset( $pool[ $current_t ] ) ) {
+            $pinned_active_key = $current_t;
+        }
+
+        if ( empty( $pinned_active_key ) ) {
+            $today_ymd   = current_time( 'Y-m-d' );
+            $upcoming    = array();
+            $sorted_keys = array_keys( $pool );
+            usort( $sorted_keys, 'strnatcasecmp' );
+
+            foreach ( $sorted_keys as $k ) {
+                $s_date = isset( $pool[ $k ]['start_date'] ) ? $pool[ $k ]['start_date'] : '';
+                if ( ! empty( $s_date ) && $s_date >= $today_ymd ) {
+                    $upcoming[ $k ] = $s_date;
+                }
+            }
+
+            if ( ! empty( $upcoming ) ) {
+                asort( $upcoming );
+                reset( $upcoming );
+                $pinned_active_key = key( $upcoming );
+            } elseif ( ! empty( $sorted_keys ) ) {
+                $pinned_active_key = $sorted_keys[0];
+            }
+        }
+
+        // Resolve actual selected tournament using unslashed exact or case-insensitive key match
+        $selected_tournament = '';
+        if ( ! empty( $requested_tourn ) ) {
+            if ( isset( $pool[ $requested_tourn ] ) ) {
+                $selected_tournament = $requested_tourn;
+            } else {
+                foreach ( array_keys( $pool ) as $k ) {
+                    if ( strcasecmp( $k, $requested_tourn ) === 0 ) {
+                        $selected_tournament = $k;
+                        break;
+                    }
+                }
+            }
+        }
+        if ( empty( $selected_tournament ) ) {
+            $selected_tournament = $pinned_active_key;
+        }
+
+        // Build ordered dropdown options:
+        // 1. Pinned active tournament at the top
+        // 2. Remaining tournaments sorted A–Z (natural case-insensitive)
+        $ordered     = array();
+        $other_names = array();
+
+        foreach ( array_keys( $pool ) as $t_name ) {
+            if ( $t_name === $pinned_active_key ) {
+                continue;
+            }
+            $other_names[] = $t_name;
+        }
+        usort( $other_names, 'strnatcasecmp' );
+
+        if ( ! empty( $pinned_active_key ) && isset( $pool[ $pinned_active_key ] ) ) {
+            $ordered[ $pinned_active_key ] = '★ ' . $pinned_active_key . ' (Active)';
+        }
+        foreach ( $other_names as $o_name ) {
+            $ordered[ $o_name ] = $o_name;
+        }
+
+        return array(
+            'ordered'  => $ordered,
+            'selected' => $selected_tournament,
+        );
+    }
+}
 
 /**
  * Render Full Registration Desk Page (Shortcode Handler: [sywat_register])
@@ -34,21 +191,26 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         // Scope Tournaments to User's Assigned Shop
         $scoped_tournaments = array();
         foreach ( $tournaments as $t_name => $t_data ) {
-            $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
-                $scoped_tournaments[$t_name] = $t_data;
+                $scoped_tournaments[ $t_name ] = $t_data;
             }
         }
 
-        // Determine Selected Tournament
-        $selected_tournament = isset( $_REQUEST['selected_tournament'] ) ? sanitize_text_field( $_REQUEST['selected_tournament'] ) : '';
-        if ( empty( $selected_tournament ) && ! empty( $scoped_tournaments ) ) {
-            $keys = array_keys( $scoped_tournaments );
-            $selected_tournament = reset( $keys );
+        // Unslash GET/POST tournament names so apostrophes (e.g., "Buck & Doe's - 1") match exact keys
+        $requested_tourn = '';
+        if ( isset( $_REQUEST['selected_tournament'] ) ) {
+            $requested_tourn = sanitize_text_field( wp_unslash( $_REQUEST['selected_tournament'] ) );
+        } elseif ( isset( $_GET['view_tournament'] ) ) {
+            $requested_tourn = sanitize_text_field( wp_unslash( $_GET['view_tournament'] ) );
         }
 
-        $available_lines = ( ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] ) && function_exists('sywat_get_tournament_lines') ) 
-            ? sywat_get_tournament_lines( $tournaments[$selected_tournament] ) 
+        $dropdown_data       = sywat_registration_build_tournament_dropdown( $scoped_tournaments, $requested_tourn, $user_shop_id );
+        $ordered_tournaments = $dropdown_data['ordered'];
+        $selected_tournament = $dropdown_data['selected'];
+
+        $available_lines = ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) && function_exists( 'sywat_get_tournament_lines' ) )
+            ? sywat_get_tournament_lines( $tournaments[ $selected_tournament ] )
             : array();
 
         $active_t_slug = sanitize_title( $selected_tournament );
@@ -74,13 +236,16 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         // POST Handling Notice
         $notice = '';
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) ) {
-            $is_valid_nonce = isset($_POST['sywat_nonce']) && wp_verify_nonce($_POST['sywat_nonce'], 'sywat_desk_action');
+            $nonce_val      = isset( $_POST['sywat_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ) : '';
+            $is_valid_nonce = ! empty( $nonce_val ) && wp_verify_nonce( $nonce_val, 'sywat_desk_action' );
             if ( $is_valid_nonce ) {
-                $action = sanitize_text_field( $_POST['sywat_action'] );
+                $action = sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) );
                 if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
                     $notice = sywat_handle_register_shooter( $tournaments, $registrations );
                 } elseif ( $action === 'import_shooters' && function_exists( 'sywat_handle_import_shooters' ) ) {
-                    $notice = sywat_handle_import_shooters( $tournaments, $registrations );
+                    $import_tourn    = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : $selected_tournament;
+                    $target_line_idx = isset( $_POST['target_line_idx'] ) ? sanitize_text_field( wp_unslash( $_POST['target_line_idx'] ) ) : '0';
+                    $notice          = sywat_handle_import_shooters( $import_tourn, $target_line_idx, $tournaments, $registrations );
                 } elseif ( $action === 'purge_line' ) {
                     if ( ! function_exists( 'sywat_handle_purge_line' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php' ) ) {
                         require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';
@@ -133,12 +298,12 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                             <div class="sywat-field-group">
                                 <label for="sywat_selected_tournament">Active Tournament:</label>
                                 <select id="sywat_selected_tournament" name="selected_tournament" onchange="this.form.submit()">
-                                    <?php if ( empty( $scoped_tournaments ) ): ?>
+                                    <?php if ( empty( $ordered_tournaments ) ): ?>
                                         <option value="">No Tournaments Configured</option>
                                     <?php else: ?>
-                                        <?php foreach ( $scoped_tournaments as $t_name => $t_data ): ?>
+                                        <?php foreach ( $ordered_tournaments as $t_name => $t_label ): ?>
                                             <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
-                                                <?php echo esc_html( $t_name ); ?>
+                                                <?php echo esc_html( $t_label ); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -148,10 +313,10 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                     </div>
                 </div>
 
-                <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[$selected_tournament] ) ): ?>
-                    <?php 
+                <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) ): ?>
+                    <?php
                     if ( function_exists( 'sywat_render_registration_modal' ) ) {
-                        sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations ); 
+                        sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
                     }
                     ?>
                 <?php else: ?>
