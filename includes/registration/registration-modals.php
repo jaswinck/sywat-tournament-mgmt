@@ -3,10 +3,48 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.3.1
+ * Version: 6.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+/**
+ * Helper: Resolve a human-readable shooting line label from line config array.
+ * Prevents "Line 1, Line 2" fallback when lines are stored with day/time keys.
+ */
+if ( ! function_exists( 'sywat_reg_resolve_line_label' ) ) {
+    function sywat_reg_resolve_line_label( $line, $idx ) {
+        $label = '';
+        if ( is_array( $line ) ) {
+            if ( ! empty( $line['name'] ) ) {
+                $label = trim( $line['name'] );
+            } else {
+                $day_str  = isset( $line['day'] ) ? trim( $line['day'] ) : '';
+                $time_str = isset( $line['time'] ) ? trim( $line['time'] ) : ( isset( $line['start_time'] ) ? trim( $line['start_time'] ) : '' );
+                if ( ! empty( $day_str ) && ! empty( $time_str ) ) {
+                    $label = trim( $day_str . ' ' . $time_str );
+                } elseif ( ! empty( $day_str ) ) {
+                    $label = $day_str;
+                } elseif ( ! empty( $time_str ) ) {
+                    $label = $time_str;
+                }
+            }
+        } elseif ( is_string( $line ) && trim( $line ) !== '' ) {
+            $label = trim( $line );
+        }
+
+        if ( $label === '' ) {
+            return 'Line ' . ( (int)$idx + 1 );
+        }
+
+        // Normalize line times consistently with Manage Tournaments view
+        $label = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $label );
+        $label = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $label );
+        $label = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $label );
+
+        return $label;
+    }
+}
 
 /**
  * Main Dispatcher: Registration Forms & Line Usage Component Container
@@ -73,19 +111,19 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
     function sywat_render_phone_intake_form( $selected_tournament, $available_lines ) {
         $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
-            ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
-            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
+            ? sanitize_text_field( wp_unslash( $_REQUEST['default_line_idx'] ) ) 
+            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['target_line_idx'] ) ) : 0 );
 
         $is_overflow_notice = ! empty( $GLOBALS['sywat_modal_notice'] ) && stripos( $GLOBALS['sywat_modal_notice'], 'OVERFLOW' ) !== false;
         $retain_form_data   = $is_overflow_notice || ! empty( $GLOBALS['sywat_skipped_duplicates'] ) || ! empty( $GLOBALS['sywat_skipped_full'] );
 
-        $group_name_val  = $retain_form_data && isset($_POST['group_name']) ? sanitize_text_field($_POST['group_name']) : '';
-        $group_phone_val = $retain_form_data && isset($_POST['group_phone']) ? sanitize_text_field($_POST['group_phone']) : '';
-        $amount_paid_val = $retain_form_data && isset($_POST['amount_paid_today']) ? sanitize_text_field($_POST['amount_paid_today']) : '0.00';
+        $group_name_val  = $retain_form_data && isset($_POST['group_name']) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
+        $group_phone_val = $retain_form_data && isset($_POST['group_phone']) ? sanitize_text_field( wp_unslash( $_POST['group_phone'] ) ) : '';
+        $amount_paid_val = $retain_form_data && isset($_POST['amount_paid_today']) ? sanitize_text_field( wp_unslash( $_POST['amount_paid_today'] ) ) : '0.00';
 
         $archers_data = array();
         if ( $retain_form_data && isset($_POST['archers']) && is_array($_POST['archers']) ) {
-            $archers_data = $_POST['archers'];
+            $archers_data = wp_unslash( $_POST['archers'] );
         }
 
         if ( empty( $archers_data ) ) {
@@ -127,7 +165,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                         <select name="default_line_idx" id="sywat_default_line_idx" required onchange="updateAllArcherLines(this.value)">
                             <?php foreach ( $available_lines as $idx => $line ): ?>
                                 <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
-                                    <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                    <?php echo esc_html( sywat_reg_resolve_line_label( $line, $idx ) ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -184,7 +222,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                                 <select name="archers[<?php echo $i; ?>][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
                                     <?php foreach ( $available_lines as $idx => $line ): ?>
                                         <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$a_line, (string)$idx ); ?>>
-                                            <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                            <?php echo esc_html( sywat_reg_resolve_line_label( $line, $idx ) ); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -235,8 +273,8 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
         }
 
         $current_default_line = isset( $_REQUEST['default_line_idx'] ) 
-            ? sanitize_text_field( $_REQUEST['default_line_idx'] ) 
-            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( $_REQUEST['target_line_idx'] ) : 0 );
+            ? sanitize_text_field( wp_unslash( $_REQUEST['default_line_idx'] ) ) 
+            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['target_line_idx'] ) ) : 0 );
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
@@ -255,7 +293,7 @@ if ( ! function_exists( 'sywat_render_csv_import_form' ) ) {
                         <select name="target_line_idx" id="sywat_target_line_idx" required>
                             <?php foreach ( $available_lines as $idx => $line ): ?>
                                 <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$current_default_line, (string)$idx ); ?>>
-                                    <?php echo esc_html( isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1) ); ?>
+                                    <?php echo esc_html( sywat_reg_resolve_line_label( $line, $idx ) ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -304,7 +342,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                     <tbody>
                         <?php foreach ( $available_lines as $idx => $line ): ?>
                             <?php
-                                $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ((int)$idx + 1);
+                                $line_title = sywat_reg_resolve_line_label( $line, $idx );
                                 $c_20 = sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations );
                                 $m_20 = sywat_get_line_max_cap( $line, '20yd' );
                                 $c_cub = sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations );
