@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
  * Author: SYWAT Archery
- * Version: 6.8.1
+ * Version: 6.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -25,12 +25,23 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
             ? sywat_roster_manage_base_url()
             : ( function_exists( 'sywat_page_url' ) ? sywat_page_url( 'manage_tournaments' ) : get_permalink() );
 
+        $return_to       = isset( $_REQUEST['return_to'] ) ? sanitize_key( wp_unslash( $_REQUEST['return_to'] ) ) : '';
+        $filter_line_idx = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['filter_line_idx'] ) ) : '';
+
+        $edit_action_args = array(
+            'tab'             => 'manage',
+            'view_tournament' => $selected_tournament,
+            'modal_action'    => 'manage',
+        );
+        if ( $filter_line_idx !== '' ) {
+            $edit_action_args['filter_line_idx'] = $filter_line_idx;
+        }
+        if ( ! empty( $return_to ) ) {
+            $edit_action_args['return_to'] = $return_to;
+        }
+
         $edit_form_action = add_query_arg(
-            array(
-                'tab'             => 'manage',
-                'view_tournament' => $selected_tournament,
-                'modal_action'    => 'manage',
-            ),
+            $edit_action_args,
             $manage_base_url
         );
 
@@ -88,6 +99,12 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                             <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                             <input type="hidden" name="modal_action" value="manage">
                             <input type="hidden" name="registration_id" value="<?php echo esc_attr( $target_archer['id'] ); ?>">
+                            <?php if ( $filter_line_idx !== '' ) : ?>
+                                <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
+                            <?php endif; ?>
+                            <?php if ( ! empty( $return_to ) ) : ?>
+                                <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
+                            <?php endif; ?>
 
                             <div class="sywat-form-grid-2">
                                 <div class="sywat-field-group sywat-full-width">
