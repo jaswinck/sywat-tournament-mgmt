@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, control toolbars, and dynamic TFAA target URL preview button.
+ * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -53,9 +53,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             }
         }
 
-        $selected_tournament = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( $_POST['selected_tournament'] ) : ( isset( $_GET['selected_tournament'] ) ? sanitize_text_field( $_GET['selected_tournament'] ) : '' );
-        $selected_line_idx   = isset( $_POST['selected_line_idx'] )   ? sanitize_text_field( $_POST['selected_line_idx'] )   : ( isset( $_GET['selected_line_idx'] )   ? sanitize_text_field( $_GET['selected_line_idx'] )   : 'all' );
-        $search_query        = isset( $_POST['search_query'] )        ? sanitize_text_field( $_POST['search_query'] )        : '';
+        $selected_tournament = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : ( isset( $_GET['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_GET['selected_tournament'] ) ) : '' );
+        $selected_line_idx   = isset( $_POST['selected_line_idx'] )   ? sanitize_text_field( wp_unslash( $_POST['selected_line_idx'] ) )   : ( isset( $_GET['selected_line_idx'] )   ? sanitize_text_field( wp_unslash( $_GET['selected_line_idx'] ) )   : 'all' );
+        $search_query        = isset( $_POST['search_query'] )        ? sanitize_text_field( wp_unslash( $_POST['search_query'] ) )        : '';
 
         // ALWAYS prefer global active tournament first when GET/POST is empty
         if ( empty( $selected_tournament ) ) {
@@ -160,19 +160,8 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
 
-        // Read target URL directly from saved tournament database record (Zero HTTP calls)
-        $preview_tfaa_url = 'https://texasfieldarchery.org/results';
-        if ( ! empty( $t_master['tfaa_results_url'] ) ) {
-            $preview_tfaa_url = trim( $t_master['tfaa_results_url'] );
-        } elseif ( ! empty( $t_master['tfaa_event_id'] ) ) {
-            $t_override = trim( $t_master['tfaa_event_id'] );
-            $preview_tfaa_url = is_numeric( $t_override ) ? 'https://texasfieldarchery.org/results/' . $t_override : $t_override;
-        } elseif ( ! empty( $t_master['season'] ) ) {
-            $preview_tfaa_url = 'https://texasfieldarchery.org/results?season=' . urlencode( trim( $t_master['season'] ) );
-        }
-
         // Enqueue client score interactive JavaScript asset
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.2.0', true );
+        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.3.0', true );
         ?>
 
         <div class="sywat-wrap">
@@ -362,16 +351,6 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_score_search_input').value=''; document.getElementById('sywat_score_search_input').dispatchEvent(new Event('input'));">Clear</button>
                                 </div>
 
-                                <!-- Dynamic View TFAA Page Preview Link -->
-                                <a href="<?php echo esc_url( $preview_tfaa_url ); ?>" id="sywat_tfaa_preview_btn" target="_blank" rel="noopener" class="sywat-btn sywat-btn-secondary sywat-btn-icon-external" title="Open TFAA Event Results page in a new tab to verify before syncing">
-                                    View TFAA Page ↗
-                                </a>
-
-                                <!-- Sync TFAA Event Scores Trigger -->
-                                <button type="submit" name="sywat_action" value="sync_tfaa_scores" class="sywat-btn sywat-btn-secondary sywat-btn-icon-sync" onclick="return confirm('Sync scores for \'<?php echo esc_js($selected_tournament); ?>\' directly from TFAA?');">
-                                    Sync TFAA Scores
-                                </button>
-
                                 <!-- Export CSV Button (Admin & Shop Managers) -->
                                 <?php if ( $is_admin && ! empty( $locked_lines ) ): ?>
                                     <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
@@ -449,14 +428,14 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </table>
                             </div>
 
-                            <div class="sywat-table-footer-controls">
+                            <div class="sywat-table-footer-controls" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
                                 <?php if ( $is_admin ): ?>
                                     <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                                 <?php endif; ?>
                                 <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
                             </div>
                         <?php else: ?>
-                            <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection. Click <strong>Sync TFAA Scores</strong> to pull archers and scores from TFAA.</p>
+                            <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection.</p>
                         <?php endif; ?>
                     </form>
                 </div>
