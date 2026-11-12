@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: includes/checkin/checkin-data.php
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.8.3
  */
 
 if (!defined('ABSPATH')) exit;
@@ -89,41 +89,140 @@ function sywat_desk_get_data() {
         $all_tournaments = array($single_name => get_option('sywat_line_config', array()));
     }
 
-    $tournaments = array();
-    foreach ($all_tournaments as $t_name => $t_data) {
-        $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id($t_data) : 'shop_ccr';
-        if ($is_admin || $t_shop === $user_shop_id) {
-            $tournaments[$t_name] = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : $t_data;
+    $requested_tourn   = isset($_REQUEST['selected_tournament']) ? sanitize_text_field(wp_unslash($_REQUEST['selected_tournament'])) : '';
+    $selected_line_idx = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field(wp_unslash($_REQUEST['selected_line_idx']))   : 'all';
+    $search_query      = isset($_REQUEST['search_query'])        ? sanitize_text_field(wp_unslash($_REQUEST['search_query']))        : '';
+
+    // Identify active season slugs/names so archived season events do not clutter the dropdown
+    $seasons            = function_exists('sywat_get_seasons') ? sywat_get_seasons() : get_option('sywat_seasons_list', array());
+    $active_season_keys = array();
+    if (is_array($seasons)) {
+        foreach ($seasons as $s_slug => $s_data) {
+            if (is_array($s_data) && isset($s_data['status']) && $s_data['status'] === 'active') {
+                $active_season_keys[] = strtolower(trim((string) $s_slug));
+                if (!empty($s_data['name'])) {
+                    $active_season_keys[] = strtolower(trim((string) $s_data['name']));
+                }
+            }
         }
     }
 
-    $selected_tournament = isset($_REQUEST['selected_tournament']) ? sanitize_text_field($_REQUEST['selected_tournament']) : '';
-    $selected_line_idx   = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field($_REQUEST['selected_line_idx'])   : 'all';
-    $search_query        = isset($_REQUEST['search_query'])        ? sanitize_text_field($_REQUEST['search_query'])        : '';
+    // Scope Tournaments to User's Assigned Shop & Active Season(s)
+    $scoped_raw = array();
+    foreach ($all_tournaments as $t_name => $t_data) {
+        $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id($t_data) : 'shop_ccr';
+        if (!$is_admin && $t_shop !== $user_shop_id) {
+            continue;
+        }
 
-    // ALWAYS prefer the globally active tournament first so TD and Admin stay in sync
+        $is_explicitly_requested = (!empty($requested_tourn) && strcasecmp($t_name, $requested_tourn) === 0);
+        if (!$is_explicitly_requested && !empty($active_season_keys)) {
+            $t_season = '';
+            if (is_array($t_data)) {
+                $t_season = !empty($t_data['season_slug']) ? $t_data['season_slug'] : (!empty($t_data['season']) ? $t_data['season'] : '');
+            }
+            if (!empty($t_season) && !in_array(strtolower(trim((string) $t_season)), $active_season_keys, true)) {
+                continue;
+            }
+        }
+
+        $scoped_raw[$t_name] = $t_data;
+    }
+
+    if (empty($scoped_raw)) {
+        foreach ($all_tournaments as $t_name => $t_data) {
+            $t_shop = function_exists('sywat_get_tournament_shop_id') ? sywat_get_tournament_shop_id($t_data) : 'shop_ccr';
+            if ($is_admin || $t_shop === $user_shop_id) {
+                $scoped_raw[$t_name] = $t_data;
+            }
+        }
+    }
+
+    // Sort scoped keys alphabetically (A–Z, natural case-insensitive)
+    $sorted_keys = array_keys($scoped_raw);
+    usort($sorted_keys, 'strnatcasecmp');
+
+    // Resolve selected tournament with exact or case-insensitive match
+    $selected_tournament = '';
+    if (!empty($requested_tourn)) {
+        if (isset($scoped_raw[$requested_tourn])) {
+            $selected_tournament = $requested_tourn;
+        } else {
+            foreach ($sorted_keys as $k) {
+                if (strcasecmp($k, $requested_tourn) === 0) {
+                    $selected_tournament = $k;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Prefer globally active tournament if set and no explicit request was provided
     if (empty($selected_tournament)) {
         $global_curr = get_option('sywat_current_tournament', '');
-        if (!empty($global_curr) && isset($tournaments[$global_curr])) {
+        if (!empty($global_curr) && isset($scoped_raw[$global_curr])) {
             $selected_tournament = $global_curr;
         }
     }
 
-    // Fallback to local user meta if global fails
+    // Fallback to saved user meta
     if (empty($selected_tournament) && $user->ID) {
         $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
-        if (!empty($saved_t) && isset($tournaments[$saved_t])) {
+        if (!empty($saved_t) && isset($scoped_raw[$saved_t])) {
             $selected_tournament = $saved_t;
         }
     }
 
-    if (empty($selected_tournament) && !empty($tournaments)) {
-        reset($tournaments);
-        $selected_tournament = key($tournaments);
+    // Fallback to nearest upcoming event (user shop first, then overall), else first A–Z
+    if (empty($selected_tournament) && !empty($sorted_keys)) {
+        $today_ymd     = current_time('Y-m-d');
+        $shop_upcoming = array();
+        $any_upcoming  = array();
+
+        foreach ($sorted_keys as $k) {
+            $s_date = isset($scoped_raw[$k]['start_date']) ? $scoped_raw[$k]['start_date'] : '';
+            if (!empty($s_date) && $s_date >= $today_ymd) {
+                $any_upcoming[$k] = $s_date;
+                $t_shop = function_exists('sywat_get_tournament_shop_id')
+                    ? (string) sywat_get_tournament_shop_id($scoped_raw[$k])
+                    : (isset($scoped_raw[$k]['shop_id']) ? (string) $scoped_raw[$k]['shop_id'] : '');
+                if (!empty($user_shop_id) && $t_shop === (string) $user_shop_id) {
+                    $shop_upcoming[$k] = $s_date;
+                }
+            }
+        }
+
+        if (!empty($shop_upcoming)) {
+            asort($shop_upcoming);
+            reset($shop_upcoming);
+            $selected_tournament = key($shop_upcoming);
+        } elseif (!empty($any_upcoming)) {
+            asort($any_upcoming);
+            reset($any_upcoming);
+            $selected_tournament = key($any_upcoming);
+        } else {
+            $selected_tournament = $sorted_keys[0];
+        }
     }
 
     if ($user->ID && !empty($selected_tournament)) {
         update_user_meta($user->ID, 'sywat_desk_selected_tournament', $selected_tournament);
+    }
+
+    // Build ordered $tournaments map: selected tournament pinned at the top, remaining sorted A–Z
+    $tournaments = array();
+    if (!empty($selected_tournament) && isset($scoped_raw[$selected_tournament])) {
+        $tournaments[$selected_tournament] = function_exists('sywat_get_tournament_lines')
+            ? sywat_get_tournament_lines($scoped_raw[$selected_tournament])
+            : $scoped_raw[$selected_tournament];
+    }
+    foreach ($sorted_keys as $t_name) {
+        if ($t_name === $selected_tournament) {
+            continue;
+        }
+        $tournaments[$t_name] = function_exists('sywat_get_tournament_lines')
+            ? sywat_get_tournament_lines($scoped_raw[$t_name])
+            : $scoped_raw[$t_name];
     }
 
     $lines         = isset($tournaments[$selected_tournament]) ? $tournaments[$selected_tournament] : array();
@@ -272,8 +371,8 @@ function sywat_desk_get_data() {
         return strcasecmp(isset($a['name']) ? trim($a['name']) : '', isset($b['name']) ? trim($b['name']) : '');
     });
 
-    $modal_target_id = isset($_POST['open_checkin_id']) ? sanitize_text_field($_POST['open_checkin_id']) : '';
-    $modal_edit_id   = isset($_POST['open_edit_id']) ? sanitize_text_field($_POST['open_edit_id']) : '';
+    $modal_target_id = isset($_POST['open_checkin_id']) ? sanitize_text_field(wp_unslash($_POST['open_checkin_id'])) : '';
+    $modal_edit_id   = isset($_POST['open_edit_id']) ? sanitize_text_field(wp_unslash($_POST['open_edit_id'])) : '';
     $modal_archer    = null;
     $modal_edit_archer = null;
     
