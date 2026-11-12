@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
- * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, Household Link Overlays, Edit Board Member Position Overlays, Head of Household Edit Overlays with URL query state preservation, and Collapsible Standalone Account Conversion Drawers with instant blur focus release), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
- * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
+ * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, Household Link Overlays, Edit Board Member Position Overlays, Head of Household Edit Overlays with URL query state preservation, Collapsible Standalone Account Conversion Drawers with instant blur focus release, and Temporary POC TFAA Reconciliation Modal listeners), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
+ * Compliance: Zero inline style manipulation on new handlers. Uses class toggles (.active, .sywat-hidden, etc.) and delegated listeners.
  * Author: SYWAT Archery
- * Version: 5.3.0
+ * Version: 5.3.1
  */
 
 /**
@@ -674,6 +674,44 @@ function sywatResetBoardSearch() {
     }
     sywatApplyBoardSearch();
 }
+
+/**
+ * Temporary POC Delegated Listeners: TFAA Gender & Pro Reconciliation Modal
+ */
+document.addEventListener('click', function(e) {
+    const closeTrigger = e.target.closest('[data-sywat-action="close-reconcile-modal"]');
+    if (closeTrigger) {
+        const modal = document.getElementById('sywat_tfaa_reconcile_modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.delete('reconcile_tfaa');
+        window.history.replaceState({}, document.title, url.toString());
+    }
+});
+
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'sywat_reconcile_select_all') {
+        const checked = e.target.checked;
+        document.querySelectorAll('.sywat-reconcile-target-cb').forEach(function(cb) {
+            cb.checked = checked;
+        });
+    }
+
+    if (e.target && e.target.classList.contains('sywat-unmatched-action-select')) {
+        const normKey = e.target.getAttribute('data-norm-key') || '';
+        const safeKey = normKey.replace(/[^a-zA-Z0-9_-]/g, '');
+        const mapSelect = document.getElementById('sywat_map_target_' + safeKey);
+        if (mapSelect) {
+            const isMapping = (e.target.value === 'map_member');
+            mapSelect.disabled = !isMapping;
+            if (!isMapping) {
+                mapSelect.value = '';
+            }
+        }
+    }
+});
 
 /**
  * Handles DOM load initializations: shop visibility state check, notice auto-dismissal, form submit handlers, and AJAX stream progress modal triggers.
