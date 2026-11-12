@@ -5,7 +5,7 @@
  * Description: Main loader binding public/admin shortcode [sywat_members], registering sub-module data engines, helper utilities, action processors, and modals, and enqueuing sub-module assets.
  * Compliance: Registers script hooks for external JS asset loading. Requires data layer separation.
  * Author: SYWAT Archery
- * Version: 4.1.0
+ * Version: 4.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,6 +17,14 @@ require_once plugin_dir_path( __FILE__ ) . 'members-actions.php';
 require_once plugin_dir_path( __FILE__ ) . 'import/archers-importer.php';
 require_once plugin_dir_path( __FILE__ ) . 'members-views.php';
 require_once plugin_dir_path( __FILE__ ) . 'members-modals.php';
+
+// Temporary POC Sub-Module: TFAA Gender & Pro Status Reconciliation (Remove Post-POC)
+if ( file_exists( plugin_dir_path( __FILE__ ) . 'reconcile/tfaa-reconcile-engine.php' ) ) {
+    require_once plugin_dir_path( __FILE__ ) . 'reconcile/tfaa-reconcile-engine.php';
+}
+if ( file_exists( plugin_dir_path( __FILE__ ) . 'reconcile/modal-tfaa-reconcile.php' ) ) {
+    require_once plugin_dir_path( __FILE__ ) . 'reconcile/modal-tfaa-reconcile.php';
+}
 
 /**
  * Enqueue JavaScript assets for the Member Management sub-module.
@@ -31,7 +39,7 @@ if ( ! function_exists( 'sywat_enqueue_members_assets' ) ) {
 
         $js_url  = $plugin_root_url . 'assets/js/sywat-members.js';
         $js_path = $plugin_root_path . 'assets/js/sywat-members.js';
-        $version = file_exists( $js_path ) ? filemtime( $js_path ) : '4.1.0';
+        $version = file_exists( $js_path ) ? filemtime( $js_path ) : '4.1.1';
 
         wp_enqueue_script(
             'sywat-members-js',
