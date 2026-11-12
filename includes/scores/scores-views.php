@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -147,21 +147,13 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             return strcasecmp( $name_a, $name_b );
         } );
 
-        // Check host shop & active Volunteer Hub status for dynamic return button
-        $t_master  = ( is_array( $all_tournaments ) && isset( $all_tournaments[$selected_tournament] ) ) ? $all_tournaments[$selected_tournament] : array();
-        $t_shop_id = 'shop_ccr';
-        if ( is_array( $t_master ) && isset( $t_master['shop_id'] ) && ! empty( $t_master['shop_id'] ) ) {
-            $t_shop_id = $t_master['shop_id'];
-        } elseif ( function_exists( 'sywat_get_tournament_shop_id' ) ) {
-            $t_shop_id = sywat_get_tournament_shop_id( $t_master );
-        }
-
+        // Check active Volunteer Hub status across all host shops for dynamic return button
         $active_hubs    = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_hubs ) ) $active_hubs = array();
-        $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_tournament, $active_hubs );
+        $is_hub_enabled = in_array( $selected_tournament, $active_hubs );
 
         // Enqueue client score interactive JavaScript asset
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.3.0', true );
+        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.3.1', true );
         ?>
 
         <div class="sywat-wrap">
