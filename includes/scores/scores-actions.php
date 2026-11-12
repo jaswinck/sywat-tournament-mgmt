@@ -4,15 +4,10 @@
  * Path: includes/scores/scores-actions.php
  * Description: Pure POST request processing, AJAX autosave endpoints, batch score saves, and line lock management.
  * Author: SYWAT Archery
- * Version: 11.1.0
+ * Version: 11.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
-
-// Ensure shared sync engine is available
-if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php' ) ) {
-    require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
-}
 
 /**
  * Handles real-time single score AJAX auto-save request from client.
@@ -20,14 +15,14 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) && file_exists( SYWAT_P
 if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
     function sywat_scores_handle_ajax_autosave() {
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'autosave_single_score' ) {
-            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_scores_action' ) ) {
+            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) ) {
                 wp_send_json_error( array( 'message' => 'Security token expired' ) );
             }
 
-            $clean_id   = sanitize_text_field( $_POST['reg_id'] );
-            $score_str  = isset( $_POST['score'] ) ? trim( $_POST['score'] ) : '';
-            $x_str      = isset( $_POST['x_count'] ) ? trim( $_POST['x_count'] ) : '';
-            $tourn_name = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( $_POST['selected_tournament'] ) : '';
+            $clean_id   = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
+            $score_str  = isset( $_POST['score'] ) ? trim( wp_unslash( $_POST['score'] ) ) : '';
+            $x_str      = isset( $_POST['x_count'] ) ? trim( wp_unslash( $_POST['x_count'] ) ) : '';
+            $tourn_name = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : '';
 
             if ( $score_str !== '' && ( intval( $score_str ) < 0 || intval( $score_str ) > 300 ) ) {
                 wp_send_json_error( array( 'message' => 'Score out of range (0-300)' ) );
@@ -72,15 +67,15 @@ if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
 }
 
 /**
- * Processes batch score save, line locks, score reset, and TFAA event score sync POST requests.
+ * Processes batch score save, line locks, and score reset POST requests.
  */
 if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
     function sywat_scores_handle_batch_actions( $selected_tournament, $selected_line_idx, $is_admin, &$locked_lines, &$current_view_locked ) {
         global $wpdb;
         $notice = '';
 
-        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_scores_action' ) );
-        $action         = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) );
+        $action         = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
 
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'autosave_single_score' ) {
             return '<div class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
@@ -88,18 +83,6 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
 
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
             $active_t_slug = sanitize_title( $selected_tournament );
-
-            // Action: Sync Single TFAA Event Scores (Calls Shared Engine)
-            if ( $action === 'sync_tfaa_scores' ) {
-                if ( function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
-                    $res = sywat_sync_tfaa_event_scores( $selected_tournament );
-                    if ( ! empty( $res['success'] ) ) {
-                        return '<div class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
-                    } else {
-                        return '<div class="sywat-alert sywat-alert-danger">⚠️ Sync Failed: ' . esc_html( $res['message'] ) . '</div>';
-                    }
-                }
-            }
 
             // Action: Toggle Line Lock
             if ( $action === 'toggle_lock' ) {
@@ -178,16 +161,16 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                 ) );
 
                 foreach ( $submitted_ids as $id ) {
-                    $clean_id = sanitize_text_field( $id );
-                    if ( isset( $_POST['scores'][$clean_id] ) ) {
-                        $score_str = trim( $_POST['scores'][$clean_id] );
+                    $clean_id = sanitize_text_field( wp_unslash( $id ) );
+                    if ( isset( $_POST['scores'][$id] ) ) {
+                        $score_str = trim( wp_unslash( $_POST['scores'][$id] ) );
                         if ( $score_str !== '' ) {
                             $s_val = intval( $score_str );
                             if ( $s_val < 0 || $s_val > 300 ) { $has_invalid_data = true; break; }
                         }
                     }
-                    if ( isset( $_POST['x_counts'][$clean_id] ) ) {
-                        $x_str = trim( $_POST['x_counts'][$clean_id] );
+                    if ( isset( $_POST['x_counts'][$id] ) ) {
+                        $x_str = trim( wp_unslash( $_POST['x_counts'][$id] ) );
                         if ( $x_str !== '' ) {
                             $x_val = intval( $x_str );
                             if ( $x_val < 0 || $x_val > 60 ) { $has_invalid_data = true; break; }
@@ -205,7 +188,7 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                     if ( ! is_array( $scores_map ) ) $scores_map = array();
 
                     foreach ( $submitted_ids as $id ) {
-                        $clean_id = sanitize_text_field( $id );
+                        $clean_id = sanitize_text_field( wp_unslash( $id ) );
                         $opt_key  = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
                         $reg      = get_option( $opt_key );
 
@@ -214,12 +197,12 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                                 continue;
                             }
 
-                            if ( isset( $_POST['scores'][$clean_id] ) ) {
-                                $raw_score = trim( $_POST['scores'][$clean_id] );
+                            if ( isset( $_POST['scores'][$id] ) ) {
+                                $raw_score = trim( wp_unslash( $_POST['scores'][$id] ) );
                                 $reg['score'] = ( $raw_score !== '' ) ? intval( $raw_score ) : 0;
                             }
-                            if ( isset( $_POST['x_counts'][$clean_id] ) ) {
-                                $raw_x = trim( $_POST['x_counts'][$clean_id] );
+                            if ( isset( $_POST['x_counts'][$id] ) ) {
+                                $raw_x = trim( wp_unslash( $_POST['x_counts'][$id] ) );
                                 $reg['x_count'] = ( $raw_x !== '' ) ? intval( $raw_x ) : 0;
                             }
 
