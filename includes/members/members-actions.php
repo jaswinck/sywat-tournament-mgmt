@@ -5,7 +5,7 @@
  * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings in fallback role map), high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 5.1.0
+ * Version: 5.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -190,6 +190,11 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
         }
 
         $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+
+        // TEMPORARY POC HOOK: TFAA GENDER & PRO STATUS RECONCILIATION (Remove Post-POC)
+        if ( $action === 'reconcile_tfaa_data' && function_exists( 'sywat_handle_tfaa_reconcile_post' ) ) {
+            return sywat_handle_tfaa_reconcile_post();
+        }
 
         // 0. 2-STEP BATCH HISTORICAL ARCHERS SPREADSHEET IMPORT HANDLER
         if ( $action === 'import_archers_spreadsheet' ) {
