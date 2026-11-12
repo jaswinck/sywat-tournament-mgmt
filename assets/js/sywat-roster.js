@@ -84,7 +84,7 @@
     /**
      * Enforce Division vs. Shooting Style Restrictions
      */
-    window.handleStyleRestrictions = function(type) {
+    window.sywatRosterHandleStyleRestrictions = function(type) {
         const divisionEl = document.getElementById(type + '_division');
         const styleEl    = document.getElementById(type + '_style');
         if (!divisionEl || !styleEl) return;
@@ -129,7 +129,7 @@
     /**
      * Division Change Event Handler
      */
-    window.handleDivisionChange = function(type) {
+    window.sywatRosterHandleDivisionChange = function(type) {
         const divisionEl = document.getElementById(type + '_division');
         const distDispEl = document.getElementById(type + '_distance_display');
         if (!divisionEl) return;
@@ -140,7 +140,7 @@
         }
 
         window.updatePaidStatusDisplay(type);
-        window.handleStyleRestrictions(type);
+        window.sywatRosterHandleStyleRestrictions(type);
     };
 
     /**
@@ -149,7 +149,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize division rules for edit modal if open
         if (document.getElementById('edit_division')) {
-            window.handleDivisionChange('edit');
+            window.sywatRosterHandleDivisionChange('edit');
         }
 
         // Live Search Filter for Archer Roster Table

@@ -734,3 +734,72 @@ document.addEventListener('click', function(e) {
         closeAllDeskTfaaAutocompletes();
     }
 });
+
+/* ==========================================================================
+   Desk page behaviour (moved from includes/checkin/checkin-views.php)
+   ========================================================================== */
+if ( window.history.replaceState ) {
+    window.history.replaceState( null, null, window.location.href );
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // Persistent Archer Search Query Retention & Dynamic Table Filter
+    const searchInput = document.getElementById('sywat_search_input');
+    
+    function applySearchFilter(query) {
+        const cleanQuery = query.trim().toLowerCase();
+        const rows = document.querySelectorAll('.sywat-archer-row');
+        
+        rows.forEach(function(row) {
+            const archerName = row.getAttribute('data-name') || '';
+            if (!cleanQuery || archerName.includes(cleanQuery)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Sync hidden search fields across all forms on the page
+        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
+            hiddenInput.value = query;
+        });
+
+        // Store query in sessionStorage for retention across action posts
+        if (query) {
+            sessionStorage.setItem('sywat_checkin_search_query', query);
+        } else {
+            sessionStorage.removeItem('sywat_checkin_search_query');
+        }
+    }
+
+    if (searchInput) {
+        let initialQuery = searchInput.value;
+        if (!initialQuery) {
+            const savedQuery = sessionStorage.getItem('sywat_checkin_search_query');
+            if (savedQuery) {
+                initialQuery = savedQuery;
+                searchInput.value = savedQuery;
+            }
+        }
+
+        if (initialQuery) {
+            applySearchFilter(initialQuery);
+        }
+
+        searchInput.addEventListener('input', function() {
+            applySearchFilter(this.value);
+        });
+    }
+
+    // Auto-dismiss standard notices after 4 seconds
+    setTimeout(function() {
+        const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
+        notices.forEach(function(notice) {
+            notice.style.transition = 'opacity 0.5s ease, margin-bottom 0.5s ease';
+            notice.style.opacity = '0';
+            setTimeout(function() {
+                notice.style.display = 'none';
+            }, 500);
+        });
+    }, 4000);
+});

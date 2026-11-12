@@ -23,6 +23,9 @@ require_once plugin_dir_path( __FILE__ ) . 'members-modals.php';
  */
 if ( ! function_exists( 'sywat_enqueue_members_assets' ) ) {
     function sywat_enqueue_members_assets() {
+        if ( ! function_exists( 'sywat_should_load_module_assets' ) || ! sywat_should_load_module_assets() ) {
+            return;
+        }
         $plugin_root_url  = plugin_dir_url( dirname( dirname( __FILE__ ) ) );
         $plugin_root_path = plugin_dir_path( dirname( dirname( __FILE__ ) ) );
 
@@ -40,7 +43,6 @@ if ( ! function_exists( 'sywat_enqueue_members_assets' ) ) {
     }
 }
 add_action( 'wp_enqueue_scripts', 'sywat_enqueue_members_assets' );
-add_action( 'admin_enqueue_scripts', 'sywat_enqueue_members_assets' );
 
 // Shortcode Registration
 if ( shortcode_exists( 'sywat_members' ) ) {

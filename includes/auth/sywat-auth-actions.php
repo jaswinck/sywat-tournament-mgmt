@@ -15,17 +15,18 @@ if ( ! function_exists( 'sywat_get_post_login_redirect_url' ) ) {
     function sywat_get_post_login_redirect_url( $user ) {
         // 1. If user was attempting to access a specific protected page, respect that destination
         if ( ! empty( $_REQUEST['redirect_to'] ) ) {
-            return esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) );
+            // Only allow same-site destinations (prevents open redirects).
+            return wp_validate_redirect( esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ), home_url() );
         }
 
         // 2. Administrators, TFAA Board Members, Directors & Shop Managers -> Tournaments Admin Page
         if ( function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user->ID ) ) {
-            return site_url( '/tournaments' );
+            return sywat_page_url( 'after_login_manager' );
         }
 
         // 3. Shop Operators -> Check-In Desk Page
         if ( function_exists( 'sywat_user_has_any_role' ) && sywat_user_has_any_role( array( 'sywat_shop_user' ), $user->ID ) ) {
-            return site_url( '/desk' );
+            return sywat_page_url( 'after_login_shop' );
         }
 
         // 4. Default: Standard TFAA Members & All Other Roles -> Main Site Homepage

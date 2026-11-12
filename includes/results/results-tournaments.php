@@ -149,7 +149,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                     <td class="sywat-col-right">
                                         <div class="sywat-table-actions">
                                             <?php if ( $can_edit_scores ): ?>
-                                                <a href="/sywat-enter-scores/?selected_tournament=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit" title="Jump to Score Entry Desk">Enter Scores</a>
+                                                <a href="<?php echo esc_url( add_query_arg( 'selected_tournament', rawurlencode( $t_name ), sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit" title="Jump to Score Entry Desk">Enter Scores</a>
                                             <?php endif; ?>
 
                                             <?php if ( $scores_count > 0 ): ?>
@@ -167,7 +167,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
             <?php endif; ?>
         </div>
 
-        <script>
+        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
         function sywatApplyDirectoryFilters() {
             const shopSelect   = document.getElementById('sywat_dir_shop_filter');
             const searchInput  = document.getElementById('sywat_dir_search_input');
@@ -510,7 +510,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 </div>
             </div>
 
-            <script>
+            <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
             function openResultsEditModal(regId, name, division, gender, style, score, xCount) {
                 document.getElementById('edit_modal_reg_id').value   = regId;
                 document.getElementById('edit_modal_name').value     = name;
@@ -540,7 +540,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             </script>
         <?php endif; ?>
 
-        <script>
+        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
         function sywatApplyTournFilters() {
             const divFilter   = document.getElementById('sywat_tourn_filter_div').value.toLowerCase().trim();
             const genFilter   = document.getElementById('sywat_tourn_filter_gen').value.toLowerCase().trim();

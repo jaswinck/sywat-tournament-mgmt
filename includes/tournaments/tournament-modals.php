@@ -325,7 +325,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             </div>
         </div>
 
-        <script>
+        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
         var sywatNameIsCustomized = false;
         var sywatNameIsUnlocked   = false;
 

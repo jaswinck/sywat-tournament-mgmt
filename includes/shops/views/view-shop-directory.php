@@ -436,7 +436,7 @@ uasort( $filtered_shops, function( $a, $b ) {
     </div>
 </div>
 
-<script>
+<script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
 function openImportShopsModal() {
     var modal = document.getElementById('importShopsModal');
     if (modal) modal.style.display = 'flex';

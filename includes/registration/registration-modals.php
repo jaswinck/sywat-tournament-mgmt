@@ -386,7 +386,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                         'modal_action'    => 'manage',
                                         'filter_line_idx' => $idx,
                                     ),
-                                    site_url( '/sywat-manage-tournaments/' )
+                                    sywat_page_url( 'manage_tournaments' )
                                 );
                             ?>
                             <tr>

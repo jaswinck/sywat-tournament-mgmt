@@ -150,7 +150,7 @@ function sywat_desk_handle_actions(&$data) {
         if ($is_duplicate) {
             $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js($name_val) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
             return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html($name_val) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
-                   '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
+                   '<script ' . SYWAT_SCRIPT_OPTOUT_ATTRS . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
         }
 
         $new_id    = uniqid('reg_');
@@ -414,7 +414,7 @@ function sywat_desk_handle_actions(&$data) {
                 if ($dupe_found) {
                     $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js($edit_name) . ' is already registered on this shooting line.';
                     return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html($edit_name) . '</strong> is already registered on this shooting line.</div>' .
-                           '<script>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
+                           '<script ' . SYWAT_SCRIPT_OPTOUT_ATTRS . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
                 }
             }
 

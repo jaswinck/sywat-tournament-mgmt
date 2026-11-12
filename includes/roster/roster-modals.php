@@ -89,7 +89,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
 
                                 <div class="sywat-field-group">
                                     <label for="edit_division">Division</label>
-                                    <select name="edit_division" id="edit_division" required onchange="handleDivisionChange('edit');">
+                                    <select name="edit_division" id="edit_division" required onchange="sywatRosterHandleDivisionChange('edit');">
                                         <?php foreach ( $divs as $d ): ?>
                                             <option value="<?php echo esc_attr( $d ); ?>" <?php selected( $curr_div, $d ); ?>>
                                                 <?php echo esc_html( $d ); ?>

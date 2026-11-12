@@ -5,7 +5,7 @@
 
 .sywat-public-card {
     background: #ffffff;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -13,8 +13,8 @@
 }
 
 .sywat-filter-bar {
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
+    background: var(--sywat-surface-alt);
+    border: 1px solid var(--sywat-border);
     border-radius: 8px;
     padding: 15px;
     margin-bottom: 25px;
@@ -59,7 +59,7 @@
 /* Leaderboard & Division Cards */
 .sywat-div-gen-card {
     margin-bottom: 30px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 8px;
     overflow: hidden;
     background: #ffffff;
@@ -67,7 +67,7 @@
 }
 
 .sywat-div-gen-header {
-    background: #1e3a8a;
+    background: var(--sywat-heading);
     color: #ffffff;
     padding: 12px 18px;
     font-weight: 800;
@@ -80,7 +80,7 @@
 .sywat-style-block:last-child { margin-bottom: 5px; }
 
 .sywat-single-category-header {
-    background: #1e3a8a;
+    background: var(--sywat-heading);
     color: #ffffff;
     padding: 10px 14px;
     font-size: 14px;
@@ -95,8 +95,8 @@
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 700;
-    color: #0f172a;
-    background: #e2e8f0;
+    color: var(--sywat-navy);
+    background: var(--sywat-border-light);
     padding: 8px 14px;
     border-left: 5px solid #2563eb;
     border-radius: 0 6px 6px 0;
@@ -106,9 +106,9 @@
     text-align: left;
 }
 
-.sywat-shop-location { font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px; }
+.sywat-shop-location { font-size: 12px; color: var(--sywat-primary); font-weight: 600; margin-top: 2px; }
 .sywat-empty-notice { color: #646970; font-style: italic; padding: 20px 0; }
-.sywat-badge-pending { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 6px 12px; font-size: 12px; }
+.sywat-badge-pending { background: var(--sywat-surface-muted); color: var(--sywat-text-subtle); border: 1px solid var(--sywat-border); padding: 6px 12px; font-size: 12px; }
 
 @media (max-width: 768px) {
     .sywat-filter-bar .sywat-field-group { flex: 1 1 100% !important; width: 100% !important; }

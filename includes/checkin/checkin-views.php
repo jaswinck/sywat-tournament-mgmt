@@ -62,12 +62,12 @@ function sywat_desk_render_filter_bar($data) {
     ?>
     <!-- Master Navigation Tabs (Card-Docked) -->
     <div class="sywat-nav-tabs no-print">
-        <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-        <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
-        <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
-        <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+        <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+        <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+        <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
+        <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
         <?php if ( $can_manage_seasons ): ?>
-            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
+            <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
         <?php endif; ?>
     </div>
 
@@ -111,7 +111,7 @@ function sywat_desk_render_filter_bar($data) {
                 </form>
 
                 <?php if ($is_hub_enabled): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
+                    <a href="<?php echo esc_url( sywat_page_url( 'volunteer_hub' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -419,72 +419,6 @@ function sywat_desk_render_archers_table($data) {
     </div>
     <?php
 }
-?>
-
-<script>
-if ( window.history.replaceState ) {
-    window.history.replaceState( null, null, window.location.href );
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    // Persistent Archer Search Query Retention & Dynamic Table Filter
-    const searchInput = document.getElementById('sywat_search_input');
-    
-    function applySearchFilter(query) {
-        const cleanQuery = query.trim().toLowerCase();
-        const rows = document.querySelectorAll('.sywat-archer-row');
-        
-        rows.forEach(function(row) {
-            const archerName = row.getAttribute('data-name') || '';
-            if (!cleanQuery || archerName.includes(cleanQuery)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        // Sync hidden search fields across all forms on the page
-        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
-            hiddenInput.value = query;
-        });
-
-        // Store query in sessionStorage for retention across action posts
-        if (query) {
-            sessionStorage.setItem('sywat_checkin_search_query', query);
-        } else {
-            sessionStorage.removeItem('sywat_checkin_search_query');
-        }
-    }
-
-    if (searchInput) {
-        let initialQuery = searchInput.value;
-        if (!initialQuery) {
-            const savedQuery = sessionStorage.getItem('sywat_checkin_search_query');
-            if (savedQuery) {
-                initialQuery = savedQuery;
-                searchInput.value = savedQuery;
-            }
-        }
-
-        if (initialQuery) {
-            applySearchFilter(initialQuery);
-        }
-
-        searchInput.addEventListener('input', function() {
-            applySearchFilter(this.value);
-        });
-    }
-
-    // Auto-dismiss standard notices after 4 seconds
-    setTimeout(function() {
-        const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
-        notices.forEach(function(notice) {
-            notice.style.transition = 'opacity 0.5s ease, margin-bottom 0.5s ease';
-            notice.style.opacity = '0';
-            setTimeout(function() {
-                notice.style.display = 'none';
-            }, 500);
-        });
-    }, 4000);
-});
-</script>
+// Page behaviour (search retention, notice auto-dismiss, resubmit guard) lives in
+// assets/js/sywat-checkin.js. It used to be printed here at file-include time,
+// which emitted a <script> block on EVERY request (all pages, AJAX, REST, feeds).

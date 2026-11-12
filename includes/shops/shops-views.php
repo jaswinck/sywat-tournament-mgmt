@@ -22,7 +22,7 @@ if ( ! function_exists( 'sywat_render_shops_tab' ) ) {
         // Enqueue Module JavaScript
         wp_enqueue_script( 'sywat-shops-js', plugin_dir_url( dirname( __DIR__ ) ) . 'assets/js/sywat-shops.js', array(), '1.0.0', true );
 
-        $page_url        = site_url( '/sywat-manage-shops/' );
+        $page_url        = sywat_page_url( 'manage_shops' );
         $notice          = sywat_handle_shop_actions();
         $all_shops       = sywat_get_shops();
 

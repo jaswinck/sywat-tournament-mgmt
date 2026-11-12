@@ -38,13 +38,13 @@
 .sywat-btn-primary,
 .sywat-btn-secondary {
     background-color: #ffffff;
-    border: 1px solid #0284c7;
-    color: #0284c7 !important;
+    border: 1px solid var(--sywat-primary);
+    color: var(--sywat-primary) !important;
 }
 .sywat-btn-primary:hover,
 .sywat-btn-secondary:hover {
-    background-color: #0284c7;
-    border-color: #0284c7;
+    background-color: var(--sywat-primary);
+    border-color: var(--sywat-primary);
     color: #ffffff !important;
 }
 
@@ -119,23 +119,23 @@
 
 .sywat-btn-push {
     background-color: #ffffff;
-    border: 1px solid #475569;
-    color: #475569 !important;
+    border: 1px solid var(--sywat-text-muted);
+    color: var(--sywat-text-muted) !important;
 }
 .sywat-btn-push:hover {
-    background-color: #475569;
-    border-color: #475569;
+    background-color: var(--sywat-text-muted);
+    border-color: var(--sywat-text-muted);
     color: #ffffff !important;
 }
 
 .sywat-btn-global-push {
     background-color: #ffffff;
-    border: 1px solid #0f172a;
-    color: #0f172a !important;
+    border: 1px solid var(--sywat-navy);
+    color: var(--sywat-navy) !important;
 }
 .sywat-btn-global-push:hover {
-    background-color: #0f172a;
-    border-color: #0f172a;
+    background-color: var(--sywat-navy);
+    border-color: var(--sywat-navy);
     color: #ffffff !important;
 }
 
@@ -163,7 +163,7 @@
 
 /* Special Pill Buttons & Action Triggers */
 .sywat-btn-pill {
-    background-color: #0284c7;
+    background-color: var(--sywat-primary);
     color: #ffffff !important;
     border: none;
     padding: 4px 8px;
@@ -174,7 +174,7 @@
     transition: background-color 0.15s ease;
 }
 .sywat-btn-pill:hover {
-    background-color: #0369a1;
+    background-color: var(--sywat-primary-dark);
 }
 
 .sywat-btn-use-official {

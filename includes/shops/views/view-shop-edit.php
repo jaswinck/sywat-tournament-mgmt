@@ -9,7 +9,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
-$fallback_list_url  = $can_manage_seasons ? add_query_arg( 'type', $type_filter, $page_url ) : site_url( '/shops-and-clubs/' );
+$fallback_list_url  = $can_manage_seasons ? add_query_arg( 'type', $type_filter, $page_url ) : sywat_page_url( 'shops_public' );
 
 $curr_fac       = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
 $curr_dist      = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';

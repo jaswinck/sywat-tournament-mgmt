@@ -203,7 +203,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             <?php endif; ?>
         </div>
 
-        <script>
+        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
         function sywatApplyStandingsFilters() {
             const divFilter   = document.getElementById('sywat_standings_filter_div').value.toLowerCase().trim();
             const genFilter   = document.getElementById('sywat_standings_filter_gen').value.toLowerCase().trim();

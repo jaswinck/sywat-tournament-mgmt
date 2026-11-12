@@ -223,7 +223,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     return '<div class="sywat-alert sywat-alert-info">🔍 <strong>File Audited:</strong> Review the batch archer mapping details in the pop-up modal below.</div>';
                 }
             } elseif ( $import_mode === 'commit' ) {
-                $persistent_file = isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( $_POST['persistent_file_path'] ) : '';
+                $persistent_file = function_exists( 'sywat_validate_import_path' ) ? sywat_validate_import_path( isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['persistent_file_path'] ) ) : '' ) : '';
 
                 if ( empty( $persistent_file ) || ! file_exists( $persistent_file ) ) {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Staged upload file missing or expired. Please upload the spreadsheet again.</div>';
