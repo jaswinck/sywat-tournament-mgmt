@@ -3,7 +3,7 @@
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
  * Author: SYWAT Archery
- * Version: 7.18.3
+ * Version: 7.18.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -27,14 +27,14 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $registrations      = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : array();
 
         $notice     = '';
-        $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( $_REQUEST['tab'] ) : 'manage';
+        $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['tab'] ) ) : 'manage';
 
         // 2. Execute POST Actions FIRST (Before rendering data load)
-        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) )
-                       || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_import_schedule_nonce'], 'sywat_import_schedule_nonce' ) )
-                       || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( $_POST['sywat_confirm_schedule_nonce'], 'sywat_confirm_schedule_nonce' ) );
+        $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_desk_action' ) )
+                       || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_import_schedule_nonce'] ) ), 'sywat_import_schedule_nonce' ) )
+                       || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_confirm_schedule_nonce'] ) ), 'sywat_confirm_schedule_nonce' ) );
 
-        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( $_POST['sywat_action'] ) : '';
+        $action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
 
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'cancel' ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
@@ -61,7 +61,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $tfaa_count         = $data['tfaa_count'];
 
         // Enforce active season selection (No "All Seasons" option)
-        $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : '';
+        $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_season'] ) ) : '';
         if ( empty( $selected_season ) && ! empty( $seasons ) ) {
             foreach ( $seasons as $s_slug => $s_data ) {
                 if ( is_array( $s_data ) && isset( $s_data['status'] ) && $s_data['status'] === 'active' ) {
@@ -278,8 +278,6 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 }
                                             }
 
-                                            $is_ccr = ( strcasecmp( trim( $t_shop_name ), 'Cinnamon Creek Ranch' ) === 0 || $t_shop_id === 'shop_ccr' );
-
                                             $s_date        = ( is_array( $t_data ) && isset( $t_data['start_date'] ) ) ? $t_data['start_date'] : '';
                                             $e_date        = ( is_array( $t_data ) && isset( $t_data['end_date'] ) ) ? $t_data['end_date'] : '';
                                             $disp_dates    = sywat_format_tournament_dates( $s_date, $e_date );
@@ -312,22 +310,18 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <div class="sywat-tourn-tfaa-link sywat-label-subtext">🔗 TFAA Link: Pending</div>
                                                 <?php endif; ?>
 
-                                                <!-- Volunteer Hub Toggle Chip -->
+                                                <!-- Volunteer Hub Toggle Chip (Available to All Host Shops, Hidden by Default) -->
                                                 <div class="sywat-table-action-form">
-                                                    <?php if ( $is_ccr ): ?>
-                                                        <form method="post" class="sywat-table-action-form">
-                                                            <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                            <input type="hidden" name="sywat_action" value="toggle_active_tournament">
-                                                            <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
-                                                            <?php if ( $is_active_hub ): ?>
-                                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-sm" title="Visible in Volunteer Hub">🟢 Hub Active</button>
-                                                            <?php else: ?>
-                                                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
-                                                            <?php endif; ?>
-                                                        </form>
-                                                    <?php else: ?>
-                                                        <span class="sywat-hub-chip-na">Hub: N/A</span>
-                                                    <?php endif; ?>
+                                                    <form method="post" class="sywat-table-action-form">
+                                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                                        <input type="hidden" name="sywat_action" value="toggle_active_tournament">
+                                                        <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                        <?php if ( $is_active_hub ): ?>
+                                                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-sm" title="Visible in Volunteer Hub">🟢 Hub Active</button>
+                                                        <?php else: ?>
+                                                            <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
+                                                        <?php endif; ?>
+                                                    </form>
                                                 </div>
                                             </td>
 
