@@ -3,7 +3,7 @@
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
  * Author: SYWAT Archery
- * Version: 6.8.1
+ * Version: 6.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -70,15 +70,28 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
     function sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer = '', $tournaments = array() ) {
 
         $manage_base_url = sywat_roster_manage_base_url();
-        $roster_post_url = add_query_arg(
-            array(
-                'tab'             => 'manage',
-                'view_tournament' => $selected_tournament,
-                'modal_action'    => 'manage',
-                'filter_line_idx' => $filter_line_idx,
-            ),
-            $manage_base_url
+        $return_to       = isset( $_REQUEST['return_to'] ) ? sanitize_key( wp_unslash( $_REQUEST['return_to'] ) ) : '';
+
+        $close_target_url = $manage_base_url;
+        if ( $return_to === 'register' && function_exists( 'sywat_page_url' ) ) {
+            $close_target_url = add_query_arg(
+                array(
+                    'selected_tournament' => $selected_tournament,
+                ),
+                sywat_page_url( 'register' )
+            );
+        }
+
+        $roster_post_args = array(
+            'tab'             => 'manage',
+            'view_tournament' => $selected_tournament,
+            'modal_action'    => 'manage',
+            'filter_line_idx' => $filter_line_idx,
         );
+        if ( ! empty( $return_to ) ) {
+            $roster_post_args['return_to'] = $return_to;
+        }
+        $roster_post_url = add_query_arg( $roster_post_args, $manage_base_url );
 
         // STRICT FILTER: Build Line-Scoped & Smart-Named Family Groups array for JS dynamic dropdowns & labels
         $existing_families_by_line = array();
@@ -173,7 +186,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         }
         ?>
 
-        <div class="sywat-modal-backdrop active no-print" id="sywat_roster_modal" data-sywat-close-url="<?php echo esc_url( $manage_base_url ); ?>">
+        <div class="sywat-modal-backdrop active no-print" id="sywat_roster_modal" data-sywat-close-url="<?php echo esc_url( $close_target_url ); ?>">
             <div class="sywat-modal-content sywat-modal-xl">
 
                 <!-- Standard Pinned Header -->
@@ -182,7 +195,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <h3>👥 Registered Archer Roster</h3>
                         <div class="sywat-subtitle">(<?php echo esc_html( $selected_tournament ); ?>)</div>
                     </div>
-                    <button type="button" class="sywat-modal-close" aria-label="Close Roster Modal" data-sywat-action="close-roster-modal" data-close-url="<?php echo esc_url( $manage_base_url ); ?>">&times;</button>
+                    <button type="button" class="sywat-modal-close" aria-label="Close Roster Modal" data-sywat-action="close-roster-modal" data-close-url="<?php echo esc_url( $close_target_url ); ?>">&times;</button>
                 </div>
 
                 <!-- Scrollable Modal Body -->
@@ -194,6 +207,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             <input type="hidden" name="tab" value="manage">
                             <input type="hidden" name="modal_action" value="manage">
                             <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                            <?php if ( ! empty( $return_to ) ): ?>
+                                <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
+                            <?php endif; ?>
 
                             <!-- Read-Only Active Tournament Field -->
                             <div class="sywat-filter-field">
@@ -235,6 +251,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                     <input type="hidden" name="modal_action" value="manage">
                                     <input type="hidden" name="redirect_action" value="manage">
+                                    <?php if ( ! empty( $return_to ) ): ?>
+                                        <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
+                                    <?php endif; ?>
                                     <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Clear Line Roster</button>
                                 </form>
                             </div>
@@ -288,16 +307,17 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                 $line_disp = ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1';
                                             }
 
-                                            $edit_archer_url = add_query_arg(
-                                                array(
-                                                    'tab'             => 'manage',
-                                                    'view_tournament' => $selected_tournament,
-                                                    'modal_action'    => 'manage',
-                                                    'edit_archer'     => $reg_id,
-                                                    'filter_line_idx' => $filter_line_idx,
-                                                ),
-                                                $manage_base_url
+                                            $edit_archer_args = array(
+                                                'tab'             => 'manage',
+                                                'view_tournament' => $selected_tournament,
+                                                'modal_action'    => 'manage',
+                                                'edit_archer'     => $reg_id,
+                                                'filter_line_idx' => $filter_line_idx,
                                             );
+                                            if ( ! empty( $return_to ) ) {
+                                                $edit_archer_args['return_to'] = $return_to;
+                                            }
+                                            $edit_archer_url = add_query_arg( $edit_archer_args, $manage_base_url );
                                         ?>
                                         <tr class="sywat-manage-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                             <td>
@@ -333,6 +353,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                         <input type="hidden" name="modal_action" value="manage">
                                                         <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                                         <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
+                                                        <?php if ( ! empty( $return_to ) ): ?>
+                                                            <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
+                                                        <?php endif; ?>
                                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Remove</button>
                                                     </form>
                                                 </div>
@@ -347,7 +370,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
 
                 <!-- Standard Pinned Footer -->
                 <div class="sywat-modal-footer">
-                    <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="close-roster-modal" data-close-url="<?php echo esc_url( $manage_base_url ); ?>">Close Roster</button>
+                    <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="close-roster-modal" data-close-url="<?php echo esc_url( $close_target_url ); ?>">Close Roster</button>
                 </div>
             </div>
         </div>
