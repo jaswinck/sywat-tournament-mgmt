@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -388,6 +388,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                     ),
                                     sywat_page_url( 'manage_tournaments' )
                                 );
+                                $confirm_msg = sprintf( 'Are you sure you want to clear ALL archers from %s?', $line_title );
                             ?>
                             <tr>
                                 <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
@@ -411,7 +412,7 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
                                             Manage Roster
                                         </a>
                                         <?php if ( $total_line_shooters > 0 || ($waitlisted_20 + $waitlisted_cub) > 0 ): ?>
-                                            <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to clear ALL archers from <?php echo esc_js( $line_title ); ?>?');">
+                                            <form method="post" class="sywat-table-action-form" data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>" onsubmit="return confirm(this.dataset.confirmMsg);">
                                                 <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
                                                 <input type="hidden" name="sywat_action" value="purge_line">
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
