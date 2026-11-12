@@ -3,14 +3,14 @@
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
  * Author: SYWAT Archery
- * Version: 6.8.2
+ * Version: 6.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * Helper: Filter scoped tournaments to active season(s) and build an ordered option map
- * with the active/pinned tournament at the top and all remaining tournaments sorted A–Z.
+ * with the currently selected tournament at the top and all remaining tournaments sorted A–Z.
  *
  * @param array  $scoped_tournaments  Shop-scoped tournaments array (name => config).
  * @param string $requested_tourn     Unslashed requested tournament name from GET/POST.
@@ -64,60 +64,9 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
             $pool = $scoped_tournaments;
         }
 
-        // Determine primary active tournament for top pinning
-        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
-        $current_t          = get_option( 'sywat_current_tournament', '' );
-        $pinned_active_key  = '';
-
-        if ( is_array( $active_tournaments ) && ! empty( $active_tournaments ) ) {
-            if ( ! empty( $user_shop_id ) ) {
-                foreach ( $active_tournaments as $act_name ) {
-                    if ( isset( $pool[ $act_name ] ) ) {
-                        $t_shop = function_exists( 'sywat_get_tournament_shop_id' )
-                            ? (string) sywat_get_tournament_shop_id( $pool[ $act_name ] )
-                            : ( isset( $pool[ $act_name ]['shop_id'] ) ? (string) $pool[ $act_name ]['shop_id'] : '' );
-                        if ( $t_shop === (string) $user_shop_id ) {
-                            $pinned_active_key = $act_name;
-                            break;
-                        }
-                    }
-                }
-            }
-            if ( empty( $pinned_active_key ) ) {
-                foreach ( $active_tournaments as $act_name ) {
-                    if ( isset( $pool[ $act_name ] ) ) {
-                        $pinned_active_key = $act_name;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if ( empty( $pinned_active_key ) && ! empty( $current_t ) && isset( $pool[ $current_t ] ) ) {
-            $pinned_active_key = $current_t;
-        }
-
-        if ( empty( $pinned_active_key ) ) {
-            $today_ymd   = current_time( 'Y-m-d' );
-            $upcoming    = array();
-            $sorted_keys = array_keys( $pool );
-            usort( $sorted_keys, 'strnatcasecmp' );
-
-            foreach ( $sorted_keys as $k ) {
-                $s_date = isset( $pool[ $k ]['start_date'] ) ? $pool[ $k ]['start_date'] : '';
-                if ( ! empty( $s_date ) && $s_date >= $today_ymd ) {
-                    $upcoming[ $k ] = $s_date;
-                }
-            }
-
-            if ( ! empty( $upcoming ) ) {
-                asort( $upcoming );
-                reset( $upcoming );
-                $pinned_active_key = key( $upcoming );
-            } elseif ( ! empty( $sorted_keys ) ) {
-                $pinned_active_key = $sorted_keys[0];
-            }
-        }
+        // Sort all pool keys alphabetically (A–Z, natural case-insensitive)
+        $sorted_keys = array_keys( $pool );
+        usort( $sorted_keys, 'strnatcasecmp' );
 
         // Resolve actual selected tournament using unslashed exact or case-insensitive key match
         $selected_tournament = '';
@@ -125,7 +74,7 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
             if ( isset( $pool[ $requested_tourn ] ) ) {
                 $selected_tournament = $requested_tourn;
             } else {
-                foreach ( array_keys( $pool ) as $k ) {
+                foreach ( $sorted_keys as $k ) {
                     if ( strcasecmp( $k, $requested_tourn ) === 0 ) {
                         $selected_tournament = $k;
                         break;
@@ -133,29 +82,54 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
                 }
             }
         }
+
+        // If no tournament was explicitly requested, pick a clean default:
+        // 1. Nearest upcoming tournament belonging to the user's assigned shop
+        // 2. Nearest upcoming tournament overall
+        // 3. First tournament alphabetically (A–Z)
         if ( empty( $selected_tournament ) ) {
-            $selected_tournament = $pinned_active_key;
+            $today_ymd     = current_time( 'Y-m-d' );
+            $shop_upcoming = array();
+            $any_upcoming  = array();
+
+            foreach ( $sorted_keys as $k ) {
+                $s_date = isset( $pool[ $k ]['start_date'] ) ? $pool[ $k ]['start_date'] : '';
+                if ( ! empty( $s_date ) && $s_date >= $today_ymd ) {
+                    $any_upcoming[ $k ] = $s_date;
+                    $t_shop = function_exists( 'sywat_get_tournament_shop_id' )
+                        ? (string) sywat_get_tournament_shop_id( $pool[ $k ] )
+                        : ( isset( $pool[ $k ]['shop_id'] ) ? (string) $pool[ $k ]['shop_id'] : '' );
+                    if ( ! empty( $user_shop_id ) && $t_shop === (string) $user_shop_id ) {
+                        $shop_upcoming[ $k ] = $s_date;
+                    }
+                }
+            }
+
+            if ( ! empty( $shop_upcoming ) ) {
+                asort( $shop_upcoming );
+                reset( $shop_upcoming );
+                $selected_tournament = key( $shop_upcoming );
+            } elseif ( ! empty( $any_upcoming ) ) {
+                asort( $any_upcoming );
+                reset( $any_upcoming );
+                $selected_tournament = key( $any_upcoming );
+            } elseif ( ! empty( $sorted_keys ) ) {
+                $selected_tournament = $sorted_keys[0];
+            }
         }
 
         // Build ordered dropdown options:
-        // 1. Pinned active tournament at the top
-        // 2. Remaining tournaments sorted A–Z (natural case-insensitive)
-        $ordered     = array();
-        $other_names = array();
-
-        foreach ( array_keys( $pool ) as $t_name ) {
-            if ( $t_name === $pinned_active_key ) {
+        // 1. Currently selected tournament pinned at the top
+        // 2. All remaining tournaments sorted A–Z
+        $ordered = array();
+        if ( ! empty( $selected_tournament ) && isset( $pool[ $selected_tournament ] ) ) {
+            $ordered[ $selected_tournament ] = $selected_tournament;
+        }
+        foreach ( $sorted_keys as $t_name ) {
+            if ( $t_name === $selected_tournament ) {
                 continue;
             }
-            $other_names[] = $t_name;
-        }
-        usort( $other_names, 'strnatcasecmp' );
-
-        if ( ! empty( $pinned_active_key ) && isset( $pool[ $pinned_active_key ] ) ) {
-            $ordered[ $pinned_active_key ] = '★ ' . $pinned_active_key . ' (Active)';
-        }
-        foreach ( $other_names as $o_name ) {
-            $ordered[ $o_name ] = $o_name;
+            $ordered[ $t_name ] = $t_name;
         }
 
         return array(
