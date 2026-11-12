@@ -3,7 +3,7 @@
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
  * Author: SYWAT Archery
- * Version: 6.4.0
+ * Version: 6.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -34,19 +34,19 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
  */
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
-        $group_name       = trim( sanitize_text_field( $_POST['group_name'] ?? '' ) );
-        $group_phone      = trim( sanitize_text_field( $_POST['group_phone'] ?? '' ) );
-        $default_line_idx = sanitize_text_field( $_POST['default_line_idx'] ?? '0' );
-        $tourn_name       = sanitize_text_field( $_POST['selected_tournament'] ?? '' );
-        $amount_paid      = isset($_POST['amount_paid_today']) ? floatval($_POST['amount_paid_today']) : 0;
-        $allow_partial    = isset($_POST['allow_partial']) && $_POST['allow_partial'] === '1';
-        $waitlist_mode    = sanitize_text_field($_POST['waitlist_mode'] ?? '');
+        $group_name       = trim( sanitize_text_field( wp_unslash( $_POST['group_name'] ?? '' ) ) );
+        $group_phone      = trim( sanitize_text_field( wp_unslash( $_POST['group_phone'] ?? '' ) ) );
+        $default_line_idx = sanitize_text_field( wp_unslash( $_POST['default_line_idx'] ?? '0' ) );
+        $tourn_name       = sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ?? '' ) );
+        $amount_paid      = isset($_POST['amount_paid_today']) ? floatval( wp_unslash( $_POST['amount_paid_today'] ) ) : 0;
+        $allow_partial    = isset($_POST['allow_partial']) && wp_unslash( $_POST['allow_partial'] ) === '1';
+        $waitlist_mode    = sanitize_text_field( wp_unslash( $_POST['waitlist_mode'] ?? '' ) );
         $t_slug           = sanitize_title( $tourn_name );
 
         $t_data  = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
         $t_lines = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : array());
 
-        $archers_raw = isset($_POST['archers']) && is_array($_POST['archers']) ? $_POST['archers'] : array();
+        $archers_raw = isset($_POST['archers']) && is_array($_POST['archers']) ? wp_unslash( $_POST['archers'] ) : array();
 
         if ( empty( $archers_raw ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please add at least one archer name.</div>';
@@ -164,10 +164,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             $hidden_archers_html = '';
             foreach ($archers_raw as $i => $a) {
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][name]" value="' . esc_attr($a['name'] ?? '') . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][distance]" value="' . esc_attr($a['distance'] ?? '') . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][division]" value="' . esc_attr($a['division'] ?? '') . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . $i . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][name]" value="' . esc_attr($a['name'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][distance]" value="' . esc_attr($a['distance'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][division]" value="' . esc_attr($a['division'] ?? '') . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][line_idx]" value="' . esc_attr($a['line_idx'] ?? '') . '">';
             }
 
             $base_hidden_fields  = wp_nonce_field('sywat_desk_action', 'sywat_nonce', true, false);
