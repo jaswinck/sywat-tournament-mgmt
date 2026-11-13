@@ -2,35 +2,40 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
+ * Description: Renders the Check-In Desk navigation, Line Capacity Tracker, Active Registered Archers table, and the embedded FIFO family-grouped Waitlist Queue component.
  * Author: SYWAT Archery
- * Version: 6.3.2
+ * Version: 6.9.0
  */
 
-if (!defined('ABSPATH')) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Reusable helper to render hidden filter context inputs and eliminate form bloat.
  */
-function sywat_desk_render_hidden_context($selected_tournament, $selected_line_idx, $search_query) {
+function sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ) {
     ?>
-    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr($selected_tournament); ?>">
-    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr($selected_line_idx); ?>">
-    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($search_query); ?>">
+    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+    <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $selected_line_idx ); ?>">
+    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
     <?php
 }
 
-function sywat_desk_render_family_banner($added_family_prompt) {
-    if (!$added_family_prompt) return;
+function sywat_desk_render_family_banner( $added_family_prompt ) {
+    if ( ! $added_family_prompt ) {
+        return;
+    }
     ?>
     <div class="sywat-alert sywat-alert-success no-print sywat-family-banner">
         <div class="sywat-family-banner-title">
-            ✅ <?php echo esc_html($added_family_prompt['archer_name']); ?> added under <?php echo esc_html($added_family_prompt['family_name']); ?>!
+            ✅ <?php echo esc_html( $added_family_prompt['archer_name'] ); ?> added under <?php echo esc_html( $added_family_prompt['family_name'] ); ?>!
         </div>
         <div class="sywat-family-banner-subtext">
             Is there another family member to register under this same payment group?
         </div>
         <div class="sywat-family-banner-actions">
-            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js($added_family_prompt['family_id']); ?>', '<?php echo esc_js($added_family_prompt['line_idx']); ?>')">
+            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js( $added_family_prompt['family_id'] ); ?>', '<?php echo esc_js( $added_family_prompt['line_idx'] ); ?>')">
                 Yes, Add Next Family Member
             </button>
             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="this.parentElement.parentElement.remove();">
@@ -41,24 +46,26 @@ function sywat_desk_render_family_banner($added_family_prompt) {
     <?php
 }
 
-function sywat_desk_render_filter_bar($data) {
-    $can_manage_seasons = function_exists('sywat_can_manage_seasons') && sywat_can_manage_seasons();
-    $selected_t = isset($data['selected_tournament']) ? $data['selected_tournament'] : '';
-    
-    $all_tournaments = get_option('sywat_tournaments_list', array());
-    $t_master        = (is_array($all_tournaments) && isset($all_tournaments[$selected_t])) ? $all_tournaments[$selected_t] : array();
+function sywat_desk_render_filter_bar( $data ) {
+    $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+    $selected_t         = isset( $data['selected_tournament'] ) ? $data['selected_tournament'] : '';
+
+    $all_tournaments = get_option( 'sywat_tournaments_list', array() );
+    $t_master        = ( is_array( $all_tournaments ) && isset( $all_tournaments[ $selected_t ] ) ) ? $all_tournaments[ $selected_t ] : array();
 
     $t_shop_id = 'shop_ccr';
-    if (is_array($t_master) && isset($t_master['shop_id']) && !empty($t_master['shop_id'])) {
+    if ( is_array( $t_master ) && isset( $t_master['shop_id'] ) && ! empty( $t_master['shop_id'] ) ) {
         $t_shop_id = $t_master['shop_id'];
-    } elseif (function_exists('sywat_get_tournament_shop_id')) {
-        $t_shop_id = sywat_get_tournament_shop_id($t_master);
+    } elseif ( function_exists( 'sywat_get_tournament_shop_id' ) ) {
+        $t_shop_id = sywat_get_tournament_shop_id( $t_master );
     }
 
-    $active_hubs = get_option('sywat_active_tournaments', array());
-    if (!is_array($active_hubs)) $active_hubs = array();
+    $active_hubs = get_option( 'sywat_active_tournaments', array() );
+    if ( ! is_array( $active_hubs ) ) {
+        $active_hubs = array();
+    }
 
-    $is_hub_enabled = ($t_shop_id === 'shop_ccr') && in_array($selected_t, $active_hubs);
+    $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_t, $active_hubs, true );
     ?>
     <!-- Master Navigation Tabs (Card-Docked) -->
     <div class="sywat-nav-tabs no-print">
@@ -66,7 +73,7 @@ function sywat_desk_render_filter_bar($data) {
         <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
         <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
         <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
-        <?php if ( $can_manage_seasons ): ?>
+        <?php if ( $can_manage_seasons ) : ?>
             <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
         <?php endif; ?>
     </div>
@@ -82,15 +89,15 @@ function sywat_desk_render_filter_bar($data) {
 
             <div class="sywat-header-inline-controls">
                 <form method="post" id="sywat_filter_form" class="sywat-filter-bar-form">
-                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr($data['search_query']); ?>">
+                    <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $data['search_query'] ); ?>">
                     
                     <!-- Stacked Active Tournament Select -->
                     <div class="sywat-field-group sywat-field-auto">
                         <label for="sywat_selected_tournament">Active Tournament:</label>
                         <select id="sywat_selected_tournament" name="selected_tournament" class="sywat-select-tournament" onchange="document.getElementById('sywat_filter_form').submit();">
-                            <?php foreach ($data['tournaments'] as $t_name => $t_lines): ?>
-                                <option value="<?php echo esc_attr($t_name); ?>" <?php selected($data['selected_tournament'], $t_name); ?>>
-                                    <?php echo esc_html($t_name); ?>
+                            <?php foreach ( $data['tournaments'] as $t_name => $t_lines ) : ?>
+                                <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $data['selected_tournament'], $t_name ); ?>>
+                                    <?php echo esc_html( $t_name ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -100,17 +107,17 @@ function sywat_desk_render_filter_bar($data) {
                     <div class="sywat-field-group sywat-field-auto">
                         <label for="sywat_selected_line_idx">Shooting Line:</label>
                         <select id="sywat_selected_line_idx" name="selected_line_idx" class="sywat-select-line" onchange="document.getElementById('sywat_filter_form').submit();">
-                            <option value="all" <?php selected($data['selected_line_idx'], 'all'); ?>>All Lines</option>
-                            <?php foreach ($data['lines'] as $idx => $line): ?>
-                                <option value="<?php echo esc_attr($idx); ?>" <?php selected((string)$data['selected_line_idx'], (string)$idx); ?>>
-                                    <?php echo esc_html($line['name']); ?>
+                            <option value="all" <?php selected( $data['selected_line_idx'], 'all' ); ?>>All Lines</option>
+                            <?php foreach ( $data['lines'] as $idx => $line ) : ?>
+                                <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $data['selected_line_idx'], (string) $idx ); ?>>
+                                    <?php echo esc_html( $line['name'] ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                 </form>
 
-                <?php if ($is_hub_enabled): ?>
+                <?php if ( $is_hub_enabled ) : ?>
                     <a href="<?php echo esc_url( sywat_page_url( 'volunteer_hub' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                 <?php endif; ?>
             </div>
@@ -118,17 +125,17 @@ function sywat_desk_render_filter_bar($data) {
     <?php
 }
 
-function sywat_desk_render_capacity_tracker($data) {
+function sywat_desk_render_capacity_tracker( $data ) {
     $lines               = $data['lines'];
     $registrations       = $data['registrations'];
     $selected_tournament = $data['selected_tournament'];
     $is_admin            = $data['is_admin'];
 
-    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
+    $active_t_slug    = isset( $data['active_t_slug'] ) ? $data['active_t_slug'] : sanitize_title( $selected_tournament );
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    
-    $raw_closed   = get_option($closed_lines_key, array());
-    $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
+
+    $raw_closed   = get_option( $closed_lines_key, array() );
+    $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
     ?>
     <!-- Nested Section: Line Capacity Tracker -->
     <div class="sywat-tracker-container">
@@ -138,77 +145,106 @@ function sywat_desk_render_capacity_tracker($data) {
                 <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
             </div>
         </div>
-        <?php if (!empty($lines)): ?>
+        <?php if ( ! empty( $lines ) ) : ?>
             <?php
                 $ordered_lines = array();
-                foreach ($lines as $idx => $line) {
-                    $line_title = isset($line['name']) ? $line['name'] : 'Line ' . ($idx + 1);
-                    $weight = 50;
+                foreach ( $lines as $idx => $line ) {
+                    $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ( $idx + 1 );
+                    $weight     = 50;
 
-                    if (stripos($line_title, 'Sat') !== false) {
-                        if (stripos($line_title, '10') !== false) $weight = 10;
-                        elseif (stripos($line_title, '2') !== false) $weight = 20;
-                        else $weight = 25;
-                    } elseif (stripos($line_title, 'Sun') !== false) {
-                        if (stripos($line_title, '10') !== false) $weight = 30;
-                        elseif (stripos($line_title, '2') !== false) $weight = 40;
-                        else $weight = 45;
+                    if ( stripos( $line_title, 'Sat' ) !== false ) {
+                        if ( stripos( $line_title, '10' ) !== false ) {
+                            $weight = 10;
+                        } elseif ( stripos( $line_title, '2' ) !== false ) {
+                            $weight = 20;
+                        } else {
+                            $weight = 25;
+                        }
+                    } elseif ( stripos( $line_title, 'Sun' ) !== false ) {
+                        if ( stripos( $line_title, '10' ) !== false ) {
+                            $weight = 30;
+                        } elseif ( stripos( $line_title, '2' ) !== false ) {
+                            $weight = 40;
+                        } else {
+                            $weight = 45;
+                        }
                     }
 
-                    $ordered_lines[] = array('idx' => (string)$idx, 'line' => $line, 'weight' => $weight);
+                    $ordered_lines[] = array(
+                        'idx'    => (string) $idx,
+                        'line'   => $line,
+                        'weight' => $weight,
+                    );
                 }
 
-                usort($ordered_lines, function($a, $b) {
-                    if ($a['weight'] !== $b['weight']) return $a['weight'] <=> $b['weight'];
+                usort( $ordered_lines, function( $a, $b ) {
+                    if ( $a['weight'] !== $b['weight'] ) {
+                        return $a['weight'] <=> $b['weight'];
+                    }
                     return $a['idx'] <=> $b['idx'];
-                });
+                } );
             ?>
 
             <div class="sywat-tracker-grid">
-                <?php foreach ($ordered_lines as $item): ?>
+                <?php foreach ( $ordered_lines as $item ) : ?>
                     <?php
                         $idx       = $item['idx'];
                         $line      = $item['line'];
-                        $line_name = isset($line['name']) ? trim($line['name']) : '';
-                        
-                        $booked_20yd = 0; $booked_cub = 0; $total_reg_line = 0; $checked_in_line = 0; $waitlist_line = 0;
+                        $line_name = isset( $line['name'] ) ? trim( $line['name'] ) : '';
 
-                        foreach ($registrations as $reg) {
-                            if (isset($reg['tournament']) && $reg['tournament'] === $selected_tournament) {
-                                $match_index = isset($reg['line_index']) && (string)$reg['line_index'] === $idx;
-                                $match_name  = isset($reg['line_name']) && $line_name !== '' && trim($reg['line_name']) === $line_name;
+                        $booked_20yd     = 0;
+                        $booked_cub      = 0;
+                        $total_reg_line  = 0;
+                        $checked_in_line = 0;
+                        $waitlist_line   = 0;
 
-                                if ($match_index || $match_name) {
-                                    $is_wait = isset($reg['status']) && strcasecmp(trim($reg['status']), 'Waitlist') === 0;
-                                    if ($is_wait) {
+                        foreach ( $registrations as $reg ) {
+                            if ( isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament ) {
+                                $match_index = isset( $reg['line_index'] ) && (string) $reg['line_index'] === $idx;
+                                $match_name  = isset( $reg['line_name'] ) && $line_name !== '' && trim( $reg['line_name'] ) === $line_name;
+
+                                if ( $match_index || $match_name ) {
+                                    $status_str = isset( $reg['status'] ) ? trim( $reg['status'] ) : '';
+                                    if ( strcasecmp( $status_str, 'Cancelled' ) === 0 ) {
+                                        continue;
+                                    }
+
+                                    $is_wait = ( strcasecmp( $status_str, 'Waitlist' ) === 0 );
+                                    if ( $is_wait ) {
                                         $waitlist_line++;
                                     } else {
                                         $total_reg_line++;
-                                        if (!empty($reg['checked_in'])) $checked_in_line++;
-                                        if (isset($reg['distance']) && $reg['distance'] === '20yd') $booked_20yd++;
-                                        if (isset($reg['distance']) && $reg['distance'] === 'Cub') $booked_cub++;
+                                        if ( ! empty( $reg['checked_in'] ) ) {
+                                            $checked_in_line++;
+                                        }
+                                        if ( isset( $reg['distance'] ) && $reg['distance'] === '20yd' ) {
+                                            $booked_20yd++;
+                                        }
+                                        if ( isset( $reg['distance'] ) && $reg['distance'] === 'Cub' ) {
+                                            $booked_cub++;
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        $cap_20yd_num = max(0, intval(isset($line['cap_20yd']) ? $line['cap_20yd'] : 0) - $booked_20yd);
-                        $cap_cub_num  = max(0, intval(isset($line['cap_cub']) ? $line['cap_cub'] : 0) - $booked_cub);
+                        $cap_20yd_num = max( 0, intval( isset( $line['cap_20yd'] ) ? $line['cap_20yd'] : 0 ) - $booked_20yd );
+                        $cap_cub_num  = max( 0, intval( isset( $line['cap_cub'] ) ? $line['cap_cub'] : 0 ) - $booked_cub );
 
-                        $disp_20yd = ($cap_20yd_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
-                        $disp_cub  = ($cap_cub_num === 0) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
-                        
-                        $is_closed_line = in_array($idx, $closed_lines, true) || ($line_name !== '' && in_array($line_name, $closed_lines, true));
+                        $disp_20yd = ( $cap_20yd_num === 0 ) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
+                        $disp_cub  = ( $cap_cub_num === 0 ) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
+
+                        $is_closed_line = in_array( $idx, $closed_lines, true ) || ( $line_name !== '' && in_array( $line_name, $closed_lines, true ) );
                     ?>
                     <div class="sywat-tracker-card">
                         <div>
                             <div class="sywat-tracker-card-header">
-                                <strong class="sywat-tracker-card-title"><?php echo esc_html($line['name']); ?></strong>
+                                <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
                                 <div class="sywat-tracker-header-badges" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                                     <span class="sywat-badge sywat-badge-prereg">
                                         <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                     </span>
-                                    <?php if ($waitlist_line > 0): ?>
+                                    <?php if ( $waitlist_line > 0 ) : ?>
                                         <span class="sywat-badge sywat-waitlist-pill">🕒 <?php echo $waitlist_line; ?> Waitlisted</span>
                                     <?php endif; ?>
                                 </div>
@@ -220,28 +256,28 @@ function sywat_desk_render_capacity_tracker($data) {
                         </div>
                         
                         <div class="sywat-tracker-card-actions">
-                            <?php if (!$is_closed_line): ?>
+                            <?php if ( ! $is_closed_line ) : ?>
                                 <form method="post">
-                                    <?php sywat_desk_render_hidden_context($selected_tournament, $idx, $data['search_query']); ?>
+                                    <?php sywat_desk_render_hidden_context( $selected_tournament, $idx, $data['search_query'] ); ?>
                                     <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
                                 </form>
                             <?php endif; ?>
 
-                            <?php if ($is_admin): ?>
-                                <?php if ($is_closed_line): ?>
+                            <?php if ( $is_admin ) : ?>
+                                <?php if ( $is_closed_line ) : ?>
                                     <form method="post">
-                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="reopen_line">
-                                        <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
-                                        <?php sywat_desk_render_hidden_context($selected_tournament, $idx, $data['search_query']); ?>
+                                        <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                        <?php sywat_desk_render_hidden_context( $selected_tournament, $idx, $data['search_query'] ); ?>
                                         <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Reopen</button>
                                     </form>
-                                <?php else: ?>
+                                <?php else : ?>
                                     <form method="post" onsubmit="return confirm('Are you sure you want to close this line? All un-checked-in archers will be permanently marked as No Show.');">
-                                        <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
+                                        <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="close_line">
-                                        <input type="hidden" name="target_line_idx" value="<?php echo esc_attr($idx); ?>">
-                                        <?php sywat_desk_render_hidden_context($selected_tournament, $idx, $data['search_query']); ?>
+                                        <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                        <?php sywat_desk_render_hidden_context( $selected_tournament, $idx, $data['search_query'] ); ?>
                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-lock">Close</button>
                                     </form>
                                 <?php endif; ?>
@@ -250,40 +286,54 @@ function sywat_desk_render_capacity_tracker($data) {
                     </div>
                 <?php endforeach; ?>
             </div>
-        <?php else: ?>
+        <?php else : ?>
             <p class="sywat-empty-text">No shooting lines configured.</p>
         <?php endif; ?>
     </div>
     <?php
 }
 
-function sywat_desk_render_archers_table($data) {
+function sywat_desk_render_archers_table( $data ) {
     $tourn_registrations = $data['tourn_registrations'];
+    $all_tourn_regs      = isset( $data['registrations'] ) ? $data['registrations'] : $tourn_registrations;
     $search_query        = $data['search_query'];
     $selected_tournament = $data['selected_tournament'];
     $selected_line_idx   = $data['selected_line_idx'];
     $lines               = $data['lines'];
 
-    $active_t_slug    = isset($data['active_t_slug']) ? $data['active_t_slug'] : sanitize_title($selected_tournament);
+    $active_t_slug    = isset( $data['active_t_slug'] ) ? $data['active_t_slug'] : sanitize_title( $selected_tournament );
     $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-    
-    $raw_closed   = get_option($closed_lines_key, array());
-    $closed_lines = is_array($raw_closed) ? array_map('trim', array_map('strval', $raw_closed)) : array();
 
+    $raw_closed   = get_option( $closed_lines_key, array() );
+    $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
+
+    // Filter out Waitlisted & Cancelled archers from the active check-in table
+    // (Waitlisted archers are rendered in the dedicated FIFO Family-Grouped Waitlist Queue below)
+    $active_checkins = array_values( array_filter( $tourn_registrations, function( $reg ) {
+        $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
+        if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
+            return false;
+        }
+        return true;
+    } ) );
+
+    if ( function_exists( 'sywat_enqueue_waitlist_scripts' ) ) {
+        sywat_enqueue_waitlist_scripts();
+    }
     ?>
     <!-- Nested Section: Registered Archers Table -->
     <div>
         <div class="sywat-table-header-bar">
-            <h2>Registered Archers</h2>
+            <h2>Registered Archers (<?php echo intval( count( $active_checkins ) ); ?>)</h2>
             <div class="sywat-table-header-controls">
                 <div class="sywat-search-input-group">
-                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr($search_query); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                    <input type="text" id="sywat_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
                 </div>
             </div>
         </div>
 
-        <?php if (!empty($tourn_registrations)): ?>
+        <?php if ( ! empty( $active_checkins ) ) : ?>
             <div class="sywat-table-responsive">
                 <table class="sywat-table">
                     <thead>
@@ -300,108 +350,101 @@ function sywat_desk_render_archers_table($data) {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($tourn_registrations as $reg): ?>
-                            <?php 
-                                $is_waitlist    = isset($reg['status']) && strcasecmp(trim($reg['status']), 'Waitlist') === 0;
-                                $reg_type       = isset($reg['type']) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
-                                $badge_class    = ($reg_type === 'Walk-In') ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-                                $balance_due    = isset($reg['balance_due']) ? floatval($reg['balance_due']) : 0;
-                                
+                        <?php foreach ( $active_checkins as $reg ) : ?>
+                            <?php
+                                $reg_type    = isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
+                                $badge_class = ( $reg_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+                                $balance_due = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
+
                                 // Clean Line Title Resolution
-                                $resolved_l_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($reg, $lines) : (isset($reg['line_index']) ? (string)$reg['line_index'] : '0');
-                                $reg_line_name  = (isset($reg['line_name']) && !empty(trim($reg['line_name']))) 
-                                                    ? trim($reg['line_name']) 
-                                                    : (isset($lines[$resolved_l_idx]['name']) ? trim($lines[$resolved_l_idx]['name']) : 'Line ' . (intval($resolved_l_idx) + 1));
+                                $resolved_l_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+                                $reg_line_name  = ( isset( $reg['line_name'] ) && ! empty( trim( $reg['line_name'] ) ) )
+                                                    ? trim( $reg['line_name'] )
+                                                    : ( isset( $lines[ $resolved_l_idx ]['name'] ) ? trim( $lines[ $resolved_l_idx ]['name'] ) : 'Line ' . ( intval( $resolved_l_idx ) + 1 ) );
 
-                                $is_line_closed = in_array((string)$resolved_l_idx, $closed_lines, true) || ($reg_line_name !== '' && in_array($reg_line_name, $closed_lines, true));
-                                $is_checked_in  = !empty($reg['checked_in']);
+                                $is_line_closed = in_array( (string) $resolved_l_idx, $closed_lines, true ) || ( $reg_line_name !== '' && in_array( $reg_line_name, $closed_lines, true ) );
+                                $is_checked_in  = ! empty( $reg['checked_in'] );
 
-                                $raw_div        = !empty($reg['division']) ? $reg['division'] : '—';
-                                $is_no_show     = !$is_waitlist && !$is_checked_in && ($is_line_closed || $raw_div === 'No Show');
+                                $raw_div    = ! empty( $reg['division'] ) ? $reg['division'] : '—';
+                                $is_no_show = ! $is_checked_in && ( $is_line_closed || $raw_div === 'No Show' );
 
                                 // Uniform No Show Metadata Overrides
-                                $div_disp       = $is_no_show ? 'No Show' : $raw_div;
-                                $gender_disp    = $is_no_show ? 'No Show' : (!empty($reg['gender']) ? $reg['gender'] : 'N/A');
-                                $style_disp     = $is_no_show ? 'No Show' : (!empty($reg['style']) ? $reg['style'] : '—');
-                                $paid_disp      = $is_no_show ? 'No Show' : (!empty($reg['paid']) ? $reg['paid'] : '—');
-                                $dist_disp      = $is_no_show ? 'No Show' : (!empty($reg['distance']) ? $reg['distance'] : 'N/A');
+                                $div_disp    = $is_no_show ? 'No Show' : $raw_div;
+                                $gender_disp = $is_no_show ? 'No Show' : ( ! empty( $reg['gender'] ) ? $reg['gender'] : 'N/A' );
+                                $style_disp  = $is_no_show ? 'No Show' : ( ! empty( $reg['style'] ) ? $reg['style'] : '—' );
+                                $paid_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['paid'] ) ? $reg['paid'] : '—' );
+                                $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? $reg['distance'] : 'N/A' );
 
-                                $is_family_due  = !$is_no_show && ((isset($reg['paid']) && $reg['paid'] === 'Family') || (isset($reg['rate_type']) && strtolower($reg['rate_type']) === 'family'));
+                                $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && $reg['paid'] === 'Family' ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
                             ?>
-                            <tr class="sywat-archer-row" data-name="<?php echo esc_attr(strtolower($reg['name'])); ?>">
+                            <tr class="sywat-archer-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                 <td>
-                                    <div class="sywat-archer-name"><?php echo esc_html($reg['name']); ?></div>
-                                    <!-- OWE Badge Rule: Suppress for Waitlists, No Shows, Closed Unchecked Lines, and Zero Balances -->
-                                    <?php if (!$is_waitlist && !$is_no_show && $balance_due > 0): ?>
+                                    <div class="sywat-archer-name"><?php echo esc_html( $reg['name'] ); ?></div>
+                                    <!-- OWE Badge Rule: Suppress for No Shows, Closed Unchecked Lines, and Zero Balances -->
+                                    <?php if ( ! $is_no_show && $balance_due > 0 ) : ?>
                                         <div class="sywat-owe-badge-wrap">
                                             <span class="sywat-badge sywat-badge-full">
-                                                <?php 
+                                                <?php
                                                     $fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
                                                     if ( empty( $fam_id ) && $is_family_due ) {
                                                         $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
                                                         $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
-                                                        $reg_l_idx  = isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0';
+                                                        $reg_l_idx  = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
                                                         $fam_id     = 'line_' . $reg_l_idx . '_last_' . $last_name;
                                                     }
 
-                                                    $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) ) 
-                                                        ? sywat_calculate_family_group_balance( $fam_id, 'all', $tourn_registrations ) 
+                                                    $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) )
+                                                        ? sywat_calculate_family_group_balance( $fam_id, 'all', $all_tourn_regs )
                                                         : null;
 
                                                     $is_true_family_cap = ( $fam_calc && ! empty( $fam_calc['is_family_capped'] ) );
                                                 ?>
-                                                <?php if ( $is_true_family_cap ): ?>
+                                                <?php if ( $is_true_family_cap ) : ?>
                                                     ⚠️ OWE: FAMILY
-                                                <?php else: ?>
-                                                    ⚠️ OWE $<?php echo number_format($balance_due, 2); ?>
+                                                <?php else : ?>
+                                                    ⚠️ OWE $<?php echo number_format( $balance_due, 2 ); ?>
                                                 <?php endif; ?>
                                             </span>
                                         </div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="sywat-col-center">
-                                    <?php if ($is_waitlist): ?>
-                                        <span class="sywat-badge sywat-waitlist-pill">🕒 Waitlist</span>
-                                    <?php else: ?>
-                                        <span class="sywat-badge <?php echo $badge_class; ?>"><?php echo esc_html($reg_type); ?></span>
-                                    <?php endif; ?>
+                                    <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $reg_type ); ?></span>
                                 </td>
-                                <td><?php echo esc_html($reg_line_name); ?></td>
-                                <td><?php echo esc_html($div_disp); ?></td>
-                                <td class="sywat-col-center"><?php echo esc_html($gender_disp); ?></td>
-                                <td><?php echo esc_html($style_disp); ?></td>
-                                <td class="sywat-col-paid"><?php echo esc_html($is_waitlist ? 'Waitlist' : $paid_disp); ?></td>
-                                <td class="sywat-col-center"><?php echo esc_html($dist_disp); ?></td>
+                                <td><?php echo esc_html( $reg_line_name ); ?></td>
+                                <td><?php echo esc_html( $div_disp ); ?></td>
+                                <td class="sywat-col-center"><?php echo esc_html( $gender_disp ); ?></td>
+                                <td><?php echo esc_html( $style_disp ); ?></td>
+                                <td class="sywat-col-paid"><?php echo esc_html( $paid_disp ); ?></td>
+                                <td class="sywat-col-center"><?php echo esc_html( $dist_disp ); ?></td>
                                 <td class="sywat-col-center">
                                     <div class="sywat-table-actions-vertical">
-                                        <?php if ($is_waitlist): ?>
-                                            <span class="sywat-badge sywat-waitlist-pill">🕒 Waitlisted</span>
-                                        <?php elseif ($is_line_closed): ?>
-                                            <?php if ($is_checked_in): ?>
+                                        <?php if ( $is_line_closed ) : ?>
+                                            <?php if ( $is_checked_in ) : ?>
                                                 <span class="sywat-badge sywat-badge-open">✓ Checked In</span>
-                                            <?php else: ?>
+                                            <?php else : ?>
                                                 <span class="sywat-badge sywat-badge-full">Line Closed</span>
                                             <?php endif; ?>
-                                        <?php elseif ($is_checked_in): ?>
+                                        <?php elseif ( $is_checked_in ) : ?>
                                             <form method="post" class="sywat-table-action-form">
-                                                <?php wp_nonce_field('sywat_desk_action', 'sywat_nonce'); ?>
-                                                <?php sywat_desk_render_hidden_context($selected_tournament, $selected_line_idx, $search_query); ?>
+                                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
                                                 <input type="hidden" name="sywat_action" value="undo_checkin">
-                                                <input type="hidden" name="reg_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                                <input type="hidden" name="reg_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
                                                 <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                             </form>
-                                        <?php else: ?>
+                                        <?php else : ?>
                                             <form method="post" class="sywat-table-action-form">
-                                                <?php sywat_desk_render_hidden_context($selected_tournament, $selected_line_idx, $search_query); ?>
-                                                <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                                <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
+                                                <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
                                                 <button type="submit" class="sywat-btn sywat-btn-success-solid sywat-btn-icon-checkin">Check In Archer</button>
                                             </form>
                                         <?php endif; ?>
 
                                         <!-- Edit Form -->
                                         <form method="post" class="sywat-table-action-form">
-                                            <?php sywat_desk_render_hidden_context($selected_tournament, $selected_line_idx, $search_query); ?>
-                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr($reg['id']); ?>">
+                                            <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
+                                            <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
                                             <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
                                         </form>
                                     </div>
@@ -411,14 +454,28 @@ function sywat_desk_render_archers_table($data) {
                     </tbody>
                 </table>
             </div>
-        <?php else: ?>
-            <p class="sywat-empty-text">No archers registered for this selection.</p>
+        <?php else : ?>
+            <p class="sywat-empty-text">No active archers registered for this selection.</p>
         <?php endif; ?>
     </div>
+
+    <!-- Dedicated FIFO Family-Grouped Waitlist Queue Component -->
+    <?php
+    if ( function_exists( 'sywat_render_waitlist_panel' ) ) {
+        sywat_render_waitlist_panel(
+            $selected_tournament,
+            $lines,
+            $all_tourn_regs,
+            $selected_line_idx,
+            '',
+            'checkin',
+            array(
+                'search_query' => $search_query,
+            )
+        );
+    }
+    ?>
     <!-- Close Master Single Unified Desk Card -->
     </div>
     <?php
 }
-// Page behaviour (search retention, notice auto-dismiss, resubmit guard) lives in
-// assets/js/sywat-checkin.js. It used to be printed here at file-include time,
-// which emitted a <script> block on EVERY request (all pages, AJAX, REST, feeds).
