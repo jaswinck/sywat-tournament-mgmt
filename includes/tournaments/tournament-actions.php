@@ -3,7 +3,7 @@
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
  * Author: SYWAT Archery
- * Version: 7.10.5
+ * Version: 7.11.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -99,6 +99,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
         // Action: Purge Entire Line
         if ( $action === 'purge_line' && function_exists( 'sywat_handle_purge_line' ) ) {
             return sywat_handle_purge_line( $tournaments, $registrations );
+        }
+
+        // Action: Waitlist Promotion & Open-Line Move Handlers
+        if ( function_exists( 'sywat_waitlist_is_supported_action' ) && sywat_waitlist_is_supported_action( $action ) && function_exists( 'sywat_waitlist_dispatch_post_action' ) ) {
+            return sywat_waitlist_dispatch_post_action( $tournaments, $registrations );
         }
 
         // Action: Deactivate All Volunteer Hubs
