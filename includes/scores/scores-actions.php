@@ -230,3 +230,25 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
         return $notice;
     }
 }
+
+/**
+ * Run the single-score autosave before the theme starts output.
+ *
+ * The autosave is POSTed to the Enter Scores page itself. It used to be handled
+ * inside the shortcode, after the theme had already printed the page header,
+ * so the JSON reply arrived wrapped in HTML and the browser kept the score as a
+ * local draft. Handling it on template_redirect returns clean JSON.
+ */
+add_action( 'template_redirect', function () {
+    if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' )
+        || ! isset( $_POST['sywat_action'] ) || 'autosave_single_score' !== $_POST['sywat_action'] ) {
+        return;
+    }
+    if ( function_exists( 'sywat_is_plugin_page' ) && ! sywat_is_plugin_page() ) {
+        return;
+    }
+    if ( ! function_exists( 'sywat_can_edit_scores' ) || ! sywat_can_edit_scores() ) {
+        wp_send_json_error( array( 'message' => 'Access denied' ), 403 );
+    }
+    sywat_scores_handle_ajax_autosave();
+}, 0 );

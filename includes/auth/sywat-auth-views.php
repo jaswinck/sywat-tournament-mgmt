@@ -53,11 +53,11 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     <!-- 1. Operational Tournaments Dropdown (Staff Only) -->
                     <?php if ( $can_manage_tournaments ): ?>
                         <div class="sywat-auth-dropdown">
-                            <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                            <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
                                 🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
-                                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>">
+                                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>">
                                     🎯 Tournament Portal
                                 </a>
                             </div>
@@ -71,7 +71,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
-                                <a href="<?php echo esc_url( site_url( '/member-directory/' ) ); ?>">
+                                <a href="<?php echo esc_url( sywat_page_url( 'member_directory' ) ); ?>">
                                     👥 Member Directory
                                 </a>
                             </div>
@@ -81,35 +81,35 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                     <!-- 3. Shops & Clubs Navigation Item (Dropdown for Staff, Direct Link for Public) -->
                     <?php if ( $can_manage_shops || ! empty( $user_shop_id ) ): ?>
                         <div class="sywat-auth-dropdown">
-                            <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                            <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
                                 🎯 Shops & Clubs <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
                                 <?php if ( ! $is_admin && ! empty( $user_shop_id ) ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/?edit_shop=' . urlencode( $user_shop_id ) ) ); ?>">
+                                    <a href="<?php echo esc_url( add_query_arg( 'edit_shop', rawurlencode( $user_shop_id ), sywat_page_url( 'manage_shops' ) ) ); ?>">
                                         🎯 My Shop / Club Profile
                                     </a>
                                 <?php endif; ?>
                                 
                                 <?php if ( $can_manage_seasons ): ?>
-                                    <a href="<?php echo esc_url( site_url( '/sywat-manage-shops/' ) ); ?>">
+                                    <a href="<?php echo esc_url( sywat_page_url( 'manage_shops' ) ); ?>">
                                         ⚙️ Shops & Clubs Management
                                     </a>
                                 <?php endif; ?>
 
-                                <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>">
+                                <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>">
                                     🌐 View Public Directory
                                 </a>
                             </div>
                         </div>
                     <?php else: ?>
-                        <a href="<?php echo esc_url( site_url( '/shops-and-clubs/' ) ); ?>" class="sywat-auth-nav-link">
+                        <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link">
                             🎯 Shops & Clubs
                         </a>
                     <?php endif; ?>
 
                     <!-- 4. Public Tournament Results -->
-                    <a href="<?php echo esc_url( site_url( '/results/' ) ); ?>" class="sywat-auth-nav-link">
+                    <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>" class="sywat-auth-nav-link">
                         🏆 Results
                     </a>
                 </nav>
@@ -122,17 +122,17 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                 👤 <strong><?php echo esc_html( $current_user->display_name ); ?></strong> <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
-                                <a href="<?php echo esc_url( site_url( '/member-directory/?tab=members&subtab=profile' ) ); ?>">
+                                <a href="<?php echo esc_url( add_query_arg( array( 'tab' => 'members', 'subtab' => 'profile' ), sywat_page_url( 'member_directory' ) ) ); ?>">
                                     👤 My Profile &amp; Household
                                 </a>
                             </div>
                         </div>
 
-                        <a href="<?php echo esc_url( wp_logout_url( site_url( '/login/' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
+                        <a href="<?php echo esc_url( wp_logout_url( sywat_page_url( 'login' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
                             🚪 Log Out
                         </a>
                     <?php else: ?>
-                        <a href="<?php echo esc_url( site_url( '/login/' ) ); ?>" class="sywat-btn sywat-btn-primary">
+                        <a href="<?php echo esc_url( sywat_page_url( 'login' ) ); ?>" class="sywat-btn sywat-btn-primary">
                             🔑 Login
                         </a>
                     <?php endif; ?>
@@ -157,7 +157,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
         $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( $_GET['login'] ) : '';
         
-        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : site_url( '/sywat-manage-tournaments/' );
+        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : sywat_page_url( 'manage_tournaments' );
 
         if ( ! empty( $rp_key ) && ! empty( $rp_login ) ) {
             $action = 'rp';

@@ -5,7 +5,7 @@
  * Description: Main entry point and shortcode definition for the Check-In Desk portal.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.1.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -76,7 +76,8 @@ function sywat_desk_enqueue_scripts($data) {
         : array();
 
     $handle  = 'sywat-checkin-js';
-    $version = defined('SYWAT_PLUGIN_VERSION') ? SYWAT_PLUGIN_VERSION : '6.1.0';
+    $js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin.js';
+    $version = file_exists($js_file) ? (string) filemtime($js_file) : (defined('SYWAT_PLUGIN_VERSION') ? SYWAT_PLUGIN_VERSION : '6.1.1');
     wp_enqueue_script($handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', array(), $version, true);
 
     $inline_js = 'window.sywatHistory = ' . json_encode($data['history_profiles']) . '; ' .

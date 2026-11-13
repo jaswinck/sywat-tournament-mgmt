@@ -1,19 +1,35 @@
 /* ==========================================================================
    SYWAT Archery - Modals, Dialogs, Intake Forms & TFAA Dropdowns
    Path: assets/css/sywat-modals.css
-   Version: 6.8.0
+   Version: 6.9.0
    ========================================================================== */
 
-/* 1. Modal Container & Backdrop Engine */
+/* 1. Modal Container & Backdrop Engine
+   Modals are moved to <body> by sywat-modal-manager.js so no theme section
+   (transforms, filters, sticky headers) can trap or clip them. One stacking
+   scale sits above typical theme headers (Divi/Astra use up to ~100000). */
+:root {
+    --sywat-z-modal: 1000000;
+    --sywat-z-modal-nested: 1000050;
+    --sywat-z-modal-dropdown: 1000100;
+    --sywat-z-modal-alert: 1000200;
+}
+
+html.sywat-modal-open,
+body.sywat-modal-open {
+    overflow: hidden !important;
+}
+
 .sywat-modal-backdrop {
     position: fixed;
+    inset: 0;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: auto;
+    height: auto;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
-    z-index: 99999;
+    z-index: var(--sywat-z-modal);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -53,7 +69,7 @@
 /* Capacity Overflow Overlay Overrides */
 .sywat-modal-overflow-backdrop {
     background: rgba(15, 23, 42, 0.85) !important;
-    z-index: 9999999 !important;
+    z-index: var(--sywat-z-modal-alert) !important;
 }
 
 .sywat-modal-overflow-content {
@@ -68,6 +84,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 16px 20px;
     border-bottom: 1px solid #dcdcde;
     background: #f6f7f7;
@@ -77,31 +94,47 @@
 .sywat-modal-header h3 { 
     margin: 0; 
     font-size: 1.2em; 
-    color: #0f172a; 
+    color: var(--sywat-navy); 
     font-weight: 700; 
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
 .sywat-modal-header .sywat-subtitle {
     font-size: 12px;
-    color: #64748b;
+    color: var(--sywat-text-subtle);
     font-weight: 400;
     margin-top: 2px;
 }
 
 .sywat-modal-close {
-    background: none;
-    border: none;
-    font-size: 22px;
-    font-weight: bold;
-    color: #646970;
-    cursor: pointer;
-    line-height: 1;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 6px !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    max-width: 34px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    color: #646970 !important;
+    cursor: pointer !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sywat-modal-close:hover { color: #d63638; }
+.sywat-modal-close:hover {
+    background-color: #fee2e2 !important;
+    color: #d63638 !important;
+}
 
 .sywat-modal-footer {
     display: flex;
@@ -145,15 +178,15 @@
 /* Role Grids & Selection Labels */
 .sywat-role-grid {
     gap: 6px 12px;
-    background: #f8fafc;
+    background: var(--sywat-surface-alt);
     padding: 10px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 6px;
 }
 
 .sywat-checkbox-label {
     font-size: 12px;
-    color: #334155;
+    color: var(--sywat-text);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -161,13 +194,13 @@
 }
 
 .sywat-member-info-banner {
-    background: #f8fafc;
-    border: 1px solid #cbd5e1;
+    background: var(--sywat-surface-alt);
+    border: 1px solid var(--sywat-border);
     border-radius: 6px;
     padding: 8px 12px;
     margin-bottom: 12px;
     font-size: 12px;
-    color: #334155;
+    color: var(--sywat-text);
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
@@ -178,8 +211,8 @@
 .sywat-password-rules-box {
     margin-top: 10px;
     margin-bottom: 16px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--sywat-surface-alt);
+    border: 1px solid var(--sywat-border-light);
     border-radius: 6px;
     padding: 6px 10px;
 }
@@ -189,13 +222,13 @@
     flex-wrap: wrap;
     gap: 4px 12px;
     font-size: 11px;
-    color: #64748b;
+    color: var(--sywat-text-subtle);
     align-items: center;
 }
 
 .sywat-password-rules-label {
     font-weight: 700;
-    color: #475569;
+    color: var(--sywat-text-muted);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -257,7 +290,7 @@
 
 .sywat-modal-row-spacing { margin-top: 8px !important; }
 .sywat-grid-compact { gap: 8px !important; }
-.sywat-label-subtext { font-weight: normal; color: #64748b; }
+.sywat-label-subtext { font-weight: normal; color: var(--sywat-text-subtle); }
 .sywat-modal-section-header { margin-top: 10px !important; margin-bottom: 6px !important; }
 .sywat-modal-section-header h2 { font-size: 14px !important; font-weight: 700 !important; margin: 0; }
 
@@ -302,7 +335,7 @@
 
 /* Overflow Warning Modal Formatting */
 .sywat-overflow-dialog {
-    color: #0f172a;
+    color: var(--sywat-navy);
 }
 
 .sywat-overflow-title {
@@ -346,11 +379,30 @@
     justify-content: center;
 }
 
+/* Waitlist Pill Badge (Clickable Triggers, Queue Numbers & Selected Counter) */
 .sywat-waitlist-pill {
-    font-size: 0.8rem;
-    color: #d97706;
-    margin-top: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 3px 9px;
+    font-size: 12px;
     font-weight: 700;
+    line-height: 1.2;
+    color: #b45309 !important;
+    background-color: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    text-decoration: none !important;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+a.sywat-waitlist-pill:hover {
+    background-color: #fde68a;
+    border-color: #f59e0b;
+    color: #92400e !important;
 }
 
 /* In-body Form Actions Wrappers */
@@ -359,7 +411,7 @@
     margin-top: 20px !important;
     margin-bottom: 0 !important;
     padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--sywat-border-light);
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -370,7 +422,7 @@
     margin-top: 20px !important;
     margin-bottom: 0 !important;
     padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--sywat-border-light);
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
@@ -387,7 +439,7 @@
 .sywat-intake-card {
     background: #ffffff;
     padding: 16px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 6px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     margin-bottom: 20px;
@@ -397,20 +449,20 @@
     margin-top: 0 !important;
     margin-bottom: 12px !important;
     padding-bottom: 8px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--sywat-surface-muted);
 }
 
 .sywat-intake-card .sywat-table-header-bar h2 {
     font-size: 14px !important;
     font-weight: 700 !important;
-    color: #0f172a;
+    color: var(--sywat-navy);
     margin: 0;
 }
 
 .sywat-intake-group-wrapper {
-    background: #f8fafc;
+    background: var(--sywat-surface-alt);
     padding: 14px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--sywat-border-light);
     border-radius: 6px;
     margin-bottom: 16px;
 }
@@ -436,7 +488,7 @@
     padding: 0 4px;
     font-weight: 700;
     font-size: 12px;
-    color: #475569;
+    color: var(--sywat-text-muted);
     flex-wrap: nowrap;
     width: 100%;
     box-sizing: border-box;
@@ -475,14 +527,14 @@
     align-items: center;
     margin-top: 14px;
     padding-top: 14px;
-    border-top: 1px dashed #cbd5e1;
+    border-top: 1px dashed var(--sywat-border);
     flex-wrap: wrap;
     gap: 10px;
 }
 
 .sywat-intake-summary { text-align: right; }
-.sywat-intake-total-text { font-size: 14px; font-weight: 700; color: #0f172a; }
-.sywat-intake-total-val { color: #0284c7; }
+.sywat-intake-total-text { font-size: 14px; font-weight: 700; color: var(--sywat-navy); }
+.sywat-intake-total-val { color: var(--sywat-primary); }
 
 .sywat-family-badge {
     display: none;
@@ -495,7 +547,7 @@
     margin-left: 6px;
 }
 
-.sywat-intake-due-text { font-size: 12px; color: #64748b; margin-top: 2px; }
+.sywat-intake-due-text { font-size: 12px; color: var(--sywat-text-subtle); margin-top: 2px; }
 .sywat-intake-due-val { color: #dc2626; font-weight: 700; }
 
 /* FareHarbor Bulk Upload Layouts */
@@ -508,7 +560,7 @@
 }
 
 .sywat-import-details { margin-top: 10px; }
-.sywat-import-summary { font-size: 12px; font-weight: 600; color: #0284c7; cursor: pointer; }
+.sywat-import-summary { font-size: 12px; font-weight: 600; color: var(--sywat-primary); cursor: pointer; }
 .sywat-import-textarea-wrap { margin-top: 8px; }
 .sywat-import-textarea { font-family: monospace; font-size: 12px; width: 100%; box-sizing: border-box; }
 
@@ -527,9 +579,9 @@
     left: 0 !important;
     width: 100% !important;
     min-width: 240px !important;
-    z-index: 100000 !important;
+    z-index: var(--sywat-z-modal-dropdown) !important;
     background: #ffffff !important;
-    border: 1px solid #94a3b8 !important;
+    border: 1px solid var(--sywat-border-strong) !important;
     border-radius: 4px !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     max-height: 180px !important;
@@ -543,25 +595,25 @@
 .sywat-desk-tfaa-item {
     padding: 7px 10px !important;
     cursor: pointer !important;
-    border-bottom: 1px solid #f1f5f9 !important;
+    border-bottom: 1px solid var(--sywat-surface-muted) !important;
     font-size: 12px !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    color: #1e293b !important;
+    color: var(--sywat-navy-soft) !important;
 }
 
 .sywat-autocomplete-item:hover,
 .sywat-tfaa-autocomplete-dropdown > div:hover,
 .sywat-tfaa-item:hover,
 .sywat-desk-tfaa-item:hover { 
-    background-color: #f1f5f9 !important; 
+    background-color: var(--sywat-surface-muted) !important; 
 }
 
 .sywat-tfaa-item-badge {
     font-size: 11px;
-    color: #0284c7;
-    background: #e0f2fe;
+    color: var(--sywat-primary);
+    background: var(--sywat-primary-tint);
     padding: 1px 6px;
     border-radius: 3px;
 }
@@ -598,7 +650,7 @@
 #sywat_edit_archer_modal, 
 #sywat_results_edit_modal,
 .sywat-modal-backdrop.sywat-nested-modal { 
-    z-index: 100050 !important; 
+    z-index: var(--sywat-z-modal-nested) !important; 
 }
 
 /* ==========================================================================
@@ -629,9 +681,9 @@
 }
 
 .sywat-badge-none { 
-    background: #f1f5f9; 
-    color: #475569; 
-    border: 1px solid #cbd5e1; 
+    background: var(--sywat-surface-muted); 
+    color: var(--sywat-text-muted); 
+    border: 1px solid var(--sywat-border); 
     padding: 6px 10px; 
     border-radius: 4px; 
     font-size: 11px; 
@@ -688,7 +740,7 @@
 
 .sywat-calculated-status-label {
     font-size: 13px;
-    color: #0284c7;
+    color: var(--sywat-primary);
     font-weight: 600;
 }
 
@@ -703,20 +755,169 @@
     font-weight: 700 !important;
 }
 
+/* ==========================================================================
+   6B. Dedicated Waitlist Management Modal (#sywat_waitlist_modal)
+   ========================================================================== */
+#sywat_waitlist_modal .sywat-waitlist-filter-bar,
+#sywat_waitlist_modal .sywat-waitlist-move-toolbar {
+    background: var(--sywat-surface-alt);
+    border: 1px solid var(--sywat-border-light);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+    width: 100%;
+    margin: 0;
+}
+
+#sywat_waitlist_modal .sywat-filter-field-grow {
+    flex: 1 1 280px;
+    min-width: 240px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-control-group input[type="text"],
+#sywat_waitlist_modal .sywat-waitlist-control-group select {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Uniform 38px Height Parity Across All Top Toolbar Inputs, Selects & Buttons */
+#sywat_waitlist_modal .sywat-filter-field select.sywat-waitlist-toolbar-control,
+#sywat_waitlist_modal input[type="text"].sywat-waitlist-toolbar-control,
+#sywat_waitlist_modal .sywat-waitlist-toolbar-btn,
+#sywat_waitlist_modal .sywat-waitlist-count-pill {
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    border-radius: 4px !important;
+}
+
+#sywat_waitlist_modal .sywat-filter-field select.sywat-waitlist-toolbar-control,
+#sywat_waitlist_modal input[type="text"].sywat-waitlist-toolbar-control {
+    padding: 6px 12px !important;
+    font-weight: 500 !important;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-toolbar-btn,
+#sywat_waitlist_modal .sywat-waitlist-count-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 14px !important;
+    white-space: nowrap !important;
+}
+
+/* Waitlist Queue Table Columns & Neatly Aligned Mobile-Friendly Action Stacks */
+#sywat_waitlist_modal .sywat-waitlist-table {
+    min-width: 680px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-col-select {
+    width: 96px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-col-actions {
+    width: 196px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-select-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-group-header-row {
+    background-color: #f8fafc;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-action-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    width: 100% !important;
+    max-width: 176px !important;
+    margin: 0 auto !important;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-action-form {
+    display: block !important;
+    width: 100% !important;
+    max-width: 176px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-action-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    margin: 0 !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-group-header-row .sywat-btn-warning.sywat-waitlist-action-btn {
+    background-color: #f59e0b !important;
+    border-color: #d97706 !important;
+    color: #ffffff !important;
+}
+
+#sywat_waitlist_modal .sywat-waitlist-group-header-row .sywat-btn-warning.sywat-waitlist-action-btn:hover {
+    background-color: #d97706 !important;
+    border-color: #b45309 !important;
+}
+
 @media screen and (max-width: 768px) {
     .sywat-modal-backdrop { padding: 10px; }
     .sywat-modal-content, .sywat-modal-sm, .sywat-modal-md, .sywat-modal-lg, .sywat-modal-xl { width: 100% !important; max-height: 94vh !important; }
     .sywat-modal-body { padding: 14px; }
     .sywat-form-grid-2, .sywat-form-grid-4 { grid-template-columns: 1fr !important; gap: 8px !important; }
 
+    #sywat_waitlist_modal .sywat-filter-field,
+    #sywat_waitlist_modal .sywat-filter-field-grow {
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 1 100% !important;
+    }
+
     /* Responsive Archer Input Row Stacking on Mobile Only */
     .sywat-archer-header-row { display: none; }
     .sywat-archer-input-row { 
         flex-direction: column; 
         align-items: stretch; 
-        background: #f8fafc; 
+        background: var(--sywat-surface-alt); 
         padding: 10px; 
-        border: 1px solid #e2e8f0; 
+        border: 1px solid var(--sywat-border-light); 
         border-radius: 6px; 
     }
     .sywat-col-archer-name, .sywat-col-archer-div, .sywat-col-archer-gender, .sywat-col-archer-style, .sywat-col-archer-line { width: 100%; min-width: 0; }
@@ -730,7 +931,7 @@
 .sywat-progress-track {
     width: 100%;
     height: 18px;
-    background-color: #e2e8f0;
+    background-color: var(--sywat-border-light);
     border-radius: 9999px;
     overflow: hidden;
     margin: 16px 0 12px 0;
@@ -751,7 +952,7 @@
     align-items: center;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #475569;
+    color: var(--sywat-text-muted);
 }
 
 /* ==========================================================================
@@ -773,6 +974,17 @@
         overflow: visible !important;
         float: none !important;
         box-sizing: border-box !important;
+    }
+
+    /* When a modal is open, print ONLY that modal: hide every other direct child
+       of <body> (theme header, Divi sections, footer, admin bar...). Works for any
+       theme because open modals are moved to <body> by sywat-modal-manager.js. */
+    body.sywat-modal-open > *:not(.sywat-modal-backdrop) {
+        display: none !important;
+    }
+    html.sywat-modal-open,
+    body.sywat-modal-open {
+        overflow: visible !important;
     }
 
     /* Hide WP Admin chrome, non-print elements, AND inactive modals */

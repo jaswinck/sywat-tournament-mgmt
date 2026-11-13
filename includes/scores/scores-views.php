@@ -4,7 +4,7 @@
  * Path: includes/scores/scores-views.php
  * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -57,19 +57,19 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $selected_line_idx   = isset( $_POST['selected_line_idx'] )   ? sanitize_text_field( wp_unslash( $_POST['selected_line_idx'] ) )   : ( isset( $_GET['selected_line_idx'] )   ? sanitize_text_field( wp_unslash( $_GET['selected_line_idx'] ) )   : 'all' );
         $search_query        = isset( $_POST['search_query'] )        ? sanitize_text_field( wp_unslash( $_POST['search_query'] ) )        : '';
 
-        // ALWAYS prefer global active tournament first when GET/POST is empty
-        if ( empty( $selected_tournament ) ) {
-            $global_curr = get_option( 'sywat_current_tournament', '' );
-            if ( ! empty( $global_curr ) && isset( $raw_tournaments[$global_curr] ) ) {
-                $selected_tournament = $global_curr;
-            }
-        }
-
-        // Secondary Fallback: User Meta Preference
+        // Primary Fallback: Sticky User Meta Preference across Register / Check-In / Scores
         if ( empty( $selected_tournament ) && $user->ID ) {
             $saved_t = get_user_meta( $user->ID, 'sywat_desk_selected_tournament', true );
             if ( ! empty( $saved_t ) && isset( $raw_tournaments[$saved_t] ) ) {
                 $selected_tournament = $saved_t;
+            }
+        }
+
+        // Secondary Fallback: Global active tournament
+        if ( empty( $selected_tournament ) ) {
+            $global_curr = get_option( 'sywat_current_tournament', '' );
+            if ( ! empty( $global_curr ) && isset( $raw_tournaments[$global_curr] ) ) {
+                $selected_tournament = $global_curr;
             }
         }
 
@@ -153,7 +153,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $is_hub_enabled = in_array( $selected_tournament, $active_hubs );
 
         // Enqueue client score interactive JavaScript asset
-        wp_enqueue_script( 'sywat-scores-js', site_url( '/assets/js/sywat-scores.js' ), array(), '7.3.1', true );
+        wp_enqueue_script( 'sywat-scores-js', SYWAT_PLUGIN_URL . 'assets/js/sywat-scores.js', array(), SYWAT_PLUGIN_VERSION, true );
+
+        $tab_query_args = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
         ?>
 
         <div class="sywat-wrap">
@@ -161,12 +163,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
 
             <!-- Master Navigation Tabs -->
             <div class="sywat-nav-tabs no-print">
-                <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-                <a href="<?php echo esc_url( site_url( '/sywat-register/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
-                <a href="<?php echo esc_url( site_url( '/sywat-desk/' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
-                <a href="<?php echo esc_url( site_url( '/sywat-enter-scores/' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
+                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
                 <?php if ( $can_manage_seasons ): ?>
-                    <a href="<?php echo esc_url( site_url( '/sywat-manage-tournaments/?tab=seasons' ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
+                    <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
                 <?php endif; ?>
             </div>
 
@@ -211,7 +213,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         </form>
 
                         <?php if ( $is_hub_enabled ): ?>
-                            <a href="<?php echo esc_url( site_url( '/sywat-volunteer-hub/' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
+                            <a href="<?php echo esc_url( sywat_page_url( 'volunteer_hub' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -426,7 +428,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <?php endif; ?>
                                 <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
                             </div>
-                        <?php else: ?>
+                        <?php else : ?>
                             <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection.</p>
                         <?php endif; ?>
                     </form>
@@ -435,7 +437,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             </div>
         </div>
 
-        <script>
+        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
         document.addEventListener("DOMContentLoaded", function() {
             const searchInput = document.getElementById('sywat_score_search_input');
             

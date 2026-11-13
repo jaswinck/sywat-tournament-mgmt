@@ -2,7 +2,7 @@
  * SYWAT Archery - Member & Board Management JavaScript & AJAX Batch Engine
  * Path: assets/js/sywat-members.js
  * Description: Handles modal toggles (including Historical Archers Batch Import, Audit Preview Overlays, Protected Test Data Purge Overlays, Household Link Overlays, Edit Board Member Position Overlays, Head of Household Edit Overlays with URL query state preservation, and Collapsible Standalone Account Conversion Drawers with instant blur focus release), real-time progress bar modal streams for chunked AJAX imports and test data purges, client-side phone formatting, password policy validation, dynamic shop visibility, live unassigned archer autocomplete search APIs, live Head of Household autocomplete search APIs, search/status filtering, and notice auto-dismissal.
- * Compliance: Zero inline style manipulation. Uses class toggles (.active, .sywat-hidden, etc.).
+ * Compliance: Pure Member & Board management logic. Temporary POC reconciliation logic is isolated in assets/js/sywat-tfaa-reconcile.js.
  * Author: SYWAT Archery
  * Version: 5.3.0
  */

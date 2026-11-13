@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Unified Button System Spec
    Path: assets/css/sywat-buttons.css
-   Version: 6.5.1
+   Version: 6.8.2
    ========================================================================== */
 
 /* Universal Button Base (38px Standard Height) */
@@ -36,20 +36,23 @@
 
 /* Color Tier Variants (SYWAT Action Blue Design Tokens - Outline Default) */
 .sywat-btn-primary,
-.sywat-btn-secondary {
+.sywat-btn-secondary,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary:focus:not(:focus-visible),
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary:focus:not(:focus-visible) {
     background-color: #ffffff;
-    border: 1px solid #0284c7;
-    color: #0284c7 !important;
+    border: 1px solid var(--sywat-primary);
+    color: var(--sywat-primary) !important;
 }
 .sywat-btn-primary:hover,
 .sywat-btn-secondary:hover {
-    background-color: #0284c7;
-    border-color: #0284c7;
+    background-color: var(--sywat-primary);
+    border-color: var(--sywat-primary);
     color: #ffffff !important;
 }
 
 /* Outline Success Button (Default for Add Walk-In & Check In Line) */
-.sywat-btn-success {
+.sywat-btn-success,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success:focus:not(:focus-visible) {
     background-color: #ffffff;
     border: 1px solid #008a20;
     color: #008a20 !important;
@@ -61,7 +64,8 @@
 }
 
 /* Solid Success Button (Dedicated Primary CTA for Check In Archer) */
-.sywat-btn-success-solid {
+.sywat-btn-success-solid,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid:focus:not(:focus-visible) {
     background-color: #008a20;
     border: 1px solid #008a20;
     color: #ffffff !important;
@@ -73,7 +77,8 @@
 }
 
 /* Warning Buttons (Capacity Overflows & Waitlists) */
-.sywat-btn-warning {
+.sywat-btn-warning,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning:focus:not(:focus-visible) {
     background-color: #ffffff;
     border: 1px solid #d97706;
     color: #d97706 !important;
@@ -84,7 +89,8 @@
     color: #ffffff !important;
 }
 
-.sywat-btn-warning-solid {
+.sywat-btn-warning-solid,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid:focus:not(:focus-visible) {
     background-color: #d97706;
     border: 1px solid #d97706;
     color: #ffffff !important;
@@ -95,7 +101,8 @@
     color: #ffffff !important;
 }
 
-.sywat-btn-danger {
+.sywat-btn-danger,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger:focus:not(:focus-visible) {
     background-color: #ffffff;
     border: 1px solid #dc3545;
     color: #dc3545 !important;
@@ -106,7 +113,8 @@
     color: #ffffff !important;
 }
 
-.sywat-btn-checkedin {
+.sywat-btn-checkedin,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin:focus:not(:focus-visible) {
     background-color: #d4edda;
     border: 1px solid #c3e6cb;
     color: #155724 !important;
@@ -117,29 +125,32 @@
     color: #155724 !important;
 }
 
-.sywat-btn-push {
+.sywat-btn-push,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push:focus:not(:focus-visible) {
     background-color: #ffffff;
-    border: 1px solid #475569;
-    color: #475569 !important;
+    border: 1px solid var(--sywat-text-muted);
+    color: var(--sywat-text-muted) !important;
 }
 .sywat-btn-push:hover {
-    background-color: #475569;
-    border-color: #475569;
+    background-color: var(--sywat-text-muted);
+    border-color: var(--sywat-text-muted);
     color: #ffffff !important;
 }
 
-.sywat-btn-global-push {
+.sywat-btn-global-push,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push:focus:not(:focus-visible) {
     background-color: #ffffff;
-    border: 1px solid #0f172a;
-    color: #0f172a !important;
+    border: 1px solid var(--sywat-navy);
+    color: var(--sywat-navy) !important;
 }
 .sywat-btn-global-push:hover {
-    background-color: #0f172a;
-    border-color: #0f172a;
+    background-color: var(--sywat-navy);
+    border-color: var(--sywat-navy);
     color: #ffffff !important;
 }
 
-.sywat-btn-live {
+.sywat-btn-live,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live:focus:not(:focus-visible) {
     background-color: #ffffff;
     border: 1px solid #008a20;
     color: #008a20 !important;
@@ -150,7 +161,8 @@
     color: #ffffff !important;
 }
 
-.sywat-btn-gray {
+.sywat-btn-gray,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray:focus:not(:focus-visible) {
     background-color: #6c757d;
     border: 1px solid #6c757d;
     color: #ffffff !important;
@@ -162,8 +174,9 @@
 }
 
 /* Special Pill Buttons & Action Triggers */
-.sywat-btn-pill {
-    background-color: #0284c7;
+.sywat-btn-pill,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill:focus:not(:focus-visible) {
+    background-color: var(--sywat-primary);
     color: #ffffff !important;
     border: none;
     padding: 4px 8px;
@@ -174,10 +187,11 @@
     transition: background-color 0.15s ease;
 }
 .sywat-btn-pill:hover {
-    background-color: #0369a1;
+    background-color: var(--sywat-primary-dark);
 }
 
-.sywat-btn-use-official {
+.sywat-btn-use-official,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official:focus:not(:focus-visible) {
     background-color: #0d9488;
     color: #ffffff !important;
     border: none;
@@ -191,6 +205,26 @@
 }
 .sywat-btn-use-official:hover {
     background-color: #0f766e;
+}
+
+/* Accessible Keyboard Focus Ring (Preserves :focus-visible Outlines) */
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill:focus-visible,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official:focus-visible {
+    outline: 2px solid var(--sywat-primary);
+    outline-offset: 2px;
 }
 
 /* Sizing Helpers */

@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     6.7.0
+ * Version:     6.8.1
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '6.7.0' );
+define( 'SYWAT_PLUGIN_VERSION', '6.8.1' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -28,22 +28,11 @@ function sywat_archery_activate() {
     }
 }
 
-// Enqueue standard jQuery and modular global styles for front-end and WP admin
-add_action( 'wp_enqueue_scripts', 'sywat_archery_enqueue_assets', 99 );
-add_action( 'admin_enqueue_scripts', 'sywat_archery_enqueue_assets', 99 );
-function sywat_archery_enqueue_assets() {
-    wp_enqueue_script( 'jquery' );
-
-    $base_css_url = SYWAT_PLUGIN_URL . 'assets/css/';
-
-    // Enqueue Modular Admin & Operations Stylesheets (Priority 99 ensures overrides take precedence)
-    wp_enqueue_style( 'sywat-core',    $base_css_url . 'sywat-core.css',    array(), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-buttons', $base_css_url . 'sywat-buttons.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-tables',  $base_css_url . 'sywat-tables.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-toolbar', $base_css_url . 'sywat-toolbar.css', array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-modals',  $base_css_url . 'sywat-modals.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
-    wp_enqueue_style( 'sywat-public',  $base_css_url . 'sywat-public.css',  array( 'sywat-core' ), SYWAT_PLUGIN_VERSION );
-}
+// Front-end integration layer: page detection, conditional asset loading,
+// cache exclusion, optimizer opt-outs, builder placeholders, display settings.
+// Assets now load only on pages that contain a SYWAT shortcode (never in wp-admin
+// or page-builder editors). jQuery is no longer required by any plugin script.
+require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-frontend.php';
 
 // Load Shared Core Engines & Utilities
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
@@ -57,6 +46,7 @@ require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-con
 require_once SYWAT_PLUGIN_DIR . 'includes/members/class-sywat-members.php';               // Member Management Sub-System ([sywat_members])
 require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';      // Intake & Phone Registration Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';                  // Roster Administration & Line Purging Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/waitlist/class-sywat-waitlist.php';              // Waitlist Queue Management & Family Cap Reconciliation Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';                     // Financial Split Calculations & Invoicing
 require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';                     // Multi-Tenant Shop Management Engine
 

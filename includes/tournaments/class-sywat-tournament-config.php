@@ -22,7 +22,10 @@ add_shortcode( 'sywat_volunteer_hub',      'render_sywat_volunteer_hub' );
 
 // Enqueue Module Scripts & Assets
 function sywat_enqueue_tournament_scripts() {
-    $js_url = plugins_url( '../../assets/js/sywat-tournaments.js', __FILE__ );
+    if ( ! function_exists( 'sywat_should_load_module_assets' ) || ! sywat_should_load_module_assets() ) {
+        return;
+    }
+    $js_url = SYWAT_PLUGIN_URL . 'assets/js/sywat-tournaments.js';
     wp_enqueue_script( 'sywat-tournaments-js', $js_url, array(), '1.0.1', true );
     
     // Localize Script to pass AJAX URL and Security Nonce to client-side JS
@@ -32,7 +35,6 @@ function sywat_enqueue_tournament_scripts() {
     ) );
 }
 add_action( 'wp_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
-add_action( 'admin_enqueue_scripts', 'sywat_enqueue_tournament_scripts' );
 
 // Include Sub-Module Files
 require_once plugin_dir_path( __FILE__ ) . 'tournament-data.php';

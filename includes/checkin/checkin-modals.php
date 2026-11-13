@@ -2,8 +2,9 @@
 /**
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
+ * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with household-wide unpaid family balance enforcement.
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 6.6.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -28,6 +29,7 @@ function sywat_desk_render_modals($data) {
     $legacy_div_map            = $data['legacy_div_map'];
     $existing_families         = $data['existing_families'];
     $existing_families_by_line = isset($data['existing_families_by_line']) ? $data['existing_families_by_line'] : array();
+    $all_tourn_regs            = isset($data['registrations']) ? $data['registrations'] : array();
     
     // Fast-Loop Context Persistence with 3-tier fail-safe checking
     $walkin_context = array();
@@ -59,11 +61,35 @@ function sywat_desk_render_modals($data) {
     <!-- CHECK-IN MODAL (PRE-REG) -->
     <?php if ($modal_archer): ?>
     <?php 
-        $modal_due = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
-        $is_family = isset($modal_archer['paid']) && $modal_archer['paid'] === 'Family';
+        $modal_due      = isset($modal_archer['balance_due']) ? floatval($modal_archer['balance_due']) : 0; 
+        $is_family      = isset($modal_archer['paid']) && strcasecmp($modal_archer['paid'], 'Family') === 0;
         $curr_div_check = isset($modal_archer['division']) ? $modal_archer['division'] : '';
         $is_youth_check = (stripos($curr_div_check, 'Cub') !== false || stripos($curr_div_check, 'Youth') !== false || stripos($curr_div_check, 'Young Adult') !== false);
-        $display_due    = $is_family ? $modal_due : ($is_youth_check ? 25.00 : 30.00);
+
+        $household_info = function_exists('sywat_get_household_balance_info')
+            ? sywat_get_household_balance_info($modal_archer, $all_tourn_regs, $lines)
+            : null;
+
+        $effective_due = $household_info ? floatval($household_info['effective_due']) : $modal_due;
+        if (!$household_info && $is_family) {
+            $fam_id = !empty($modal_archer['family_id']) ? trim((string) $modal_archer['family_id']) : (!empty($modal_archer['booking_id']) ? trim((string) $modal_archer['booking_id']) : '');
+            if ($fam_id !== '') {
+                foreach ($all_tourn_regs as $other_r) {
+                    $o_status = isset($other_r['status']) ? trim((string) $other_r['status']) : '';
+                    if (strcasecmp($o_status, 'Waitlist') === 0 || strcasecmp($o_status, 'Cancelled') === 0) {
+                        continue;
+                    }
+                    $o_fam  = !empty($other_r['family_id']) ? trim((string) $other_r['family_id']) : '';
+                    $o_book = !empty($other_r['booking_id']) ? trim((string) $other_r['booking_id']) : '';
+                    if ($o_fam === $fam_id || $o_book === $fam_id) {
+                        $effective_due = max($effective_due, isset($other_r['balance_due']) ? floatval($other_r['balance_due']) : 0);
+                    }
+                }
+            }
+        }
+
+        $is_family_balance = $is_family || ($household_info && !empty($household_info['has_family']));
+        $display_due       = $is_family_balance ? $effective_due : ($modal_due > 0 ? $modal_due : ($is_youth_check ? 25.00 : 30.00));
 
         $checkin_line_idx = function_exists('sywat_desk_resolve_line_idx') ? sywat_desk_resolve_line_idx($modal_archer, $lines) : (isset($modal_archer['line_index']) ? $modal_archer['line_index'] : '0');
         $checkin_families = isset($existing_families_by_line[$checkin_line_idx]) ? $existing_families_by_line[$checkin_line_idx] : $existing_families;
@@ -93,13 +119,13 @@ function sywat_desk_render_modals($data) {
                         <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
                     </div>
 
-                    <?php if ($modal_due > 0): ?>
+                    <?php if ($effective_due > 0): ?>
                         <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger sywat-alert-center">
                             <div class="sywat-alert-title">
-                                ⚠️ <?php echo $is_family ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
+                                ⚠️ <?php echo $is_family_balance ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format($display_due, 2); ?>
                             </div>
                             <div class="sywat-alert-subtext">
-                                <?php if ($is_family): ?>
+                                <?php if ($is_family_balance): ?>
                                     Family Cap Group Outstanding Balance. Collect Payment Onsite.
                                 <?php else: ?>
                                     Please See Event Staff for Payment

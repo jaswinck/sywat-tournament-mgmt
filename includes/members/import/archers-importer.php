@@ -10,6 +10,26 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Accept only staged import files inside uploads/sywat-temp/. The path comes
+ * back from the browser in a hidden field, so it must never be trusted as-is
+ * (the importer reads and then deletes it).
+ */
+if ( ! function_exists( 'sywat_validate_import_path' ) ) {
+    function sywat_validate_import_path( $path ) {
+        if ( empty( $path ) ) {
+            return '';
+        }
+        $uploads  = wp_upload_dir();
+        $base     = realpath( trailingslashit( $uploads['basedir'] ) . 'sywat-temp' );
+        $resolved = realpath( $path );
+        if ( ! $base || ! $resolved || 0 !== strpos( $resolved, trailingslashit( $base ) ) ) {
+            return '';
+        }
+        return $resolved;
+    }
+}
+
 if ( ! function_exists( 'sywat_structure_parsed_rows' ) ) {
     /**
      * Structure raw matrix into associative rows keyed by header titles.
@@ -784,7 +804,7 @@ if ( ! function_exists( 'sywat_ajax_import_archers_chunk' ) ) {
         @ini_set( 'memory_limit', '512M' );
 
         $user_id         = get_current_user_id();
-        $persistent_file = isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( $_POST['persistent_file_path'] ) : '';
+        $persistent_file = sywat_validate_import_path( isset( $_POST['persistent_file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['persistent_file_path'] ) ) : '' );
         $offset          = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
         $limit           = isset( $_POST['limit'] ) ? intval( $_POST['limit'] ) : 100;
         $reset           = isset( $_POST['reset'] ) && $_POST['reset'] === 'yes';

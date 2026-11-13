@@ -4,15 +4,39 @@
    Version: 7.5.0
    ========================================================================== */
 
-/* Page Resets & Outer Layout Wrappers */
-body {
+:root {
+    /* Brand tokens. Each falls back to the plugin's original colour; a theme
+       (e.g. the TFAA Divi child theme) restyles the plugin by defining the
+       matching --tfaa-* variable, or by overriding --sywat-* directly. */
+    --sywat-navy: var(--tfaa-navy, #0f172a);
+    --sywat-navy-soft: var(--tfaa-navy-soft, #1e293b);
+    --sywat-primary: var(--tfaa-primary, #0284c7);
+    --sywat-primary-dark: var(--tfaa-primary-dark, #0369a1);
+    --sywat-primary-tint: var(--tfaa-primary-tint, #e0f2fe);
+    --sywat-accent: var(--tfaa-accent, #38bdf8);
+    --sywat-heading: var(--tfaa-heading, #1e3a8a);
+    --sywat-text: var(--tfaa-text, #334155);
+    --sywat-text-muted: var(--tfaa-text-muted, #475569);
+    --sywat-text-subtle: var(--tfaa-text-subtle, #64748b);
+    --sywat-border: var(--tfaa-border, #cbd5e1);
+    --sywat-border-light: var(--tfaa-border-light, #e2e8f0);
+    --sywat-border-strong: var(--tfaa-border-strong, #94a3b8);
+    --sywat-surface-alt: var(--tfaa-surface-alt, #f8fafc);
+    --sywat-surface-muted: var(--tfaa-surface-muted, #f1f5f9);
+    --sywat-font-body: var(--tfaa-font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif);
+}
+
+/* Page Resets & Outer Layout Wrappers
+   Applied only in App mode (Settings > SYWAT Display), which is the default and
+   matches the original behaviour. Theme mode leaves the theme layout alone. */
+body.sywat-hide-theme-chrome {
     padding-top: 0 !important;
     margin-top: 0 !important;
 }
 
 .sywat-wrap,
 .sywat-app {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    font-family: var(--sywat-font-body);
     color: #2c3338;
     max-width: 1200px;
     margin: 0 auto;
@@ -41,16 +65,29 @@ body {
 .sywat-mt-4 { margin-top: 16px !important; }
 .sywat-mb-4 { margin-bottom: 16px !important; }
 
-/* Theme Overrides & Global Enforcements */
-#masthead, header.site-header, .ast-site-title-wrap, .site-branding, .main-header-bar, .entry-header, h1.entry-title {
+/* Theme Overrides: hide the theme header/title in App mode only (default,
+   original behaviour). Theme mode (e.g. Divi) keeps the site header. */
+body.sywat-hide-theme-chrome #masthead,
+body.sywat-hide-theme-chrome header.site-header,
+body.sywat-hide-theme-chrome .ast-site-title-wrap,
+body.sywat-hide-theme-chrome .site-branding,
+body.sywat-hide-theme-chrome .main-header-bar,
+body.sywat-hide-theme-chrome .entry-header,
+body.sywat-hide-theme-chrome h1.entry-title,
+body.sywat-hide-theme-chrome #main-header,
+body.sywat-hide-theme-chrome #top-header,
+body.sywat-hide-theme-chrome .et-l--header {
     display: none !important;
+}
+body.sywat-hide-theme-chrome #page-container {
+    padding-top: 0 !important; /* Divi reserves space for its fixed header */
 }
 
 /* Master Card Containers */
 .sywat-card,
 .sywat-shop-card {
     background: #ffffff;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     padding: 20px;
@@ -64,7 +101,7 @@ body {
     max-width: 420px;
     margin: 30px auto 40px auto !important;
     background: #ffffff;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     overflow: hidden;
@@ -75,10 +112,10 @@ body {
 /* Compact Dark Navy Header Banner & Logo Rules */
 .sywat-login-card-header,
 .sywat-login-card > header {
-    background-color: #0f172a !important;
+    background-color: var(--sywat-navy) !important;
     padding: 16px 20px 14px 20px !important;
     text-align: center !important;
-    border-bottom: 3px solid #0284c7 !important;
+    border-bottom: 3px solid var(--sywat-primary) !important;
 }
 
 .sywat-login-card-header img,
@@ -133,7 +170,7 @@ body {
 .sywat-login-card label {
     font-size: 12px !important;
     font-weight: 700 !important;
-    color: #1e293b !important;
+    color: var(--sywat-navy-soft) !important;
     display: block !important;
     margin: 0 0 6px 0 !important;
     line-height: 1.3 !important;
@@ -146,12 +183,12 @@ body {
     box-sizing: border-box !important;
     min-height: 38px !important;
     height: 38px !important;
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid var(--sywat-border) !important;
     border-radius: 4px !important;
     padding: 8px 12px !important;
     font-size: 13px !important;
-    color: #1e293b !important;
-    background-color: #f8fafc !important;
+    color: var(--sywat-navy-soft) !important;
+    background-color: var(--sywat-surface-alt) !important;
     margin: 0 !important;
     display: block !important;
     transition: border-color 0.15s ease, background-color 0.15s ease;
@@ -160,7 +197,7 @@ body {
 .sywat-login-card input[type="text"]:focus,
 .sywat-login-card input[type="password"]:focus,
 .sywat-login-card input[type="email"]:focus {
-    border-color: #0284c7 !important;
+    border-color: var(--sywat-primary) !important;
     background-color: #ffffff !important;
     box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2) !important;
     outline: none !important;
@@ -177,7 +214,7 @@ body {
     margin: 20px 0 24px 0 !important;
     padding: 0 !important;
     font-size: 12px !important;
-    color: #475569 !important;
+    color: var(--sywat-text-muted) !important;
     line-height: 1.4 !important;
 }
 
@@ -188,7 +225,7 @@ body {
     gap: 8px !important;
     font-size: 12px !important;
     font-weight: 600 !important;
-    color: #334155 !important;
+    color: var(--sywat-text) !important;
     margin: 0 !important;
     cursor: pointer !important;
 }
@@ -216,8 +253,8 @@ body {
     width: 100% !important;
     min-height: 42px !important;
     height: 42px !important;
-    background-color: #0284c7 !important;
-    border: 1px solid #0369a1 !important;
+    background-color: var(--sywat-primary) !important;
+    border: 1px solid var(--sywat-primary-dark) !important;
     color: #ffffff !important;
     font-weight: 700 !important;
     font-size: 14px !important;
@@ -233,7 +270,7 @@ body {
 .sywat-login-card .button-primary:hover,
 .sywat-login-card button[type="submit"]:hover,
 .sywat-login-card .sywat-btn-primary:hover {
-    background-color: #0369a1 !important;
+    background-color: var(--sywat-primary-dark) !important;
     border-color: #075985 !important;
 }
 
@@ -247,7 +284,7 @@ body {
 
 .sywat-login-card .sywat-login-footer a,
 .sywat-login-card #nav a {
-    color: #0284c7;
+    color: var(--sywat-primary);
     text-decoration: none;
     font-weight: 600;
 }
@@ -261,12 +298,12 @@ body {
 .sywat-nav-tabs {
     display: inline-flex;
     align-items: center;
-    background-color: #0f172a;
+    background-color: var(--sywat-navy);
     padding: 4px 4px 0 4px;
     border-radius: 8px 8px 0 0;
     margin-bottom: -1px;
     gap: 4px;
-    border: 1px solid #0f172a;
+    border: 1px solid var(--sywat-navy);
     border-bottom: none;
     position: relative;
     z-index: 2;
@@ -276,7 +313,7 @@ body {
     padding: 10px 18px;
     font-weight: 700;
     text-decoration: none !important;
-    color: #94a3b8;
+    color: var(--sywat-border-strong);
     background: transparent;
     border: none;
     border-radius: 6px 6px 0 0;
@@ -292,7 +329,7 @@ body {
 
 .sywat-tab-item.active {
     background: #ffffff;
-    color: #0f172a;
+    color: var(--sywat-navy);
     box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
     margin-bottom: 0;
 }
@@ -314,21 +351,21 @@ body {
     gap: 16px;
     margin-bottom: 20px;
     padding-bottom: 15px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--sywat-border-light);
 }
 
 .sywat-card-header-bar h2 {
     margin: 0;
     font-size: 20px;
     font-weight: 700;
-    color: #1e3a8a;
+    color: var(--sywat-heading);
 }
 
 /* High-Contrast Subtitles & Typography Utilities */
 .sywat-subtitle {
     font-size: 14px;
     font-weight: 500;
-    color: #334155;
+    color: var(--sywat-text);
     margin-top: 4px;
     margin-bottom: 0;
     line-height: 1.4;
@@ -341,14 +378,14 @@ body {
 }
 
 .sywat-no-data-tag {
-    color: #94a3b8;
+    color: var(--sywat-border-strong);
     font-size: 11px;
     font-style: italic;
 }
 
 .sywat-meta-subtext {
     font-size: 11px;
-    color: #64748b;
+    color: var(--sywat-text-subtle);
     font-family: monospace;
     margin-top: 1px;
 }
@@ -356,13 +393,13 @@ body {
 .sywat-meta-code {
     font-family: monospace;
     font-weight: bold;
-    color: #334155;
+    color: var(--sywat-text);
 }
 
 .sywat-meta-code-primary {
     font-family: monospace;
     font-weight: bold;
-    color: #1e3a8a;
+    color: var(--sywat-heading);
 }
 
 .sywat-header-inline-controls {
@@ -386,7 +423,7 @@ body {
     font-size: 16px;
     margin: 0;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--sywat-navy);
 }
 
 .sywat-table-header-controls {
@@ -397,25 +434,22 @@ body {
     margin-left: auto;
 }
 
-/* Form Inputs & Focus States */
-.sywat-wrap input[type="text"],
-.sywat-wrap input[type="tel"],
-.sywat-wrap input[type="number"],
-.sywat-wrap input[type="password"],
-.sywat-wrap select,
-.sywat-wrap textarea,
-.sywat-app input[type="text"],
-.sywat-app input[type="tel"],
-.sywat-app input[type="number"],
-.sywat-app input[type="password"],
-.sywat-app select,
-.sywat-app textarea {
+/* Form Inputs & Focus States
+   Scope covers page wrappers, the shortcode container and modals (modals are
+   moved to <body> by sywat-modal-manager.js). Specificity is unchanged (0,2,1).
+   Added: email, date/time, search and URL fields, which previously fell back to
+   theme styling. */
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) :is(
+    input[type="text"], input[type="tel"], input[type="number"], input[type="password"],
+    input[type="email"], input[type="url"], input[type="search"], input[type="date"],
+    input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"],
+    select, textarea) {
     box-sizing: border-box;
     font-family: inherit;
     font-size: 13px;
-    color: #1e293b;
+    color: var(--sywat-navy-soft);
     background-color: #ffffff;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
     border-radius: 4px;
     padding: 8px 12px;
     min-height: 38px;
@@ -424,14 +458,20 @@ body {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.sywat-wrap input:focus,
-.sywat-wrap select:focus,
-.sywat-wrap textarea:focus,
-.sywat-app input:focus,
-.sywat-app select:focus,
-.sywat-app textarea:focus {
-    border-color: #0284c7;
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) :is(input, select, textarea):focus {
+    border-color: var(--sywat-primary);
     box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sywat-primary) 20%, transparent);
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: var(--sywat-primary);
+}
+
+/* Keyboard focus ring for plugin buttons and links (themes often remove it). */
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) :is(a, button, .sywat-btn):focus-visible {
+    outline: 2px solid var(--sywat-primary);
+    outline-offset: 2px;
 }
 
 /* Responsive Form Grids */
@@ -452,7 +492,7 @@ body {
 .sywat-field-group label {
     font-weight: 700;
     font-size: 12px;
-    color: #1e293b;
+    color: var(--sywat-navy-soft);
 }
 
 /* Summary Grid Component Rules (13px Font Scale Matching Table Names) */
@@ -477,7 +517,7 @@ body {
     grid-row: 1;
     font-size: 13px;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--sywat-navy-soft);
     line-height: 1.4;
 }
 
@@ -486,7 +526,7 @@ body {
     grid-row: 2;
     font-size: 13px;
     font-weight: 700;
-    color: #334155;
+    color: var(--sywat-text);
     line-height: 1.4;
 }
 
@@ -526,9 +566,9 @@ body {
 
 .sywat-status-saved  { color: #008a20; background: #d4edda; border: 1px solid #c3e6cb; }
 .sywat-status-draft  { color: #b45309; background: #fef3c7; border: 1px solid #fde68a; }
-.sywat-status-saving { color: #0369a1; background: #e0f2fe; border: 1px solid #bae6fd; }
+.sywat-status-saving { color: var(--sywat-primary-dark); background: var(--sywat-primary-tint); border: 1px solid #bae6fd; }
 .sywat-status-error  { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
-.sywat-status-locked { color: #475569; background: #e2e8f0; border: 1px solid #cbd5e1; }
+.sywat-status-locked { color: var(--sywat-text-muted); background: var(--sywat-border-light); border: 1px solid var(--sywat-border); }
 
 .sywat-alert { padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; font-size: 14px; }
 .sywat-alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }

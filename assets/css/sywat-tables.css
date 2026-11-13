@@ -37,7 +37,7 @@
     width: 100% !important;
     margin-bottom: 4px !important;
     font-weight: 700 !important;
-    color: #1e293b !important;
+    color: var(--sywat-navy-soft) !important;
     line-height: 1 !important;
 }
 
@@ -49,10 +49,13 @@
 }
 
 .sywat-table-responsive::-webkit-scrollbar { height: 6px; }
-.sywat-table-responsive::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-.sywat-table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-.sywat-table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.sywat-table-responsive::-webkit-scrollbar-track { background: var(--sywat-surface-muted); border-radius: 4px; }
+.sywat-table-responsive::-webkit-scrollbar-thumb { background: var(--sywat-border); border-radius: 4px; }
+.sywat-table-responsive::-webkit-scrollbar-thumb:hover { background: var(--sywat-border-strong); }
 
+/* Base table rules are scoped (specificity 0,2,1) so theme content-table rules
+   such as Divi's `.entry-content tr td` cannot override plugin cell padding. */
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table,
 .sywat-table {
     width: 100%;
     min-width: 880px;
@@ -61,7 +64,7 @@
     font-size: 13px;
 }
 
-.sywat-table th {
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table th {
     background-color: #f6f7f7;
     text-align: left;
     padding: 8px 10px;
@@ -71,7 +74,7 @@
     white-space: nowrap;
 }
 
-.sywat-table td {
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table td {
     padding: 8px 10px;
     border-bottom: 1px solid #f0f0f1;
     color: #2c3338;
@@ -92,7 +95,7 @@
 
 .sywat-member-row:hover,
 .sywat-board-row:hover {
-    background-color: #f8fafc;
+    background-color: var(--sywat-surface-alt);
 }
 
 .sywat-table-link {
@@ -211,8 +214,8 @@
 }
 
 /* Default Last Column Behavior */
-.sywat-table th:last-child, 
-.sywat-table td:last-child { 
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table th:last-child,
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table td:last-child { 
     text-align: right; 
 }
 
@@ -286,9 +289,9 @@
 .sywat-archer-header-row {
     font-weight: 700;
     font-size: 12px;
-    color: #1e293b;
+    color: var(--sywat-navy-soft);
     padding: 6px 0;
-    border-bottom: 1px solid #cbd5e1;
+    border-bottom: 1px solid var(--sywat-border);
     margin-bottom: 10px;
 }
 
@@ -322,19 +325,19 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: #f8fafc;
+    background: var(--sywat-surface-alt);
     padding: 6px 10px;
     border-radius: 4px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--sywat-border-light);
     font-size: 12px;
 }
 
-.sywat-line-slot-title { font-weight: 700; color: #1e293b; white-space: nowrap; }
+.sywat-line-slot-title { font-weight: 700; color: var(--sywat-navy-soft); white-space: nowrap; }
 
 .sywat-line-slot-caps { 
     display: flex; 
     gap: 8px; 
-    color: #475569; 
+    color: var(--sywat-text-muted); 
     align-items: center; 
     font-size: 11px; 
     white-space: nowrap; 
@@ -353,9 +356,9 @@
 .sywat-lines-total {
     margin-top: 8px;
     padding-top: 6px;
-    border-top: 1px dashed #cbd5e1;
+    border-top: 1px dashed var(--sywat-border);
     font-size: 12px;
-    color: #1e293b;
+    color: var(--sywat-navy-soft);
     text-align: center;
 }
 
@@ -455,8 +458,8 @@
 }
 
 .sywat-badge-prereg {
-    background-color: #e0f2fe;
-    color: #0369a1;
+    background-color: var(--sywat-primary-tint);
+    color: var(--sywat-primary-dark);
     border: 1px solid #bae6fd;
 }
 
@@ -467,9 +470,9 @@
 }
 
 .sywat-badge-muted {
-    background-color: #f1f5f9;
+    background-color: var(--sywat-surface-muted);
     color: #646970;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--sywat-border);
 }
 
 .sywat-badge-unassigned {
@@ -482,8 +485,8 @@
 .sywat-badge-family-cap {
     font-size: 10px;
     font-weight: 700;
-    color: #0284c7;
-    background: #e0f2fe;
+    color: var(--sywat-primary);
+    background: var(--sywat-primary-tint);
     padding: 2px 4px;
     border-radius: 3px;
     display: inline-block;
@@ -501,11 +504,11 @@
 }
 
 /* Tournament Row Metadata Typography & Chips */
-.sywat-tourn-title  { font-size: 15px; color: #0f172a; display: block; }
-.sywat-tourn-season { font-size: 12px; color: #1e3a8a; font-weight: 700; margin-top: 3px; }
-.sywat-tourn-shop   { font-size: 12px; color: #0284c7; font-weight: 600; margin-top: 2px; }
-.sywat-tourn-dates  { font-size: 11px; color: #64748b; margin-top: 2px; }
-.sywat-hub-chip-na  { color: #94a3b8; font-size: 11px; font-weight: 600; }
+.sywat-tourn-title  { font-size: 15px; color: var(--sywat-navy); display: block; }
+.sywat-tourn-season { font-size: 12px; color: var(--sywat-heading); font-weight: 700; margin-top: 3px; }
+.sywat-tourn-shop   { font-size: 12px; color: var(--sywat-primary); font-weight: 600; margin-top: 2px; }
+.sywat-tourn-dates  { font-size: 11px; color: var(--sywat-text-subtle); margin-top: 2px; }
+.sywat-hub-chip-na  { color: var(--sywat-border-strong); font-size: 11px; font-weight: 600; }
 
 /* Cell Content Formatting */
 .sywat-archer-cell-content {
@@ -517,7 +520,7 @@
 
 .sywat-archer-name {
     font-weight: bold;
-    color: #0f172a;
+    color: var(--sywat-navy);
 }
 
 .sywat-owe-badge-wrap {
@@ -530,12 +533,12 @@
 }
 
 .sywat-empty-text {
-    color: #64748b;
+    color: var(--sywat-text-subtle);
     font-style: italic;
 }
 
-.sywat-score-null { color: #94a3b8; }
-.sywat-score-cell { font-size: 13px; font-weight: 700; color: #0f172a; }
+.sywat-score-null { color: var(--sywat-border-strong); }
+.sywat-score-cell { font-size: 13px; font-weight: 700; color: var(--sywat-navy); }
 
 @media (max-width: 600px) {
     .sywat-archer-cell-content {
@@ -592,11 +595,11 @@
 .invoice-header-label { font-weight: bold; width: 28%; white-space: nowrap; }
 .invoice-header-val { background-color: #DAE6F5; border: 1px solid #7092BE; font-weight: bold; padding: 4px 8px; }
 .invoice-fee-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-.invoice-fee-table th { background-color: #f1f5f9; border: 1px solid #000; padding: 6px; font-size: 12px; text-align: left; }
+.invoice-fee-table th { background-color: var(--sywat-surface-muted); border: 1px solid #000; padding: 6px; font-size: 12px; text-align: left; }
 .invoice-fee-table td { border: 1px solid #000; padding: 6px; font-size: 12px; }
 .blue-shade { background-color: #DAE6F5; font-weight: bold; text-align: right; }
 .invoice-footer { text-align: center; font-size: 11px; margin-top: 15px; line-height: 1.5; }
-.invoice-footer-bold { font-weight: bold; color: #1e3a8a; }
+.invoice-footer-bold { font-weight: bold; color: var(--sywat-heading); }
 
 @media print {
     .sywat-table-responsive { overflow: visible !important; }

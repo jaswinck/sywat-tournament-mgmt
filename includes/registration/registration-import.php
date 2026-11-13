@@ -3,7 +3,7 @@
  * Sub-Module: FareHarbor CSV & Raw Text Import Engine
  * Path: includes/registration/registration-import.php
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Handles CSV file and raw text payload roster imports for pre-registration intake.
  *
- * @param string $tourn_name       Selected tournament name.
+ * @param string $tourn_name       Selected tournament name (unslashed).
  * @param string $target_line_idx  Target shooting line index key.
  * @param array  $tournaments      Master tournament configuration array.
  * @param array  $registrations    Master registration state array reference.
@@ -19,15 +19,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
     function sywat_handle_import_shooters( $tourn_name, $target_line_idx, $tournaments, &$registrations ) {
+        $tourn_name     = sanitize_text_field( wp_unslash( $tourn_name ) );
+        $target_line_idx = sanitize_text_field( wp_unslash( $target_line_idx ) );
         $t_data         = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
         $t_lines        = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
         $t_slug         = sanitize_title( $tourn_name );
-        $allow_partial  = isset( $_POST['allow_partial'] ) && $_POST['allow_partial'] === '1';
+        $allow_partial  = isset( $_POST['allow_partial'] ) && wp_unslash( $_POST['allow_partial'] ) === '1';
         $imported_count = 0;
         $skipped_dup    = 0;
         $skipped_cap    = 0;
 
-        $raw_text_payload = ! empty( $_POST['pasted_text'] ) ? $_POST['pasted_text'] : '';
+        $raw_text_payload = ! empty( $_POST['pasted_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['pasted_text'] ) ) : '';
 
         if ( ! empty( $raw_text_payload ) ) {
             $lines = explode( "\n", $raw_text_payload );
