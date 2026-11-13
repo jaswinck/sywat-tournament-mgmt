@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with active-only family cap evaluation, household-wide check-in balance verification, and archer edits/deletions with per-line Family Cap reconciliation.
+ * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with database-driven style/division rule enforcement and active-only family cap evaluation, household-wide check-in balance verification, and archer edits/deletions with per-line Family Cap reconciliation.
  * Author: SYWAT Archery
- * Version: 6.9.2
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -41,6 +41,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         $registrations       = &$data['registrations'];
         $lines               = $data['lines'];
         $tournaments_map     = isset( $data['tournaments'] ) ? $data['tournaments'] : array();
+        $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
 
         // Delegate Waitlist Modal actions (promote_waitlist, move_waitlist_line, modal delete_shooter) to central Waitlist engine
         if ( function_exists( 'sywat_waitlist_is_supported_action' ) && sywat_waitlist_is_supported_action( $action ) && function_exists( 'sywat_waitlist_dispatch_post_action' ) ) {
@@ -70,35 +71,93 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         $existing_families_by_line = isset( $data['existing_families_by_line'] ) ? $data['existing_families_by_line'] : array();
         $existing_families         = $data['existing_families'];
 
-        $youth_divs = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
+        $legacy_youth_divs = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
 
-        $calculate_individual_fee = function( $division ) use ( $youth_divs ) {
-            if ( $division === 'No Show' ) {
-                return 0;
-            }
-            return in_array( $division, $youth_divs, true ) ? 25.00 : 30.00;
-        };
-
-        $sanitize_style_for_division = function( $style, $division ) {
-            if ( $division === 'No Show' || $style === 'No Show' ) {
+        $resolve_paid_tier = function( $division ) use ( $legacy_youth_divs ) {
+            $clean_div = trim( (string) $division );
+            if ( strcasecmp( $clean_div, 'No Show' ) === 0 ) {
                 return 'No Show';
             }
-            if ( strpos( $style, 'Genesis' ) !== false && $division !== 'Cub (8 - 11)' ) {
-                return 'FS – Freestyle';
+            if ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
+                return sywat_shooting_styles_get_division_rate_tier( $clean_div );
+            }
+            return in_array( $clean_div, $legacy_youth_divs, true ) ? 'Youth' : 'Adult';
+        };
+
+        $calculate_individual_fee = function( $division ) use ( $resolve_paid_tier ) {
+            $clean_div = trim( (string) $division );
+            if ( $clean_div === '' || strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+                return 0.00;
+            }
+            $tier = $resolve_paid_tier( $clean_div );
+            return ( $tier === 'Youth' ) ? 25.00 : 30.00;
+        };
+
+        $resolve_division_distance = function( $division ) {
+            $clean_div = trim( (string) $division );
+            if ( strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+                return 'Cub';
+            }
+            if ( function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
+                return sywat_shooting_styles_get_division_distance( $clean_div );
+            }
+            return ( $clean_div === 'Cub (8 - 11)' ) ? 'Cub' : '20yd';
+        };
+
+        $resolve_style_and_div = function( $raw_style, $raw_division ) {
+            $clean_div   = trim( (string) $raw_division );
+            $clean_style = trim( (string) $raw_style );
+
+            if ( $clean_div !== '' && strcasecmp( $clean_div, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+                $clean_div = sywat_shooting_styles_normalize_division( $clean_div );
+            }
+            if ( $clean_style !== '' && strcasecmp( $clean_style, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
+                $clean_style = sywat_shooting_styles_normalize_style( $clean_style );
             }
 
-            $is_pro_fsl_trad = ( strpos( $style, 'FS Pro' ) !== false || strpos( $style, 'FSL –' ) !== false || strpos( $style, 'TRAD' ) !== false || stripos( $style, 'Traditional' ) !== false );
-            $allowed         = array( 'Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)' );
-
-            if ( $is_pro_fsl_trad && ! in_array( $division, $allowed, true ) ) {
-                return 'FS – Freestyle';
-            }
-            $is_lb = ( strpos( $style, 'LB' ) !== false || stripos( $style, 'Longbow' ) !== false );
-            if ( $is_lb && $division !== 'Adult (18 - 49)' ) {
-                return 'FS – Freestyle';
+            if ( strcasecmp( $clean_div, 'No Show' ) === 0 || strcasecmp( $clean_style, 'No Show' ) === 0 ) {
+                return array(
+                    'style'    => 'No Show',
+                    'division' => $clean_div,
+                );
             }
 
-            return $style;
+            if ( function_exists( 'sywat_resolve_style_and_division' ) ) {
+                $resolved = sywat_resolve_style_and_division( $clean_style, $clean_div );
+                if ( is_array( $resolved ) ) {
+                    return array(
+                        'style'    => ! empty( $resolved['style'] ) ? $resolved['style'] : $clean_style,
+                        'division' => ! empty( $resolved['division'] ) ? $resolved['division'] : $clean_div,
+                    );
+                }
+            }
+
+            // Legacy fallback if shooting styles engine is unavailable
+            if ( stripos( $clean_style, 'Genesis' ) !== false && $clean_div !== 'Cub (8 - 11)' ) {
+                $clean_style = 'FS – Freestyle';
+            }
+
+            $is_pro_fsl_trad = (
+                stripos( $clean_style, 'FS Pro' ) !== false ||
+                stripos( $clean_style, 'FSL –' ) !== false ||
+                stripos( $clean_style, 'TRAD' ) !== false ||
+                stripos( $clean_style, 'Traditional' ) !== false
+            );
+            $allowed_adult = array( 'Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)' );
+
+            if ( $is_pro_fsl_trad && ! in_array( $clean_div, $allowed_adult, true ) ) {
+                $clean_style = 'FS – Freestyle';
+            }
+
+            $is_lb = ( stripos( $clean_style, 'LB' ) !== false || stripos( $clean_style, 'Longbow' ) !== false );
+            if ( $is_lb && $clean_div !== 'Adult (18 - 49)' ) {
+                $clean_style = 'FS – Freestyle';
+            }
+
+            return array(
+                'style'    => $clean_style,
+                'division' => $clean_div,
+            );
         };
 
         // Close Line (Preserves Waitlist & Cancelled records; marks un-checked-in active archers as No Show)
@@ -178,14 +237,14 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
 
         // Add Walk-In (Fully Automated Fee & Family Cap Engine)
         if ( $action === 'add_walkin' || $action === 'add_walkin_next' ) {
-            $name_val    = trim( sanitize_text_field( wp_unslash( $_POST['walkin_name'] ) ) );
-            $group_name  = isset( $_POST['walkin_group_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_name'] ) ) ) : '';
-            $group_phone = isset( $_POST['walkin_group_phone'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_phone'] ) ) ) : '';
-            $line_idx    = sanitize_text_field( wp_unslash( $_POST['walkin_line_index'] ) );
-            $division    = sanitize_text_field( wp_unslash( $_POST['walkin_division'] ) );
-            $gender      = sanitize_text_field( wp_unslash( $_POST['walkin_gender'] ) );
-            $style       = sanitize_text_field( wp_unslash( $_POST['walkin_style'] ) );
-            $is_courtesy = ! empty( $_POST['walkin_is_courtesy'] );
+            $name_val     = trim( sanitize_text_field( wp_unslash( $_POST['walkin_name'] ) ) );
+            $group_name   = isset( $_POST['walkin_group_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_name'] ) ) ) : '';
+            $group_phone  = isset( $_POST['walkin_group_phone'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_phone'] ) ) ) : '';
+            $line_idx     = sanitize_text_field( wp_unslash( $_POST['walkin_line_index'] ) );
+            $raw_division = sanitize_text_field( wp_unslash( $_POST['walkin_division'] ) );
+            $gender       = sanitize_text_field( wp_unslash( $_POST['walkin_gender'] ) );
+            $raw_style    = sanitize_text_field( wp_unslash( $_POST['walkin_style'] ) );
+            $is_courtesy  = ! empty( $_POST['walkin_is_courtesy'] );
 
             if ( empty( $name_val ) ) {
                 return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
@@ -209,12 +268,17 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             if ( $is_duplicate ) {
                 $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js( $name_val ) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
                 return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html( $name_val ) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
-                       '<script ' . SYWAT_SCRIPT_OPTOUT_ATTRS . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
+                       '<script ' . $script_optout_attrs . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
             }
+
+            // Enforce database-driven style & age division rules (including force-division overrides)
+            $resolved_sd = $resolve_style_and_div( $raw_style, $raw_division );
+            $division    = $resolved_sd['division'];
+            $style       = $resolved_sd['style'];
+            $distance    = $resolve_division_distance( $division );
 
             $new_id    = uniqid( 'reg_' );
             $line_name = isset( $lines[ $line_idx ]['name'] ) ? $lines[ $line_idx ]['name'] : 'N/A';
-            $distance  = ( $division === 'Cub (8 - 11)' ) ? 'Cub' : '20yd';
 
             // Family Group Resolution
             $sel_fam_id  = isset( $_POST['walkin_family_group_id'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_family_group_id'] ) ) : '';
@@ -264,7 +328,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             } elseif ( $is_family_capped ) {
                 $paid_status = 'Family';
             } else {
-                $paid_status = in_array( $division, $youth_divs, true ) ? 'Youth' : 'Adult';
+                $paid_status = $resolve_paid_tier( $division );
             }
 
             $new_reg = array(
@@ -279,7 +343,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 'status'      => 'Pre-Reg',
                 'division'    => $division,
                 'gender'      => $gender,
-                'style'       => $sanitize_style_for_division( $style, $division ),
+                'style'       => $style,
                 'paid'        => $paid_status,
                 'family_id'   => $family_id,
                 'family_name' => $family_name,
@@ -422,10 +486,15 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     }
                     return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance ($' . number_format( $effective_due, 2 ) . '). Please see event staff for payment and check the verification box.</div>';
                 } else {
-                    $division = sanitize_text_field( wp_unslash( $_POST['checkin_division'] ) );
-                    $distance = ( $division === 'Cub (8 - 11)' || $division === 'No Show' ) ? 'Cub' : '20yd';
-                    $pay_opt  = sanitize_text_field( wp_unslash( $_POST['checkin_pay_option'] ) );
-                    $style    = sanitize_text_field( wp_unslash( $_POST['checkin_style'] ) );
+                    $raw_division = sanitize_text_field( wp_unslash( $_POST['checkin_division'] ) );
+                    $raw_style    = sanitize_text_field( wp_unslash( $_POST['checkin_style'] ) );
+                    $pay_opt      = sanitize_text_field( wp_unslash( $_POST['checkin_pay_option'] ) );
+
+                    // Enforce database-driven style & age division rules
+                    $resolved_sd = $resolve_style_and_div( $raw_style, $raw_division );
+                    $division    = $resolved_sd['division'];
+                    $style       = $resolved_sd['style'];
+                    $distance    = $resolve_division_distance( $division );
 
                     if ( ! empty( $_POST['checkin_name'] ) ) {
                         $reg['name'] = sanitize_text_field( wp_unslash( $_POST['checkin_name'] ) );
@@ -439,8 +508,8 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     $reg['distance']    = $distance;
                     $reg['division']    = $division;
                     $reg['gender']      = sanitize_text_field( wp_unslash( $_POST['checkin_gender'] ) );
-                    $reg['style']       = $sanitize_style_for_division( $style, $division );
-                    $reg['paid']        = ( $pay_opt === 'Family' ) ? 'Family' : ( ( $pay_opt === 'Field Governor' ) ? 'Field Governor' : ( in_array( $division, $youth_divs, true ) ? 'Youth' : 'Adult' ) );
+                    $reg['style']       = $style;
+                    $reg['paid']        = ( $pay_opt === 'Family' ) ? 'Family' : ( ( $pay_opt === 'Field Governor' ) ? 'Field Governor' : $resolve_paid_tier( $division ) );
                     $reg['checked_in']  = 1;
                     $reg['balance_due'] = 0;
 
@@ -519,7 +588,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             }
         }
 
-        // Save Edit (With per-line Family Cap reconciliation)
+        // Save Edit (With database-driven rule enforcement & per-line Family Cap reconciliation)
         if ( $action === 'save_edit' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -550,15 +619,20 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     if ( $dupe_found ) {
                         $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js( $edit_name ) . ' is already registered on this shooting line.';
                         return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html( $edit_name ) . '</strong> is already registered on this shooting line.</div>' .
-                               '<script ' . SYWAT_SCRIPT_OPTOUT_ATTRS . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
+                               '<script ' . $script_optout_attrs . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
                     }
                 }
 
-                $line_name = isset( $lines[ $line_idx ]['name'] ) ? $lines[ $line_idx ]['name'] : 'N/A';
-                $division  = sanitize_text_field( wp_unslash( $_POST['edit_division'] ) );
-                $distance  = ( $division === 'Cub (8 - 11)' || $division === 'No Show' ) ? 'Cub' : '20yd';
-                $pay_opt   = sanitize_text_field( wp_unslash( $_POST['edit_pay_option'] ) );
-                $style     = sanitize_text_field( wp_unslash( $_POST['edit_style'] ) );
+                $line_name    = isset( $lines[ $line_idx ]['name'] ) ? $lines[ $line_idx ]['name'] : 'N/A';
+                $raw_division = sanitize_text_field( wp_unslash( $_POST['edit_division'] ) );
+                $raw_style    = sanitize_text_field( wp_unslash( $_POST['edit_style'] ) );
+                $pay_opt      = sanitize_text_field( wp_unslash( $_POST['edit_pay_option'] ) );
+
+                // Enforce database-driven style & age division rules
+                $resolved_sd = $resolve_style_and_div( $raw_style, $raw_division );
+                $division    = $resolved_sd['division'];
+                $style       = $resolved_sd['style'];
+                $distance    = $resolve_division_distance( $division );
 
                 $reg['name']        = $edit_name;
                 $reg['line_index']  = $line_idx;
@@ -566,8 +640,8 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $reg['distance']    = $distance;
                 $reg['division']    = $division;
                 $reg['gender']      = sanitize_text_field( wp_unslash( $_POST['edit_gender'] ) );
-                $reg['style']       = $sanitize_style_for_division( $style, $division );
-                $reg['paid']        = ( $pay_opt === 'Family' ) ? 'Family' : ( ( $pay_opt === 'Field Governor' ) ? 'Field Governor' : ( in_array( $division, $youth_divs, true ) ? 'Youth' : 'Adult' ) );
+                $reg['style']       = $style;
+                $reg['paid']        = ( $pay_opt === 'Family' ) ? 'Family' : ( ( $pay_opt === 'Field Governor' ) ? 'Field Governor' : $resolve_paid_tier( $division ) );
                 $reg['balance_due'] = isset( $_POST['edit_balance_due'] ) ? floatval( wp_unslash( $_POST['edit_balance_due'] ) ) : 0;
 
                 if ( $reg['paid'] === 'Family' ) {
