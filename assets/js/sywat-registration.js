@@ -1,13 +1,24 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 6.4.0
+ * Description: Manages multi-archer phone intake rows, database-driven age division & distance synchronization, dynamic Youth/Adult fee & $75.00 Family Cap calculation, and TFAA historical shooter autocomplete.
+ * Version: 7.0.0
  */
 
 (function() {
     'use strict';
 
     let archerRowCount = 1;
+
+    const DEFAULT_DIVISIONS = [
+        { slug: 'cub-8-11',           code: 'C',  label: 'Cub (8 - 11)',           distance: 'Cub',  rate_tier: 'Youth', fee: 25, aliases: ['Cub'] },
+        { slug: 'youth-12-14',        code: 'Y',  label: 'Youth (12 - 14)',        distance: '20yd', rate_tier: 'Youth', fee: 25, aliases: ['Youth'] },
+        { slug: 'young-adult-15-17',  code: 'YA', label: 'Young Adult (15 - 17)',  distance: '20yd', rate_tier: 'Youth', fee: 25, aliases: ['Young Adult'] },
+        { slug: 'adult-18-49',        code: 'A',  label: 'Adult (18 - 49)',        distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Adult'] },
+        { slug: 'senior-50-59',       code: 'S',  label: 'Senior (50 - 59)',       distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Senior'] },
+        { slug: 'silver-senior-60-69',code: 'SS', label: 'Silver Senior (60 - 69)',distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Silver Senior'] },
+        { slug: 'master-senior-70',   code: 'MS', label: 'Master Senior (70+)',    distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Master Senior', 'Master'] }
+    ];
 
     function getTfaaShooters() {
         if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
@@ -27,6 +38,45 @@
             return sywatPhoneCache;
         }
         return {};
+    }
+
+    function getDivisions() {
+        if (window.sywatRegData && Array.isArray(window.sywatRegData.divisions) && window.sywatRegData.divisions.length > 0) {
+            return window.sywatRegData.divisions;
+        }
+        return DEFAULT_DIVISIONS;
+    }
+
+    function findDivisionConfig(divValue) {
+        if (!divValue) return null;
+        const needle = String(divValue).trim().toLowerCase();
+        if (!needle) return null;
+
+        const divisions = getDivisions();
+        for (let i = 0; i < divisions.length; i++) {
+            const d = divisions[i];
+            if ((d.label || '').trim().toLowerCase() === needle || (d.code || '').trim().toLowerCase() === needle) {
+                return d;
+            }
+            if (Array.isArray(d.aliases)) {
+                for (let j = 0; j < d.aliases.length; j++) {
+                    if (String(d.aliases[j] || '').trim().toLowerCase() === needle) {
+                        return d;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    function getDefaultCubDivisionLabel() {
+        const divisions = getDivisions();
+        for (let i = 0; i < divisions.length; i++) {
+            if (divisions[i].distance === 'Cub' && divisions[i].label) {
+                return divisions[i].label;
+            }
+        }
+        return 'Cub (8 - 11)';
     }
 
     function escapeHtml(str) {
@@ -85,7 +135,12 @@
             const distSelect = row.querySelector('.sywat-distance-select');
             if (distSelect) {
                 const selectedDiv = divSelect.value;
-                if (selectedDiv && selectedDiv.includes('Cub')) {
+                const selectedOpt = divSelect.options[divSelect.selectedIndex];
+                const optDist     = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
+                const divCfg      = optDist ? null : findDivisionConfig(selectedDiv);
+                const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
+
+                if (resolvedDist === 'Cub' || (resolvedDist === '' && selectedDiv && selectedDiv.includes('Cub'))) {
                     distSelect.value = 'Cub';
                 } else if (selectedDiv !== '') {
                     distSelect.value = '20yd';
@@ -102,12 +157,21 @@
         const divSelect = row.querySelector('.sywat-division-select');
         if (!divSelect) return;
 
+        const defaultCubLabel = getDefaultCubDivisionLabel();
+
         if (distSelect.value === 'Cub') {
-            divSelect.value = 'Cub (8 - 11)';
+            divSelect.value = defaultCubLabel;
             divSelect.dataset.userChosen = 'true';
-        } else if (distSelect.value === '20yd' && divSelect.value === 'Cub (8 - 11)') {
-            divSelect.value = '';
-            delete divSelect.dataset.userChosen;
+        } else if (distSelect.value === '20yd') {
+            const selectedOpt  = divSelect.options[divSelect.selectedIndex];
+            const optDist      = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
+            const divCfg       = optDist ? null : findDivisionConfig(divSelect.value);
+            const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
+
+            if (resolvedDist === 'Cub' || divSelect.value === defaultCubLabel) {
+                divSelect.value = '';
+                delete divSelect.dataset.userChosen;
+            }
         }
         window.recalculateGroupTotal();
     };
@@ -116,6 +180,7 @@
         if (!tfaaDiv || !selectEl) return;
         const cleanTfaa = tfaaDiv.trim().toLowerCase();
 
+        // 1. Direct option value match
         for (let opt of selectEl.options) {
             if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
                 selectEl.value = opt.value;
@@ -124,6 +189,19 @@
             }
         }
 
+        // 2. Match via configured division aliases or export code
+        const matchedCfg = findDivisionConfig(tfaaDiv);
+        if (matchedCfg && matchedCfg.label) {
+            for (let opt of selectEl.options) {
+                if (opt.value && opt.value.trim().toLowerCase() === matchedCfg.label.trim().toLowerCase()) {
+                    selectEl.value = opt.value;
+                    window.handleDivisionChange(selectEl);
+                    return;
+                }
+            }
+        }
+
+        // 3. Base-name fuzzy fallback
         const tfaaBaseName = cleanTfaa.split(' (')[0].trim();
 
         for (let opt of selectEl.options) {
@@ -257,6 +335,14 @@
             });
         }
 
+        let divisionOptionsHtml = '<option value="" disabled selected hidden>Select Division</option>';
+        getDivisions().forEach(d => {
+            const fee      = (d.rate_tier === 'Youth' || Number(d.fee) === 25) ? 25 : 30;
+            const dist     = d.distance === 'Cub' ? 'Cub' : '20yd';
+            const rateTier = fee === 25 ? 'Youth' : 'Adult';
+            divisionOptionsHtml += `<option value="${escapeHtml(d.label)}" data-distance="${escapeHtml(dist)}" data-rate-tier="${escapeHtml(rateTier)}" data-fee="${fee}">${escapeHtml(d.label)} [$${fee}]</option>`;
+        });
+
         const rowDiv = document.createElement('div');
         rowDiv.className = 'sywat-archer-input-row';
 
@@ -274,14 +360,7 @@
 
             <div class="sywat-field-group sywat-col-archer-div">
                 <select name="archers[${rowIndex}][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
-                    <option value="" disabled selected hidden>Select Division</option>
-                    <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
-                    <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
-                    <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
-                    <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
-                    <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
-                    <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
+                    ${divisionOptionsHtml}
                 </select>
             </div>
 
@@ -313,7 +392,6 @@
 
     window.recalculateGroupTotal = function() {
         const rows = document.querySelectorAll('.sywat-archer-input-row');
-        const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
         const lineMap = {};
 
         rows.forEach(row => {
@@ -332,11 +410,27 @@
                 }
 
                 lineMap[lIdx].count++;
-                if (dist === 'Cub' || youthDivisions.includes(div)) {
-                    lineMap[lIdx].rawTotal += 25;
-                } else {
-                    lineMap[lIdx].rawTotal += 30;
+
+                let archerFee = 30;
+                if (dist === 'Cub') {
+                    archerFee = 25;
+                } else if (divSelect && divSelect.selectedIndex >= 0) {
+                    const opt      = divSelect.options[divSelect.selectedIndex];
+                    const optFee   = opt ? parseFloat(opt.getAttribute('data-fee')) : NaN;
+                    const optTier  = opt ? opt.getAttribute('data-rate-tier') : '';
+                    if (!Number.isNaN(optFee) && optFee > 0) {
+                        archerFee = optFee;
+                    } else if (optTier === 'Youth') {
+                        archerFee = 25;
+                    } else if (div !== '') {
+                        const divCfg = findDivisionConfig(div);
+                        if (divCfg && (divCfg.rate_tier === 'Youth' || Number(divCfg.fee) === 25)) {
+                            archerFee = 25;
+                        }
+                    }
                 }
+
+                lineMap[lIdx].rawTotal += archerFee;
             }
         });
 
