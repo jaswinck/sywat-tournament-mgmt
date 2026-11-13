@@ -5,7 +5,7 @@
  * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.5.0
+ * Version: 5.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -73,6 +73,9 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                             <div class="sywat-auth-dropdown-menu">
                                 <a href="<?php echo esc_url( sywat_page_url( 'member_directory' ) ); ?>">
                                     👥 Member Directory
+                                </a>
+                                <a href="<?php echo esc_url( sywat_page_url( 'shooting_styles' ) ); ?>">
+                                    🏹 Shooting Styles &amp; Rules
                                 </a>
                             </div>
                         </div>
