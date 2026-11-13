@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 6.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -425,34 +425,45 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $paid_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['paid'] ) ? $reg['paid'] : '—' );
                                     $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? $reg['distance'] : 'N/A' );
 
-                                    $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && $reg['paid'] === 'Family' ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
+                                    $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && strcasecmp( $reg['paid'], 'Family' ) === 0 ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
+
+                                    // Evaluate household-wide unpaid balance so every family member reflects an open family balance
+                                    $household_info = function_exists( 'sywat_get_household_balance_info' )
+                                        ? sywat_get_household_balance_info( $reg, $all_tourn_regs, $lines )
+                                        : null;
+
+                                    $effective_due      = $household_info ? floatval( $household_info['effective_due'] ) : $balance_due;
+                                    $is_true_family_cap = $household_info ? ! empty( $household_info['is_family_capped'] ) : false;
+
+                                    if ( ! $household_info && $is_family_due ) {
+                                        $fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : ( ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '' );
+                                        if ( $fam_id !== '' ) {
+                                            foreach ( $all_tourn_regs as $other_r ) {
+                                                $o_status = isset( $other_r['status'] ) ? trim( (string) $other_r['status'] ) : '';
+                                                if ( strcasecmp( $o_status, 'Waitlist' ) === 0 || strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
+                                                    continue;
+                                                }
+                                                $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
+                                                $o_book = ! empty( $other_r['booking_id'] ) ? trim( (string) $other_r['booking_id'] ) : '';
+                                                if ( $o_fam === $fam_id || $o_book === $fam_id ) {
+                                                    $effective_due = max( $effective_due, isset( $other_r['balance_due'] ) ? floatval( $other_r['balance_due'] ) : 0 );
+                                                }
+                                            }
+                                        }
+                                        $is_true_family_cap = ( $effective_due >= 75.00 );
+                                    }
                                 ?>
                                 <tr class="sywat-archer-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                     <td>
                                         <div class="sywat-archer-name"><?php echo esc_html( $reg['name'] ); ?></div>
-                                        <!-- OWE Badge Rule: Suppress for No Shows, Closed Unchecked Lines, and Zero Balances -->
-                                        <?php if ( ! $is_no_show && $balance_due > 0 ) : ?>
+                                        <!-- OWE Badge Rule: Show across all members of an unpaid household; suppress for No Shows and Zero Balances -->
+                                        <?php if ( ! $is_no_show && $effective_due > 0 ) : ?>
                                             <div class="sywat-owe-badge-wrap">
                                                 <span class="sywat-badge sywat-badge-full">
-                                                    <?php
-                                                        $fam_id = ! empty( $reg['family_id'] ) ? $reg['family_id'] : ( ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '' );
-                                                        if ( empty( $fam_id ) && $is_family_due ) {
-                                                            $name_parts = array_values( array_filter( explode( ' ', trim( $reg['name'] ) ) ) );
-                                                            $last_name  = ! empty( $name_parts ) ? strtolower( end( $name_parts ) ) : 'fam';
-                                                            $reg_l_idx  = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
-                                                            $fam_id     = 'line_' . $reg_l_idx . '_last_' . $last_name;
-                                                        }
-
-                                                        $fam_calc = ( $is_family_due && function_exists( 'sywat_calculate_family_group_balance' ) )
-                                                            ? sywat_calculate_family_group_balance( $fam_id, 'all', $all_tourn_regs )
-                                                            : null;
-
-                                                        $is_true_family_cap = ( $fam_calc && ! empty( $fam_calc['is_family_capped'] ) );
-                                                    ?>
-                                                    <?php if ( $is_true_family_cap ) : ?>
+                                                    <?php if ( $is_true_family_cap || ( $is_family_due && $household_info && ! empty( $household_info['has_family'] ) ) ) : ?>
                                                         ⚠️ OWE: FAMILY
                                                     <?php else : ?>
-                                                        ⚠️ OWE $<?php echo number_format( $balance_due, 2 ); ?>
+                                                        ⚠️ OWE $<?php echo number_format( $effective_due, 2 ); ?>
                                                     <?php endif; ?>
                                                 </span>
                                             </div>
