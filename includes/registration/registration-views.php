@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal, dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the [sywat_register] Registration Desk portal, persists sticky tournament selection across desk portals, dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 6.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,6 +14,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Helper: Filter scoped tournaments to active season(s) and build an ordered option map
  * with the currently selected tournament at the top and all remaining tournaments sorted A–Z.
+ *
+ * Priority order when no explicit tournament is requested:
+ * 1. User's last-selected tournament (sywat_desk_selected_tournament user meta)
+ * 2. Active Volunteer Hub tournament (user's shop first, then any shop) or sywat_current_tournament
+ * 3. Nearest upcoming tournament belonging to the user's assigned shop
+ * 4. Nearest upcoming tournament overall
+ * 5. First tournament alphabetically (A–Z)
  *
  * @param array  $scoped_tournaments  Shop-scoped tournaments array (name => config).
  * @param string $requested_tourn     Unslashed requested tournament name from GET/POST.
@@ -43,10 +50,17 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
             }
         }
 
-        // Filter pool to active season(s), always preserving an explicitly requested tournament if valid
+        $uid          = get_current_user_id();
+        $saved_user_t = $uid ? trim( (string) get_user_meta( $uid, 'sywat_desk_selected_tournament', true ) ) : '';
+
+        // Filter pool to active season(s), always preserving an explicitly requested or saved tournament if valid
         $pool = array();
         foreach ( $scoped_tournaments as $t_name => $t_data ) {
             if ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 ) {
+                $pool[ $t_name ] = $t_data;
+                continue;
+            }
+            if ( $saved_user_t !== '' && strcasecmp( $t_name, $saved_user_t ) === 0 ) {
                 $pool[ $t_name ] = $t_data;
                 continue;
             }
@@ -71,7 +85,7 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
         $sorted_keys = array_keys( $pool );
         usort( $sorted_keys, 'strnatcasecmp' );
 
-        // Resolve actual selected tournament using unslashed exact or case-insensitive key match
+        // 1. Resolve explicitly requested tournament using exact or case-insensitive key match
         $selected_tournament = '';
         if ( ! empty( $requested_tourn ) ) {
             if ( isset( $pool[ $requested_tourn ] ) ) {
@@ -86,10 +100,62 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
             }
         }
 
-        // If no tournament was explicitly requested, pick a clean default:
-        // 1. Nearest upcoming tournament belonging to the user's assigned shop
-        // 2. Nearest upcoming tournament overall
-        // 3. First tournament alphabetically (A–Z)
+        // 2. Sticky User Preference: Restore last tournament selected across Register / Check-In / Scores
+        if ( empty( $selected_tournament ) && $saved_user_t !== '' ) {
+            if ( isset( $pool[ $saved_user_t ] ) ) {
+                $selected_tournament = $saved_user_t;
+            } else {
+                foreach ( $sorted_keys as $k ) {
+                    if ( strcasecmp( $k, $saved_user_t ) === 0 ) {
+                        $selected_tournament = $k;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3. Active Volunteer Hub tournament or global active tournament
+        if ( empty( $selected_tournament ) ) {
+            $active_hubs = get_option( 'sywat_active_tournaments', array() );
+            if ( is_array( $active_hubs ) && ! empty( $active_hubs ) ) {
+                $hub_any = '';
+                foreach ( $sorted_keys as $k ) {
+                    if ( in_array( $k, $active_hubs, true ) ) {
+                        $t_shop = function_exists( 'sywat_get_tournament_shop_id' )
+                            ? (string) sywat_get_tournament_shop_id( $pool[ $k ] )
+                            : ( isset( $pool[ $k ]['shop_id'] ) ? (string) $pool[ $k ]['shop_id'] : '' );
+                        if ( ! empty( $user_shop_id ) && $t_shop === (string) $user_shop_id ) {
+                            $selected_tournament = $k;
+                            break;
+                        }
+                        if ( $hub_any === '' ) {
+                            $hub_any = $k;
+                        }
+                    }
+                }
+                if ( empty( $selected_tournament ) && $hub_any !== '' ) {
+                    $selected_tournament = $hub_any;
+                }
+            }
+        }
+
+        if ( empty( $selected_tournament ) ) {
+            $global_curr = trim( (string) get_option( 'sywat_current_tournament', '' ) );
+            if ( $global_curr !== '' ) {
+                if ( isset( $pool[ $global_curr ] ) ) {
+                    $selected_tournament = $global_curr;
+                } else {
+                    foreach ( $sorted_keys as $k ) {
+                        if ( strcasecmp( $k, $global_curr ) === 0 ) {
+                            $selected_tournament = $k;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Nearest upcoming tournament (user's shop first, then overall), else first A–Z
         if ( empty( $selected_tournament ) ) {
             $today_ymd     = current_time( 'Y-m-d' );
             $shop_upcoming = array();
@@ -190,6 +256,12 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         $ordered_tournaments = $dropdown_data['ordered'];
         $selected_tournament = $dropdown_data['selected'];
 
+        // Persist active selection to user meta so Check-In and Enter Scores stay synchronized
+        $uid = get_current_user_id();
+        if ( $uid && ! empty( $selected_tournament ) ) {
+            update_user_meta( $uid, 'sywat_desk_selected_tournament', $selected_tournament );
+        }
+
         $available_lines = ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) && function_exists( 'sywat_get_tournament_lines' ) )
             ? sywat_get_tournament_lines( $tournaments[ $selected_tournament ] )
             : array();
@@ -246,6 +318,8 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         if ( function_exists( 'sywat_render_registration_scripts' ) ) {
             sywat_render_registration_scripts();
         }
+
+        $tab_query_args = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
         ?>
 
         <div class="sywat-wrap">
@@ -254,12 +328,12 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             <!-- Master Operational Navigation Tabs (Card-Docked) -->
             <div class="sywat-nav-tabs no-print">
                 <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-                <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register active">Register Shooters</a>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register active">Register Shooters</a>
                 <?php if ( $can_access_desk ) : ?>
-                    <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
+                    <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <?php endif; ?>
                 <?php if ( $can_edit_scores ) : ?>
-                    <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+                    <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
                 <?php endif; ?>
                 <?php if ( $can_manage_seasons ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
