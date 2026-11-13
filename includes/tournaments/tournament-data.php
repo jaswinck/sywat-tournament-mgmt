@@ -2,11 +2,14 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
+ * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation, TFAA schedule scraping, and safe chronological re-sequencing.
  * Author: SYWAT Archery
- * Version: 8.1.1
+ * Version: 8.1.2
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 // DEBUG TOGGLE: Set to true to inspect scraping logs; set to false for production.
 if ( ! defined( 'SYWAT_DEBUG_SYNC' ) ) {
@@ -42,7 +45,9 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
         );
 
         $seasons = get_option( 'sywat_seasons_list', $default_seasons );
-        if ( ! is_array( $seasons ) ) $seasons = $default_seasons;
+        if ( ! is_array( $seasons ) ) {
+            $seasons = $default_seasons;
+        }
 
         uasort( $seasons, function( $a, $b ) {
             $a_date = ! empty( $a['start_date'] ) ? $a['start_date'] : ( ! empty( $a['end_date'] ) ? $a['end_date'] : '' );
@@ -51,7 +56,7 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
                 return strcasecmp( isset( $b['name'] ) ? $b['name'] : '', isset( $a['name'] ) ? $a['name'] : '' );
             }
             return ( $a_date < $b_date ) ? 1 : -1;
-        });
+        } );
 
         return $seasons;
     }
@@ -100,23 +105,54 @@ if ( ! function_exists( 'sywat_get_registrations' ) ) {
 }
 
 /**
+ * Retrieves all individual archer registration records across all tournaments directly from wp_options.
+ */
+if ( ! function_exists( 'sywat_get_all_registrations' ) ) {
+    function sywat_get_all_registrations() {
+        global $wpdb;
+
+        $registrations = array();
+        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+
+        if ( is_array( $results ) ) {
+            foreach ( $results as $row ) {
+                $reg_data = maybe_unserialize( $row->option_value );
+                if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
+                    $registrations[] = $reg_data;
+                }
+            }
+        }
+
+        if ( empty( $registrations ) ) {
+            $registrations = sywat_get_registrations();
+        }
+
+        return $registrations;
+    }
+}
+
+/**
  * Performs a partial search query against the cached TFAA member roster database option.
  */
 if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
     function sywat_search_tfaa_shooters( $query, $limit = 10 ) {
         $clean_query = strtolower( trim( $query ) );
-        if ( strlen( $clean_query ) < 2 ) return array();
+        if ( strlen( $clean_query ) < 2 ) {
+            return array();
+        }
 
         $cache    = get_option( 'sywat_tfaa_cache', array() );
-        $shooters = isset( $cache['shooters'] ) && is_array( $cache['shooters'] ) 
-            ? $cache['shooters'] 
+        $shooters = isset( $cache['shooters'] ) && is_array( $cache['shooters'] )
+            ? $cache['shooters']
             : ( is_array( $cache ) ? $cache : array() );
 
         $matches = array();
 
         foreach ( $shooters as $s ) {
             $name = isset( $s['name'] ) ? $s['name'] : ( isset( $s['full_name'] ) ? $s['full_name'] : '' );
-            if ( empty( $name ) ) continue;
+            if ( empty( $name ) ) {
+                continue;
+            }
 
             if ( strpos( strtolower( $name ), $clean_query ) !== false ) {
                 $matches[] = array(
@@ -126,7 +162,9 @@ if ( ! function_exists( 'sywat_search_tfaa_shooters' ) ) {
                     'style'    => isset( $s['style'] ) ? $s['style'] : '',
                 );
 
-                if ( count( $matches ) >= $limit ) break;
+                if ( count( $matches ) >= $limit ) {
+                    break;
+                }
             }
         }
 
@@ -143,7 +181,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         $is_debug  = defined( 'SYWAT_DEBUG_SYNC' ) && SYWAT_DEBUG_SYNC;
 
         if ( $is_debug ) {
-            $debug_log[] = "--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER (DOMDocument) ---";
+            $debug_log[] = '--- SYWAT TFAA SYNC DIAGNOSTIC PROFILER (DOMDocument) ---';
         }
 
         $all_tournaments = get_option( 'sywat_tournaments_list', array() );
@@ -151,7 +189,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'No tournaments configured in database.' );
         }
 
-        $target_input = trim( (string)$season_name_or_slug );
+        $target_input = trim( (string) $season_name_or_slug );
         $target_slug  = '';
         $target_name  = '';
 
@@ -194,8 +232,8 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             'sslverify' => false,
             'headers'   => array(
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-            )
+                'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            ),
         );
 
         $index_resp = wp_remote_get( $index_url, $http_args );
@@ -203,7 +241,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             return array( 'success' => false, 'message' => 'Failed to connect to TFAA: ' . $index_resp->get_error_message() );
         }
 
-        $http_code = wp_remote_retrieve_response_code($index_resp);
+        $http_code = wp_remote_retrieve_response_code( $index_resp );
         if ( $is_debug ) {
             $debug_log[] = "HTTP Response Code: {$http_code}";
         }
@@ -214,45 +252,45 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         }
 
         $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-        libxml_use_internal_errors(true);
+        libxml_use_internal_errors( true );
         $dom = new DOMDocument();
-        @$dom->loadHTML($html);
-        $xpath = new DOMXPath($dom);
-        
-        $rows          = $xpath->query('//table//tr');
+        @$dom->loadHTML( $html );
+        $xpath = new DOMXPath( $dom );
+
+        $rows          = $xpath->query( '//table//tr' );
         $remote_events = array();
 
-        if ($rows->length > 0) {
-            foreach ($rows as $row) {
-                $cells = $xpath->query('.//td', $row);
-                if ($cells->length >= 2) {
-                    $name_cell = $cells->item(1);
-                    $link      = $xpath->query('.//a', $name_cell);
-                    
-                    if ($link->length > 0) {
+        if ( $rows->length > 0 ) {
+            foreach ( $rows as $row ) {
+                $cells = $xpath->query( './/td', $row );
+                if ( $cells->length >= 2 ) {
+                    $name_cell = $cells->item( 1 );
+                    $link      = $xpath->query( './/a', $name_cell );
+
+                    if ( $link->length > 0 ) {
                         $remote_events[] = array(
                             'has_link' => true,
-                            'href'     => trim($link->item(0)->getAttribute('href')),
-                            'text'     => trim($link->item(0)->textContent),
+                            'href'     => trim( $link->item( 0 )->getAttribute( 'href' ) ),
+                            'text'     => trim( $link->item( 0 )->textContent ),
                         );
                     } else {
                         $remote_events[] = array(
                             'has_link' => false,
                             'href'     => '',
-                            'text'     => trim($name_cell->textContent),
+                            'text'     => trim( $name_cell->textContent ),
                         );
                     }
                 }
             }
         } else {
-            $links = $dom->getElementsByTagName('a');
-            foreach ($links as $link) {
-                $href = trim($link->getAttribute('href'));
-                if (strpos($href, '/results/') !== false) {
+            $links = $dom->getElementsByTagName( 'a' );
+            foreach ( $links as $link ) {
+                $href = trim( $link->getAttribute( 'href' ) );
+                if ( strpos( $href, '/results/' ) !== false ) {
                     $remote_events[] = array(
                         'has_link' => true,
                         'href'     => $href,
-                        'text'     => trim($link->textContent),
+                        'text'     => trim( $link->textContent ),
                     );
                 }
             }
@@ -260,43 +298,47 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
         libxml_clear_errors();
 
         if ( $is_debug ) {
-            $debug_log[] = "DOM Parser found " . count($remote_events) . " tournament rows on the page.";
+            $debug_log[] = 'DOM Parser found ' . count( $remote_events ) . ' tournament rows on the page.';
         }
 
-        $target_year = preg_replace('/[^0-9]/', '', $target_name);
-        $target_type = stripos($target_name, 'indoor') !== false ? 'indoor' : 'outdoor';
+        $target_year = preg_replace( '/[^0-9]/', '', $target_name );
+        $target_type = stripos( $target_name, 'indoor' ) !== false ? 'indoor' : 'outdoor';
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
             if ( $is_debug ) {
-                $debug_log[] = "--------------------------------------------------";
+                $debug_log[] = '--------------------------------------------------';
                 $debug_log[] = "Evaluating Local DB Tournament: '{$t_name}'";
             }
 
             if ( ! empty( $t_data['tfaa_event_id'] ) && strpos( $t_data['tfaa_event_id'], 'http' ) === 0 ) {
-                if ( $is_debug ) $debug_log[] = " -> SKIP: Manual URL override already exists.";
+                if ( $is_debug ) {
+                    $debug_log[] = ' -> SKIP: Manual URL override already exists.';
+                }
                 continue;
             }
 
             $t_season = isset( $t_data['season'] ) ? $t_data['season'] : ( isset( $t_data['season_slug'] ) ? $t_data['season_slug'] : '' );
-            $t_year   = preg_replace('/[^0-9]/', '', $t_season);
-            $t_type   = stripos($t_season, 'indoor') !== false ? 'indoor' : 'outdoor';
-            
+            $t_year   = preg_replace( '/[^0-9]/', '', $t_season );
+            $t_type   = stripos( $t_season, 'indoor' ) !== false ? 'indoor' : 'outdoor';
+
             if ( $target_year !== $t_year || $target_type !== $t_type ) {
-                if ( $is_debug ) $debug_log[] = " -> SKIP: Season mismatch.";
+                if ( $is_debug ) {
+                    $debug_log[] = ' -> SKIP: Season mismatch.';
+                }
                 continue;
             }
 
-            $simple_local_name = strtolower(preg_replace('/[^a-z0-9]/i', '', $t_name));
+            $simple_local_name = strtolower( preg_replace( '/[^a-z0-9]/i', '', $t_name ) );
             $matched           = false;
 
             foreach ( $remote_events as $remote ) {
-                $simple_remote_text = strtolower(preg_replace('/[^a-z0-9]/i', '', $remote['text']));
-                
+                $simple_remote_text = strtolower( preg_replace( '/[^a-z0-9]/i', '', $remote['text'] ) );
+
                 if ( ! empty( $simple_local_name ) && strpos( $simple_remote_text, $simple_local_name ) !== false ) {
                     if ( $remote['has_link'] && ! empty( $remote['href'] ) ) {
                         $link_href = $remote['href'];
-                        
+
                         if ( preg_match( '/\/(?:results|view)\/(\d+)/i', $link_href, $id_m ) ) {
                             $resolved_url = 'https://texasfieldarchery.org/results/' . $id_m[1];
                         } else {
@@ -306,12 +348,18 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                         if ( empty( $t_data['tfaa_results_url'] ) || $t_data['tfaa_results_url'] !== $resolved_url ) {
                             $t_data['tfaa_results_url'] = $resolved_url;
                             $updated_count++;
-                            if ( $is_debug ) $debug_log[] = "    -> [MATCH SUCCESS]: Saved URL: {$resolved_url}";
+                            if ( $is_debug ) {
+                                $debug_log[] = "    -> [MATCH SUCCESS]: Saved URL: {$resolved_url}";
+                            }
                         } else {
-                            if ( $is_debug ) $debug_log[] = "    -> [MATCH SUCCESS]: URL already up to date.";
+                            if ( $is_debug ) {
+                                $debug_log[] = '    -> [MATCH SUCCESS]: URL already up to date.';
+                            }
                         }
                     } else {
-                        if ( $is_debug ) $debug_log[] = "    -> [MATCH FOUND BUT NO LINK YET]: Results not posted yet.";
+                        if ( $is_debug ) {
+                            $debug_log[] = '    -> [MATCH FOUND BUT NO LINK YET]: Results not posted yet.';
+                        }
                     }
                     $matched = true;
                     break;
@@ -319,7 +367,7 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
             }
 
             if ( ! $matched && $is_debug ) {
-                $debug_log[] = " -> FAILED TO MATCH against any of the remote rows.";
+                $debug_log[] = ' -> FAILED TO MATCH against any of the remote rows.';
             }
         }
         unset( $t_data );
@@ -330,14 +378,14 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
 
         $debug_html = '';
         if ( $is_debug ) {
-            $debug_html = '<details class="sywat-debug-log-details"><summary class="sywat-debug-log-summary">View Diagnostic Log</summary><pre class="sywat-debug-log-pre">' . esc_html(implode("\n", $debug_log)) . '</pre></details>';
+            $debug_html = '<details class="sywat-debug-log-details"><summary class="sywat-debug-log-summary">View Diagnostic Log</summary><pre class="sywat-debug-log-pre">' . esc_html( implode( "\n", $debug_log ) ) . '</pre></details>';
         }
 
         return array(
             'success' => true,
             'count'   => $updated_count,
             'debug'   => $is_debug,
-            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'." . $debug_html
+            'message' => "Successfully resolved and saved {$updated_count} TFAA direct link(s) for season '" . esc_html( $target_name ) . "'." . $debug_html,
         );
     }
 }
@@ -355,9 +403,9 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             if ( is_array( $s_data ) ) {
                 $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
                 if ( ! empty( $title ) ) {
-                    $norm_key                    = strtolower( trim( $title ) );
-                    $known_shops[$norm_key]      = trim( $title );
-                    $shop_lookup_data[$norm_key] = $s_data;
+                    $norm_key                      = strtolower( trim( $title ) );
+                    $known_shops[ $norm_key ]      = trim( $title );
+                    $shop_lookup_data[ $norm_key ] = $s_data;
                 }
             }
         }
@@ -375,7 +423,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             $national_title = trim( isset( $row['national_event_title'] ) ? $row['national_event_title'] : '' );
             $notes          = trim( isset( $row['notes'] ) ? $row['notes'] : '' );
 
-            if ( empty( $start_date ) || in_array( strtolower( $raw_host_city ), $holiday_keywords ) ) {
+            if ( empty( $start_date ) || in_array( strtolower( $raw_host_city ), $holiday_keywords, true ) ) {
                 continue;
             }
 
@@ -427,7 +475,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             }
 
             if ( strcasecmp( $event_type, 'National' ) === 0 ) {
-                $final_title = ! empty( $national_title ) ? $national_title : $raw_host_city;
+                $final_title         = ! empty( $national_title ) ? $national_title : $raw_host_city;
                 $valid_tournaments[] = array(
                     'tournament_name'      => $final_title,
                     'official_shop_name'   => '',
@@ -444,11 +492,11 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 
             if ( strcasecmp( $event_type, 'TFAA State' ) === 0 ) {
                 $norm_shop     = strtolower( $raw_host_city );
-                $official_shop = isset( $known_shops[$norm_shop] ) ? $known_shops[$norm_shop] : $raw_host_city;
-                $target_shop   = isset( $shop_lookup_data[$norm_shop] ) ? $shop_lookup_data[$norm_shop] : $raw_host_city;
-                
-                $caps = function_exists( 'sywat_get_shop_capacity_defaults' ) 
-                    ? sywat_get_shop_capacity_defaults( $target_shop ) 
+                $official_shop = isset( $known_shops[ $norm_shop ] ) ? $known_shops[ $norm_shop ] : $raw_host_city;
+                $target_shop   = isset( $shop_lookup_data[ $norm_shop ] ) ? $shop_lookup_data[ $norm_shop ] : $raw_host_city;
+
+                $caps = function_exists( 'sywat_get_shop_capacity_defaults' )
+                    ? sywat_get_shop_capacity_defaults( $target_shop )
                     : array( 'cap_20yd' => 20, 'cap_cub' => 5 );
 
                 $line_slots = function_exists( 'sywat_parse_imported_line_schedule' )
@@ -470,18 +518,18 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             }
 
             $norm_shop = strtolower( $raw_host_city );
-            if ( isset( $known_shops[$norm_shop] ) ) {
-                $official_shop = $known_shops[$norm_shop];
-                if ( ! isset( $shop_counters[$official_shop] ) ) {
-                    $shop_counters[$official_shop] = 1;
+            if ( isset( $known_shops[ $norm_shop ] ) ) {
+                $official_shop = $known_shops[ $norm_shop ];
+                if ( ! isset( $shop_counters[ $official_shop ] ) ) {
+                    $shop_counters[ $official_shop ] = 1;
                 }
 
-                $tournament_name = $official_shop . '-' . $shop_counters[$official_shop];
-                $shop_counters[$official_shop]++;
+                $tournament_name = $official_shop . '-' . $shop_counters[ $official_shop ];
+                $shop_counters[ $official_shop ]++;
 
-                $target_shop = isset( $shop_lookup_data[$norm_shop] ) ? $shop_lookup_data[$norm_shop] : $official_shop;
-                $caps        = function_exists( 'sywat_get_shop_capacity_defaults' ) 
-                    ? sywat_get_shop_capacity_defaults( $target_shop ) 
+                $target_shop = isset( $shop_lookup_data[ $norm_shop ] ) ? $shop_lookup_data[ $norm_shop ] : $official_shop;
+                $caps        = function_exists( 'sywat_get_shop_capacity_defaults' )
+                    ? sywat_get_shop_capacity_defaults( $target_shop )
                     : array( 'cap_20yd' => 20, 'cap_cub' => 5 );
 
                 $line_slots = function_exists( 'sywat_parse_imported_line_schedule' )
@@ -516,15 +564,22 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 }
 
 /**
- * Re-sequences tournaments chronologically for a specific shop and season.
+ * Re-sequences tournaments chronologically for a specific shop and season,
+ * migrating all associated archer registrations directly in wp_options.
  */
 if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
     function sywat_resequence_shop_tournaments( $shop_id, $season_slug, &$tournaments, &$active_tournaments, &$registrations ) {
-        if ( empty( $shop_id ) ) return;
+        if ( empty( $shop_id ) ) {
+            return;
+        }
 
-        $all_shops       = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : array() );
-        $shop_name       = isset( $all_shops[$shop_id]['name'] ) ? $all_shops[$shop_id]['name'] : '';
-        
+        if ( empty( $registrations ) || ! is_array( $registrations ) ) {
+            $registrations = sywat_get_all_registrations();
+        }
+
+        $all_shops = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : array() );
+        $shop_name = isset( $all_shops[ $shop_id ]['name'] ) ? $all_shops[ $shop_id ]['name'] : '';
+
         $shop_lookup_map = array();
         foreach ( $all_shops as $s_id => $s_data ) {
             if ( is_array( $s_data ) ) {
@@ -538,11 +593,11 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
         $shop_tournaments = array();
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : '';
-            if ( empty( $t_shop ) || ! isset( $all_shops[$t_shop] ) ) {
+            if ( empty( $t_shop ) || ! isset( $all_shops[ $t_shop ] ) ) {
                 $raw_shop = ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : ( ! empty( $t_data['official_shop_name'] ) ? $t_data['official_shop_name'] : '' );
                 $norm     = strtolower( trim( $raw_shop ) );
-                if ( ! empty( $norm ) && isset( $shop_lookup_map[$norm] ) ) {
-                    $t_shop = $shop_lookup_map[$norm];
+                if ( ! empty( $norm ) && isset( $shop_lookup_map[ $norm ] ) ) {
+                    $t_shop = $shop_lookup_map[ $norm ];
                 }
             }
 
@@ -558,18 +613,22 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             }
         }
 
-        if ( empty( $shop_tournaments ) ) return;
+        if ( empty( $shop_tournaments ) ) {
+            return;
+        }
 
         usort( $shop_tournaments, function( $a, $b ) {
             return strcmp( $a['start_date'], $b['start_date'] );
-        });
+        } );
 
         if ( empty( $shop_name ) ) {
             $first_data = $shop_tournaments[0]['data'];
             $shop_name  = ! empty( $first_data['shop_name'] ) ? $first_data['shop_name'] : ( ! empty( $first_data['official_shop_name'] ) ? $first_data['official_shop_name'] : '' );
         }
 
-        if ( empty( $shop_name ) ) return;
+        if ( empty( $shop_name ) ) {
+            return;
+        }
 
         $renamed_map = array();
         foreach ( $shop_tournaments as $idx => $item ) {
@@ -577,19 +636,21 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             $old_name      = $item['old_name'];
 
             if ( $old_name !== $expected_name ) {
-                $renamed_map[$old_name] = $expected_name;
+                $renamed_map[ $old_name ] = $expected_name;
             }
         }
 
-        if ( empty( $renamed_map ) ) return;
+        if ( empty( $renamed_map ) ) {
+            return;
+        }
 
         $temp_rebuilt = array();
         foreach ( $renamed_map as $old_name => $new_name ) {
-            if ( isset( $tournaments[$old_name] ) ) {
-                $t_data = $tournaments[$old_name];
-                unset( $tournaments[$old_name] );
-                $t_data['name'] = $new_name;
-                $temp_rebuilt[$new_name] = array(
+            if ( isset( $tournaments[ $old_name ] ) ) {
+                $t_data = $tournaments[ $old_name ];
+                unset( $tournaments[ $old_name ] );
+                $t_data['name']            = $new_name;
+                $temp_rebuilt[ $new_name ] = array(
                     'old_name' => $old_name,
                     'data'     => $t_data,
                 );
@@ -600,7 +661,7 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             $old_name = $item['old_name'];
             $t_data   = $item['data'];
 
-            $tournaments[$new_name] = $t_data;
+            $tournaments[ $new_name ] = $t_data;
 
             $old_slug = sanitize_title( $old_name );
             $new_slug = sanitize_title( $new_name );
@@ -608,17 +669,21 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             $dates = get_option( 'sywat_dates_' . $old_slug );
             if ( $dates ) {
                 update_option( 'sywat_dates_' . $new_slug, $dates );
-                delete_option( 'sywat_dates_' . $old_slug );
+                if ( $old_slug !== $new_slug ) {
+                    delete_option( 'sywat_dates_' . $old_slug );
+                }
             }
 
-            if ( in_array( $old_name, $active_tournaments ) ) {
+            if ( in_array( $old_name, $active_tournaments, true ) ) {
                 $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
                 $active_tournaments[] = $new_name;
             }
 
             foreach ( $registrations as &$reg ) {
-                if ( isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $old_name ) === 0 ) {
-                    delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
+                if ( isset( $reg['tournament'] ) && ( strcasecmp( $reg['tournament'], $old_name ) === 0 || sanitize_title( $reg['tournament'] ) === $old_slug ) ) {
+                    if ( $old_slug !== $new_slug ) {
+                        delete_option( 'sywat_t_' . $old_slug . '_' . $reg['id'] );
+                    }
                     $reg['tournament'] = $new_name;
                     update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
                 }
@@ -633,7 +698,9 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 }
 
 /**
- * Master Data Retrieval Engine for Admin Portal & Views
+ * Master Data Retrieval Engine for Admin Portal & Views.
+ * Automatically reconciles any registration records whose tournament slug matches a configured
+ * tournament whose display punctuation/spacing was normalized (e.g., space vs. hyphen).
  */
 if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
     function sywat_get_master_portal_data() {
@@ -643,22 +710,44 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         $can_access_desk    = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_edit_scores    = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
 
-        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
-        $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
-        $seasons            = sywat_get_seasons();
+        $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $all_shops    = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        $seasons      = sywat_get_seasons();
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
-        if ( ! is_array( $tournaments ) ) $tournaments = array();
+        if ( ! is_array( $tournaments ) ) {
+            $tournaments = array();
+        }
 
         $active_tournaments = get_option( 'sywat_active_tournaments', array() );
-        if ( ! is_array( $active_tournaments ) ) $active_tournaments = array();
+        if ( ! is_array( $active_tournaments ) ) {
+            $active_tournaments = array();
+        }
+
+        // Map normalized tournament slugs to their canonical key in $tournaments
+        $slug_to_canonical = array();
+        foreach ( array_keys( $tournaments ) as $canonical_name ) {
+            $t_slug = sanitize_title( $canonical_name );
+            if ( ! empty( $t_slug ) && ! isset( $slug_to_canonical[ $t_slug ] ) ) {
+                $slug_to_canonical[ $t_slug ] = $canonical_name;
+            }
+        }
 
         $registrations = array();
-        $results = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+
         if ( is_array( $results ) ) {
-            foreach ($results as $row) {
-                $reg_data = maybe_unserialize($row->option_value);
-                if (is_array($reg_data) && isset($reg_data['id'])) {
+            foreach ( $results as $row ) {
+                $reg_data = maybe_unserialize( $row->option_value );
+                if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
+                    if ( ! empty( $reg_data['tournament'] ) ) {
+                        $reg_t_slug = sanitize_title( $reg_data['tournament'] );
+                        if ( isset( $slug_to_canonical[ $reg_t_slug ] ) && $reg_data['tournament'] !== $slug_to_canonical[ $reg_t_slug ] ) {
+                            $canonical_title        = $slug_to_canonical[ $reg_t_slug ];
+                            $reg_data['tournament'] = $canonical_title;
+                            update_option( $row->option_name, $reg_data, false );
+                        }
+                    }
                     $registrations[] = $reg_data;
                 }
             }
@@ -681,9 +770,9 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
             }
 
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
-                $scoped_tournaments[$t_name] = $t_data;
-                if ( isset( $all_shops[$t_shop]['name'] ) ) {
-                    $filter_shops[$t_shop] = $all_shops[$t_shop]['name'];
+                $scoped_tournaments[ $t_name ] = $t_data;
+                if ( isset( $all_shops[ $t_shop ]['name'] ) ) {
+                    $filter_shops[ $t_shop ] = $all_shops[ $t_shop ]['name'];
                 }
             }
         }
@@ -692,9 +781,11 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         uasort( $scoped_tournaments, function( $a, $b ) {
             $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
             $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
-            if ( $a_date === $b_date ) return 0;
+            if ( $a_date === $b_date ) {
+                return 0;
+            }
             return ( $a_date < $b_date ) ? -1 : 1;
-        });
+        } );
 
         $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
         $tfaa_count = isset( $tfaa_cache['count'] ) ? $tfaa_cache['count'] : 0;
