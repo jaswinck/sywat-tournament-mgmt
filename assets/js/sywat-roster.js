@@ -1,7 +1,8 @@
 /**
  * SYWAT Archery - Archer Roster Management & Edit Modal Engine
  * Path: assets/js/sywat-roster.js
- * Version: 6.8.1
+ * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, and database-driven shooting style & age division rule enforcement.
+ * Version: 7.0.0
  */
 
 (function() {
@@ -20,6 +21,80 @@
             return existingFamiliesByLine;
         }
         return {};
+    }
+
+    /**
+     * Retrieve Localized Database Age Divisions
+     */
+    function getDivisions() {
+        if (window.sywatRosterData && Array.isArray(window.sywatRosterData.divisions)) {
+            return window.sywatRosterData.divisions;
+        }
+        return [];
+    }
+
+    /**
+     * Lookup Division Metadata Record by Label, Code, or Alias
+     */
+    function findDivisionConfig(divValue) {
+        if (!divValue) return null;
+        const needle = String(divValue).trim().toLowerCase();
+        if (!needle) return null;
+
+        const divisions = getDivisions();
+        for (let i = 0; i < divisions.length; i++) {
+            const d = divisions[i];
+            if ((d.label || '').trim().toLowerCase() === needle || (d.code || '').trim().toLowerCase() === needle) {
+                return d;
+            }
+            if (Array.isArray(d.aliases)) {
+                for (let j = 0; j < d.aliases.length; j++) {
+                    if (String(d.aliases[j] || '').trim().toLowerCase() === needle) {
+                        return d;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve Shooting Distance ('Cub' vs '20yd') from Division Select Element
+     */
+    function getDivisionDistance(divisionEl) {
+        if (!divisionEl) return '20yd';
+        const selectedOpt = divisionEl.options[divisionEl.selectedIndex];
+        const optDist     = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
+        if (optDist === 'Cub' || optDist === '20yd') {
+            return optDist;
+        }
+
+        const cfg = findDivisionConfig(divisionEl.value);
+        if (cfg && (cfg.distance === 'Cub' || cfg.distance === '20yd')) {
+            return cfg.distance;
+        }
+
+        return (divisionEl.value === 'Cub (8 - 11)') ? 'Cub' : '20yd';
+    }
+
+    /**
+     * Resolve Individual Fee Tier ('Youth' vs 'Adult') from Division Select Element
+     */
+    function getDivisionRateTier(divisionEl) {
+        if (!divisionEl) return 'Adult';
+        const selectedOpt = divisionEl.options[divisionEl.selectedIndex];
+        const optTier     = selectedOpt ? selectedOpt.getAttribute('data-rate-tier') : '';
+        if (optTier === 'Youth' || optTier === 'Adult') {
+            return optTier;
+        }
+
+        const cfg = findDivisionConfig(divisionEl.value);
+        if (cfg && (cfg.rate_tier === 'Youth' || cfg.rate_tier === 'Adult')) {
+            return cfg.rate_tier;
+        }
+
+        const youthDivs = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
+        return youthDivs.includes(divisionEl.value) ? 'Youth' : 'Adult';
     }
 
     /**
@@ -107,21 +182,26 @@
             if (payOption.value === 'Field Governor') {
                 calculatedStatus = 'Field Governor';
             } else {
-                const youthDivs = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
-                calculatedStatus = youthDivs.includes(division.value) ? 'Youth' : 'Adult';
+                calculatedStatus = getDivisionRateTier(division);
             }
         }
         displayEl.textContent = calculatedStatus;
     }
 
     /**
-     * Enforce Division vs. Shooting Style Restrictions
+     * Enforce Division vs. Shooting Style Restrictions (Database-Driven with Legacy Fallback)
      */
     function handleStyleRestrictions(type) {
         const divisionEl = document.getElementById(type + '_division');
         const styleEl    = document.getElementById(type + '_style');
         if (!divisionEl || !styleEl) return;
 
+        if (window.SYWAT && window.SYWAT.shootingStyles && typeof window.SYWAT.shootingStyles.applyStyleRules === 'function') {
+            window.SYWAT.shootingStyles.applyStyleRules(styleEl, divisionEl, { trigger: 'division' });
+            return;
+        }
+
+        // Legacy fallback if shared shooting styles rule controller is unavailable
         const currentDiv = divisionEl.value;
         const allowedAdultSenior = ['Adult (18 - 49)', 'Senior (50 - 59)', 'Silver Senior (60 - 69)', 'Master Senior (70+)'];
 
@@ -130,12 +210,10 @@
             const val = opt.value;
             let isDisabled = false;
 
-            // Genesis style requires Cub division
             if (val.indexOf('Genesis') !== -1 && currentDiv !== 'Cub (8 - 11)') {
                 isDisabled = true;
             }
 
-            // FS Pro, FSL, TRAD require Adult/Senior divisions
             const isFSPro = val.indexOf('FS Pro') !== -1;
             const isFSL   = val.indexOf('FSL –') !== -1;
             const isTRAD  = val.indexOf('TRAD') !== -1 || val.toLowerCase().indexOf('traditional') !== -1;
@@ -144,7 +222,6 @@
                 isDisabled = true;
             }
 
-            // Longbow requires Adult (18 - 49)
             const isLB = val.indexOf('LB') !== -1 || val.toLowerCase().indexOf('longbow') !== -1;
             if (isLB && currentDiv !== 'Adult (18 - 49)') {
                 isDisabled = true;
@@ -152,10 +229,40 @@
 
             opt.disabled = isDisabled;
 
-            // Default fallback if current selection becomes disabled
             if (isDisabled && styleEl.value === val) {
                 styleEl.value = 'FS – Freestyle';
             }
+        }
+    }
+
+    /**
+     * Style Change Event Handler (Applies Force-Division Rules & Syncs Distance/Fee Tier)
+     */
+    function handleStyleChange(type) {
+        const divisionEl = document.getElementById(type + '_division');
+        const styleEl    = document.getElementById(type + '_style');
+        if (!divisionEl || !styleEl) return;
+
+        const prevDiv = divisionEl.value;
+
+        if (window.SYWAT && window.SYWAT.shootingStyles && typeof window.SYWAT.shootingStyles.applyStyleRules === 'function') {
+            window.SYWAT.shootingStyles.applyStyleRules(styleEl, divisionEl, { trigger: 'style' });
+        } else {
+            const val = styleEl.value || '';
+            if (val.indexOf('Genesis') !== -1) {
+                divisionEl.value = 'Cub (8 - 11)';
+            } else if (val.indexOf('LB') !== -1 || val.toLowerCase().indexOf('longbow') !== -1) {
+                divisionEl.value = 'Adult (18 - 49)';
+            }
+        }
+
+        if (divisionEl.value !== prevDiv) {
+            const distDispEl = document.getElementById(type + '_distance_display');
+            if (distDispEl) {
+                distDispEl.value = getDivisionDistance(divisionEl);
+            }
+            updatePaidStatusDisplay(type);
+            handleStyleRestrictions(type);
         }
     }
 
@@ -167,9 +274,8 @@
         const distDispEl = document.getElementById(type + '_distance_display');
         if (!divisionEl) return;
 
-        const calculatedDist = (divisionEl.value === 'Cub (8 - 11)') ? 'Cub' : '20yd';
         if (distDispEl) {
-            distDispEl.value = calculatedDist;
+            distDispEl.value = getDivisionDistance(divisionEl);
         }
 
         updatePaidStatusDisplay(type);
@@ -198,6 +304,7 @@
         closeEditArcherModal: closeEditArcherModal,
         updatePaidStatusDisplay: updatePaidStatusDisplay,
         handleStyleRestrictions: handleStyleRestrictions,
+        handleStyleChange: handleStyleChange,
         handleDivisionChange: handleDivisionChange,
         applySearchFilter: applyRosterSearchFilter
     };
@@ -207,6 +314,7 @@
     window.closeEditArcherModal               = closeEditArcherModal;
     window.updatePaidStatusDisplay            = updatePaidStatusDisplay;
     window.sywatRosterHandleStyleRestrictions = handleStyleRestrictions;
+    window.sywatRosterHandleStyleChange       = handleStyleChange;
     window.sywatRosterHandleDivisionChange    = handleDivisionChange;
 
     // Delegated Click Listener (Optimizer-Safe — Section IV.1)
@@ -248,6 +356,8 @@
             updateRosterEditFamilyOptions(actionEl.value);
         } else if (action === 'roster-edit-division-change') {
             handleDivisionChange('edit');
+        } else if (action === 'roster-edit-style-change') {
+            handleStyleChange('edit');
         } else if (action === 'roster-edit-pay-change') {
             updatePaidStatusDisplay('edit');
         }
