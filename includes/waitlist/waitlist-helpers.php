@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Fee Calculation, Per-Line Family Cap Reconciler & Persistence Helpers
  * Path: includes/waitlist/waitlist-helpers.php
- * Description: Pure business-rule helpers for Youth/Adult rate evaluation, strict per-line $75.00 Family Cap reconciliation, household-wide balance resolution, and atomic multi-store registration persistence.
+ * Description: Pure business-rule helpers for database-driven Youth/Adult rate evaluation, strict per-line $75.00 Family Cap reconciliation, household-wide balance resolution, and atomic multi-store registration persistence.
  * Compliance: Pure helper layer — zero HTML echo, zero POST handling, zero script/style output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,7 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Determine whether a division/distance qualifies for the Youth ($25.00) tier.
+ * Determine whether a division/distance qualifies for the Youth ($25.00) tier
+ * using database-configured age division rate tiers (with safe NFAA fallback).
  *
  * @param string $division Archer age division label.
  * @param string $distance Optional target distance label.
@@ -25,6 +26,13 @@ if ( ! function_exists( 'sywat_waitlist_is_youth_division' ) ) {
         $dist_clean = function_exists( 'sywat_waitlist_normalize_distance' )
             ? sywat_waitlist_normalize_distance( $distance )
             : ( strcasecmp( trim( (string) $distance ), 'Cub' ) === 0 ? 'Cub' : '20yd' );
+
+        if ( $div_clean !== '' && strcasecmp( $div_clean, 'No Show' ) !== 0 && function_exists( 'sywat_find_division' ) ) {
+            $div_rec = sywat_find_division( $div_clean );
+            if ( is_array( $div_rec ) && isset( $div_rec['rate_tier'] ) ) {
+                return ( $div_rec['rate_tier'] === 'Youth' );
+            }
+        }
 
         if ( $dist_clean === 'Cub' ) {
             return true;
