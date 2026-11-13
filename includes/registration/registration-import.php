@@ -2,8 +2,9 @@
 /**
  * Sub-Module: FareHarbor CSV & Raw Text Import Engine
  * Path: includes/registration/registration-import.php
+ * Description: Handles CSV file and raw text payload roster imports for pre-registration intake using database-configured age divisions.
  * Author: SYWAT Archery
- * Version: 6.8.2
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,15 +20,67 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
     function sywat_handle_import_shooters( $tourn_name, $target_line_idx, $tournaments, &$registrations ) {
-        $tourn_name     = sanitize_text_field( wp_unslash( $tourn_name ) );
+        $tourn_name      = sanitize_text_field( wp_unslash( $tourn_name ) );
         $target_line_idx = sanitize_text_field( wp_unslash( $target_line_idx ) );
-        $t_data         = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
-        $t_lines        = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
-        $t_slug         = sanitize_title( $tourn_name );
-        $allow_partial  = isset( $_POST['allow_partial'] ) && wp_unslash( $_POST['allow_partial'] ) === '1';
-        $imported_count = 0;
-        $skipped_dup    = 0;
-        $skipped_cap    = 0;
+        $t_data          = isset( $tournaments[$tourn_name] ) ? $tournaments[$tourn_name] : array();
+        $t_lines         = function_exists('sywat_get_tournament_lines') ? sywat_get_tournament_lines($t_data) : (isset($t_data['lines']) ? $t_data['lines'] : $t_data);
+        $t_slug          = sanitize_title( $tourn_name );
+        $allow_partial   = isset( $_POST['allow_partial'] ) && wp_unslash( $_POST['allow_partial'] ) === '1';
+        $imported_count  = 0;
+        $skipped_dup     = 0;
+        $skipped_cap     = 0;
+
+        // Resolve default Cub, Youth (20yd), and Adult (20yd) divisions from database configuration
+        $default_cub_div   = 'Cub (8 - 11)';
+        $default_youth_div = 'Youth (12 - 14)';
+        $default_adult_div = 'Adult (18 - 49)';
+
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $active_divs = sywat_get_division_records( false );
+            if ( is_array( $active_divs ) && ! empty( $active_divs ) ) {
+                $found_cub   = '';
+                $found_youth = '';
+                $found_adult = '';
+                $first_20yd  = '';
+
+                foreach ( $active_divs as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    $rec_dist = isset( $rec['distance'] ) ? $rec['distance'] : '20yd';
+                    $rec_tier = isset( $rec['rate_tier'] ) ? $rec['rate_tier'] : 'Adult';
+
+                    if ( $rec_dist === 'Cub' ) {
+                        if ( $found_cub === '' ) {
+                            $found_cub = $rec['label'];
+                        }
+                    } else {
+                        if ( $first_20yd === '' ) {
+                            $first_20yd = $rec['label'];
+                        }
+                        if ( $rec_tier === 'Youth' && $found_youth === '' ) {
+                            $found_youth = $rec['label'];
+                        } elseif ( $rec_tier === 'Adult' && $found_adult === '' ) {
+                            $found_adult = $rec['label'];
+                        }
+                    }
+                }
+
+                if ( $found_cub !== '' ) {
+                    $default_cub_div = $found_cub;
+                }
+                if ( $found_youth !== '' ) {
+                    $default_youth_div = $found_youth;
+                } elseif ( $first_20yd !== '' ) {
+                    $default_youth_div = $first_20yd;
+                }
+                if ( $found_adult !== '' ) {
+                    $default_adult_div = $found_adult;
+                } elseif ( $first_20yd !== '' ) {
+                    $default_adult_div = $first_20yd;
+                }
+            }
+        }
 
         $raw_text_payload = ! empty( $_POST['pasted_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['pasted_text'] ) ) : '';
 
@@ -49,8 +102,8 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 if ( stripos( $clean_line, 'Intro To Archery' ) !== false ) { $in_intro = true; continue; }
                 if ( $in_intro ) continue;
 
-                $detected_hdr_paid = sywat_detect_paid_category($clean_line);
-                if (!empty($detected_hdr_paid)) $current_paid_context = $detected_hdr_paid;
+                $detected_hdr_paid = function_exists( 'sywat_detect_paid_category' ) ? sywat_detect_paid_category( $clean_line ) : '';
+                if ( ! empty( $detected_hdr_paid ) ) $current_paid_context = $detected_hdr_paid;
 
                 if ( stripos( $clean_line, '10 YARDS' ) !== false && stripos( $clean_line, 'SYWAT' ) !== false ) { $current_dist = 'Cub'; continue; }
                 if ( stripos( $clean_line, '20 YARDS' ) !== false && stripos( $clean_line, 'SYWAT' ) !== false ) { $current_dist = '20yd'; continue; }
@@ -73,9 +126,20 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 $clean_line = trim( ltrim( $clean_line, '| ' ) );
                 if ( strlen( $clean_line ) < 2 || strlen( $clean_line ) > 60 ) continue;
 
-                $dist_val  = function_exists('sywat_normalize_dist') ? sywat_normalize_dist( $current_dist ) : $current_dist;
-                $final_paid = !empty($current_paid_context) ? $current_paid_context : ($dist_val === 'Cub' ? 'Youth' : 'Adult');
-                $final_div  = ($final_paid === 'Youth') ? ($dist_val === 'Cub' ? 'Cub (8 - 11)' : 'Youth (12 - 14)') : 'Adult (18 - 49)';
+                $dist_val   = function_exists('sywat_normalize_dist') ? sywat_normalize_dist( $current_dist ) : $current_dist;
+                $final_paid = ! empty( $current_paid_context ) ? $current_paid_context : ( $dist_val === 'Cub' ? 'Youth' : 'Adult' );
+
+                if ( $dist_val === 'Cub' ) {
+                    $final_div = $default_cub_div;
+                } elseif ( $final_paid === 'Youth' ) {
+                    $final_div = $default_youth_div;
+                } else {
+                    $final_div = $default_adult_div;
+                }
+
+                if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $final_div !== '' ) {
+                    $final_div = sywat_shooting_styles_normalize_division( $final_div );
+                }
 
                 $parsed_shooters[] = array(
                     'name'     => $clean_line,
@@ -122,10 +186,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
 
             foreach ( $parsed_shooters as $s ) {
-                $line_idx  = $s['line_idx'];
-                $line_data = isset( $t_lines[$line_idx] ) ? $t_lines[$line_idx] : array();
-                $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
-                $dist_val  = $s['distance'];
+                $line_idx   = $s['line_idx'];
+                $line_data  = isset( $t_lines[$line_idx] ) ? $t_lines[$line_idx] : array();
+                $line_name  = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
+                $dist_val   = $s['distance'];
                 $clean_line = $s['name'];
 
                 $is_duplicate = false;
@@ -284,6 +348,18 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $matched_line_name = isset( $t_lines[$matched_line_idx]['name'] ) ? $t_lines[$matched_line_idx]['name'] : 'Line 1';
                     $line_data = isset( $t_lines[$matched_line_idx] ) ? $t_lines[$matched_line_idx] : array();
 
+                    if ( $dist_val === 'Cub' ) {
+                        $final_div = $default_cub_div;
+                    } elseif ( $final_paid === 'Youth' ) {
+                        $final_div = $default_youth_div;
+                    } else {
+                        $final_div = $default_adult_div;
+                    }
+
+                    if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $final_div !== '' ) {
+                        $final_div = sywat_shooting_styles_normalize_division( $final_div );
+                    }
+
                     foreach ($split_names as $single_name) {
                         $clean_name = trim(sanitize_text_field($single_name));
                         if (empty($clean_name)) continue;
@@ -307,9 +383,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
                         if ( $current_count >= $max_capacity ) { $skipped_cap++; continue; }
 
-                        $final_div = ($final_paid === 'Youth') ? ($dist_val === 'Cub' ? 'Cub (8 - 11)' : 'Youth (12 - 14)') : 'Adult (18 - 49)';
-
-                        $new_reg   = array(
+                        $new_reg = array(
                             'id'          => uniqid( 'reg_' ),
                             'tournament'  => $tourn_name,
                             'line_index'  => $matched_line_idx,
