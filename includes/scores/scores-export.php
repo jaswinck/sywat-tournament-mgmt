@@ -2,12 +2,14 @@
 /**
  * Sub-Module: Scores Engine CSV Export Processor
  * Path: includes/scores/scores-export.php
- * Description: Generates and streams standard CSV score reports for locked lines, resolving scores from master option maps and tagging guest/duplicate scores.
+ * Description: Generates and streams standard CSV score reports for locked lines, resolving scores and TFAA division/style export codes from database configuration and tagging guest/duplicate scores.
  * Author: SYWAT Archery
- * Version: 6.5.0
+ * Version: 7.0.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 if ( ! function_exists( 'sywat_process_csv_export' ) ) {
     add_action( 'template_redirect', 'sywat_process_csv_export' );
@@ -17,7 +19,7 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
      */
     function sywat_process_csv_export() {
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'export_csv' ) {
-            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_scores_action' ) ) {
+            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) ) {
                 wp_die( 'Security token expired. Please refresh and try again.' );
             }
 
@@ -31,7 +33,7 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
             global $wpdb;
 
-            $selected_tournament = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( $_POST['selected_tournament'] ) : '';
+            $selected_tournament = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : '';
             if ( empty( $selected_tournament ) ) {
                 $tournaments = get_option( 'sywat_tournaments_list', array() );
                 if ( ! empty( $tournaments ) && is_array( $tournaments ) ) {
@@ -51,7 +53,9 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
             // Fetch master score map for high-speed resolution
             $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
-            if ( ! is_array( $scores_map ) ) $scores_map = array();
+            if ( ! is_array( $scores_map ) ) {
+                $scores_map = array();
+            }
 
             // Fetch ALL checked-in archers for the active tournament across locked lines
             $results = $wpdb->get_results( $wpdb->prepare(
@@ -65,14 +69,17 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                 if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
                     $match_tourn   = isset( $reg_data['tournament'] ) && $reg_data['tournament'] === $selected_tournament;
                     $is_checked_in = ! empty( $reg_data['checked_in'] );
-                    $line_idx      = isset( $reg_data['line_index'] ) ? (string)$reg_data['line_index'] : '';
-                    $is_locked     = ! empty( $locked_lines[$line_idx] );
+                    $line_idx      = isset( $reg_data['line_index'] ) ? (string) $reg_data['line_index'] : '';
+                    $is_locked     = ! empty( $locked_lines[ $line_idx ] );
 
                     if ( $match_tourn && $is_checked_in && $is_locked ) {
                         $export_regs[] = $reg_data;
                     }
                 }
             }
+
+            $has_div_lookup   = function_exists( 'sywat_find_division' );
+            $has_style_lookup = function_exists( 'sywat_find_shooting_style' );
 
             $processed_items = array();
             foreach ( $export_regs as $reg ) {
@@ -90,56 +97,89 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                 }
 
                 // 2. Score & 3. Xs (Prefer master scores map first)
-                $score_val   = isset( $scores_map[$reg_id]['score'] ) ? intval( $scores_map[$reg_id]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
-                $x_count_val = isset( $scores_map[$reg_id]['xs'] )    ? intval( $scores_map[$reg_id]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                $score_val   = isset( $scores_map[ $reg_id ]['score'] ) ? intval( $scores_map[ $reg_id ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
+                $x_count_val = isset( $scores_map[ $reg_id ]['xs'] )    ? intval( $scores_map[ $reg_id ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
 
-                // 4. Division/Style Mapping
-                $div_raw    = isset( $reg['division'] ) ? $reg['division'] : '';
-                $style_raw  = isset( $reg['style'] ) ? $reg['style'] : '';
-                $gender_raw = isset( $reg['gender'] ) ? $reg['gender'] : '';
-
-                $is_pro = ( stripos( $style_raw, 'Pro' ) !== false );
+                // 4. Database-Driven Division & Shooting Style Export Code Mapping
+                $div_raw    = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+                $style_raw  = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+                $gender_raw = isset( $reg['gender'] ) ? trim( (string) $reg['gender'] ) : '';
 
                 $div_code = '';
-                if ( stripos( $div_raw, 'Cub' ) !== false ) {
-                    $div_code = 'C';
-                } elseif ( stripos( $div_raw, 'Young Adult' ) !== false ) {
-                    $div_code = 'YA';
-                } elseif ( stripos( $div_raw, 'Youth' ) !== false ) {
-                    $div_code = 'Y';
-                } elseif ( stripos( $div_raw, 'Master Senior' ) !== false ) {
-                    $div_code = 'MS';
-                } elseif ( stripos( $div_raw, 'Silver Senior' ) !== false ) {
-                    $div_code = 'SS';
-                } elseif ( stripos( $div_raw, 'Senior' ) !== false ) {
-                    $div_code = 'S'; 
-                } elseif ( stripos( $div_raw, 'Adult' ) !== false ) {
-                    $div_code = 'A'; 
+                if ( $has_div_lookup && $div_raw !== '' ) {
+                    $div_rec = sywat_find_division( $div_raw );
+                    if ( is_array( $div_rec ) && ! empty( $div_rec['code'] ) ) {
+                        $div_code = strtoupper( trim( (string) $div_rec['code'] ) );
+                    }
                 }
 
-                $gender_code = ( $gender_raw === 'Female' ) ? 'F' : 'M';
+                if ( $div_code === '' ) {
+                    if ( stripos( $div_raw, 'Cub' ) !== false ) {
+                        $div_code = 'C';
+                    } elseif ( stripos( $div_raw, 'Young Adult' ) !== false ) {
+                        $div_code = 'YA';
+                    } elseif ( stripos( $div_raw, 'Youth' ) !== false ) {
+                        $div_code = 'Y';
+                    } elseif ( stripos( $div_raw, 'Master Senior' ) !== false ) {
+                        $div_code = 'MS';
+                    } elseif ( stripos( $div_raw, 'Silver Senior' ) !== false ) {
+                        $div_code = 'SS';
+                    } elseif ( stripos( $div_raw, 'Senior' ) !== false ) {
+                        $div_code = 'S';
+                    } elseif ( stripos( $div_raw, 'Adult' ) !== false ) {
+                        $div_code = 'A';
+                    }
+                }
 
+                $gender_code = ( strcasecmp( $gender_raw, 'Female' ) === 0 ) ? 'F' : 'M';
+
+                $is_pro     = ( stripos( $style_raw, 'Pro' ) !== false );
                 $style_code = '';
-                if ( stripos( $style_raw, 'Genesis' ) !== false ) {
-                    $style_code = 'GEN';
-                } elseif ( stripos( $style_raw, 'FSL-R' ) !== false || stripos( $style_raw, 'FSLR' ) !== false || stripos( $style_raw, 'Olympic Recurve' ) !== false ) {
-                    $style_code = 'FSLR';
-                } elseif ( strpos( $style_raw, 'FSL' ) !== false ) {
-                    $style_code = 'FSL';
-                } elseif ( strpos( $style_raw, 'BHFS' ) !== false ) {
-                    $style_code = 'BHFS';
-                } elseif ( strpos( $style_raw, 'MBH' ) !== false ) {
-                    $style_code = 'MBH';
-                } elseif ( strpos( $style_raw, 'BBC' ) !== false ) {
-                    $style_code = 'BBC';
-                } elseif ( strpos( $style_raw, 'BBR' ) !== false ) {
-                    $style_code = 'BBR';
-                } elseif ( strpos( $style_raw, 'TRAD' ) !== false || stripos( $style_raw, 'Traditional' ) !== false ) {
-                    $style_code = 'TRAD';
-                } elseif ( strpos( $style_raw, 'LB' ) !== false || stripos( $style_raw, 'Longbow' ) !== false ) {
-                    $style_code = 'LB';
-                } elseif ( strpos( $style_raw, 'FS' ) !== false || stripos( $style_raw, 'Freestyle' ) !== false ) {
-                    $style_code = 'FS';
+
+                if ( $has_style_lookup && $style_raw !== '' ) {
+                    $style_rec = sywat_find_shooting_style( $style_raw );
+                    if ( is_array( $style_rec ) ) {
+                        if ( ! empty( $style_rec['is_pro'] ) ) {
+                            $is_pro = true;
+                        }
+                        if ( ! empty( $style_rec['code'] ) ) {
+                            $style_code = strtoupper( trim( (string) $style_rec['code'] ) );
+                        }
+                    }
+                }
+
+                if ( $style_code === '' ) {
+                    if ( stripos( $style_raw, 'Genesis' ) !== false ) {
+                        $style_code = 'GEN';
+                    } elseif ( stripos( $style_raw, 'FSL-R' ) !== false || stripos( $style_raw, 'FSLR' ) !== false || stripos( $style_raw, 'Olympic Recurve' ) !== false ) {
+                        $style_code = 'FSLR';
+                    } elseif ( stripos( $style_raw, 'FSL' ) !== false ) {
+                        $style_code = 'FSL';
+                    } elseif ( stripos( $style_raw, 'BHFS' ) !== false ) {
+                        $style_code = 'BHFS';
+                    } elseif ( stripos( $style_raw, 'MBH' ) !== false ) {
+                        $style_code = 'MBH';
+                    } elseif ( stripos( $style_raw, 'BBC' ) !== false ) {
+                        $style_code = 'BBC';
+                    } elseif ( stripos( $style_raw, 'BBR' ) !== false ) {
+                        $style_code = 'BBR';
+                    } elseif ( stripos( $style_raw, 'BB' ) !== false || stripos( $style_raw, 'Barebow' ) !== false ) {
+                        $style_code = 'BB';
+                    } elseif ( stripos( $style_raw, 'TRAD' ) !== false || stripos( $style_raw, 'Traditional' ) !== false ) {
+                        $style_code = 'TRAD';
+                    } elseif ( stripos( $style_raw, 'LB' ) !== false || stripos( $style_raw, 'Longbow' ) !== false ) {
+                        $style_code = 'LB';
+                    } elseif ( stripos( $style_raw, 'FS' ) !== false || stripos( $style_raw, 'Freestyle' ) !== false ) {
+                        $style_code = 'FS';
+                    }
+                }
+
+                // Strip trailing "PRO" from style code when Pro prefix ('P') is prepended (e.g., "FS Pro" -> "FS" -> "PAMFS")
+                if ( $is_pro ) {
+                    $style_code = trim( preg_replace( '/\s*\bpro\b$/i', '', $style_code ) );
+                    if ( $style_code === '' ) {
+                        $style_code = 'FS';
+                    }
                 }
 
                 $div_style_str = $div_code . $gender_code . $style_code;
@@ -155,31 +195,31 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                     'div_style'      => $div_style_str,
                     'guest'          => '',
                     'incomplete'     => ( $score_val === 0 && $x_count_val === 0 ) ? 'Y' : '',
-                    'base_prefix'    => ( $is_pro ? 'P' : '' ) . $div_code . $gender_code
+                    'base_prefix'    => ( $is_pro ? 'P' : '' ) . $div_code . $gender_code,
                 );
             }
 
             // Group by exact Archer Name and Division/Style to flag duplicate "Guest" scores
             $groups = array();
             foreach ( $processed_items as $idx => $item ) {
-                $key = strtolower( $item['formatted_name'] ) . '|||' . strtolower( $item['div_style'] );
-                $groups[$key][] = $idx;
+                $key            = strtolower( $item['formatted_name'] ) . '|||' . strtolower( $item['div_style'] );
+                $groups[ $key ][] = $idx;
             }
 
             foreach ( $groups as $key => $indices ) {
                 if ( count( $indices ) > 1 ) {
                     usort( $indices, function( $i1, $i2 ) use ( $processed_items ) {
-                        if ( $processed_items[$i1]['score'] !== $processed_items[$i2]['score'] ) {
-                            return $processed_items[$i2]['score'] <=> $processed_items[$i1]['score'];
+                        if ( $processed_items[ $i1 ]['score'] !== $processed_items[ $i2 ]['score'] ) {
+                            return $processed_items[ $i2 ]['score'] <=> $processed_items[ $i1 ]['score'];
                         }
-                        return $processed_items[$i2]['x_count'] <=> $processed_items[$i1]['x_count'];
+                        return $processed_items[ $i2 ]['x_count'] <=> $processed_items[ $i1 ]['x_count'];
                     } );
 
                     for ( $k = 1; $k < count( $indices ); $k++ ) {
-                        $target_idx = $indices[$k];
-                        if ( $processed_items[$target_idx]['score'] > 0 || $processed_items[$target_idx]['x_count'] > 0 ) {
-                            $processed_items[$target_idx]['guest']     = 'Y';
-                            $processed_items[$target_idx]['div_style'] = $processed_items[$target_idx]['base_prefix'] . 'GUEST';
+                        $target_idx = $indices[ $k ];
+                        if ( $processed_items[ $target_idx ]['score'] > 0 || $processed_items[ $target_idx ]['x_count'] > 0 ) {
+                            $processed_items[ $target_idx ]['guest']     = 'Y';
+                            $processed_items[ $target_idx ]['div_style'] = $processed_items[ $target_idx ]['base_prefix'] . 'GUEST';
                         }
                     }
                 }
@@ -187,14 +227,22 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
             usort( $processed_items, function( $a, $b ) {
                 $cmp_name = strcasecmp( $a['formatted_name'], $b['formatted_name'] );
-                if ( $cmp_name !== 0 ) return $cmp_name;
+                if ( $cmp_name !== 0 ) {
+                    return $cmp_name;
+                }
                 $cmp_div = strcasecmp( $a['div_style'], $b['div_style'] );
-                if ( $cmp_div !== 0 ) return $cmp_div;
-                if ( $a['score'] !== $b['score'] ) return $b['score'] <=> $a['score'];
+                if ( $cmp_div !== 0 ) {
+                    return $cmp_div;
+                }
+                if ( $a['score'] !== $b['score'] ) {
+                    return $b['score'] <=> $a['score'];
+                }
                 return $b['x_count'] <=> $a['x_count'];
             } );
 
-            while ( ob_get_level() ) ob_end_clean();
+            while ( ob_get_level() ) {
+                ob_end_clean();
+            }
 
             $filename = 'SYWAT_Scores_' . sanitize_file_name( $selected_tournament ) . '_' . date( 'Y-m-d' ) . '.csv';
             header( 'Content-Type: text/csv; charset=utf-8' );
@@ -212,7 +260,7 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                     $item['x_count'],
                     $item['div_style'],
                     $item['guest'],
-                    $item['incomplete']
+                    $item['incomplete'],
                 ) );
             }
 
