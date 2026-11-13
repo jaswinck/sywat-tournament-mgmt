@@ -1,11 +1,11 @@
 <?php
 /**
- * Sub-Module: Waitlist Action Handlers (Manual Promotion & Open-Line Moves)
+ * Sub-Module: Waitlist Action Handlers (Manual Promotion, Top-Bar Open-Line Moves & Removal)
  * Path: includes/waitlist/waitlist-actions.php
- * Description: Processes manual FIFO/group promotions from Waitlist to Pre-Reg and moves single waitlisted archers or entire family groups to open shooting lines with capacity guards and per-line $75.00 Family Cap reconciliation.
+ * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, legacy 'No Show' metadata cleanup, capacity guards, and per-line $75.00 Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 2.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -55,12 +55,15 @@ if ( ! function_exists( 'sywat_waitlist_extract_lines' ) ) {
 }
 
 /**
- * Resolve tournament name from POST payload (supports both selected_tournament and view_tournament).
+ * Resolve tournament name from POST payload (supports waitlist_tournament, selected_tournament, and view_tournament).
  *
  * @return string Unslashed, sanitized tournament name.
  */
 if ( ! function_exists( 'sywat_waitlist_get_posted_tournament' ) ) {
     function sywat_waitlist_get_posted_tournament() {
+        if ( ! empty( $_POST['waitlist_tournament'] ) ) {
+            return trim( sanitize_text_field( wp_unslash( $_POST['waitlist_tournament'] ) ) );
+        }
         if ( ! empty( $_POST['selected_tournament'] ) ) {
             return trim( sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) );
         }
@@ -72,20 +75,48 @@ if ( ! function_exists( 'sywat_waitlist_get_posted_tournament' ) ) {
 }
 
 /**
- * Collect matching waitlisted candidate records for a single archer or an entire
- * line-scoped family group in deterministic FIFO order.
+ * Clean up any legacy 'No Show' division/gender/style flags on a waitlisted record
+ * before promoting or moving it onto an active Pre-Reg shooting line.
+ *
+ * @param array  $record   Registration record passed by reference.
+ * @param string $dist_val Normalized distance ('20yd' or 'Cub').
+ * @return void
+ */
+if ( ! function_exists( 'sywat_waitlist_sanitize_promoted_record' ) ) {
+    function sywat_waitlist_sanitize_promoted_record( &$record, $dist_val ) {
+        $raw_div = isset( $record['division'] ) ? trim( (string) $record['division'] ) : '';
+        if ( $raw_div === '' || strcasecmp( $raw_div, 'No Show' ) === 0 ) {
+            $record['division'] = ( $dist_val === 'Cub' ) ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+        }
+
+        if ( isset( $record['gender'] ) && strcasecmp( trim( (string) $record['gender'] ), 'No Show' ) === 0 ) {
+            $record['gender'] = '';
+        }
+
+        if ( isset( $record['style'] ) && strcasecmp( trim( (string) $record['style'] ), 'No Show' ) === 0 ) {
+            $record['style'] = '';
+        }
+
+        $record['checked_in'] = 0;
+    }
+}
+
+/**
+ * Collect matching waitlisted candidate records for a single archer, a line-scoped
+ * family group, or an explicit list of checkbox-selected registration IDs in FIFO order.
  *
  * @param array  $registrations   Registrations array.
  * @param string $tourn_name      Active tournament name.
- * @param string $scope           'single' or 'group'.
+ * @param string $scope           'single', 'group', or 'selected'.
  * @param string $registration_id Target single registration ID.
  * @param string $family_id       Target family ID (for group scope).
  * @param string $source_line_idx Optional source line index filter.
  * @param array  $t_lines         Configured tournament lines array.
+ * @param array  $selected_ids    Explicit list of registration IDs (for 'selected' scope).
  * @return array                  Ordered list of matching Waitlist registration records.
  */
 if ( ! function_exists( 'sywat_waitlist_collect_candidates' ) ) {
-    function sywat_waitlist_collect_candidates( $registrations, $tourn_name, $scope, $registration_id, $family_id, $source_line_idx, $t_lines ) {
+    function sywat_waitlist_collect_candidates( $registrations, $tourn_name, $scope, $registration_id, $family_id, $source_line_idx, $t_lines, $selected_ids = array() ) {
         $candidates = array();
         if ( ! is_array( $registrations ) || empty( $tourn_name ) ) {
             return $candidates;
@@ -94,6 +125,16 @@ if ( ! function_exists( 'sywat_waitlist_collect_candidates' ) ) {
         $target_reg_id   = trim( (string) $registration_id );
         $target_fam_id   = trim( (string) $family_id );
         $target_line_str = trim( (string) $source_line_idx );
+
+        $clean_selected_ids = array();
+        if ( is_array( $selected_ids ) ) {
+            foreach ( $selected_ids as $sid ) {
+                $s_trim = trim( (string) $sid );
+                if ( $s_trim !== '' ) {
+                    $clean_selected_ids[ $s_trim ] = true;
+                }
+            }
+        }
 
         // If group scope was requested without an explicit family_id, resolve it from registration_id
         if ( $scope === 'group' && $target_fam_id === '' && $target_reg_id !== '' ) {
@@ -133,7 +174,11 @@ if ( ! function_exists( 'sywat_waitlist_collect_candidates' ) ) {
                 ? sywat_waitlist_resolve_line_idx( $reg, $t_lines )
                 : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
 
-            if ( $scope === 'group' ) {
+            if ( $scope === 'selected' ) {
+                if ( ! isset( $clean_selected_ids[ (string) $reg['id'] ] ) ) {
+                    continue;
+                }
+            } elseif ( $scope === 'group' ) {
                 $reg_fam = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
                 if ( $reg_fam !== $target_fam_id ) {
                     continue;
@@ -302,8 +347,10 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         foreach ( $candidates as $cand ) {
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
-            $div_val  = isset( $cand['division'] ) ? $cand['division'] : '';
             $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
+
+            $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
 
             $cand['status']         = 'Pre-Reg';
@@ -322,7 +369,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
             }
         }
 
-        // Clean up temporary flag on any solo records that had no family_id
+        // Clean up temporary flag on solo records that had no family_id
         foreach ( $registrations as &$r ) {
             if ( isset( $r['_just_promoted'] ) ) {
                 unset( $r['_just_promoted'] );
@@ -347,8 +394,10 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
 }
 
 /**
- * Action Handler: Move a Single Waitlisted Archer or Entire Waitlisted Family Group
- * from their current waitlisted line to a selected open shooting line as 'Pre-Reg'.
+ * Action Handler: Move Checkbox-Selected Waitlisted Archers (or Single/Group)
+ * from their current waitlisted line(s) to a selected open shooting line as 'Pre-Reg'.
+ * Keeps moved members of the same household grouped together on the destination line
+ * and reconciles per-line $75.00 Family Cap fees on both origin and destination lines.
  *
  * @param array $tournaments   Tournaments master list.
  * @param array $registrations Reference to registrations array.
@@ -357,23 +406,38 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
 if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
     function sywat_waitlist_handle_move_line( $tournaments, &$registrations ) {
         $tourn_name       = sywat_waitlist_get_posted_tournament();
-        $move_scope       = isset( $_POST['move_scope'] ) ? sanitize_key( wp_unslash( $_POST['move_scope'] ) ) : 'single';
+        $move_scope       = isset( $_POST['move_scope'] ) ? sanitize_key( wp_unslash( $_POST['move_scope'] ) ) : 'selected';
         $registration_id  = isset( $_POST['registration_id'] ) ? sanitize_text_field( wp_unslash( $_POST['registration_id'] ) ) : '';
         $family_id        = isset( $_POST['family_id'] ) ? sanitize_text_field( wp_unslash( $_POST['family_id'] ) ) : '';
         $source_line_idx  = isset( $_POST['source_line_idx'] ) ? sanitize_text_field( wp_unslash( $_POST['source_line_idx'] ) ) : '';
         $target_line_raw  = isset( $_POST['target_line_index'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['target_line_index'] ) ) ) : '';
         $force_override   = isset( $_POST['force_override'] ) && wp_unslash( $_POST['force_override'] ) === '1';
 
-        if ( $move_scope !== 'group' ) {
-            $move_scope = 'single';
+        $selected_ids_raw = ( isset( $_POST['selected_reg_ids'] ) && is_array( $_POST['selected_reg_ids'] ) )
+            ? wp_unslash( $_POST['selected_reg_ids'] )
+            : array();
+        $selected_ids = array();
+        foreach ( $selected_ids_raw as $raw_id ) {
+            $clean_id = sanitize_text_field( (string) $raw_id );
+            if ( $clean_id !== '' ) {
+                $selected_ids[] = $clean_id;
+            }
+        }
+
+        if ( ! in_array( $move_scope, array( 'selected', 'group', 'single' ), true ) ) {
+            $move_scope = ! empty( $selected_ids ) ? 'selected' : 'single';
         }
 
         if ( $tourn_name === '' ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Tournament context missing. Unable to move waitlisted archer.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Tournament context missing. Unable to move waitlisted archer(s).</div>';
         }
 
         if ( $target_line_raw === '' ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Please select a destination shooting line before moving.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Please choose a destination open shooting line first.</div>';
+        }
+
+        if ( $move_scope === 'selected' && empty( $selected_ids ) ) {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Please check at least one waitlisted archer or family group to move.</div>';
         }
 
         $t_lines = sywat_waitlist_extract_lines( $tournaments, $tourn_name );
@@ -381,14 +445,19 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Selected destination shooting line could not be found.</div>';
         }
 
-        $candidates = sywat_waitlist_collect_candidates( $registrations, $tourn_name, $move_scope, $registration_id, $family_id, $source_line_idx, $t_lines );
-        if ( empty( $candidates ) ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Waitlisted archer record was not found or has already been moved.</div>';
-        }
+        $candidates = sywat_waitlist_collect_candidates(
+            $registrations,
+            $tourn_name,
+            $move_scope,
+            $registration_id,
+            $family_id,
+            $source_line_idx,
+            $t_lines,
+            $selected_ids
+        );
 
-        $origin_line_idx = $candidates[0]['_resolved_line'];
-        if ( (string) $origin_line_idx === (string) $target_line_raw ) {
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Selected line is already their current line. Use Promote to move them onto the active roster.</div>';
+        if ( empty( $candidates ) ) {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">No eligible waitlisted archers were found for the selection.</div>';
         }
 
         $t_slug       = sanitize_title( $tourn_name );
@@ -399,12 +468,17 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             ? $dest_cap['line_name']
             : sywat_waitlist_format_line_label( $t_lines[ $target_line_raw ], $target_line_raw );
 
-        // Duplicate archer check on destination line
+        // Block if any selected archer is already on the destination line (should use Promote instead)
+        $already_on_dest = array();
         $duplicate_names = array();
         $needed_20       = 0;
         $needed_cub      = 0;
 
         foreach ( $candidates as $cand ) {
+            if ( (string) $cand['_resolved_line'] === (string) $target_line_raw ) {
+                $already_on_dest[] = $cand['name'];
+                continue;
+            }
             if ( sywat_waitlist_has_line_duplicate( $registrations, $tourn_name, $target_line_raw, $cand['name'], $cand['id'], $t_lines ) ) {
                 $duplicate_names[] = $cand['name'];
             }
@@ -414,6 +488,10 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             } else {
                 $needed_20++;
             }
+        }
+
+        if ( ! empty( $already_on_dest ) ) {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">Move Blocked: <strong>' . esc_html( implode( ', ', $already_on_dest ) ) . '</strong> is already on <strong>' . esc_html( $dest_label ) . '</strong>. Use <strong>Promote</strong> to move them onto the active roster.</div>';
         }
 
         if ( ! empty( $duplicate_names ) ) {
@@ -442,24 +520,33 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             }
         }
 
-        // Re-scope family_id strictly to destination line so per-line $75 Family Cap remains line-isolated
-        $old_fam_id    = ! empty( $candidates[0]['family_id'] ) ? trim( (string) $candidates[0]['family_id'] ) : '';
-        $old_fam_name  = ! empty( $candidates[0]['family_name'] ) ? trim( (string) $candidates[0]['family_name'] ) : '';
-        $new_fam_id    = '';
-        $new_fam_label = '';
-
-        if ( $move_scope === 'group' && count( $candidates ) > 1 ) {
-            $base_label    = $old_fam_name !== '' ? $old_fam_name : $candidates[0]['name'];
-            $new_fam_id    = 'fam_' . $t_slug . '_l' . sanitize_title( $target_line_raw ) . '_' . sanitize_title( $base_label ) . '_' . substr( md5( $old_fam_id . '_' . $target_line_raw ), 0, 4 );
-            $new_fam_label = $base_label;
+        // Count how many candidates share each original family_id so moved family members stay clustered
+        $moving_family_counts = array();
+        foreach ( $candidates as $cand ) {
+            $fid = ! empty( $cand['family_id'] ) ? trim( (string) $cand['family_id'] ) : '';
+            if ( $fid !== '' ) {
+                if ( ! isset( $moving_family_counts[ $fid ] ) ) {
+                    $moving_family_counts[ $fid ] = 0;
+                }
+                $moving_family_counts[ $fid ]++;
+            }
         }
 
-        $moved_names = array();
+        $moved_names          = array();
+        $dest_family_ids      = array();
+        $origin_family_scopes = array();
+
         foreach ( $candidates as $cand ) {
+            $origin_line_idx = $cand['_resolved_line'];
+            $old_fam_id      = ! empty( $cand['family_id'] ) ? trim( (string) $cand['family_id'] ) : '';
+            $old_fam_name    = ! empty( $cand['family_name'] ) ? trim( (string) $cand['family_name'] ) : '';
+
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
+            $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
+
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
-            $dist_val      = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
 
             $cand['line_index']     = (string) $target_line_raw;
@@ -470,9 +557,19 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             $cand['balance_due']    = ( $cand['paid'] === 'Field Governor' ) ? 0.00 : sywat_waitlist_get_individual_rate( $div_val, $dist_val );
             $cand['_just_promoted'] = true;
 
-            if ( $new_fam_id !== '' ) {
+            if ( $old_fam_id !== '' ) {
+                $origin_family_scopes[ $origin_line_idx . '___' . $old_fam_id ] = array(
+                    'line_idx'  => $origin_line_idx,
+                    'family_id' => $old_fam_id,
+                );
+            }
+
+            if ( $old_fam_id !== '' && isset( $moving_family_counts[ $old_fam_id ] ) && $moving_family_counts[ $old_fam_id ] > 1 ) {
+                $base_label          = $old_fam_name !== '' ? $old_fam_name : $cand['name'];
+                $new_fam_id          = 'fam_' . $t_slug . '_l' . sanitize_title( $target_line_raw ) . '_' . sanitize_title( $base_label ) . '_' . substr( md5( $old_fam_id . '_' . $target_line_raw ), 0, 4 );
                 $cand['family_id']   = $new_fam_id;
-                $cand['family_name'] = $new_fam_label;
+                $cand['family_name'] = $base_label;
+                $dest_family_ids[ $new_fam_id ] = true;
             } else {
                 unset( $cand['family_id'], $cand['family_name'] );
             }
@@ -492,21 +589,85 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         unset( $r );
 
         $cap_applied = false;
-        if ( $new_fam_id !== '' ) {
-            $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_raw, $new_fam_id, $registrations, $t_lines );
+        foreach ( array_keys( $dest_family_ids ) as $df_id ) {
+            $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_raw, $df_id, $registrations, $t_lines );
             if ( ! empty( $rec_res['is_family_capped'] ) ) {
                 $cap_applied = true;
             }
         }
 
-        // Reconcile origin line family if active members remained behind
-        if ( $old_fam_id !== '' ) {
-            sywat_waitlist_recalculate_line_family_fees( $tourn_name, $origin_line_idx, $old_fam_id, $registrations, $t_lines );
+        // Reconcile any origin line family groups where active members remained behind
+        foreach ( $origin_family_scopes as $scope_info ) {
+            sywat_waitlist_recalculate_line_family_fees( $tourn_name, $scope_info['line_idx'], $scope_info['family_id'], $registrations, $t_lines );
         }
 
         $count_moved = count( $moved_names );
         $cap_note    = $cap_applied ? ' ($75.00 Family Cap applied on destination line).' : '.';
 
         return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Moved <strong>' . intval( $count_moved ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $moved_names ) ) . '</strong>) to <strong>' . esc_html( $dest_label ) . '</strong> as Pre-Reg' . esc_html( $cap_note ) . '</div>';
+    }
+}
+
+/**
+ * Action Handler: Remove a Single Waitlisted Archer Entry across all host portals
+ * (Register, Manage Tournaments, Roster, Check-In) and reconcile line family fees.
+ *
+ * @param array $tournaments   Tournaments master list.
+ * @param array $registrations Reference to registrations array.
+ * @return string              HTML alert notice markup.
+ */
+if ( ! function_exists( 'sywat_waitlist_handle_remove' ) ) {
+    function sywat_waitlist_handle_remove( $tournaments, &$registrations ) {
+        $tourn_name = sywat_waitlist_get_posted_tournament();
+        $reg_id     = isset( $_POST['registration_id'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['registration_id'] ) ) ) : '';
+
+        if ( $tourn_name === '' || $reg_id === '' ) {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Missing archer or tournament identifier. Unable to remove waitlist entry.</div>';
+        }
+
+        $t_slug     = sanitize_title( $tourn_name );
+        $target_reg = get_option( 'sywat_t_' . $t_slug . '_' . $reg_id, null );
+
+        if ( ! is_array( $target_reg ) && is_array( $registrations ) ) {
+            foreach ( $registrations as $candidate ) {
+                if ( is_array( $candidate ) && isset( $candidate['id'] ) && (string) $candidate['id'] === $reg_id ) {
+                    $target_reg = $candidate;
+                    break;
+                }
+            }
+        }
+
+        $archer_name = is_array( $target_reg ) && ! empty( $target_reg['name'] ) ? $target_reg['name'] : 'Archer';
+        $line_idx    = is_array( $target_reg ) && isset( $target_reg['line_index'] ) ? (string) $target_reg['line_index'] : '';
+        $family_id   = is_array( $target_reg ) && ! empty( $target_reg['family_id'] ) ? trim( (string) $target_reg['family_id'] ) : '';
+
+        delete_option( 'sywat_t_' . $t_slug . '_' . $reg_id );
+
+        $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
+        if ( is_array( $master_regs ) && isset( $master_regs[ $reg_id ] ) ) {
+            unset( $master_regs[ $reg_id ] );
+            update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
+        }
+
+        $legacy_global = get_option( 'sywat_registrations', false );
+        if ( is_array( $legacy_global ) ) {
+            $filtered_global = array_values( array_filter( $legacy_global, function( $item ) use ( $reg_id ) {
+                return ! ( is_array( $item ) && isset( $item['id'] ) && (string) $item['id'] === $reg_id );
+            } ) );
+            update_option( 'sywat_registrations', $filtered_global, false );
+        }
+
+        if ( is_array( $registrations ) ) {
+            $registrations = array_values( array_filter( $registrations, function( $item ) use ( $reg_id ) {
+                return ! ( is_array( $item ) && isset( $item['id'] ) && (string) $item['id'] === $reg_id );
+            } ) );
+        }
+
+        if ( $family_id !== '' && $line_idx !== '' ) {
+            $t_lines = sywat_waitlist_extract_lines( $tournaments, $tourn_name );
+            sywat_waitlist_recalculate_line_family_fees( $tourn_name, $line_idx, $family_id, $registrations, $t_lines );
+        }
+
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Removed <strong>' . esc_html( $archer_name ) . '</strong> from the waitlist for <strong>' . esc_html( $tourn_name ) . '</strong>.</div>';
     }
 }
