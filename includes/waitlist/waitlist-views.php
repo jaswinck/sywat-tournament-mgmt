@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Dedicated Management Modal & Trigger Views
  * Path: includes/waitlist/waitlist-views.php
- * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with a top-of-modal "Move Selected to Open Line" bar, FIFO family-grouped queue table, clean horizontal actions, and reusable clickable waitlist badges/buttons for Register, Manage Tournaments, Roster, and Check-In screens.
+ * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with uniform-height top filter/move toolbars, FIFO family-grouped queue table, neatly aligned mobile-friendly stacked actions, and reusable clickable waitlist badges/buttons.
  * Compliance: Pure view layer — zero DB writes, zero inline scripts/styles, zero inline event attributes, accessible SVG + text controls, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 2.0.0
+ * Version: 2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -152,8 +152,6 @@ if ( ! function_exists( 'sywat_waitlist_render_context_inputs' ) ) {
 
 /**
  * Render the Dedicated Waitlist Management Popup Modal (#sywat_waitlist_modal).
- * Features a top-of-modal "Move Selected to Open Line" bar, line filter, search box,
- * and a clean 4-column FIFO family-grouped table with horizontal row actions.
  *
  * @param string $selected_tournament Active tournament name.
  * @param array  $available_lines     Configured shooting lines for the tournament.
@@ -214,25 +212,25 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                 <!-- Pinned Modal Header -->
                 <div class="sywat-modal-header">
                     <div>
-                        <h3>
+                        <h3 class="sywat-waitlist-modal-title">
                             <?php echo sywat_waitlist_clock_svg(); ?>
-                            Waitlist Queue Management
-                            <span class="sywat-waitlist-pill"><?php echo intval( $total_waitlisted ); ?> Waitlisted</span>
+                            <span>Waitlist Queue Management</span>
+                            <span class="sywat-waitlist-pill sywat-waitlist-header-badge"><?php echo intval( $total_waitlisted ); ?> Waitlisted</span>
                         </h3>
                         <div class="sywat-subtitle"><?php echo esc_html( $selected_tournament ); ?> &mdash; FIFO arrival order grouped by household</div>
                     </div>
-                    <button type="button" class="sywat-modal-close" aria-label="Close Waitlist Modal" data-sywat-action="close-waitlist-modal" data-close-url="<?php echo esc_url( $close_target_url ); ?>">&times;</button>
+                    <button type="button" class="sywat-modal-close sywat-waitlist-close-btn" aria-label="Close Waitlist Modal" data-sywat-action="close-waitlist-modal" data-close-url="<?php echo esc_url( $close_target_url ); ?>">&times;</button>
                 </div>
 
                 <!-- Scrollable Modal Body -->
                 <div class="sywat-modal-body">
 
                     <!-- Top Bar 1: Shooting Line Filter & Live Search -->
-                    <div class="sywat-roster-filter-bar">
-                        <div class="sywat-roster-filter-form">
+                    <div class="sywat-roster-filter-bar sywat-waitlist-filter-bar">
+                        <div class="sywat-roster-filter-form sywat-waitlist-toolbar-row">
                             <div class="sywat-filter-field">
                                 <label for="sywat_waitlist_line_filter">Filter by Shooting Line</label>
-                                <select id="sywat_waitlist_line_filter" data-sywat-action="waitlist-line-filter">
+                                <select id="sywat_waitlist_line_filter" class="sywat-waitlist-toolbar-control" data-sywat-action="waitlist-line-filter">
                                     <option value="<?php echo esc_attr( sywat_waitlist_get_modal_url( $selected_tournament, 'all', $close_target_url ) ); ?>" <?php selected( $active_line_filter, 'all' ); ?>>
                                         All Lines (<?php echo intval( $all_waitlisted ); ?> Waitlisted)
                                     </option>
@@ -252,11 +250,11 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                 </select>
                             </div>
 
-                            <div class="sywat-filter-field">
+                            <div class="sywat-filter-field sywat-filter-field-grow">
                                 <label for="sywat_waitlist_search_input">Search Waitlist (Name / Family)</label>
-                                <div class="sywat-search-input-group">
-                                    <input type="text" id="sywat_waitlist_search_input" value="" placeholder="Type archer or family name..." autocomplete="off">
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm" data-sywat-action="clear-waitlist-search">Clear</button>
+                                <div class="sywat-search-input-group sywat-waitlist-control-group">
+                                    <input type="text" id="sywat_waitlist_search_input" class="sywat-waitlist-toolbar-control" value="" placeholder="Type archer or family name..." autocomplete="off">
+                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-waitlist-toolbar-btn" data-sywat-action="clear-waitlist-search">Clear</button>
                                 </div>
                             </div>
                         </div>
@@ -268,46 +266,48 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
 
                         <!-- Top Bar 2: Move Selected Archers / Family to Open Line -->
                         <div class="sywat-roster-filter-bar sywat-waitlist-move-toolbar">
-                            <div class="sywat-filter-field">
-                                <label>Selected Archers</label>
-                                <div class="sywat-search-input-group">
-                                    <span class="sywat-waitlist-pill"><strong id="sywat_waitlist_selected_count">0</strong>&nbsp;selected</span>
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm" data-sywat-action="waitlist-select-all">Select All</button>
-                                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-sm" data-sywat-action="waitlist-clear-selection">Clear</button>
+                            <div class="sywat-waitlist-toolbar-row">
+                                <div class="sywat-filter-field">
+                                    <label>Selected Archers</label>
+                                    <div class="sywat-search-input-group sywat-waitlist-control-group">
+                                        <span class="sywat-waitlist-pill sywat-waitlist-count-pill"><strong id="sywat_waitlist_selected_count">0</strong>&nbsp;selected</span>
+                                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-waitlist-toolbar-btn" data-sywat-action="waitlist-select-all">Select All</button>
+                                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-waitlist-toolbar-btn" data-sywat-action="waitlist-clear-selection">Clear</button>
+                                    </div>
                                 </div>
+
+                                <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" id="sywat_waitlist_move_selected_form" class="sywat-waitlist-move-form sywat-filter-field sywat-filter-field-grow">
+                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                    <?php sywat_waitlist_render_context_inputs( $selected_tournament, $active_line_filter, $context, $extra_context ); ?>
+                                    <input type="hidden" name="sywat_action" value="move_waitlist_line">
+                                    <input type="hidden" name="move_scope" value="selected">
+
+                                    <label for="sywat_waitlist_target_line">Move Selected to Open Shooting Line (as Pre-Reg)</label>
+                                    <div class="sywat-search-input-group sywat-waitlist-control-group">
+                                        <select name="target_line_index" id="sywat_waitlist_target_line" class="sywat-waitlist-toolbar-control" required>
+                                            <option value="" disabled selected>Choose Destination Open Line...</option>
+                                            <?php foreach ( $line_capacities as $l_idx => $cap ) : ?>
+                                                <?php
+                                                    $l_name    = isset( $cap['line_name'] ) ? $cap['line_name'] : ( 'Line ' . ( (int) $l_idx + 1 ) );
+                                                    $is_closed = ! empty( $cap['is_closed'] );
+                                                    $open_20   = isset( $cap['open_20yd'] ) ? (int) $cap['open_20yd'] : 0;
+                                                    $open_cub  = isset( $cap['open_cub'] ) ? (int) $cap['open_cub'] : 0;
+
+                                                    if ( $is_closed ) {
+                                                        $opt_label = sprintf( '%s (Line Closed)', $l_name );
+                                                    } else {
+                                                        $opt_label = sprintf( '%s — %d 20yd / %d Cub Open', $l_name, $open_20, $open_cub );
+                                                    }
+                                                ?>
+                                                <option value="<?php echo esc_attr( (string) $l_idx ); ?>" data-open-20yd="<?php echo intval( $open_20 ); ?>" data-open-cub="<?php echo intval( $open_cub ); ?>" <?php echo $is_closed ? 'disabled' : ''; ?>>
+                                                    <?php echo esc_html( $opt_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button type="submit" id="sywat_waitlist_move_btn" class="sywat-btn sywat-btn-primary sywat-waitlist-toolbar-btn" disabled>Move Selected to Line</button>
+                                    </div>
+                                </form>
                             </div>
-
-                            <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" id="sywat_waitlist_move_selected_form" class="sywat-waitlist-move-form sywat-filter-field">
-                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                <?php sywat_waitlist_render_context_inputs( $selected_tournament, $active_line_filter, $context, $extra_context ); ?>
-                                <input type="hidden" name="sywat_action" value="move_waitlist_line">
-                                <input type="hidden" name="move_scope" value="selected">
-
-                                <label for="sywat_waitlist_target_line">Move Selected to Open Shooting Line (as Pre-Reg)</label>
-                                <div class="sywat-search-input-group">
-                                    <select name="target_line_index" id="sywat_waitlist_target_line" required>
-                                        <option value="" disabled selected>Choose Destination Open Line...</option>
-                                        <?php foreach ( $line_capacities as $l_idx => $cap ) : ?>
-                                            <?php
-                                                $l_name    = isset( $cap['line_name'] ) ? $cap['line_name'] : ( 'Line ' . ( (int) $l_idx + 1 ) );
-                                                $is_closed = ! empty( $cap['is_closed'] );
-                                                $open_20   = isset( $cap['open_20yd'] ) ? (int) $cap['open_20yd'] : 0;
-                                                $open_cub  = isset( $cap['open_cub'] ) ? (int) $cap['open_cub'] : 0;
-
-                                                if ( $is_closed ) {
-                                                    $opt_label = sprintf( '%s (Line Closed)', $l_name );
-                                                } else {
-                                                    $opt_label = sprintf( '%s — %d 20yd / %d Cub Open', $l_name, $open_20, $open_cub );
-                                                }
-                                            ?>
-                                            <option value="<?php echo esc_attr( (string) $l_idx ); ?>" data-open-20yd="<?php echo intval( $open_20 ); ?>" data-open-cub="<?php echo intval( $open_cub ); ?>" <?php echo $is_closed ? 'disabled' : ''; ?>>
-                                                <?php echo esc_html( $opt_label ); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <button type="submit" id="sywat_waitlist_move_btn" class="sywat-btn sywat-btn-primary" disabled>Move Selected to Line</button>
-                                </div>
-                            </form>
                         </div>
 
                         <!-- Clean 4-Column Waitlist Queue Table -->
@@ -315,10 +315,10 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                             <table class="sywat-table sywat-waitlist-table">
                                 <thead>
                                     <tr>
-                                        <th class="sywat-col-center">Select / #</th>
+                                        <th class="sywat-col-center sywat-waitlist-col-select">Select / #</th>
                                         <th>Archer / Family Group</th>
                                         <th>Current Line &amp; Category</th>
-                                        <th class="sywat-col-center">Actions</th>
+                                        <th class="sywat-col-center sywat-waitlist-col-actions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -336,9 +336,13 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                             $group_uid      = 'wlgrp_' . $q_pos . '_' . sanitize_title( $grp['group_key'] );
 
                                             $group_names_list = array();
+                                            $group_phone      = '';
                                             foreach ( $members as $gm ) {
                                                 if ( ! empty( $gm['name'] ) ) {
                                                     $group_names_list[] = strtolower( trim( (string) $gm['name'] ) );
+                                                }
+                                                if ( $group_phone === '' && ! empty( $gm['phone'] ) ) {
+                                                    $group_phone = trim( (string) $gm['phone'] );
                                                 }
                                             }
                                             $group_search_attr = trim( strtolower( $grp['group_label'] ) . ' ' . implode( ' ', $group_names_list ) );
@@ -348,8 +352,10 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                             <!-- Family Group Header Banner Row -->
                                             <tr class="sywat-waitlist-group-header-row" data-waitlist-search="<?php echo esc_attr( $group_search_attr ); ?>">
                                                 <td class="sywat-col-center">
-                                                    <input type="checkbox" aria-label="Select entire <?php echo esc_attr( $grp['group_label'] ); ?> group" data-waitlist-group-checkbox="<?php echo esc_attr( $group_uid ); ?>">
-                                                    <span class="sywat-waitlist-pill">#<?php echo intval( $q_pos ); ?></span>
+                                                    <div class="sywat-waitlist-select-cell">
+                                                        <input type="checkbox" aria-label="Select entire <?php echo esc_attr( $grp['group_label'] ); ?> group" data-waitlist-group-checkbox="<?php echo esc_attr( $group_uid ); ?>">
+                                                        <span class="sywat-waitlist-pill">#<?php echo intval( $q_pos ); ?></span>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <span class="sywat-chip-family">Family Group: <?php echo esc_html( $grp['group_label'] ); ?> (<?php echo intval( $member_count ); ?> Waitlisted)</span>
@@ -358,8 +364,18 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                             <strong>Split Family:</strong> <?php echo intval( $active_fam_cnt ); ?> member(s) already active on <?php echo esc_html( $src_line_name ); ?> ($75.00 Family Cap applies at 3+ active archers).
                                                         </div>
                                                     <?php endif; ?>
-                                                    <?php if ( ! empty( $grp['earliest_created_at'] ) ) : ?>
-                                                        <div class="sywat-meta-subtext">Added: <?php echo esc_html( $grp['earliest_created_at'] ); ?></div>
+                                                    <?php if ( $group_phone !== '' || ! empty( $grp['earliest_created_at'] ) ) : ?>
+                                                        <div class="sywat-meta-subtext">
+                                                            <?php if ( $group_phone !== '' ) : ?>
+                                                                Phone: <?php echo esc_html( $group_phone ); ?>
+                                                            <?php endif; ?>
+                                                            <?php if ( $group_phone !== '' && ! empty( $grp['earliest_created_at'] ) ) : ?>
+                                                                &bull;
+                                                            <?php endif; ?>
+                                                            <?php if ( ! empty( $grp['earliest_created_at'] ) ) : ?>
+                                                                Added: <?php echo esc_html( $grp['earliest_created_at'] ); ?>
+                                                            <?php endif; ?>
+                                                        </div>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
@@ -374,13 +390,13 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     </div>
                                                 </td>
                                                 <td class="sywat-col-center">
-                                                    <div class="sywat-modal-roster-actions">
+                                                    <div class="sywat-waitlist-action-stack">
                                                         <?php
                                                             $group_promote_confirm = $can_fit_all
                                                                 ? sprintf( 'Promote all %d waitlisted members of %s to Pre-Reg on %s?', $member_count, $grp['group_label'], $src_line_name )
                                                                 : sprintf( 'WARNING: %s does not have enough open spots for all %d members of %s. Override line capacity and promote the entire group anyway?', $src_line_name, $member_count, $grp['group_label'] );
                                                         ?>
-                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form" data-sywat-confirm="<?php echo esc_attr( $group_promote_confirm ); ?>">
+                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form sywat-waitlist-action-form" data-sywat-confirm="<?php echo esc_attr( $group_promote_confirm ); ?>">
                                                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                             <?php sywat_waitlist_render_context_inputs( $selected_tournament, $active_line_filter, $context, $extra_context ); ?>
                                                             <input type="hidden" name="sywat_action" value="promote_waitlist">
@@ -390,7 +406,7 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                             <?php if ( ! $can_fit_all ) : ?>
                                                                 <input type="hidden" name="force_override" value="1">
                                                             <?php endif; ?>
-                                                            <button type="submit" class="sywat-btn <?php echo $can_fit_all ? 'sywat-btn-success' : 'sywat-btn-warning'; ?> sywat-btn-sm">
+                                                            <button type="submit" class="sywat-btn <?php echo $can_fit_all ? 'sywat-btn-success' : 'sywat-btn-warning'; ?> sywat-btn-sm sywat-waitlist-action-btn">
                                                                 <?php echo $can_fit_all ? 'Promote All (' . intval( $member_count ) . ')' : 'Override & Promote All (' . intval( $member_count ) . ')'; ?>
                                                             </button>
                                                         </form>
@@ -406,10 +422,15 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                 $archer_phone   = isset( $m['phone'] ) ? trim( (string) $m['phone'] ) : '';
                                                 $m_dist         = isset( $m['resolved_dist'] ) ? $m['resolved_dist'] : '20yd';
                                                 $raw_div        = isset( $m['division'] ) ? trim( (string) $m['division'] ) : '';
-                                                $m_div          = ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 ) ? $raw_div : '—';
+                                                $raw_style      = isset( $m['style'] ) ? trim( (string) $m['style'] ) : '';
+                                                $m_div          = ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 ) ? $raw_div : '';
+                                                $m_style        = ( $raw_style !== '' && strcasecmp( $raw_style, 'No Show' ) !== 0 ) ? $raw_style : '';
                                                 $m_created      = ! empty( $m['created_at'] ) ? $m['created_at'] : '';
                                                 $can_fit_member = ! empty( $m['can_fit_member'] );
                                                 $avail_for_dist = ( $m_dist === 'Cub' ) ? (int) $grp['open_cub'] : (int) $grp['open_20yd'];
+
+                                                $div_style_parts = array_filter( array( $m_div, $m_style ) );
+                                                $div_style_label = implode( ' • ', $div_style_parts );
 
                                                 $single_promote_confirm = $can_fit_member
                                                     ? sprintf( 'Promote %s (%s) from Waitlist to Pre-Reg on %s?', $archer_name, $m_dist, $src_line_name )
@@ -430,38 +451,39 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                             ?>
                                             <tr class="sywat-waitlist-row <?php echo $is_multi_group ? 'sywat-waitlist-member-subrow' : ''; ?>" data-name="<?php echo esc_attr( strtolower( $archer_name ) ); ?>" data-waitlist-search="<?php echo esc_attr( $row_search_attr ); ?>">
                                                 <td class="sywat-col-center">
-                                                    <input type="checkbox"
-                                                           form="sywat_waitlist_move_selected_form"
-                                                           name="selected_reg_ids[]"
-                                                           value="<?php echo esc_attr( $reg_id ); ?>"
-                                                           aria-label="Select <?php echo esc_attr( $archer_name ); ?>"
-                                                           data-waitlist-member-checkbox="<?php echo esc_attr( $group_uid ); ?>"
-                                                           data-distance="<?php echo esc_attr( $m_dist ); ?>"
-                                                           data-source-line="<?php echo esc_attr( $src_line_idx ); ?>">
-                                                    <?php if ( ! $is_multi_group ) : ?>
-                                                        <span class="sywat-waitlist-pill">#<?php echo intval( $q_pos ); ?></span>
-                                                    <?php else : ?>
-                                                        <span class="sywat-label-subtext">#<?php echo intval( $q_pos ); ?></span>
-                                                    <?php endif; ?>
+                                                    <div class="sywat-waitlist-select-cell">
+                                                        <input type="checkbox"
+                                                               form="sywat_waitlist_move_selected_form"
+                                                               name="selected_reg_ids[]"
+                                                               value="<?php echo esc_attr( $reg_id ); ?>"
+                                                               aria-label="Select <?php echo esc_attr( $archer_name ); ?>"
+                                                               data-waitlist-member-checkbox="<?php echo esc_attr( $group_uid ); ?>"
+                                                               data-distance="<?php echo esc_attr( $m_dist ); ?>"
+                                                               data-source-line="<?php echo esc_attr( $src_line_idx ); ?>">
+                                                        <?php if ( ! $is_multi_group ) : ?>
+                                                            <span class="sywat-waitlist-pill">#<?php echo intval( $q_pos ); ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <strong><?php echo esc_html( $archer_name ); ?></strong>
-                                                    <?php if ( $is_multi_group ) : ?>
-                                                        <span class="sywat-label-subtext">(<?php echo esc_html( $grp['group_label'] ); ?>)</span>
-                                                    <?php elseif ( $active_fam_cnt > 0 ) : ?>
+                                                    <?php if ( ! $is_multi_group && $active_fam_cnt > 0 ) : ?>
                                                         <div>
                                                             <span class="sywat-chip-family">Split Family: <?php echo intval( $active_fam_cnt ); ?> active on this line</span>
                                                         </div>
                                                     <?php endif; ?>
-                                                    <?php if ( $archer_phone !== '' || ( ! $is_multi_group && $m_created !== '' ) ) : ?>
+                                                    <?php if ( $div_style_label !== '' ) : ?>
+                                                        <div class="sywat-meta-subtext"><?php echo esc_html( $div_style_label ); ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if ( ! $is_multi_group && ( $archer_phone !== '' || $m_created !== '' ) ) : ?>
                                                         <div class="sywat-meta-subtext">
                                                             <?php if ( $archer_phone !== '' ) : ?>
                                                                 Phone: <?php echo esc_html( $archer_phone ); ?>
                                                             <?php endif; ?>
-                                                            <?php if ( $archer_phone !== '' && ! $is_multi_group && $m_created !== '' ) : ?>
+                                                            <?php if ( $archer_phone !== '' && $m_created !== '' ) : ?>
                                                                 &bull;
                                                             <?php endif; ?>
-                                                            <?php if ( ! $is_multi_group && $m_created !== '' ) : ?>
+                                                            <?php if ( $m_created !== '' ) : ?>
                                                                 Added: <?php echo esc_html( $m_created ); ?>
                                                             <?php endif; ?>
                                                         </div>
@@ -471,9 +493,6 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     <div>
                                                         <strong><?php echo esc_html( $src_line_name ); ?></strong> &bull;
                                                         <span><?php echo esc_html( $m_dist ); ?></span>
-                                                        <?php if ( $m_div !== '—' ) : ?>
-                                                            <span class="sywat-label-subtext">(<?php echo esc_html( $m_div ); ?>)</span>
-                                                        <?php endif; ?>
                                                     </div>
                                                     <div>
                                                         <?php if ( $is_line_closed ) : ?>
@@ -486,9 +505,9 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     </div>
                                                 </td>
                                                 <td class="sywat-col-center">
-                                                    <div class="sywat-modal-roster-actions">
+                                                    <div class="sywat-waitlist-action-stack">
                                                         <!-- Single Archer Promote Form -->
-                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form" data-sywat-confirm="<?php echo esc_attr( $single_promote_confirm ); ?>">
+                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form sywat-waitlist-action-form" data-sywat-confirm="<?php echo esc_attr( $single_promote_confirm ); ?>">
                                                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                             <?php sywat_waitlist_render_context_inputs( $selected_tournament, $active_line_filter, $context, $extra_context ); ?>
                                                             <input type="hidden" name="sywat_action" value="promote_waitlist">
@@ -498,30 +517,30 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                             <?php if ( ! $can_fit_member ) : ?>
                                                                 <input type="hidden" name="force_override" value="1">
                                                             <?php endif; ?>
-                                                            <button type="submit" class="sywat-btn <?php echo $can_fit_member ? 'sywat-btn-success' : 'sywat-btn-warning'; ?> sywat-btn-sm">
+                                                            <button type="submit" class="sywat-btn <?php echo $can_fit_member ? 'sywat-btn-success' : 'sywat-btn-warning'; ?> sywat-btn-sm sywat-waitlist-action-btn">
                                                                 <?php echo $can_fit_member ? 'Promote' : 'Override & Promote'; ?>
                                                             </button>
                                                         </form>
 
                                                         <!-- Edit Archer Link -->
                                                         <?php if ( $context === 'checkin' ) : ?>
-                                                            <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form">
+                                                            <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form sywat-waitlist-action-form">
                                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $active_line_filter ); ?>">
                                                                 <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm">Edit</button>
+                                                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-waitlist-action-btn">Edit</button>
                                                             </form>
                                                         <?php else : ?>
-                                                            <a href="<?php echo esc_url( $edit_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-sm">Edit</a>
+                                                            <a href="<?php echo esc_url( $edit_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-sm sywat-waitlist-action-btn">Edit</a>
                                                         <?php endif; ?>
 
                                                         <!-- Remove Waitlist Entry Form -->
-                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form" data-sywat-confirm="<?php echo esc_attr( sprintf( 'Remove %s from the waitlist?', $archer_name ) ); ?>">
+                                                        <form method="post" action="<?php echo esc_url( $post_action_url ); ?>" class="sywat-table-action-form sywat-waitlist-action-form" data-sywat-confirm="<?php echo esc_attr( sprintf( 'Remove %s from the waitlist?', $archer_name ) ); ?>">
                                                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                             <?php sywat_waitlist_render_context_inputs( $selected_tournament, $active_line_filter, $context, $extra_context ); ?>
                                                             <input type="hidden" name="sywat_action" value="delete_shooter">
                                                             <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-sm">Remove</button>
+                                                            <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-sm sywat-waitlist-action-btn">Remove</button>
                                                         </form>
                                                     </div>
                                                 </td>
