@@ -1,10 +1,10 @@
 /**
- * SYWAT Archery - Shooting Styles & Divisions Client Controller
+ * SYWAT Archery - Shared Shooting Styles & Age Division Rule Engine
  * Path: assets/js/sywat-shooting-styles.js
- * Description: Namespaced vanilla JS module (window.SYWAT.shootingStyles) managing the Shooting Styles & Divisions Administration modals, dynamic rule-mode toggles, live table search on both tabs, confirmation dialogs, and reusable client-side style/division rule enforcement.
- * Compliance: Zero jQuery, zero inline style.* mutations, zero document-level keydown handlers, delegated event listeners, guarded DOM initialization.
+ * Description: Database-driven rule controller enforcing allowed divisions, force-division overrides, automatic dropdown switching, inline user warnings, and fee/distance metadata lookups across Registration, Roster, and Check-In portals.
+ * Compliance: Zero jQuery, zero inline style.* mutations, zero hardcoded style/division names.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 7.1.0
  */
 
 (function() {
@@ -12,252 +12,109 @@
 
     window.SYWAT = window.SYWAT || {};
 
-    /**
-     * Toggle visibility of Restrict vs. Force division configuration boxes inside the Style modal.
-     *
-     * @param {string} mode Rule mode ('all', 'restrict', or 'force').
-     * @return {void}
-     */
-    function syncRuleModeFields(mode) {
-        const restrictBox = document.getElementById('sywat_style_restrict_box');
-        const forceBox    = document.getElementById('sywat_style_force_box');
-        const forcedSel   = document.getElementById('sywat_style_forced_division');
+    function escapeHtmlRule(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-        if (restrictBox) {
-            if (mode === 'restrict') {
-                restrictBox.classList.remove('sywat-hidden');
-            } else {
-                restrictBox.classList.add('sywat-hidden');
+    function normalizeToken(str) {
+        if (!str) return '';
+        return String(str).replace(/[\s\u00a0]+/g, ' ').trim().toLowerCase();
+    }
+
+    /**
+     * Retrieve localized shooting styles array from wp_localize_script payload.
+     *
+     * @return {Array} Array of shooting style configuration objects.
+     */
+    function getStyles() {
+        const sources = [
+            window.sywatShootingStylesConfig && window.sywatShootingStylesConfig.styles,
+            window.sywatShootingStylesData && window.sywatShootingStylesData.styles,
+            window.sywatStylesConfig && window.sywatStylesConfig.styles,
+            window.sywatRegData && window.sywatRegData.shootingStyles,
+            window.sywatDeskShootingStyles
+        ];
+
+        for (let i = 0; i < sources.length; i++) {
+            if (Array.isArray(sources[i]) && sources[i].length > 0) {
+                return sources[i];
             }
         }
+        return [];
+    }
 
-        if (forceBox) {
-            if (mode === 'force') {
-                forceBox.classList.remove('sywat-hidden');
-                if (forcedSel) {
-                    forcedSel.setAttribute('required', 'required');
-                }
-            } else {
-                forceBox.classList.add('sywat-hidden');
-                if (forcedSel) {
-                    forcedSel.removeAttribute('required');
-                }
+    /**
+     * Retrieve localized age divisions array from wp_localize_script payload.
+     *
+     * @return {Array} Array of age division configuration objects.
+     */
+    function getDivisions() {
+        const sources = [
+            window.sywatShootingStylesConfig && window.sywatShootingStylesConfig.divisions,
+            window.sywatShootingStylesData && window.sywatShootingStylesData.divisions,
+            window.sywatStylesConfig && window.sywatStylesConfig.divisions,
+            window.sywatRegData && window.sywatRegData.divisions,
+            window.sywatDeskDivisions
+        ];
+
+        for (let i = 0; i < sources.length; i++) {
+            if (Array.isArray(sources[i]) && sources[i].length > 0) {
+                return sources[i];
             }
         }
+        return [];
     }
 
     /**
-     * Open the Shooting Style modal in Add or Edit mode.
+     * Find a configured Shooting Style object by label, slug, code, prefix, or alias.
      *
-     * @param {HTMLElement|null} triggerBtn Optional Edit button carrying data-* attributes.
-     * @return {void}
+     * @param {string} query Raw style label, code, or alias.
+     * @return {Object|null} Matching style config object or null.
      */
-    function openStyleModal(triggerBtn) {
-        const modal       = document.getElementById('sywat_style_editor_modal');
-        const titleEl     = document.getElementById('sywat_style_modal_title');
-        const origSlugEl  = document.getElementById('sywat_style_orig_slug');
-        const labelEl     = document.getElementById('sywat_style_label');
-        const codeEl      = document.getElementById('sywat_style_code');
-        const sortEl      = document.getElementById('sywat_style_sort_order');
-        const statusEl    = document.getElementById('sywat_style_status');
-        const isProEl     = document.getElementById('sywat_style_is_pro');
-        const aliasesEl   = document.getElementById('sywat_style_aliases');
-        const ruleModeEl  = document.getElementById('sywat_style_rule_mode');
-        const forcedDivEl = document.getElementById('sywat_style_forced_division');
-        const allowedCbs  = document.querySelectorAll('.sywat-style-allowed-div-cb');
-
-        if (!modal) return;
-
-        const isEdit = Boolean(triggerBtn && triggerBtn.getAttribute('data-slug'));
-
-        if (titleEl) {
-            titleEl.textContent = isEdit ? 'Edit Shooting Style' : 'Add Shooting Style';
-        }
-
-        if (isEdit) {
-            const ruleMode = triggerBtn.getAttribute('data-rule-mode') || 'all';
-            let allowedList = [];
-            try {
-                const rawJson = triggerBtn.getAttribute('data-allowed-divisions') || '[]';
-                const parsed  = JSON.parse(rawJson);
-                if (Array.isArray(parsed)) {
-                    allowedList = parsed;
-                }
-            } catch (err) {
-                allowedList = [];
-            }
-
-            if (origSlugEl)  origSlugEl.value   = triggerBtn.getAttribute('data-slug') || '';
-            if (labelEl)     labelEl.value      = triggerBtn.getAttribute('data-label') || '';
-            if (codeEl)      codeEl.value       = triggerBtn.getAttribute('data-code') || '';
-            if (sortEl)      sortEl.value       = triggerBtn.getAttribute('data-sort-order') || '10';
-            if (statusEl)    statusEl.value     = triggerBtn.getAttribute('data-status') || 'active';
-            if (isProEl)     isProEl.checked    = (triggerBtn.getAttribute('data-is-pro') === '1');
-            if (aliasesEl)   aliasesEl.value    = triggerBtn.getAttribute('data-aliases') || '';
-            if (ruleModeEl)  ruleModeEl.value   = ruleMode;
-            if (forcedDivEl) forcedDivEl.value  = triggerBtn.getAttribute('data-forced-division') || '';
-
-            allowedCbs.forEach(function(cb) {
-                cb.checked = allowedList.indexOf(cb.value) !== -1;
-            });
-
-            syncRuleModeFields(ruleMode);
-        } else {
-            const rowCount = document.querySelectorAll('.sywat-style-config-row').length;
-            if (origSlugEl)  origSlugEl.value   = '';
-            if (labelEl)     labelEl.value      = '';
-            if (codeEl)      codeEl.value       = '';
-            if (sortEl)      sortEl.value       = String(rowCount + 1);
-            if (statusEl)    statusEl.value     = 'active';
-            if (isProEl)     isProEl.checked    = false;
-            if (aliasesEl)   aliasesEl.value    = '';
-            if (ruleModeEl)  ruleModeEl.value   = 'all';
-            if (forcedDivEl) forcedDivEl.value  = '';
-
-            allowedCbs.forEach(function(cb) {
-                cb.checked = false;
-            });
-
-            syncRuleModeFields('all');
-        }
-
-        modal.classList.add('active');
-    }
-
-    /**
-     * Close the Shooting Style editor modal.
-     *
-     * @return {void}
-     */
-    function closeStyleModal() {
-        const modal = document.getElementById('sywat_style_editor_modal');
-        if (modal) {
-            modal.classList.remove('active');
-        }
-    }
-
-    /**
-     * Open the Age Division modal in Add or Edit mode.
-     *
-     * @param {HTMLElement|null} triggerBtn Optional Edit button carrying data-* attributes.
-     * @return {void}
-     */
-    function openDivisionModal(triggerBtn) {
-        const modal      = document.getElementById('sywat_division_editor_modal');
-        const titleEl    = document.getElementById('sywat_div_modal_title');
-        const origSlugEl = document.getElementById('sywat_div_orig_slug');
-        const labelEl    = document.getElementById('sywat_div_label');
-        const codeEl     = document.getElementById('sywat_div_code');
-        const distEl     = document.getElementById('sywat_div_distance');
-        const tierEl     = document.getElementById('sywat_div_rate_tier');
-        const sortEl     = document.getElementById('sywat_div_sort_order');
-        const statusEl   = document.getElementById('sywat_div_status');
-        const aliasesEl  = document.getElementById('sywat_div_aliases');
-
-        if (!modal) return;
-
-        const isEdit = Boolean(triggerBtn && triggerBtn.getAttribute('data-slug'));
-
-        if (titleEl) {
-            titleEl.textContent = isEdit ? 'Edit Age Division' : 'Add Age Division';
-        }
-
-        if (isEdit) {
-            if (origSlugEl) origSlugEl.value = triggerBtn.getAttribute('data-slug') || '';
-            if (labelEl)    labelEl.value    = triggerBtn.getAttribute('data-label') || '';
-            if (codeEl)     codeEl.value     = triggerBtn.getAttribute('data-code') || '';
-            if (distEl)     distEl.value     = triggerBtn.getAttribute('data-distance') || '20yd';
-            if (tierEl)     tierEl.value     = triggerBtn.getAttribute('data-rate-tier') || 'Adult';
-            if (sortEl)     sortEl.value     = triggerBtn.getAttribute('data-sort-order') || '10';
-            if (statusEl)   statusEl.value   = triggerBtn.getAttribute('data-status') || 'active';
-            if (aliasesEl)  aliasesEl.value  = triggerBtn.getAttribute('data-aliases') || '';
-        } else {
-            const rowCount = document.querySelectorAll('.sywat-division-config-row').length;
-            if (origSlugEl) origSlugEl.value = '';
-            if (labelEl)    labelEl.value    = '';
-            if (codeEl)     codeEl.value     = '';
-            if (distEl)     distEl.value     = '20yd';
-            if (tierEl)     tierEl.value     = 'Adult';
-            if (sortEl)     sortEl.value     = String(rowCount + 1);
-            if (statusEl)   statusEl.value   = 'active';
-            if (aliasesEl)  aliasesEl.value  = '';
-        }
-
-        modal.classList.add('active');
-    }
-
-    /**
-     * Close the Age Division editor modal.
-     *
-     * @return {void}
-     */
-    function closeDivisionModal() {
-        const modal = document.getElementById('sywat_division_editor_modal');
-        if (modal) {
-            modal.classList.remove('active');
-        }
-    }
-
-    /**
-     * Filter Shooting Styles table rows using CSS class toggles.
-     *
-     * @param {string} rawQuery Search input text.
-     * @return {void}
-     */
-    function applyStylesSearchFilter(rawQuery) {
-        const query = (rawQuery || '').toLowerCase().trim();
-        document.querySelectorAll('.sywat-style-config-row').forEach(function(row) {
-            const haystack = (row.getAttribute('data-style-search') || '').toLowerCase();
-            if (!query || haystack.indexOf(query) !== -1) {
-                row.classList.remove('sywat-hidden');
-            } else {
-                row.classList.add('sywat-hidden');
-            }
-        });
-    }
-
-    /**
-     * Filter Age Divisions table rows using CSS class toggles.
-     *
-     * @param {string} rawQuery Search input text.
-     * @return {void}
-     */
-    function applyDivisionsSearchFilter(rawQuery) {
-        const query = (rawQuery || '').toLowerCase().trim();
-        document.querySelectorAll('.sywat-division-config-row').forEach(function(row) {
-            const haystack = (row.getAttribute('data-division-search') || '').toLowerCase();
-            if (!query || haystack.indexOf(query) !== -1) {
-                row.classList.remove('sywat-hidden');
-            } else {
-                row.classList.add('sywat-hidden');
-            }
-        });
-    }
-
-    /**
-     * Look up a style configuration object from window.sywatShootingStylesConfig by label, code, or alias.
-     *
-     * @param {string} rawStyle Style option value or text.
-     * @return {Object|null} Matching style config or null.
-     */
-    function findStyleConfig(rawStyle) {
-        const cfg = window.sywatShootingStylesConfig;
-        if (!cfg || !Array.isArray(cfg.styles) || !rawStyle) {
+    function findStyle(query) {
+        const needle = normalizeToken(query);
+        if (!needle || needle === 'no show' || needle === 'guest') {
             return null;
         }
 
-        const needle = String(rawStyle).trim().toLowerCase();
-        if (!needle) return null;
+        const styles = getStyles();
+        const needlePrefix = needle.split(' –')[0].split(' - ')[0].trim();
 
-        for (let i = 0; i < cfg.styles.length; i++) {
-            const item = cfg.styles[i];
-            if ((item.label || '').toLowerCase() === needle || (item.code || '').toLowerCase() === needle) {
-                return item;
+        // Pass 1: Exact label, slug, or code match
+        for (let i = 0; i < styles.length; i++) {
+            const s = styles[i];
+            if (!s) continue;
+            const lbl  = normalizeToken(s.label);
+            const slug = normalizeToken(s.slug);
+            const code = normalizeToken(s.code);
+
+            if (needle === lbl || needle === slug || (code && needle === code)) {
+                return s;
             }
-            if (Array.isArray(item.aliases)) {
-                for (let j = 0; j < item.aliases.length; j++) {
-                    if ((item.aliases[j] || '').toLowerCase() === needle) {
-                        return item;
+        }
+
+        // Pass 2: Prefix or alias match
+        for (let i = 0; i < styles.length; i++) {
+            const s = styles[i];
+            if (!s) continue;
+            const lbl       = normalizeToken(s.label);
+            const lblPrefix = lbl.split(' –')[0].split(' - ')[0].trim();
+            const code      = normalizeToken(s.code);
+
+            if (needlePrefix && (needlePrefix === lblPrefix || (code && needlePrefix === code))) {
+                return s;
+            }
+
+            if (Array.isArray(s.aliases)) {
+                for (let j = 0; j < s.aliases.length; j++) {
+                    const alias = normalizeToken(s.aliases[j]);
+                    if (alias && (needle === alias || needlePrefix === alias)) {
+                        return s;
                     }
                 }
             }
@@ -267,192 +124,472 @@
     }
 
     /**
-     * Reusable client-side rule enforcer for any Division + Style <select> pair.
-     * Supports 'all', 'restrict' (disables ineligible styles & falls back to defaultStyle),
-     * and 'force' (pushes divisionEl to forced_division, e.g., Longbow -> Adult (18 - 49)).
+     * Find a configured Age Division object by label, slug, code, base name, or alias.
      *
-     * @param {HTMLSelectElement} divisionEl Division select element.
-     * @param {HTMLSelectElement} styleEl    Style select element.
-     * @param {string}            trigger    Which field triggered the check ('division' | 'style').
-     * @return {Object} Result metadata { divisionChanged: boolean, styleChanged: boolean, forcedDivision: string }.
+     * @param {string} query Raw division label, code, or alias.
+     * @return {Object|null} Matching division config object or null.
      */
-    function applyStyleRules(divisionEl, styleEl, trigger) {
-        const result = {
-            divisionChanged: false,
-            styleChanged: false,
-            forcedDivision: ''
-        };
-
-        if (!divisionEl || !styleEl) {
-            return result;
+    function findDivision(query) {
+        const needle = normalizeToken(query);
+        if (!needle || needle === 'no show') {
+            return null;
         }
 
-        const cfg = window.sywatShootingStylesConfig;
-        if (!cfg || !Array.isArray(cfg.styles)) {
-            return result;
-        }
+        const divisions = getDivisions();
+        const needleBase = needle.replace(/\s*\([^)]*\)\s*/g, '').trim();
 
-        const selectedStyleCfg = findStyleConfig(styleEl.value);
+        // Pass 1: Exact label, slug, or code match
+        for (let i = 0; i < divisions.length; i++) {
+            const d = divisions[i];
+            if (!d) continue;
+            const lbl  = normalizeToken(d.label);
+            const slug = normalizeToken(d.slug);
+            const code = normalizeToken(d.code);
 
-        // If selected style enforces a target division (e.g., LB – Longbow -> Adult (18 - 49)), push division automatically
-        if (
-            selectedStyleCfg &&
-            selectedStyleCfg.rule_mode === 'force' &&
-            selectedStyleCfg.forced_division &&
-            divisionEl.value !== 'No Show'
-        ) {
-            result.forcedDivision = selectedStyleCfg.forced_division;
-            if (divisionEl.value !== selectedStyleCfg.forced_division) {
-                divisionEl.value = selectedStyleCfg.forced_division;
-                result.divisionChanged = true;
+            if (needle === lbl || needle === slug || (code && needle === code)) {
+                return d;
             }
         }
 
-        const currentDiv = divisionEl.value;
-        if (!currentDiv || currentDiv === 'No Show') {
-            for (let i = 0; i < styleEl.options.length; i++) {
-                styleEl.options[i].disabled = false;
+        // Pass 2: Base name (without age range) or alias match
+        for (let i = 0; i < divisions.length; i++) {
+            const d = divisions[i];
+            if (!d) continue;
+            const lbl     = normalizeToken(d.label);
+            const lblBase = lbl.replace(/\s*\([^)]*\)\s*/g, '').trim();
+
+            if (needleBase && lblBase && needleBase === lblBase) {
+                return d;
             }
-            return result;
-        }
 
-        const fallbackStyle = cfg.defaultStyle || 'FS – Freestyle';
-
-        for (let i = 0; i < styleEl.options.length; i++) {
-            const opt = styleEl.options[i];
-            const optCfg = findStyleConfig(opt.value);
-            let isDisabled = false;
-
-            if (optCfg && optCfg.rule_mode === 'restrict') {
-                const allowed = Array.isArray(optCfg.allowed_divisions) ? optCfg.allowed_divisions : [];
-                if (allowed.indexOf(currentDiv) === -1) {
-                    isDisabled = true;
+            if (Array.isArray(d.aliases)) {
+                for (let j = 0; j < d.aliases.length; j++) {
+                    const alias = normalizeToken(d.aliases[j]);
+                    if (alias && (needle === alias || needleBase === alias)) {
+                        return d;
+                    }
                 }
             }
-
-            opt.disabled = isDisabled;
-
-            if (isDisabled && styleEl.value === opt.value) {
-                styleEl.value = fallbackStyle;
-                result.styleChanged = true;
-            }
         }
 
-        return result;
+        return null;
     }
 
-    // Export Public Namespaced API
-    window.SYWAT.shootingStyles = {
-        openStyleModal: openStyleModal,
-        closeStyleModal: closeStyleModal,
-        openDivisionModal: openDivisionModal,
-        closeDivisionModal: closeDivisionModal,
-        syncRuleModeFields: syncRuleModeFields,
-        applySearchFilter: applyStylesSearchFilter,
-        applyDivisionsSearchFilter: applyDivisionsSearchFilter,
-        findStyleConfig: findStyleConfig,
-        applyStyleRules: applyStyleRules
-    };
+    /**
+     * Resolve the list of permitted division objects for a given style record,
+     * ordered by configured database sort_order. Empty array means all divisions allowed.
+     *
+     * @param {Object} styleRec Shooting style config object.
+     * @return {Array}          Sorted array of permitted division config objects.
+     */
+    function getPermittedDivisionsForStyle(styleRec) {
+        if (!styleRec) return [];
 
-    // Delegated Click Listeners
-    document.addEventListener('click', function(event) {
-        const actionEl = event.target.closest('[data-sywat-action]');
-        if (!actionEl) return;
-
-        const action = actionEl.getAttribute('data-sywat-action');
-
-        if (action === 'open-add-style-modal') {
-            event.preventDefault();
-            openStyleModal(null);
-        } else if (action === 'open-edit-style-modal') {
-            event.preventDefault();
-            openStyleModal(actionEl);
-        } else if (action === 'close-style-modal') {
-            event.preventDefault();
-            closeStyleModal();
-        } else if (action === 'open-add-division-modal') {
-            event.preventDefault();
-            openDivisionModal(null);
-        } else if (action === 'open-edit-division-modal') {
-            event.preventDefault();
-            openDivisionModal(actionEl);
-        } else if (action === 'close-division-modal') {
-            event.preventDefault();
-            closeDivisionModal();
-        } else if (action === 'clear-styles-search') {
-            event.preventDefault();
-            const searchInput = document.getElementById('sywat_styles_search_input');
-            if (searchInput) {
-                searchInput.value = '';
-                applyStylesSearchFilter('');
-                searchInput.focus();
-            }
-        } else if (action === 'clear-divisions-search') {
-            event.preventDefault();
-            const divSearchInput = document.getElementById('sywat_divisions_search_input');
-            if (divSearchInput) {
-                divSearchInput.value = '';
-                applyDivisionsSearchFilter('');
-                divSearchInput.focus();
-            }
+        const rawAllowed = [];
+        if (styleRec.force_division && String(styleRec.force_division).trim() !== '') {
+            rawAllowed.push(styleRec.force_division);
         }
-    });
-
-    // Delegated Change Listener for Rule Mode Dropdown
-    document.addEventListener('change', function(event) {
-        const actionEl = event.target.closest('[data-sywat-action="change-style-rule-mode"]');
-        if (!actionEl) return;
-        syncRuleModeFields(actionEl.value);
-    });
-
-    // Delegated Live Search Input Listeners (Styles & Divisions Tabs)
-    document.addEventListener('input', function(event) {
-        if (!event.target) return;
-        if (event.target.id === 'sywat_styles_search_input') {
-            applyStylesSearchFilter(event.target.value);
-        } else if (event.target.id === 'sywat_divisions_search_input') {
-            applyDivisionsSearchFilter(event.target.value);
+        if (Array.isArray(styleRec.allowed_divisions) && styleRec.allowed_divisions.length > 0) {
+            styleRec.allowed_divisions.forEach(function(item) {
+                if (item && String(item).trim() !== '') {
+                    rawAllowed.push(item);
+                }
+            });
         }
-    });
 
-    // Delegated Form Confirmation Listener
-    document.addEventListener('submit', function(event) {
-        const form = event.target;
-        if (!form || !form.hasAttribute('data-sywat-confirm')) return;
-
-        const message = form.getAttribute('data-sywat-confirm');
-        if (message && !window.confirm(message)) {
-            event.preventDefault();
+        if (rawAllowed.length === 0) {
+            return [];
         }
-    });
 
-    // Guarded Initialization, Element-Scoped Keydown Guards & Auto-Dismiss System Notices
-    function initSywatShootingStyles() {
-        ['sywat_styles_search_input', 'sywat_divisions_search_input'].forEach(function(inputId) {
-            const inputEl = document.getElementById(inputId);
-            if (inputEl) {
-                inputEl.addEventListener('keydown', function(event) {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                    }
-                });
+        const seen = new Set();
+        const resolved = [];
+
+        rawAllowed.forEach(function(token) {
+            const divObj = findDivision(token);
+            if (divObj && divObj.label) {
+                const key = normalizeToken(divObj.label);
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    resolved.push(divObj);
+                }
+            } else {
+                const cleanStr = String(token).trim();
+                const key = normalizeToken(cleanStr);
+                if (key && !seen.has(key)) {
+                    seen.add(key);
+                    resolved.push({
+                        slug: key,
+                        code: '',
+                        label: cleanStr,
+                        sort_order: 999
+                    });
+                }
             }
         });
 
-        const noticeEl = document.getElementById('sywat-notice');
-        if (noticeEl) {
-            setTimeout(function() {
-                noticeEl.classList.add('sywat-fade-out');
-                setTimeout(function() {
-                    noticeEl.classList.add('sywat-hidden');
-                }, 500);
-            }, 5000);
+        resolved.sort(function(a, b) {
+            const sa = (typeof a.sort_order === 'number') ? a.sort_order : parseInt(a.sort_order || '999', 10);
+            const sb = (typeof b.sort_order === 'number') ? b.sort_order : parseInt(b.sort_order || '999', 10);
+            return sa - sb;
+        });
+
+        return resolved;
+    }
+
+    /**
+     * Check whether a given division value is permitted for a shooting style record.
+     *
+     * @param {Object} styleRec Shooting style config object.
+     * @param {string} divValue Selected division value from dropdown.
+     * @return {boolean}        True if permitted (or if style has no restrictions).
+     */
+    function isDivisionPermitted(styleRec, divValue) {
+        if (!styleRec || !divValue || normalizeToken(divValue) === 'no show') {
+            return true;
+        }
+
+        const permitted = getPermittedDivisionsForStyle(styleRec);
+        if (permitted.length === 0) {
+            return true;
+        }
+
+        const targetDivObj = findDivision(divValue);
+        const targetNorm   = normalizeToken(targetDivObj ? targetDivObj.label : divValue);
+
+        for (let i = 0; i < permitted.length; i++) {
+            if (normalizeToken(permitted[i].label) === targetNorm) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Format a human-readable list of allowed division names from database records.
+     *
+     * @param {Array} permittedDivs Array of division config objects.
+     * @return {string}             Formatted label list (e.g., "Adult (18 - 49)" or "Adult (18 - 49), Senior (50 - 59)").
+     */
+    function formatAllowedDivisionList(permittedDivs) {
+        if (!Array.isArray(permittedDivs) || permittedDivs.length === 0) {
+            return '';
+        }
+        return permittedDivs.map(function(d) {
+            return d.label || '';
+        }).filter(Boolean).join(', ');
+    }
+
+    /**
+     * Render or clear an inline warning notice directly beneath the Style/Division field group.
+     *
+     * @param {HTMLSelectElement} styleEl    Style select element.
+     * @param {HTMLSelectElement} divisionEl Division select element.
+     * @param {string}            htmlMsg    Safe HTML warning message, or empty string to clear.
+     * @return {void}
+     */
+    function setRuleNotice(styleEl, divisionEl, htmlMsg) {
+        const anchorEl = styleEl || divisionEl;
+        if (!anchorEl) return;
+
+        const fieldGroup = anchorEl.closest('.sywat-field-group') || anchorEl.parentElement;
+        if (!fieldGroup) return;
+
+        let noticeEl = fieldGroup.querySelector('.sywat-style-rule-notice');
+
+        if (!htmlMsg) {
+            if (noticeEl) {
+                noticeEl.remove();
+            }
+            return;
+        }
+
+        if (!noticeEl) {
+            noticeEl = document.createElement('div');
+            noticeEl.className = 'sywat-alert sywat-alert-warning sywat-style-rule-notice';
+            noticeEl.setAttribute('role', 'status');
+            noticeEl.setAttribute('aria-live', 'polite');
+            fieldGroup.appendChild(noticeEl);
+        }
+
+        noticeEl.innerHTML = htmlMsg;
+    }
+
+    /**
+     * Synchronize disabled state on Style <option> elements based on the currently selected Division.
+     *
+     * @param {HTMLSelectElement} styleEl    Style select element.
+     * @param {HTMLSelectElement} divisionEl Division select element.
+     * @return {void}
+     */
+    function syncStyleOptionStates(styleEl, divisionEl) {
+        if (!styleEl || !styleEl.options || !divisionEl) return;
+
+        const currentDiv = divisionEl.value || '';
+        if (!currentDiv || normalizeToken(currentDiv) === 'no show') {
+            for (let i = 0; i < styleEl.options.length; i++) {
+                styleEl.options[i].disabled = false;
+            }
+            return;
+        }
+
+        for (let i = 0; i < styleEl.options.length; i++) {
+            const opt = styleEl.options[i];
+            const val = opt.value || '';
+
+            if (!val || normalizeToken(val) === 'no show') {
+                opt.disabled = false;
+                continue;
+            }
+
+            const styleRec = findStyle(val);
+            if (!styleRec) {
+                opt.disabled = false;
+                continue;
+            }
+
+            opt.disabled = !isDivisionPermitted(styleRec, currentDiv);
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSywatShootingStyles);
-    } else {
-        initSywatShootingStyles();
+    /**
+     * Main Rule Enforcement Controller:
+     * - When trigger === 'style': If the selected style requires a specific division or restricts
+     *   divisions and the current division is ineligible, automatically switches divisionEl.value
+     *   to the required/first allowed division in database order, recalculates fees/distance, and
+     *   displays a dynamic warning banner.
+     * - When trigger === 'division': Disables styles disallowed for the chosen division; if the
+     *   currently selected style is now disallowed, resets it to the first permitted style and
+     *   displays a dynamic warning banner.
+     *
+     * @param {HTMLSelectElement} styleEl    Style select element.
+     * @param {HTMLSelectElement} divisionEl Division select element.
+     * @param {Object}            options    Optional settings: { trigger: 'division'|'style'|'init', silent: boolean }.
+     * @return {boolean}                     True if either dropdown value was automatically modified.
+     */
+    function applyStyleRules(styleEl, divisionEl, options) {
+        if (!styleEl || !divisionEl) return false;
+
+        const opts    = options || {};
+        const trigger = opts.trigger || 'division';
+        const silent  = Boolean(opts.silent);
+
+        // Ignore synthetic change events dispatched during an automatic rule update
+        if (trigger === 'division' && divisionEl.dataset.sywatAutoUpdating === '1') {
+            delete divisionEl.dataset.sywatAutoUpdating;
+            syncStyleOptionStates(styleEl, divisionEl);
+            return false;
+        }
+        if (trigger === 'style' && styleEl.dataset.sywatAutoUpdating === '1') {
+            delete styleEl.dataset.sywatAutoUpdating;
+            syncStyleOptionStates(styleEl, divisionEl);
+            return false;
+        }
+
+        // Case 1: User selected a Shooting Style
+        if (trigger === 'style') {
+            const selectedStyleVal = styleEl.value || '';
+            if (!selectedStyleVal || normalizeToken(selectedStyleVal) === 'no show') {
+                setRuleNotice(styleEl, divisionEl, '');
+                syncStyleOptionStates(styleEl, divisionEl);
+                return false;
+            }
+
+            const styleRec = findStyle(selectedStyleVal);
+            if (!styleRec) {
+                setRuleNotice(styleEl, divisionEl, '');
+                syncStyleOptionStates(styleEl, divisionEl);
+                return false;
+            }
+
+            const permittedDivs = getPermittedDivisionsForStyle(styleRec);
+            if (permittedDivs.length === 0) {
+                setRuleNotice(styleEl, divisionEl, '');
+                syncStyleOptionStates(styleEl, divisionEl);
+                return false;
+            }
+
+            const currentDivVal = divisionEl.value || '';
+            const hasForceDiv   = Boolean(styleRec.force_division && String(styleRec.force_division).trim() !== '');
+
+            // Check if current division is already valid (and matches force_division if set)
+            let needsDivisionSwitch = false;
+            if (hasForceDiv) {
+                const forcedObj  = findDivision(styleRec.force_division);
+                const forcedNorm = normalizeToken(forcedObj ? forcedObj.label : styleRec.force_division);
+                const currDivObj = findDivision(currentDivVal);
+                const currNorm   = normalizeToken(currDivObj ? currDivObj.label : currentDivVal);
+                needsDivisionSwitch = (currNorm !== forcedNorm);
+            } else {
+                needsDivisionSwitch = !isDivisionPermitted(styleRec, currentDivVal);
+            }
+
+            if (!needsDivisionSwitch) {
+                setRuleNotice(styleEl, divisionEl, '');
+                syncStyleOptionStates(styleEl, divisionEl);
+                return false;
+            }
+
+            // Locate matching <option> in divisionEl for the first permitted division
+            let targetOptionValue = '';
+            let targetDivLabel    = '';
+
+            for (let p = 0; p < permittedDivs.length; p++) {
+                const candNorm = normalizeToken(permittedDivs[p].label);
+                for (let i = 0; i < divisionEl.options.length; i++) {
+                    const dOpt = divisionEl.options[i];
+                    if (!dOpt.value || dOpt.disabled) continue;
+                    const optDivObj = findDivision(dOpt.value);
+                    const optNorm   = normalizeToken(optDivObj ? optDivObj.label : dOpt.value);
+                    if (optNorm === candNorm) {
+                        targetOptionValue = dOpt.value;
+                        targetDivLabel    = permittedDivs[p].label || dOpt.textContent.trim();
+                        break;
+                    }
+                }
+                if (targetOptionValue) break;
+            }
+
+            if (!targetOptionValue) {
+                syncStyleOptionStates(styleEl, divisionEl);
+                return false;
+            }
+
+            divisionEl.value = targetOptionValue;
+            syncStyleOptionStates(styleEl, divisionEl);
+
+            if (!silent) {
+                const styleLabel  = styleRec.label || selectedStyleVal;
+                const allowedText = formatAllowedDivisionList(permittedDivs);
+                let msg = '';
+
+                if (permittedDivs.length === 1) {
+                    msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is restricted to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>. Division was automatically updated.';
+                } else {
+                    msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is only permitted in <strong>' + escapeHtmlRule(allowedText) + '</strong>. Division was automatically updated to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>.';
+                }
+
+                setRuleNotice(styleEl, divisionEl, msg);
+            }
+
+            // Notify downstream distance/fee listeners (Registration fee summary, etc.)
+            divisionEl.dataset.sywatAutoUpdating = '1';
+            divisionEl.dispatchEvent(new Event('change', { bubbles: true }));
+            delete divisionEl.dataset.sywatAutoUpdating;
+
+            return true;
+        }
+
+        // Case 2: Division changed or initial form hydration
+        syncStyleOptionStates(styleEl, divisionEl);
+
+        const currentDivVal   = divisionEl.value || '';
+        const currentStyleVal = styleEl.value || '';
+
+        if (!currentDivVal || normalizeToken(currentDivVal) === 'no show' || !currentStyleVal || normalizeToken(currentStyleVal) === 'no show') {
+            if (trigger !== 'init') {
+                setRuleNotice(styleEl, divisionEl, '');
+            }
+            return false;
+        }
+
+        const activeStyleRec = findStyle(currentStyleVal);
+        if (!activeStyleRec || isDivisionPermitted(activeStyleRec, currentDivVal)) {
+            if (trigger !== 'init') {
+                setRuleNotice(styleEl, divisionEl, '');
+            }
+            return false;
+        }
+
+        // Current style is NOT permitted in the newly selected division — pick first enabled active style
+        let fallbackOption = null;
+        for (let i = 0; i < styleEl.options.length; i++) {
+            const opt = styleEl.options[i];
+            if (!opt.value || opt.disabled || normalizeToken(opt.value) === 'no show') {
+                continue;
+            }
+            fallbackOption = opt;
+            break;
+        }
+
+        if (!fallbackOption) {
+            return false;
+        }
+
+        const prevStyleLabel = activeStyleRec.label || currentStyleVal;
+        const permittedDivs  = getPermittedDivisionsForStyle(activeStyleRec);
+        const divRec         = findDivision(currentDivVal);
+        const currentDivLbl  = (divRec && divRec.label) ? divRec.label : currentDivVal;
+
+        styleEl.value = fallbackOption.value;
+        const newStyleRec   = findStyle(fallbackOption.value);
+        const newStyleLabel = (newStyleRec && newStyleRec.label) ? newStyleRec.label : fallbackOption.textContent.trim();
+
+        if (!silent) {
+            const allowedText = formatAllowedDivisionList(permittedDivs);
+            let msg = '';
+
+            if (permittedDivs.length === 1 && allowedText) {
+                msg = '⚠️ <strong>' + escapeHtmlRule(prevStyleLabel) + '</strong> is restricted to <strong>' + escapeHtmlRule(allowedText) + '</strong> and cannot be used in <strong>' + escapeHtmlRule(currentDivLbl) + '</strong>. Style was updated to <strong>' + escapeHtmlRule(newStyleLabel) + '</strong>.';
+            } else if (allowedText) {
+                msg = '⚠️ <strong>' + escapeHtmlRule(prevStyleLabel) + '</strong> is only permitted in <strong>' + escapeHtmlRule(allowedText) + '</strong>. Style was updated to <strong>' + escapeHtmlRule(newStyleLabel) + '</strong>.';
+            } else {
+                msg = '⚠️ <strong>' + escapeHtmlRule(prevStyleLabel) + '</strong> is not permitted in <strong>' + escapeHtmlRule(currentDivLbl) + '</strong>. Style was updated to <strong>' + escapeHtmlRule(newStyleLabel) + '</strong>.';
+            }
+
+            setRuleNotice(styleEl, divisionEl, msg);
+        }
+
+        styleEl.dataset.sywatAutoUpdating = '1';
+        styleEl.dispatchEvent(new Event('change', { bubbles: true }));
+        delete styleEl.dataset.sywatAutoUpdating;
+
+        return true;
     }
+
+    /**
+     * Get distance ('Cub' or '20yd') for a division label/code from database config.
+     *
+     * @param {string} divValue Division label, code, or alias.
+     * @return {string}         'Cub' or '20yd'.
+     */
+    function getDivisionDistance(divValue) {
+        const divRec = findDivision(divValue);
+        if (divRec && divRec.distance) {
+            return divRec.distance === 'Cub' ? 'Cub' : '20yd';
+        }
+        return normalizeToken(divValue).indexOf('cub') !== -1 ? 'Cub' : '20yd';
+    }
+
+    /**
+     * Get Individual rate tier ('Youth' or 'Adult') for a division label/code from database config.
+     *
+     * @param {string} divValue Division label, code, or alias.
+     * @return {string}         'Youth' or 'Adult'.
+     */
+    function getDivisionRateTier(divValue) {
+        const divRec = findDivision(divValue);
+        if (divRec && divRec.rate_tier) {
+            return divRec.rate_tier === 'Youth' ? 'Youth' : 'Adult';
+        }
+        const norm = normalizeToken(divValue);
+        if (norm.indexOf('cub') !== -1 || norm.indexOf('youth') !== -1 || norm.indexOf('young adult') !== -1) {
+            return 'Youth';
+        }
+        return 'Adult';
+    }
+
+    // Export public namespaced API
+    window.SYWAT.shootingStyles = {
+        getStyles: getStyles,
+        getDivisions: getDivisions,
+        findStyle: findStyle,
+        findDivision: findDivision,
+        getPermittedDivisionsForStyle: getPermittedDivisionsForStyle,
+        isDivisionPermitted: isDivisionPermitted,
+        applyStyleRules: applyStyleRules,
+        getDivisionDistance: getDivisionDistance,
+        getDivisionRateTier: getDivisionRateTier
+    };
+
 })();
