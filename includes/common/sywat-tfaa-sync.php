@@ -2,9 +2,9 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Deduplicated Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-driven NFAA shooting styles and age divisions.
  * Author: SYWAT Archery
- * Version: 1.1.1
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -41,7 +41,7 @@ if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
 }
 
 /**
- * TFAA Parser Helper: Division & Gender Resolution
+ * TFAA Parser Helper: Division & Gender Resolution (Database-Driven)
  */
 if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
     function sywat_parse_tfaa_div_gen( $text ) {
@@ -57,13 +57,82 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
         $gen = $has_female ? 'Female' : 'Male';
         $div = '';
 
-        if ( stripos( $text, 'Master Senior' ) !== false || stripos( $text, 'Master' ) !== false ) $div = 'Master Senior (70+)';
-        elseif ( stripos( $text, 'Silver Senior' ) !== false ) $div = 'Silver Senior (60 - 69)';
-        elseif ( stripos( $text, 'Senior' ) !== false ) $div = 'Senior (50 - 59)';
-        elseif ( stripos( $text, 'Young Adult' ) !== false ) $div = 'Young Adult (15 - 17)';
-        elseif ( stripos( $text, 'Youth' ) !== false ) $div = 'Youth (12 - 14)';
-        elseif ( stripos( $text, 'Cub' ) !== false ) $div = 'Cub (8 - 11)';
-        elseif ( stripos( $text, 'Adult' ) !== false ) $div = 'Adult (18 - 49)';
+        // Strip gender token to isolate division text for database matching
+        $clean_div_text = trim( preg_replace( '/\b(?:female|male)\b/i', '', $text ) );
+        $clean_div_text = trim( preg_replace( '/\s+/u', ' ', $clean_div_text ), " \t\n\r\0\x0B-–:" );
+
+        if ( function_exists( 'sywat_find_division' ) && $clean_div_text !== '' ) {
+            $direct_div = sywat_find_division( $clean_div_text );
+            if ( is_array( $direct_div ) && ! empty( $direct_div['label'] ) ) {
+                $div = $direct_div['label'];
+            }
+        }
+
+        if ( $div === '' && function_exists( 'sywat_get_division_records' ) ) {
+            $records    = sywat_get_division_records( true );
+            $candidates = array();
+
+            foreach ( $records as $rec ) {
+                if ( empty( $rec['label'] ) ) continue;
+                $label      = $rec['label'];
+                $base_label = trim( preg_replace( '/\s*\(.*?\)\s*/', '', $label ) );
+
+                $tokens = array( $label );
+                if ( $base_label !== '' && $base_label !== $label ) {
+                    $tokens[] = $base_label;
+                }
+                if ( ! empty( $rec['aliases'] ) && is_array( $rec['aliases'] ) ) {
+                    foreach ( $rec['aliases'] as $alias ) {
+                        if ( trim( $alias ) !== '' ) {
+                            $tokens[] = trim( $alias );
+                        }
+                    }
+                }
+                if ( ! empty( $rec['code'] ) ) {
+                    $tokens[] = trim( $rec['code'] );
+                }
+
+                foreach ( $tokens as $tok ) {
+                    $candidates[] = array(
+                        'token' => $tok,
+                        'label' => $label,
+                        'len'   => strlen( $tok ),
+                    );
+                }
+            }
+
+            // Longest token first prevents "Senior" from matching before "Master Senior" / "Silver Senior",
+            // and prevents "Adult" from matching before "Young Adult".
+            usort( $candidates, function( $a, $b ) {
+                return $b['len'] <=> $a['len'];
+            } );
+
+            foreach ( $candidates as $cand ) {
+                $tok = $cand['token'];
+                if ( $cand['len'] <= 3 ) {
+                    if ( preg_match( '/\b' . preg_quote( $tok, '/' ) . '\b/i', $clean_div_text ) ) {
+                        $div = $cand['label'];
+                        break;
+                    }
+                } else {
+                    if ( stripos( $clean_div_text, $tok ) !== false ) {
+                        $div = $cand['label'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Legacy fallback if shooting styles engine is unavailable
+        if ( $div === '' && ! function_exists( 'sywat_get_division_records' ) ) {
+            if ( stripos( $text, 'Master Senior' ) !== false || stripos( $text, 'Master' ) !== false ) $div = 'Master Senior (70+)';
+            elseif ( stripos( $text, 'Silver Senior' ) !== false ) $div = 'Silver Senior (60 - 69)';
+            elseif ( stripos( $text, 'Senior' ) !== false ) $div = 'Senior (50 - 59)';
+            elseif ( stripos( $text, 'Young Adult' ) !== false ) $div = 'Young Adult (15 - 17)';
+            elseif ( stripos( $text, 'Youth' ) !== false ) $div = 'Youth (12 - 14)';
+            elseif ( stripos( $text, 'Cub' ) !== false ) $div = 'Cub (8 - 11)';
+            elseif ( stripos( $text, 'Adult' ) !== false ) $div = 'Adult (18 - 49)';
+        }
 
         if ( empty( $div ) ) return array( 'division' => '', 'gender' => '' );
         return array( 'division' => $div, 'gender' => $gen );
@@ -71,7 +140,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
 }
 
 /**
- * TFAA Parser Helper: Shooting Style Resolution
+ * TFAA Parser Helper: Shooting Style Resolution (Database-Driven)
  */
 if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
     function sywat_parse_tfaa_style( $text ) {
@@ -79,6 +148,96 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
         $style  = '';
         $is_pro = ( stripos( $text, 'Pro' ) !== false );
 
+        if ( function_exists( 'sywat_get_shooting_styles' ) ) {
+            $records     = sywat_get_shooting_styles( true );
+            $matched_rec = null;
+
+            if ( function_exists( 'sywat_find_shooting_style' ) ) {
+                $direct = sywat_find_shooting_style( $text );
+                if ( is_array( $direct ) && ! empty( $direct['label'] ) ) {
+                    $matched_rec = $direct;
+                }
+            }
+
+            if ( ! $matched_rec ) {
+                $candidates = array();
+
+                foreach ( $records as $rec ) {
+                    if ( empty( $rec['label'] ) ) continue;
+                    $label  = $rec['label'];
+                    $tokens = array( $label );
+
+                    // Extract descriptive text after dash (e.g., "Freestyle Limited Recurve (or Olympic Recurve)")
+                    $dash_parts = preg_split( '/\s*[–-]\s*/u', $label, 2 );
+                    if ( isset( $dash_parts[1] ) && trim( $dash_parts[1] ) !== '' ) {
+                        $desc = trim( $dash_parts[1] );
+                        $tokens[] = $desc;
+                        $no_paren = trim( preg_replace( '/\s*\(.*?\)\s*/', '', $desc ) );
+                        if ( $no_paren !== '' && $no_paren !== $desc ) {
+                            $tokens[] = $no_paren;
+                        }
+                    }
+
+                    if ( ! empty( $rec['aliases'] ) && is_array( $rec['aliases'] ) ) {
+                        foreach ( $rec['aliases'] as $alias ) {
+                            if ( trim( $alias ) !== '' ) {
+                                $tokens[] = trim( $alias );
+                            }
+                        }
+                    }
+
+                    if ( ! empty( $rec['code'] ) ) {
+                        $tokens[] = trim( $rec['code'] );
+                    }
+
+                    foreach ( $tokens as $tok ) {
+                        $candidates[] = array(
+                            'token' => $tok,
+                            'rec'   => $rec,
+                            'len'   => strlen( $tok ),
+                        );
+                    }
+                }
+
+                // Longest token first so "Freestyle Limited Recurve" & "FS Pro" match before "Freestyle" / "FS"
+                usort( $candidates, function( $a, $b ) {
+                    return $b['len'] <=> $a['len'];
+                } );
+
+                foreach ( $candidates as $cand ) {
+                    $tok = $cand['token'];
+                    if ( $cand['len'] <= 4 ) {
+                        if ( preg_match( '/\b' . preg_quote( $tok, '/' ) . '\b/i', $text ) ) {
+                            $matched_rec = $cand['rec'];
+                            break;
+                        }
+                    } else {
+                        if ( stripos( $text, $tok ) !== false ) {
+                            $matched_rec = $cand['rec'];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ( is_array( $matched_rec ) && ! empty( $matched_rec['label'] ) ) {
+                // If header includes "Pro" and matched non-Pro record, upgrade to matching configured Pro style if one exists
+                if ( $is_pro && empty( $matched_rec['is_pro'] ) ) {
+                    $base_code = strtoupper( trim( $matched_rec['code'] ) );
+                    foreach ( $records as $candidate_pro ) {
+                        if ( ! empty( $candidate_pro['is_pro'] ) ) {
+                            $pro_code = strtoupper( trim( $candidate_pro['code'] ) );
+                            if ( $pro_code === $base_code . ' PRO' || $pro_code === $base_code . 'PRO' || stripos( $candidate_pro['label'], $matched_rec['code'] . ' Pro' ) !== false ) {
+                                return $candidate_pro['label'];
+                            }
+                        }
+                    }
+                }
+                return $matched_rec['label'];
+            }
+        }
+
+        // Legacy fallback if shooting styles engine is unavailable
         if ( stripos( $text, 'Freestyle Limited Recurve' ) !== false || stripos( $text, 'FSLR' ) !== false || stripos( $text, 'FSL-R' ) !== false ) $style = 'FSLR – Freestyle Limited Recurve (or Olympic Recurve)';
         elseif ( stripos( $text, 'Freestyle Limited' ) !== false || stripos( $text, 'FSL' ) !== false ) $style = 'FSL – Freestyle Limited';
         elseif ( stripos( $text, 'Modern Bowhunter' ) !== false || stripos( $text, 'MBH' ) !== false ) $style = 'MBH – Modern Bowhunter';
@@ -161,7 +320,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $curr_div   = '';
         $curr_gen   = 'Male';
         $curr_style = '';
-        
+
         $cnt_20yd = 0;
         $cnt_cub  = 0;
 
@@ -179,9 +338,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) continue;
 
                 $raw_name = trim( $matches[2] );
-                $is_guest = ( stripos( $raw_name, '[GUEST]' ) !== false || stripos( $line, '[GUEST]' ) !== false || $curr_style === 'Guest' );
+                $is_guest = ( stripos( $raw_name, '[GUEST]' ) !== false || stripos( $line, '[GUEST]' ) !== false || strcasecmp( $curr_style, 'Guest' ) === 0 );
                 $is_inc   = ( stripos( $raw_name, '[INC]' ) !== false || stripos( $line, '[INC]' ) !== false );
-                
+
                 $clean_raw_name = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
 
                 $parts      = explode( ',', $clean_raw_name, 2 );
@@ -189,11 +348,14 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
                 $rest        = trim( substr( $line, strlen( $matches[0] ) ) );
                 $score_parts = explode( ' ', $rest );
-                
+
                 $score = isset( $score_parts[0] ) ? intval( $score_parts[0] ) : 0;
                 $xs    = isset( $score_parts[1] ) ? intval( $score_parts[1] ) : 0;
 
-                $dist = ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
+                $dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
+                    ? sywat_shooting_styles_get_division_distance( $curr_div )
+                    : ( ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
+
                 if ( $dist === 'Cub' ) $cnt_cub++;
                 else $cnt_20yd++;
 
@@ -224,9 +386,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $style_check = sywat_parse_tfaa_style( $line );
             if ( ! empty( $style_check ) ) {
                 $curr_style = $style_check;
-                if ( stripos( $line, 'Pro' ) !== false && $curr_style === 'FS – Freestyle' ) {
-                    $curr_style = 'FS Pro – Freestyle Pro';
-                }
                 continue;
             }
         }
@@ -277,14 +436,14 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm_name      = $normalize_str( $entry['clean_name'] );
             $norm_div       = $normalize_str( $entry['division'] );
             $norm_style     = $normalize_str( $entry['style'] );
-            $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
+            $entry_is_guest = ! empty( $entry['is_guest'] ) || strcasecmp( $entry['style'], 'Guest' ) === 0;
 
             if ( ! $entry_is_guest && ! $entry['is_inc'] && empty( $primary_styles[$norm_name] ) ) {
                 $primary_styles[$norm_name] = $entry['style'];
             }
 
             $final_style = $entry['style'];
-            if ( $entry_is_guest && $final_style === 'Guest' ) {
+            if ( $entry_is_guest && strcasecmp( $final_style, 'Guest' ) === 0 ) {
                 $final_style = ! empty( $primary_styles[$norm_name] ) ? $primary_styles[$norm_name] : 'Guest';
             }
 
@@ -295,10 +454,19 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             foreach ( $registrations as $r_id => $r ) {
                 if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
 
+                $raw_r_div   = isset( $r['division'] ) ? $r['division'] : '';
+                $raw_r_style = isset( $r['style'] ) ? $r['style'] : '';
+                if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $raw_r_div !== '' && $raw_r_div !== '—' ) {
+                    $raw_r_div = sywat_shooting_styles_normalize_division( $raw_r_div );
+                }
+                if ( function_exists( 'sywat_shooting_styles_normalize_style' ) && $raw_r_style !== '' && $raw_r_style !== '—' ) {
+                    $raw_r_style = sywat_shooting_styles_normalize_style( $raw_r_style );
+                }
+
                 $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                $r_div      = $normalize_str( isset( $r['division'] ) ? $r['division'] : '' );
-                $r_style    = $normalize_str( isset( $r['style'] ) ? $r['style'] : '' );
-                $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
+                $r_div      = $normalize_str( $raw_r_div );
+                $r_style    = $normalize_str( $raw_r_style );
+                $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( strcasecmp( $raw_r_style, 'Guest' ) === 0 );
 
                 if ( $r_name === $norm_name && $r_div === $norm_div && $r_style === $norm_style && $r_is_guest === $entry_is_guest ) {
                     $matched_reg_id = $r_id;
@@ -311,9 +479,15 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 foreach ( $registrations as $r_id => $r ) {
                     if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
 
+                    $raw_r_div   = isset( $r['division'] ) ? $r['division'] : '';
+                    $raw_r_style = isset( $r['style'] ) ? $r['style'] : '';
+                    if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $raw_r_div !== '' && $raw_r_div !== '—' ) {
+                        $raw_r_div = sywat_shooting_styles_normalize_division( $raw_r_div );
+                    }
+
                     $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                    $r_div      = $normalize_str( isset( $r['division'] ) ? $r['division'] : '' );
-                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
+                    $r_div      = $normalize_str( $raw_r_div );
+                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( strcasecmp( $raw_r_style, 'Guest' ) === 0 );
 
                     if ( $r_name === $norm_name && $r_div === $norm_div && $r_is_guest === $entry_is_guest ) {
                         $matched_reg_id = $r_id;
@@ -328,7 +502,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     if ( isset( $claimed_reg_ids[$r_id] ) ) continue;
 
                     $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
+                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && strcasecmp( $r['style'], 'Guest' ) === 0 );
 
                     if ( $r_name === $norm_name && $r_is_guest === $entry_is_guest ) {
                         $matched_reg_id = $r_id;
@@ -402,6 +576,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $line_name = isset( $t_lines[$assigned_line_idx]['name'] ) ? $t_lines[$assigned_line_idx]['name'] : 'Line ' . ( intval( $assigned_line_idx ) + 1 );
                 $target_id = uniqid( 'reg_seq_' );
                 $new_type  = $entry_is_guest ? 'Guest' : 'Walk-In';
+                $rate_tier = function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
+                    ? sywat_shooting_styles_get_division_rate_tier( $entry['division'] )
+                    : ( ( $entry['distance'] === 'Cub' ) ? 'Youth' : 'Adult' );
 
                 $new_reg = array(
                     'id'          => $target_id,
@@ -415,7 +592,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'division'    => $entry['division'],
                     'gender'      => $entry['gender'],
                     'style'       => $final_style,
-                    'paid'        => ( $entry['distance'] === 'Cub' ? 'Youth' : 'Adult' ),
+                    'paid'        => $rate_tier,
                     'balance_due' => 0.00,
                     'status'      => 'Pre-Reg',
                     'checked_in'  => 1,
