@@ -2,12 +2,14 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table, and control toolbars.
+ * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table with database-normalized division/style labels, and control toolbars.
  * Author: SYWAT Archery
- * Version: 7.3.2
+ * Version: 7.4.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 if ( ! function_exists( 'render_sywat_scores_app' ) ) {
     /**
@@ -17,7 +19,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
      */
     function render_sywat_scores_app() {
         $user = wp_get_current_user();
-        
+
         // Centralized capability check (includes tfaa_tournament_director & Executive Board)
         $can_edit = function_exists( 'sywat_can_edit_scores' ) ? sywat_can_edit_scores() : ( is_user_logged_in() && (bool) array_intersect( array( 'administrator', 'management', 'non-shooting-member', 'staff_shooter', 'sywat_shop_manager', 'sywat_shop_user', 'tfaa_tournament_director', 'tfaa_president', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_field_governor' ), (array) $user->roles ) );
         if ( ! $can_edit ) {
@@ -49,7 +51,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         foreach ( $all_tournaments as $t_name => $t_data ) {
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( $is_admin || $t_shop === $user_shop_id ) {
-                $raw_tournaments[$t_name] = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : $t_data;
+                $raw_tournaments[ $t_name ] = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : $t_data;
             }
         }
 
@@ -60,7 +62,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         // Primary Fallback: Sticky User Meta Preference across Register / Check-In / Scores
         if ( empty( $selected_tournament ) && $user->ID ) {
             $saved_t = get_user_meta( $user->ID, 'sywat_desk_selected_tournament', true );
-            if ( ! empty( $saved_t ) && isset( $raw_tournaments[$saved_t] ) ) {
+            if ( ! empty( $saved_t ) && isset( $raw_tournaments[ $saved_t ] ) ) {
                 $selected_tournament = $saved_t;
             }
         }
@@ -68,7 +70,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         // Secondary Fallback: Global active tournament
         if ( empty( $selected_tournament ) ) {
             $global_curr = get_option( 'sywat_current_tournament', '' );
-            if ( ! empty( $global_curr ) && isset( $raw_tournaments[$global_curr] ) ) {
+            if ( ! empty( $global_curr ) && isset( $raw_tournaments[ $global_curr ] ) ) {
                 $selected_tournament = $global_curr;
             }
         }
@@ -86,23 +88,23 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         uksort( $raw_tournaments, 'strcasecmp' );
 
         $tournaments = array();
-        if ( ! empty( $selected_tournament ) && isset( $raw_tournaments[$selected_tournament] ) ) {
-            $tournaments[$selected_tournament] = $raw_tournaments[$selected_tournament];
+        if ( ! empty( $selected_tournament ) && isset( $raw_tournaments[ $selected_tournament ] ) ) {
+            $tournaments[ $selected_tournament ] = $raw_tournaments[ $selected_tournament ];
         }
         foreach ( $raw_tournaments as $t_name => $t_lines ) {
             if ( $t_name !== $selected_tournament ) {
-                $tournaments[$t_name] = $t_lines;
+                $tournaments[ $t_name ] = $t_lines;
             }
         }
 
-        $lines         = isset( $tournaments[$selected_tournament] ) ? $tournaments[$selected_tournament] : array();
+        $lines         = isset( $tournaments[ $selected_tournament ] ) ? $tournaments[ $selected_tournament ] : array();
         $active_t_slug = sanitize_title( $selected_tournament );
-        
+
         // Fetch Active Locks with object cache flush
         $locks_key = 'sywat_locks_' . $active_t_slug;
         wp_cache_delete( $locks_key, 'options' );
         $locked_lines        = get_option( $locks_key, array() );
-        $current_view_locked = ( $selected_line_idx !== 'all' && ! empty( $locked_lines[$selected_line_idx] ) );
+        $current_view_locked = ( $selected_line_idx !== 'all' && ! empty( $locked_lines[ $selected_line_idx ] ) );
 
         // Batch Action Handlers
         $notice = '';
@@ -125,12 +127,14 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         }
 
         $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
-        if ( ! is_array( $scores_map ) ) $scores_map = array();
+        if ( ! is_array( $scores_map ) ) {
+            $scores_map = array();
+        }
 
         $tourn_registrations = array();
         foreach ( $registrations as $reg ) {
             $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
-            $match_line    = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string)$reg['line_index'] === (string)$selected_line_idx );
+            $match_line    = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
             $is_checked_in = ! empty( $reg['checked_in'] );
 
             if ( $match_tourn && $match_line && $is_checked_in ) {
@@ -139,23 +143,30 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         }
 
         usort( $tourn_registrations, function( $a, $b ) {
-            $line_a = isset( $a['line_index'] ) ? (int)$a['line_index'] : 99;
-            $line_b = isset( $b['line_index'] ) ? (int)$b['line_index'] : 99;
-            if ( $line_a !== $line_b ) return $line_a <=> $line_b;
+            $line_a = isset( $a['line_index'] ) ? (int) $a['line_index'] : 99;
+            $line_b = isset( $b['line_index'] ) ? (int) $b['line_index'] : 99;
+            if ( $line_a !== $line_b ) {
+                return $line_a <=> $line_b;
+            }
             $name_a = isset( $a['name'] ) ? trim( $a['name'] ) : '';
             $name_b = isset( $b['name'] ) ? trim( $b['name'] ) : '';
             return strcasecmp( $name_a, $name_b );
         } );
 
         // Check active Volunteer Hub status across all host shops for dynamic return button
-        $active_hubs    = get_option( 'sywat_active_tournaments', array() );
-        if ( ! is_array( $active_hubs ) ) $active_hubs = array();
-        $is_hub_enabled = in_array( $selected_tournament, $active_hubs );
+        $active_hubs = get_option( 'sywat_active_tournaments', array() );
+        if ( ! is_array( $active_hubs ) ) {
+            $active_hubs = array();
+        }
+        $is_hub_enabled = in_array( $selected_tournament, $active_hubs, true );
 
         // Enqueue client score interactive JavaScript asset
         wp_enqueue_script( 'sywat-scores-js', SYWAT_PLUGIN_URL . 'assets/js/sywat-scores.js', array(), SYWAT_PLUGIN_VERSION, true );
 
-        $tab_query_args = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
+        $tab_query_args      = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
+        $has_norm_division   = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_norm_style      = function_exists( 'sywat_shooting_styles_normalize_style' );
+        $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
         ?>
 
         <div class="sywat-wrap">
@@ -167,7 +178,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
-                <?php if ( $can_manage_seasons ): ?>
+                <?php if ( $can_manage_seasons ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
                 <?php endif; ?>
             </div>
@@ -190,7 +201,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             <div class="sywat-field-group sywat-field-auto">
                                 <label for="selected_tournament_val">Active Tournament:</label>
                                 <select name="selected_tournament" id="selected_tournament_val" class="sywat-select-tournament" onchange="document.getElementById('sywat_score_filter_form').submit();">
-                                    <?php foreach ( $tournaments as $t_name => $t_lines ): ?>
+                                    <?php foreach ( $tournaments as $t_name => $t_lines ) : ?>
                                         <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
                                             <?php echo esc_html( $t_name ); ?>
                                         </option>
@@ -203,8 +214,8 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <label for="selected_line_val">Shooting Line:</label>
                                 <select name="selected_line_idx" id="selected_line_val" class="sywat-select-line" onchange="document.getElementById('sywat_score_filter_form').submit();">
                                     <option value="all" <?php selected( $selected_line_idx, 'all' ); ?>>All Lines (Entire Weekend)</option>
-                                    <?php foreach ( $lines as $idx => $line ): ?>
-                                        <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string)$selected_line_idx, (string)$idx ); ?>>
+                                    <?php foreach ( $lines as $idx => $line ) : ?>
+                                        <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $selected_line_idx, (string) $idx ); ?>>
                                             <?php echo esc_html( $line['name'] ); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -212,7 +223,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             </div>
                         </form>
 
-                        <?php if ( $is_hub_enabled ): ?>
+                        <?php if ( $is_hub_enabled ) : ?>
                             <a href="<?php echo esc_url( sywat_page_url( 'volunteer_hub' ) ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Hub</a>
                         <?php endif; ?>
                     </div>
@@ -223,7 +234,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                     <div class="sywat-table-header-bar">
                         <h2>Line Score Tracker</h2>
                     </div>
-                    <?php if ( ! empty( $lines ) ): ?>
+                    <?php if ( ! empty( $lines ) ) : ?>
                         <?php
                             $ordered_lines = array();
                             foreach ( $lines as $idx => $line ) {
@@ -231,43 +242,53 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 $weight     = 50;
 
                                 if ( stripos( $line_title, 'Sat' ) !== false ) {
-                                    if ( stripos( $line_title, '10' ) !== false )     $weight = 10;
-                                    elseif ( stripos( $line_title, '2' ) !== false )  $weight = 20;
-                                    else                                             $weight = 25;
+                                    if ( stripos( $line_title, '10' ) !== false ) {
+                                        $weight = 10;
+                                    } elseif ( stripos( $line_title, '2' ) !== false ) {
+                                        $weight = 20;
+                                    } else {
+                                        $weight = 25;
+                                    }
                                 } elseif ( stripos( $line_title, 'Sun' ) !== false ) {
-                                    if ( stripos( $line_title, '10' ) !== false )     $weight = 30;
-                                    elseif ( stripos( $line_title, '2' ) !== false )  $weight = 40;
-                                    else                                             $weight = 45;
+                                    if ( stripos( $line_title, '10' ) !== false ) {
+                                        $weight = 30;
+                                    } elseif ( stripos( $line_title, '2' ) !== false ) {
+                                        $weight = 40;
+                                    } else {
+                                        $weight = 45;
+                                    }
                                 }
 
                                 $ordered_lines[] = array( 'idx' => $idx, 'line' => $line, 'weight' => $weight );
                             }
 
                             usort( $ordered_lines, function( $a, $b ) {
-                                if ( $a['weight'] !== $b['weight'] ) return $a['weight'] <=> $b['weight'];
+                                if ( $a['weight'] !== $b['weight'] ) {
+                                    return $a['weight'] <=> $b['weight'];
+                                }
                                 return $a['idx'] <=> $b['idx'];
                             } );
                         ?>
 
                         <div class="sywat-tracker-grid">
-                            <?php foreach ( $ordered_lines as $item ): ?>
+                            <?php foreach ( $ordered_lines as $item ) : ?>
                                 <?php
                                     $idx  = $item['idx'];
                                     $line = $item['line'];
-                                    
+
                                     $total_line_shooters = 0;
                                     $scores_entered_line = 0;
 
                                     foreach ( $registrations as $reg ) {
                                         if ( isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament ) {
-                                            $match_index = isset( $reg['line_index'] ) && (string)$reg['line_index'] === (string)$idx;
+                                            $match_index = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $idx;
                                             $match_name  = isset( $reg['line_name'] ) && isset( $line['name'] ) && trim( $reg['line_name'] ) === trim( $line['name'] );
 
                                             if ( ( $match_index || $match_name ) && ! empty( $reg['checked_in'] ) ) {
                                                 $total_line_shooters++;
-                                                $rid       = isset( $reg['id'] ) ? $reg['id'] : '';
-                                                $map_s     = isset( $scores_map[$rid]['score'] ) ? intval( $scores_map[$rid]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
-                                                $map_x     = isset( $scores_map[$rid]['xs'] ) ? intval( $scores_map[$rid]['xs'] ) : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                                                $rid   = isset( $reg['id'] ) ? $reg['id'] : '';
+                                                $map_s = isset( $scores_map[ $rid ]['score'] ) ? intval( $scores_map[ $rid ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
+                                                $map_x = isset( $scores_map[ $rid ]['xs'] )    ? intval( $scores_map[ $rid ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
 
                                                 if ( $map_s > 0 || $map_x > 0 ) {
                                                     $scores_entered_line++;
@@ -276,7 +297,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                         }
                                     }
 
-                                    $is_line_locked = ! empty( $locked_lines[$idx] );
+                                    $is_line_locked = ! empty( $locked_lines[ $idx ] );
                                     $is_complete    = ( $total_line_shooters > 0 && $scores_entered_line === $total_line_shooters );
 
                                     if ( $is_line_locked ) {
@@ -306,15 +327,15 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                             <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-edit">Enter Scores</button>
                                         </form>
 
-                                        <?php if ( $is_admin ): ?>
+                                        <?php if ( $is_admin ) : ?>
                                             <form method="post" class="sywat-form-inline">
                                                 <?php wp_nonce_field( 'sywat_scores_action', 'sywat_nonce' ); ?>
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $idx ); ?>">
                                                 <input type="hidden" name="sywat_action" value="toggle_lock">
-                                                <?php if ( $is_line_locked ): ?>
+                                                <?php if ( $is_line_locked ) : ?>
                                                     <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock">Unlock</button>
-                                                <?php else: ?>
+                                                <?php else : ?>
                                                     <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock">Lock</button>
                                                 <?php endif; ?>
                                             </form>
@@ -323,7 +344,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                    <?php else: ?>
+                    <?php else : ?>
                         <p class="sywat-empty-text">No shooting lines configured.</p>
                     <?php endif; ?>
                 </div>
@@ -346,26 +367,26 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </div>
 
                                 <!-- Export CSV Button (Admin & Shop Managers) -->
-                                <?php if ( $is_admin && ! empty( $locked_lines ) ): ?>
+                                <?php if ( $is_admin && ! empty( $locked_lines ) ) : ?>
                                     <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
                                 <?php endif; ?>
 
-                                <?php if ( $is_admin ): ?>
-                                    <?php if ( $selected_line_idx !== 'all' ): ?>
-                                        <?php if ( $current_view_locked ): ?>
+                                <?php if ( $is_admin ) : ?>
+                                    <?php if ( $selected_line_idx !== 'all' ) : ?>
+                                        <?php if ( $current_view_locked ) : ?>
                                             <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-unlock" title="Unlock to edit scores">Unlock Line</button>
-                                        <?php else: ?>
+                                        <?php else : ?>
                                             <button type="submit" name="sywat_action" value="toggle_lock" class="sywat-btn sywat-btn-secondary sywat-btn-icon-lock" title="Lock to prevent edits">Lock Line</button>
                                         <?php endif; ?>
                                     <?php endif; ?>
                                     <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                                 <?php endif; ?>
-                                
+
                                 <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
                             </div>
                         </div>
 
-                        <?php if ( ! empty( $tourn_registrations ) ): ?>
+                        <?php if ( ! empty( $tourn_registrations ) ) : ?>
                             <div class="sywat-table-responsive">
                                 <table class="sywat-table">
                                     <thead>
@@ -382,19 +403,28 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php $num = 1; foreach ( $tourn_registrations as $reg ): ?>
-                                            <?php 
-                                                $reg_id    = isset( $reg['id'] ) ? $reg['id'] : '';
-                                                $score     = isset( $scores_map[$reg_id]['score'] ) ? intval( $scores_map[$reg_id]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
-                                                $x_count   = isset( $scores_map[$reg_id]['xs'] )    ? intval( $scores_map[$reg_id]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
-                                                $gender_str= ! empty( $reg['gender'] ) ? $reg['gender'] : '—';
-                                                $div_str   = ! empty( $reg['division'] ) ? $reg['division'] : '—';
-                                                $style_str = ! empty( $reg['style'] ) ? $reg['style'] : '—';
-                                                $is_locked = ! empty( $locked_lines[$reg['line_index']] );
+                                        <?php $num = 1; foreach ( $tourn_registrations as $reg ) : ?>
+                                            <?php
+                                                $reg_id     = isset( $reg['id'] ) ? $reg['id'] : '';
+                                                $score      = isset( $scores_map[ $reg_id ]['score'] ) ? intval( $scores_map[ $reg_id ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
+                                                $x_count    = isset( $scores_map[ $reg_id ]['xs'] )    ? intval( $scores_map[ $reg_id ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                                                $gender_str = ! empty( $reg['gender'] ) ? $reg['gender'] : '—';
+
+                                                $raw_div = ! empty( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+                                                $div_str = ( $raw_div !== '' && $raw_div !== '—' && strcasecmp( $raw_div, 'No Show' ) !== 0 && $has_norm_division )
+                                                    ? sywat_shooting_styles_normalize_division( $raw_div )
+                                                    : ( $raw_div !== '' ? $raw_div : '—' );
+
+                                                $raw_style = ! empty( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+                                                $style_str = ( $raw_style !== '' && $raw_style !== '—' && strcasecmp( $raw_style, 'No Show' ) !== 0 && $has_norm_style )
+                                                    ? sywat_shooting_styles_normalize_style( $raw_style )
+                                                    : ( $raw_style !== '' ? $raw_style : '—' );
+
+                                                $is_locked = ! empty( $locked_lines[ $reg['line_index'] ] );
                                                 $dis_attr  = $is_locked ? 'disabled' : '';
 
-                                                $lidx      = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string)$reg['line_index'] : '0' );
-                                                $line_disp = isset( $lines[$lidx]['name'] ) ? $lines[$lidx]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
+                                                $lidx      = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+                                                $line_disp = isset( $lines[ $lidx ]['name'] ) ? $lines[ $lidx ]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
                                             ?>
                                             <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr( $reg_id ); ?>" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                                 <td class="sywat-col-center"><strong><?php echo $num++; ?></strong></td>
@@ -410,9 +440,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                     <input type="number" name="x_counts[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo esc_attr( $x_count ); ?>" value="<?php echo esc_attr( $x_count ); ?>" min="0" max="60" placeholder="0" class="sywat-score-input x-val" <?php echo $dis_attr; ?>>
                                                 </td>
                                                 <td class="sywat-col-center">
-                                                    <?php if ( $is_locked ): ?>
+                                                    <?php if ( $is_locked ) : ?>
                                                         <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins & Shop Managers Only">🔒 Locked</span>
-                                                    <?php else: ?>
+                                                    <?php else : ?>
                                                         <span class="sywat-save-status sywat-status-saved" id="status_<?php echo esc_attr( $reg_id ); ?>">✓ Saved</span>
                                                     <?php endif; ?>
                                                 </td>
@@ -423,7 +453,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             </div>
 
                             <div class="sywat-table-footer-controls" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
-                                <?php if ( $is_admin ): ?>
+                                <?php if ( $is_admin ) : ?>
                                     <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                                 <?php endif; ?>
                                 <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
@@ -437,14 +467,14 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             </div>
         </div>
 
-        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
+        <script <?php echo $script_optout_attrs; ?>>
         document.addEventListener("DOMContentLoaded", function() {
             const searchInput = document.getElementById('sywat_score_search_input');
-            
+
             function applyScoreSearchFilter(query) {
                 const cleanQuery = query.trim().toLowerCase();
                 const rows = document.querySelectorAll('.sywat-score-row');
-                
+
                 rows.forEach(function(row) {
                     const dataName = (row.getAttribute('data-name') || '').toLowerCase();
                     const textContent = (row.textContent || row.innerText || '').toLowerCase();
