@@ -5,7 +5,7 @@
  * Description: Renders modal overlay templates for quick member account creation, household profile updates, dependent management, Gender and Pro selection, board position assignments with single-action automated role binding compatibility, batch spreadsheet upload, 2-step audit preview overlays, protected test data purge overlays, live unassigned archer autocomplete search fields, dynamic target Head of Household autocomplete search fields, in-form governance card standalone account conversion drawer with standardized button weight, bold compact metadata subtext typography, administrator-gated system role grids and 4-column district-specific board position assignment grids, and native button controls for client-side modal state management.
  * Compliance: Zero inline styles, zero embedded scripts. JS logic isolated to assets/js/sywat-members.js. Delegates bulk database pre-fetching to members-data.php.
  * Author: SYWAT Archery
- * Version: 6.1.1
+ * Version: 6.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 function sywat_members_render_modals( $data ) {
     $all_members         = isset( $data['all_members'] ) ? $data['all_members'] : array();
+    $all_archers         = isset( $data['all_archers'] ) ? $data['all_archers'] : null;
     $all_board_positions = isset( $data['all_board_positions'] ) ? $data['all_board_positions'] : array();
     $edit_user_obj       = isset( $data['edit_user_obj'] ) ? $data['edit_user_obj'] : null;
     $edit_dep_subprofile = isset( $data['edit_dep_subprofile'] ) ? $data['edit_dep_subprofile'] : null;
@@ -1128,6 +1129,6 @@ function sywat_members_render_modals( $data ) {
     <?php
     // TEMPORARY POC MODAL HOOK: TFAA Gender & Pro Status Reconciliation (Remove Post-POC)
     if ( function_exists( 'sywat_render_tfaa_reconcile_modal' ) ) {
-        sywat_render_tfaa_reconcile_modal();
+        sywat_render_tfaa_reconcile_modal( $all_archers );
     }
 }
