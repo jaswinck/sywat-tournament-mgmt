@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Renders the Phone & Group Intake form, FareHarbor CSV import form, and Current Line Slot Usage table with clickable Waitlist badges/buttons that open #sywat_waitlist_modal.
+ * Description: Renders the Phone & Group Intake form with database-driven age divisions, FareHarbor CSV import form, and Current Line Slot Usage table with clickable Waitlist badges/buttons that open #sywat_waitlist_modal.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -139,6 +139,39 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                 ),
             );
         }
+
+        // Load active database-configured age divisions (with safe NFAA fallback)
+        $division_options = array();
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $div_records = sywat_get_division_records( false );
+            if ( is_array( $div_records ) ) {
+                foreach ( $div_records as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    $rate_tier = ( isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Youth' ) ? 'Youth' : 'Adult';
+                    $distance  = ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd';
+                    $division_options[] = array(
+                        'label'     => $rec['label'],
+                        'distance'  => $distance,
+                        'rate_tier' => $rate_tier,
+                        'fee'       => ( $rate_tier === 'Youth' ) ? 25 : 30,
+                    );
+                }
+            }
+        }
+
+        if ( empty( $division_options ) ) {
+            $division_options = array(
+                array( 'label' => 'Cub (8 - 11)',           'distance' => 'Cub',  'rate_tier' => 'Youth', 'fee' => 25 ),
+                array( 'label' => 'Youth (12 - 14)',        'distance' => '20yd', 'rate_tier' => 'Youth', 'fee' => 25 ),
+                array( 'label' => 'Young Adult (15 - 17)',  'distance' => '20yd', 'rate_tier' => 'Youth', 'fee' => 25 ),
+                array( 'label' => 'Adult (18 - 49)',        'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => 30 ),
+                array( 'label' => 'Senior (50 - 59)',       'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => 30 ),
+                array( 'label' => 'Silver Senior (60 - 69)','distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => 30 ),
+                array( 'label' => 'Master Senior (70+)',    'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => 30 ),
+            );
+        }
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
@@ -193,7 +226,10 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                         <?php
                             $a_name = isset( $a['name'] ) ? sanitize_text_field( $a['name'] ) : '';
                             $a_dist = isset( $a['distance'] ) ? sanitize_text_field( $a['distance'] ) : '20yd';
-                            $a_div  = isset( $a['division'] ) ? sanitize_text_field( $a['division'] ) : '';
+                            $a_div  = isset( $a['division'] ) ? trim( sanitize_text_field( $a['division'] ) ) : '';
+                            if ( $a_div !== '' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+                                $a_div = sywat_shooting_styles_normalize_division( $a_div );
+                            }
                             $a_line = isset( $a['line_idx'] ) ? sanitize_text_field( $a['line_idx'] ) : $current_default_line;
                         ?>
                         <div class="sywat-archer-input-row">
@@ -211,13 +247,17 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                             <div class="sywat-field-group sywat-col-archer-div">
                                 <select name="archers[<?php echo $i; ?>][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
                                     <option value="" disabled <?php selected( $a_div, '' ); ?> hidden>Select Division</option>
-                                    <option value="Cub (8 - 11)" <?php selected( $a_div, 'Cub (8 - 11)' ); ?>>Cub (8 - 11) [$25]</option>
-                                    <option value="Youth (12 - 14)" <?php selected( $a_div, 'Youth (12 - 14)' ); ?>>Youth (12 - 14) [$25]</option>
-                                    <option value="Young Adult (15 - 17)" <?php selected( $a_div, 'Young Adult (15 - 17)' ); ?>>Young Adult (15 - 17) [$25]</option>
-                                    <option value="Adult (18 - 49)" <?php selected( $a_div, 'Adult (18 - 49)' ); ?>>Adult (18 - 49) [$30]</option>
-                                    <option value="Senior (50 - 59)" <?php selected( $a_div, 'Senior (50 - 59)' ); ?>>Senior (50 - 59) [$30]</option>
-                                    <option value="Silver Senior (60 - 69)" <?php selected( $a_div, 'Silver Senior (60 - 69)' ); ?>>Silver Senior (60 - 69) [$30]</option>
-                                    <option value="Master Senior (70+) " <?php selected( trim( $a_div ), 'Master Senior (70+)' ); ?>>Master Senior (70+) [$30]</option>
+                                    <?php foreach ( $division_options as $div_opt ) : ?>
+                                        <option
+                                            value="<?php echo esc_attr( $div_opt['label'] ); ?>"
+                                            data-distance="<?php echo esc_attr( $div_opt['distance'] ); ?>"
+                                            data-rate-tier="<?php echo esc_attr( $div_opt['rate_tier'] ); ?>"
+                                            data-fee="<?php echo intval( $div_opt['fee'] ); ?>"
+                                            <?php selected( $a_div, $div_opt['label'] ); ?>
+                                        >
+                                            <?php echo esc_html( $div_opt['label'] . ' [$' . intval( $div_opt['fee'] ) . ']' ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
 
