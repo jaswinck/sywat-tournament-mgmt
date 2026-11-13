@@ -2,11 +2,14 @@
 /**
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
+ * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, division/style controls, and line-scoped family group assignment.
  * Author: SYWAT Archery
- * Version: 6.8.3
+ * Version: 6.9.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Render Edit Archer Registration Popup Modal Component.
@@ -77,17 +80,23 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                 <div class="sywat-modal-header">
                     <div>
                         <h3>✏️ Edit Archer Registration</h3>
-                        <div class="sywat-subtitle">Update division, shooting line, or payment category details.</div>
+                        <div class="sywat-subtitle">Update registration status, division, shooting line, or payment category details.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Edit Archer Modal" data-sywat-action="close-edit-archer-modal">&times;</button>
                 </div>
                 <?php if ( $target_archer ) : ?>
                     <?php
                         $curr_line           = isset( $target_archer['line_index'] ) ? (string) $target_archer['line_index'] : '0';
-                        $curr_fam_id         = isset( $target_archer['family_id'] ) ? $target_archer['family_id'] : '';
+                        $curr_fam_id         = isset( $target_archer['family_id'] ) ? trim( (string) $target_archer['family_id'] ) : '';
                         $modal_line_families = isset( $existing_families_by_line[ $curr_line ] ) ? $existing_families_by_line[ $curr_line ] : array();
+                        $raw_status          = isset( $target_archer['status'] ) ? trim( (string) $target_archer['status'] ) : 'Pre-Reg';
+                        $curr_status         = ( strcasecmp( $raw_status, 'Waitlist' ) === 0 )
+                            ? 'Waitlist'
+                            : ( ( strcasecmp( $raw_status, 'Cancelled' ) === 0 ) ? 'Cancelled' : 'Pre-Reg' );
+
                         $curr_paid           = isset( $target_archer['paid'] ) ? $target_archer['paid'] : '';
-                        $curr_pay_opt        = ( $curr_paid === 'Family' ) ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
+                        $is_family_member    = ( $curr_paid === 'Family' ) || ( $curr_status === 'Waitlist' && $curr_fam_id !== '' );
+                        $curr_pay_opt        = $is_family_member ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
                         $curr_div            = isset( $target_archer['division'] ) ? $target_archer['division'] : 'Adult (18 - 49)';
                         $curr_gen            = isset( $target_archer['gender'] ) ? $target_archer['gender'] : 'Male';
                         $curr_sty            = isset( $target_archer['style'] ) ? $target_archer['style'] : '';
@@ -125,6 +134,17 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                                 <?php echo esc_html( $line_option_label ); ?>
                                             </option>
                                         <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="sywat-field-group">
+                                    <label for="edit_status">Registration Status</label>
+                                    <select name="edit_status" id="edit_status" required>
+                                        <option value="Pre-Reg" <?php selected( $curr_status, 'Pre-Reg' ); ?>>Pre-Reg (Active Roster)</option>
+                                        <option value="Waitlist" <?php selected( $curr_status, 'Waitlist' ); ?>>Waitlist Queue ($0.00 Due)</option>
+                                        <?php if ( $curr_status === 'Cancelled' ) : ?>
+                                            <option value="Cancelled" selected>Cancelled</option>
+                                        <?php endif; ?>
                                     </select>
                                 </div>
 
