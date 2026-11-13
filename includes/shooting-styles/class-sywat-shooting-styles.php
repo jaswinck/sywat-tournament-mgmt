@@ -3,9 +3,9 @@
  * Module: Shooting Styles & Divisions Configuration Engine
  * Path: includes/shooting-styles/class-sywat-shooting-styles.php
  * Description: Central controller loader binding database storage, global style/division helpers, POST action handlers, Administration GUI shortcode ([sywat_shooting_styles]), and conditional client script localization.
- * Compliance: Zero HTML echo at include time, optimizer-safe filemtime() asset versioning, omitted closing PHP tag.
+ * Compliance: Zero HTML echo at include time, SYWAT_PLUGIN_URL & filemtime() asset versioning, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -30,18 +30,16 @@ if ( ! function_exists( 'sywat_enqueue_shooting_styles_scripts' ) ) {
             return;
         }
 
+        if ( ! defined( 'SYWAT_PLUGIN_URL' ) || ! defined( 'SYWAT_PLUGIN_DIR' ) ) {
+            return;
+        }
+
         $rel_path = 'assets/js/sywat-shooting-styles.js';
-        $js_url   = defined( 'SYWAT_PLUGIN_URL' )
-            ? SYWAT_PLUGIN_URL . $rel_path
-            : plugins_url( '../../' . $rel_path, __FILE__ );
-
-        $js_file = defined( 'SYWAT_PLUGIN_DIR' )
-            ? SYWAT_PLUGIN_DIR . $rel_path
-            : dirname( dirname( __DIR__ ) ) . '/' . $rel_path;
-
-        $version = file_exists( $js_file )
+        $js_url   = SYWAT_PLUGIN_URL . $rel_path;
+        $js_file  = SYWAT_PLUGIN_DIR . $rel_path;
+        $version  = file_exists( $js_file )
             ? (string) filemtime( $js_file )
-            : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '1.0.0' );
+            : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : false );
 
         wp_enqueue_script( 'sywat-shooting-styles-js', $js_url, array(), $version, true );
 
