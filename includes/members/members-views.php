@@ -5,7 +5,7 @@
  * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, 2-column CSS grid aligned household summary footer with 13px font sizing matching archer table names, slash-delimited contact info formatting, and 1-click household linking triggers.
  * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
  * Author: SYWAT Archery
- * Version: 8.1.1
+ * Version: 8.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -675,6 +675,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             if ( function_exists( 'sywat_members_render_modals' ) ) {
                 sywat_members_render_modals( array(
                     'all_members'         => $all_members,
+                    'all_archers'         => $all_archers,
                     'all_board_positions' => $all_board_positions,
                     'edit_user_obj'       => $edit_user_obj,
                     'edit_dep_subprofile' => $edit_dep_subprofile,
