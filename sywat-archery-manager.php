@@ -35,6 +35,7 @@ function sywat_archery_activate() {
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-frontend.php';
 
 // Load Shared Core Engines & Utilities
+require_once SYWAT_PLUGIN_DIR . 'includes/shooting-styles/class-sywat-shooting-styles.php'; // Shooting Styles & Divisions Configuration Engine ([sywat_shooting_styles])
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
 
 // Load TFAA Authentication Engine Sub-Modules
