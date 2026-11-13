@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with active-only family cap evaluation, check-in verification, and archer edits/deletions with per-line Family Cap reconciliation.
+ * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with active-only family cap evaluation, household-wide check-in balance verification, and archer edits/deletions with per-line Family Cap reconciliation.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 6.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -372,7 +372,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html( $name_val ) . '</strong> registered and checked in successfully. Total Due: $' . number_format( $session_total, 2 ) . '</div>';
         }
 
-        // Check-In
+        // Check-In (Enforces household-wide unpaid family balance block)
         if ( $action === 'save_checkin' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -382,8 +382,45 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $due_amt  = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
                 $verified = ! empty( $_POST['checkin_payment_verified'] );
 
-                if ( $due_amt > 0 && ! $verified ) {
-                    return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance. Please see event staff for payment and check the verification box.</div>';
+                $household_info = function_exists( 'sywat_get_household_balance_info' )
+                    ? sywat_get_household_balance_info( $reg, $registrations, $lines )
+                    : null;
+
+                $effective_due  = $household_info ? floatval( $household_info['effective_due'] ) : $due_amt;
+                $is_family_paid = ( isset( $reg['paid'] ) && strcasecmp( $reg['paid'], 'Family' ) === 0 )
+                    || ( ! empty( $reg['rate_type'] ) && stripos( (string) $reg['rate_type'], 'family' ) !== false );
+
+                if ( ! $household_info && $is_family_paid ) {
+                    $fam_id   = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+                    $book_id  = ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '';
+                    $reg_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+
+                    if ( $fam_id !== '' || $book_id !== '' ) {
+                        foreach ( $registrations as $other_r ) {
+                            $o_status = isset( $other_r['status'] ) ? trim( (string) $other_r['status'] ) : '';
+                            if ( strcasecmp( $o_status, 'Waitlist' ) === 0 || strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
+                                continue;
+                            }
+                            $o_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $other_r, $lines ) : ( isset( $other_r['line_index'] ) ? (string) $other_r['line_index'] : '0' );
+                            if ( $o_line !== $reg_line ) {
+                                continue;
+                            }
+                            $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
+                            $o_book = ! empty( $other_r['booking_id'] ) ? trim( (string) $other_r['booking_id'] ) : '';
+                            if ( ( $fam_id !== '' && $o_fam === $fam_id ) || ( $book_id !== '' && $o_book === $book_id ) ) {
+                                $effective_due = max( $effective_due, isset( $other_r['balance_due'] ) ? floatval( $other_r['balance_due'] ) : 0 );
+                            }
+                        }
+                    }
+                }
+
+                $is_family_balance = $is_family_paid || ( $household_info && ! empty( $household_info['has_family'] ) );
+
+                if ( $effective_due > 0 && ! $verified ) {
+                    if ( $is_family_balance ) {
+                        return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Household has an unpaid Family Cap balance ($' . number_format( $effective_due, 2 ) . '). Please collect payment onsite and check the verification box.</div>';
+                    }
+                    return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance ($' . number_format( $effective_due, 2 ) . '). Please see event staff for payment and check the verification box.</div>';
                 } else {
                     $division = sanitize_text_field( wp_unslash( $_POST['checkin_division'] ) );
                     $distance = ( $division === 'Cub (8 - 11)' || $division === 'No Show' ) ? 'Cub' : '20yd';
@@ -392,6 +429,11 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
 
                     if ( ! empty( $_POST['checkin_name'] ) ) {
                         $reg['name'] = sanitize_text_field( wp_unslash( $_POST['checkin_name'] ) );
+                    }
+
+                    if ( $verified && $effective_due > 0 ) {
+                        $prior_paid         = isset( $reg['amount_paid'] ) ? floatval( $reg['amount_paid'] ) : 0.00;
+                        $reg['amount_paid'] = round( $prior_paid + $effective_due, 2 );
                     }
 
                     $reg['distance']    = $distance;
@@ -424,21 +466,22 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                         update_option( $opt_key, $reg, false );
                     }
 
-                    $fam_id      = ! empty( $reg['family_id'] ) ? $reg['family_id'] : '';
-                    $book_id     = ! empty( $reg['booking_id'] ) ? $reg['booking_id'] : '';
-                    $target_line = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
+                    $fam_id      = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+                    $book_id     = ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '';
+                    $target_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
 
                     foreach ( $registrations as &$r ) {
                         if ( isset( $r['id'] ) && $r['id'] === $target_id ) {
                             $r = $reg;
                         }
                         if ( ! empty( $fam_id ) || ! empty( $book_id ) ) {
-                            if ( isset( $r['tournament'], $r['line_index'] )
+                            $r_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $r, $lines ) : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
+                            if ( isset( $r['tournament'] )
                                 && strcasecmp( $r['tournament'], $selected_tournament ) === 0
-                                && (string) $r['line_index'] === $target_line ) {
+                                && $r_line === $target_line ) {
 
-                                $is_fam_match = ( ! empty( $fam_id ) && isset( $r['family_id'] ) && $r['family_id'] === $fam_id ) ||
-                                                ( ! empty( $book_id ) && isset( $r['booking_id'] ) && $r['booking_id'] === $book_id );
+                                $is_fam_match = ( ! empty( $fam_id ) && isset( $r['family_id'] ) && trim( (string) $r['family_id'] ) === $fam_id ) ||
+                                                ( ! empty( $book_id ) && isset( $r['booking_id'] ) && trim( (string) $r['booking_id'] ) === $book_id );
                                 if ( $is_fam_match ) {
                                     $r['balance_due'] = 0;
                                     if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
