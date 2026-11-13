@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Shooting Styles & Divisions POST Action Handlers
  * Path: includes/shooting-styles/shooting-styles-actions.php
- * Description: Processes nonce-verified POST mutations for adding, editing, retiring, deleting, and resetting NFAA shooting styles and age divisions in WordPress options.
+ * Description: Processes nonce-verified POST mutations for adding, editing, reordering, retiring, deleting, and resetting NFAA shooting styles and age divisions in WordPress options.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -177,7 +177,48 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting style <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
         }
 
-        // 4. Add or Edit Age Division
+        // 4. Move Shooting Style Up / Down
+        if ( $action === 'move_style' ) {
+            $slug      = isset( $_POST['style_slug'] ) ? sanitize_title( wp_unslash( $_POST['style_slug'] ) ) : '';
+            $direction = isset( $_POST['direction'] ) ? sanitize_key( wp_unslash( $_POST['direction'] ) ) : '';
+            $styles    = function_exists( 'sywat_get_shooting_styles' ) ? sywat_get_shooting_styles( true ) : array();
+
+            if ( $slug === '' || ! isset( $styles[ $slug ] ) || ! in_array( $direction, array( 'up', 'down' ), true ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unable to reorder shooting style.</div>';
+            }
+
+            $ordered_list = array_values( $styles );
+            $target_index = -1;
+            foreach ( $ordered_list as $idx => $rec ) {
+                if ( $rec['slug'] === $slug ) {
+                    $target_index = $idx;
+                    break;
+                }
+            }
+
+            $swap_index = ( $direction === 'up' ) ? ( $target_index - 1 ) : ( $target_index + 1 );
+            if ( $target_index >= 0 && isset( $ordered_list[ $swap_index ] ) ) {
+                $temp                          = $ordered_list[ $target_index ];
+                $ordered_list[ $target_index ] = $ordered_list[ $swap_index ];
+                $ordered_list[ $swap_index ]   = $temp;
+
+                $reindexed = array();
+                $pos       = 1;
+                foreach ( $ordered_list as $rec ) {
+                    $rec['sort_order']         = $pos;
+                    $reindexed[ $rec['slug'] ] = $rec;
+                    $pos++;
+                }
+
+                if ( function_exists( 'sywat_save_shooting_styles' ) ) {
+                    sywat_save_shooting_styles( $reindexed );
+                }
+            }
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting style <strong>' . esc_html( $styles[ $slug ]['label'] ) . '</strong> moved ' . esc_html( $direction ) . '.</div>';
+        }
+
+        // 5. Add or Edit Age Division
         if ( $action === 'save_division' ) {
             $orig_slug  = isset( $_POST['orig_div_slug'] ) ? sanitize_title( wp_unslash( $_POST['orig_div_slug'] ) ) : '';
             $label      = isset( $_POST['div_label'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['div_label'] ) ) ) : '';
@@ -234,7 +275,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $label ) . '</strong> ' . esc_html( $verb ) . ' successfully.</div>';
         }
 
-        // 5. Toggle Division Active / Retired Status
+        // 6. Toggle Division Active / Retired Status
         if ( $action === 'toggle_division_status' ) {
             $slug      = isset( $_POST['div_slug'] ) ? sanitize_title( wp_unslash( $_POST['div_slug'] ) ) : '';
             $divisions = function_exists( 'sywat_get_division_records' ) ? sywat_get_division_records( true ) : array();
@@ -254,7 +295,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $divisions[ $slug ]['label'] ) . '</strong> ' . esc_html( $state_label ) . '.</div>';
         }
 
-        // 6. Delete Division
+        // 7. Delete Division
         if ( $action === 'delete_division' ) {
             $slug      = isset( $_POST['div_slug'] ) ? sanitize_title( wp_unslash( $_POST['div_slug'] ) ) : '';
             $divisions = function_exists( 'sywat_get_division_records' ) ? sywat_get_division_records( true ) : array();
@@ -273,7 +314,48 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
         }
 
-        // 7. Reset All Styles & Divisions to NFAA Defaults
+        // 8. Move Age Division Up / Down
+        if ( $action === 'move_division' ) {
+            $slug      = isset( $_POST['div_slug'] ) ? sanitize_title( wp_unslash( $_POST['div_slug'] ) ) : '';
+            $direction = isset( $_POST['direction'] ) ? sanitize_key( wp_unslash( $_POST['direction'] ) ) : '';
+            $divisions = function_exists( 'sywat_get_division_records' ) ? sywat_get_division_records( true ) : array();
+
+            if ( $slug === '' || ! isset( $divisions[ $slug ] ) || ! in_array( $direction, array( 'up', 'down' ), true ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unable to reorder age division.</div>';
+            }
+
+            $ordered_list = array_values( $divisions );
+            $target_index = -1;
+            foreach ( $ordered_list as $idx => $rec ) {
+                if ( $rec['slug'] === $slug ) {
+                    $target_index = $idx;
+                    break;
+                }
+            }
+
+            $swap_index = ( $direction === 'up' ) ? ( $target_index - 1 ) : ( $target_index + 1 );
+            if ( $target_index >= 0 && isset( $ordered_list[ $swap_index ] ) ) {
+                $temp                          = $ordered_list[ $target_index ];
+                $ordered_list[ $target_index ] = $ordered_list[ $swap_index ];
+                $ordered_list[ $swap_index ]   = $temp;
+
+                $reindexed = array();
+                $pos       = 1;
+                foreach ( $ordered_list as $rec ) {
+                    $rec['sort_order']         = $pos;
+                    $reindexed[ $rec['slug'] ] = $rec;
+                    $pos++;
+                }
+
+                if ( function_exists( 'sywat_save_divisions' ) ) {
+                    sywat_save_divisions( $reindexed );
+                }
+            }
+
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $divisions[ $slug ]['label'] ) . '</strong> moved ' . esc_html( $direction ) . '.</div>';
+        }
+
+        // 9. Reset All Styles & Divisions to NFAA Defaults
         if ( $action === 'reset_nfaa_defaults' ) {
             if ( function_exists( 'sywat_shooting_styles_reset_defaults' ) ) {
                 sywat_shooting_styles_reset_defaults();
