@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Shooting Styles & Divisions Global Helpers
  * Path: includes/shooting-styles/shooting-styles-helpers.php
- * Description: Provides centralized helper functions for active dropdown options, style/alias matching, division/age rule enforcement (all, restrict, force), CSV export codes, leaderboard sort weights, and JS localization payloads.
+ * Description: Provides centralized helper functions for active dropdown options, O(1)-cached style/alias matching, division/age rule enforcement (all, restrict, force), CSV export codes, leaderboard sort weights, and JS localization payloads.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -38,31 +38,44 @@ if ( ! function_exists( 'sywat_get_shooting_style_options' ) ) {
 
 /**
  * Finds a configured shooting style record by label, code, slug, or alias.
+ * Uses a request-scoped hashtable cache for O(1) lookups across large datasets.
  *
  * @param string $raw_style Raw style text from form input, registration record, or TFAA sync.
  * @return array|null Matching style record array, or null if unmatched.
  */
 if ( ! function_exists( 'sywat_find_shooting_style' ) ) {
     function sywat_find_shooting_style( $raw_style ) {
+        static $lookup_cache = array();
+        static $sorted_aliases = null;
+
         $needle = trim( (string) $raw_style );
         if ( $needle === '' ) {
             return null;
         }
 
+        $cache_key = strtolower( $needle );
+        if ( array_key_exists( $cache_key, $lookup_cache ) ) {
+            return $lookup_cache[ $cache_key ];
+        }
+
         $styles = function_exists( 'sywat_get_shooting_styles' ) ? sywat_get_shooting_styles( true ) : array();
         if ( empty( $styles ) ) {
+            $lookup_cache[ $cache_key ] = null;
             return null;
         }
 
         // 1. Exact case-insensitive match on label, slug, or code
         foreach ( $styles as $item ) {
             if ( strcasecmp( $needle, $item['label'] ) === 0 ) {
+                $lookup_cache[ $cache_key ] = $item;
                 return $item;
             }
             if ( strcasecmp( $needle, $item['slug'] ) === 0 ) {
+                $lookup_cache[ $cache_key ] = $item;
                 return $item;
             }
             if ( ! empty( $item['code'] ) && strcasecmp( $needle, $item['code'] ) === 0 ) {
+                $lookup_cache[ $cache_key ] = $item;
                 return $item;
             }
         }
@@ -72,46 +85,52 @@ if ( ! function_exists( 'sywat_find_shooting_style' ) ) {
             if ( ! empty( $item['aliases'] ) && is_array( $item['aliases'] ) ) {
                 foreach ( $item['aliases'] as $alias ) {
                     if ( strcasecmp( $needle, $alias ) === 0 ) {
+                        $lookup_cache[ $cache_key ] = $item;
                         return $item;
                     }
                 }
             }
         }
 
-        // 3. Prefix / substring match on label prefix before dash (e.g., "FSL-R – ..." vs "FSLR")
+        // 3. Prefix match before dash (e.g., "FSL-R – ..." vs "FSLR")
         $needle_prefix = trim( preg_split( '/\s*[–-]\s*/u', $needle )[0] );
         if ( $needle_prefix !== '' ) {
             foreach ( $styles as $item ) {
                 $item_prefix = trim( preg_split( '/\s*[–-]\s*/u', $item['label'] )[0] );
                 if ( strcasecmp( $needle_prefix, $item_prefix ) === 0 ) {
+                    $lookup_cache[ $cache_key ] = $item;
                     return $item;
                 }
             }
         }
 
-        // 4. Substring match against aliases (longer aliases checked first so "Freestyle Limited Recurve" beats "Freestyle")
-        $alias_candidates = array();
-        foreach ( $styles as $item ) {
-            $alias_candidates[] = array( 'term' => $item['label'], 'record' => $item );
-            if ( ! empty( $item['aliases'] ) && is_array( $item['aliases'] ) ) {
-                foreach ( $item['aliases'] as $alias ) {
-                    if ( strlen( $alias ) >= 2 ) {
-                        $alias_candidates[] = array( 'term' => $alias, 'record' => $item );
+        // 4. Hoisted longest-first alias candidates for substring matching
+        if ( null === $sorted_aliases ) {
+            $sorted_aliases = array();
+            foreach ( $styles as $item ) {
+                $sorted_aliases[] = array( 'term' => $item['label'], 'record' => $item );
+                if ( ! empty( $item['aliases'] ) && is_array( $item['aliases'] ) ) {
+                    foreach ( $item['aliases'] as $alias ) {
+                        if ( strlen( $alias ) >= 2 ) {
+                            $sorted_aliases[] = array( 'term' => $alias, 'record' => $item );
+                        }
                     }
                 }
             }
+
+            usort( $sorted_aliases, function( $a, $b ) {
+                return strlen( $b['term'] ) <=> strlen( $a['term'] );
+            } );
         }
 
-        usort( $alias_candidates, function( $a, $b ) {
-            return strlen( $b['term'] ) <=> strlen( $a['term'] );
-        } );
-
-        foreach ( $alias_candidates as $cand ) {
+        foreach ( $sorted_aliases as $cand ) {
             if ( stripos( $needle, $cand['term'] ) !== false ) {
+                $lookup_cache[ $cache_key ] = $cand['record'];
                 return $cand['record'];
             }
         }
 
+        $lookup_cache[ $cache_key ] = null;
         return null;
     }
 }
@@ -242,18 +261,32 @@ if ( ! function_exists( 'sywat_get_style_export_code' ) ) {
  */
 if ( ! function_exists( 'sywat_get_division_export_code' ) ) {
     function sywat_get_division_export_code( $raw_division ) {
+        static $div_code_cache = array();
+
+        $clean = trim( (string) $raw_division );
+        if ( $clean === '' ) {
+            return '';
+        }
+
+        $key = strtolower( $clean );
+        if ( array_key_exists( $key, $div_code_cache ) ) {
+            return $div_code_cache[ $key ];
+        }
+
         $norm = function_exists( 'sywat_shooting_styles_normalize_division' )
-            ? sywat_shooting_styles_normalize_division( $raw_division )
-            : trim( (string) $raw_division );
+            ? sywat_shooting_styles_normalize_division( $clean )
+            : $clean;
 
         if ( function_exists( 'sywat_get_division_records' ) ) {
             foreach ( sywat_get_division_records( true ) as $d_rec ) {
                 if ( strcasecmp( $norm, $d_rec['label'] ) === 0 && ! empty( $d_rec['code'] ) ) {
-                    return strtoupper( $d_rec['code'] );
+                    $div_code_cache[ $key ] = strtoupper( $d_rec['code'] );
+                    return $div_code_cache[ $key ];
                 }
             }
         }
 
+        $div_code_cache[ $key ] = '';
         return '';
     }
 }
