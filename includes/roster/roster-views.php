@@ -2,11 +2,14 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
+ * Description: Renders the Registered Archer Roster modal with alphabetical active shooters separated from the FIFO family-grouped Waitlist Queue component.
  * Author: SYWAT Archery
- * Version: 6.8.3
+ * Version: 6.9.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Helper: Resolve clean Manage Tournaments base URL using central page registry.
@@ -31,6 +34,10 @@ if ( ! function_exists( 'sywat_roster_manage_base_url' ) ) {
  */
 if ( ! function_exists( 'sywat_roster_format_line_display' ) ) {
     function sywat_roster_format_line_display( $line, $idx ) {
+        if ( function_exists( 'sywat_waitlist_format_line_label' ) ) {
+            return sywat_waitlist_format_line_label( $line, $idx );
+        }
+
         $line_disp_name = '';
         if ( is_array( $line ) ) {
             if ( ! empty( $line['name'] ) ) {
@@ -55,7 +62,7 @@ if ( ! function_exists( 'sywat_roster_format_line_display' ) ) {
 }
 
 /**
- * Component Renderer: Archer Roster Management Table & Controls
+ * Component Renderer: Archer Roster Management Table, Waitlist Queue & Controls
  *
  * @param string $selected_tournament Active tournament name.
  * @param array  $available_lines     Configured shooting lines for the tournament.
@@ -93,81 +100,93 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         }
         $roster_post_url = add_query_arg( $roster_post_args, $manage_base_url );
 
-        // STRICT FILTER: Build Line-Scoped & Smart-Named Family Groups array for JS dynamic dropdowns & labels
-        $existing_families_by_line = array();
-        $family_members_by_id      = array();
+        // Build Tournament- & Line-Scoped Family Groups array for JS dynamic dropdowns & labels
+        if ( function_exists( 'sywat_waitlist_build_family_labels_by_line' ) ) {
+            $existing_families_by_line = sywat_waitlist_build_family_labels_by_line( $selected_tournament, $available_lines, $registrations );
+        } else {
+            $existing_families_by_line = array();
+            $family_members_by_id      = array();
 
-        foreach ( $registrations as $r ) {
-            $fid = ! empty( $r['family_id'] ) ? trim( $r['family_id'] ) : '';
-            if ( empty( $fid ) ) continue;
-
-            $is_fam = ( isset( $r['paid'] ) && strcasecmp( $r['paid'], 'Family' ) === 0 )
-                   || ( ! empty( $r['rate_type'] ) && stripos( $r['rate_type'], 'family' ) !== false );
-
-            if ( ! $is_fam ) continue;
-
-            $resolved_l_idx = function_exists( 'sywat_roster_resolve_line_idx' )
-                ? sywat_roster_resolve_line_idx( $r, $available_lines )
-                : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
-
-            if ( ! isset( $family_members_by_id[ $fid ] ) ) {
-                $family_members_by_id[ $fid ] = array(
-                    'line_idx'    => $resolved_l_idx,
-                    'family_name' => ! empty( $r['family_name'] ) ? trim( $r['family_name'] ) : '',
-                    'names'       => array(),
-                );
-            }
-            if ( ! empty( $r['name'] ) ) {
-                $family_members_by_id[ $fid ]['names'][] = trim( $r['name'] );
-            }
-        }
-
-        foreach ( $family_members_by_id as $fid => $fam_info ) {
-            $l_idx     = $fam_info['line_idx'];
-            $raw_fname = $fam_info['family_name'];
-            $names     = $fam_info['names'];
-
-            if ( ! empty( $raw_fname ) && stripos( $raw_fname, 'fam_' ) === false && stripos( $raw_fname, 'Booking' ) === false && strlen( $raw_fname ) > 2 ) {
-                $label = $raw_fname;
-            } elseif ( ! empty( $names ) ) {
-                if ( count( $names ) === 1 ) {
-                    $label = $names[0] . ' Group';
-                } elseif ( count( $names ) <= 3 ) {
-                    $last_names = array_map( function( $n ) {
-                        $p = explode( ' ', trim( $n ) );
-                        return end( $p );
-                    }, $names );
-                    $label = implode( ' / ', array_unique( $last_names ) ) . ' Group';
-                } else {
-                    $p     = explode( ' ', trim( $names[0] ) );
-                    $label = end( $p ) . ' Family Group (' . count( $names ) . ' Archers)';
+            foreach ( $registrations as $r ) {
+                if ( ! isset( $r['tournament'] ) || strcasecmp( trim( (string) $r['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                    continue;
                 }
-            } else {
-                $label = 'Family Group (' . substr( $fid, -6 ) . ')';
+
+                $fid = ! empty( $r['family_id'] ) ? trim( $r['family_id'] ) : '';
+                if ( empty( $fid ) ) {
+                    continue;
+                }
+
+                $is_fam = ( isset( $r['paid'] ) && strcasecmp( $r['paid'], 'Family' ) === 0 )
+                       || ( ! empty( $r['rate_type'] ) && stripos( $r['rate_type'], 'family' ) !== false );
+
+                if ( ! $is_fam ) {
+                    continue;
+                }
+
+                $resolved_l_idx = function_exists( 'sywat_roster_resolve_line_idx' )
+                    ? sywat_roster_resolve_line_idx( $r, $available_lines )
+                    : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
+
+                if ( ! isset( $family_members_by_id[ $fid ] ) ) {
+                    $family_members_by_id[ $fid ] = array(
+                        'line_idx'    => $resolved_l_idx,
+                        'family_name' => ! empty( $r['family_name'] ) ? trim( $r['family_name'] ) : '',
+                        'names'       => array(),
+                    );
+                }
+                if ( ! empty( $r['name'] ) ) {
+                    $family_members_by_id[ $fid ]['names'][] = trim( $r['name'] );
+                }
             }
 
-            if ( ! isset( $existing_families_by_line[ $l_idx ] ) ) {
-                $existing_families_by_line[ $l_idx ] = array();
+            foreach ( $family_members_by_id as $fid => $fam_info ) {
+                $l_idx     = $fam_info['line_idx'];
+                $raw_fname = $fam_info['family_name'];
+                $names     = $fam_info['names'];
+
+                if ( ! empty( $raw_fname ) && stripos( $raw_fname, 'fam_' ) === false && stripos( $raw_fname, 'Booking' ) === false && strlen( $raw_fname ) > 2 ) {
+                    $label = $raw_fname;
+                } elseif ( ! empty( $names ) ) {
+                    if ( count( $names ) === 1 ) {
+                        $label = $names[0] . ' Group';
+                    } elseif ( count( $names ) <= 3 ) {
+                        $last_names = array_map( function( $n ) {
+                            $p = explode( ' ', trim( $n ) );
+                            return end( $p );
+                        }, $names );
+                        $label = implode( ' / ', array_unique( $last_names ) ) . ' Group';
+                    } else {
+                        $p     = explode( ' ', trim( $names[0] ) );
+                        $label = end( $p ) . ' Family Group (' . count( $names ) . ' Archers)';
+                    }
+                } else {
+                    $label = 'Family Group (' . substr( $fid, -6 ) . ')';
+                }
+
+                if ( ! isset( $existing_families_by_line[ $l_idx ] ) ) {
+                    $existing_families_by_line[ $l_idx ] = array();
+                }
+                $existing_families_by_line[ $l_idx ][ $fid ] = $label;
             }
-            $existing_families_by_line[ $l_idx ][ $fid ] = $label;
         }
 
         // Filter registrations for this tournament & line filter
         $filtered_registrations = array_filter( $registrations, function( $reg ) use ( $selected_tournament, $filter_line_idx, $available_lines ) {
-            if ( ! isset( $reg['tournament'] ) || strcasecmp( $reg['tournament'], $selected_tournament ) !== 0 ) return false;
-            if ( $filter_line_idx !== 'all' ) {
+            if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                return false;
+            }
+            if ( (string) $filter_line_idx !== 'all' && (string) $filter_line_idx !== '' ) {
                 $match_idx  = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $filter_line_idx;
                 $match_name = isset( $available_lines[ $filter_line_idx ]['name'] ) && isset( $reg['line_name'] ) && strcasecmp( trim( $reg['line_name'] ), trim( $available_lines[ $filter_line_idx ]['name'] ) ) === 0;
-                if ( ! $match_idx && ! $match_name ) return false;
+                if ( ! $match_idx && ! $match_name ) {
+                    return false;
+                }
             }
             return true;
         } );
 
-        usort( $filtered_registrations, function( $a, $b ) {
-            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
-        } );
-
-        // Resolve Target Archer record for the Edit Modal
+        // Resolve Target Archer record for the Edit Modal (supports both active & waitlisted records)
         $target_archer = null;
         if ( is_array( $modal_edit_archer ) ) {
             $target_archer = $modal_edit_archer;
@@ -180,9 +199,25 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             }
         }
 
-        // Enqueue Client Logic & Localize Family Groups
+        // Separate Active Shooters (sorted A–Z) from Waitlisted Archers (rendered in FIFO Waitlist Queue below)
+        $active_registrations = array_filter( $filtered_registrations, function( $reg ) {
+            $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
+            if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                return false;
+            }
+            return true;
+        } );
+
+        usort( $active_registrations, function( $a, $b ) {
+            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
+        } );
+
+        // Enqueue Roster & Waitlist Client Scripts
         if ( function_exists( 'sywat_render_roster_scripts' ) ) {
             sywat_render_roster_scripts( $existing_families_by_line );
+        }
+        if ( function_exists( 'sywat_enqueue_waitlist_scripts' ) ) {
+            sywat_enqueue_waitlist_scripts();
         }
         ?>
 
@@ -207,7 +242,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             <input type="hidden" name="tab" value="manage">
                             <input type="hidden" name="modal_action" value="manage">
                             <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                            <?php if ( ! empty( $return_to ) ): ?>
+                            <?php if ( ! empty( $return_to ) ) : ?>
                                 <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
                             <?php endif; ?>
 
@@ -222,7 +257,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 <label for="filter_line_idx">Filter by Line</label>
                                 <select name="filter_line_idx" id="filter_line_idx" data-sywat-action="filter-roster-line">
                                     <option value="all" <?php selected( $filter_line_idx, 'all' ); ?>>(All Lines)</option>
-                                    <?php foreach ( $available_lines as $idx => $line ): ?>
+                                    <?php foreach ( $available_lines as $idx => $line ) : ?>
                                         <?php $line_disp_name = sywat_roster_format_line_display( $line, $idx ); ?>
                                         <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $filter_line_idx, (string) $idx ); ?>>
                                             <?php echo esc_html( $line_disp_name ); ?>
@@ -241,9 +276,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             </div>
                         </form>
 
-                        <?php if ( $filter_line_idx !== 'all' && ! empty( $filtered_registrations ) ): ?>
+                        <?php if ( (string) $filter_line_idx !== 'all' && (string) $filter_line_idx !== '' && ! empty( $active_registrations ) ) : ?>
                             <div class="sywat-filter-field">
-                                <form method="post" action="<?php echo esc_url( $roster_post_url ); ?>" data-sywat-confirm="Are you sure you want to clear ALL archers from this line?">
+                                <form method="post" action="<?php echo esc_url( $roster_post_url ); ?>" data-sywat-confirm="Are you sure you want to clear ALL active archers from this line?">
                                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                     <input type="hidden" name="sywat_action" value="purge_line">
                                     <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
@@ -251,7 +286,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                     <input type="hidden" name="modal_action" value="manage">
                                     <input type="hidden" name="redirect_action" value="manage">
-                                    <?php if ( ! empty( $return_to ) ): ?>
+                                    <?php if ( ! empty( $return_to ) ) : ?>
                                         <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
                                     <?php endif; ?>
                                     <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Clear Line Roster</button>
@@ -260,10 +295,14 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <?php endif; ?>
                     </div>
 
-                    <!-- Archer Roster Table -->
-                    <?php if ( empty( $filtered_registrations ) ): ?>
-                        <p class="sywat-label-subtext">No archers found matching your filter criteria.</p>
-                    <?php else: ?>
+                    <!-- Active Registered Archers Table (Sorted Alphabetically) -->
+                    <div class="sywat-table-header-bar sywat-modal-section-header">
+                        <h2>Active Roster (<?php echo intval( count( $active_registrations ) ); ?>)</h2>
+                    </div>
+
+                    <?php if ( empty( $active_registrations ) ) : ?>
+                        <p class="sywat-label-subtext">No active archers found matching your filter criteria.</p>
+                    <?php else : ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table sywat-roster-table">
                                 <thead>
@@ -276,18 +315,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ( $filtered_registrations as $reg ): ?>
+                                    <?php foreach ( $active_registrations as $reg ) : ?>
                                         <?php
                                             $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
-                                            $is_waitlist = isset( $reg['status'] ) && strcasecmp( trim( $reg['status'] ), 'Waitlist' ) === 0;
-
-                                            if ( $is_waitlist ) {
-                                                $badge_type  = 'Waitlist';
-                                                $badge_class = 'sywat-waitlist-pill';
-                                            } else {
-                                                $badge_type  = ! empty( $reg['is_walkin'] ) || ( isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ) ? 'Walk-In' : 'Pre-Reg';
-                                                $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-                                            }
+                                            $badge_type  = ! empty( $reg['is_walkin'] ) || ( isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ) ? 'Walk-In' : 'Pre-Reg';
+                                            $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
 
                                             $paid_status = isset( $reg['paid'] ) ? $reg['paid'] : '';
                                             $lidx        = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $available_lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
@@ -322,19 +354,15 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                         <tr class="sywat-manage-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                             <td>
                                                 <strong><?php echo esc_html( $reg['name'] ); ?></strong>
-                                                <?php if ( ! empty( $fam_label ) ): ?>
+                                                <?php if ( ! empty( $fam_label ) ) : ?>
                                                     <div>
                                                         <span class="sywat-chip-family">🟢 <?php echo esc_html( $fam_label ); ?></span>
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
                                             <td class="sywat-col-center">
-                                                <?php if ( $is_waitlist ): ?>
-                                                    <span class="sywat-waitlist-pill">🕒 Waitlist</span>
-                                                <?php else: ?>
-                                                    <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge_type ); ?></span>
-                                                <?php endif; ?>
-                                                <?php if ( $paid_status === 'Family' ): ?>
+                                                <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge_type ); ?></span>
+                                                <?php if ( $paid_status === 'Family' ) : ?>
                                                     <br><span class="sywat-badge-family-cap">Family Cap</span>
                                                 <?php endif; ?>
                                             </td>
@@ -353,7 +381,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                                         <input type="hidden" name="modal_action" value="manage">
                                                         <input type="hidden" name="filter_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
                                                         <input type="hidden" name="registration_id" value="<?php echo esc_attr( $reg_id ); ?>">
-                                                        <?php if ( ! empty( $return_to ) ): ?>
+                                                        <?php if ( ! empty( $return_to ) ) : ?>
                                                             <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
                                                         <?php endif; ?>
                                                         <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Remove</button>
@@ -366,6 +394,24 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             </table>
                         </div>
                     <?php endif; ?>
+
+                    <!-- Dedicated FIFO Family-Grouped Waitlist Queue Component -->
+                    <?php
+                    if ( function_exists( 'sywat_render_waitlist_panel' ) ) {
+                        sywat_render_waitlist_panel(
+                            $selected_tournament,
+                            $available_lines,
+                            $registrations,
+                            $filter_line_idx,
+                            $roster_post_url,
+                            'roster',
+                            array(
+                                'return_to'     => $return_to,
+                                'edit_base_url' => $manage_base_url,
+                            )
+                        );
+                    }
+                    ?>
                 </div>
 
                 <!-- Standard Pinned Footer -->
