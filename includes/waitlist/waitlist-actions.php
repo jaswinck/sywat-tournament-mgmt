@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Action Handlers (Manual Promotion, Top-Bar Open-Line Moves & Removal)
  * Path: includes/waitlist/waitlist-actions.php
- * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, legacy 'No Show' metadata cleanup, capacity guards, and per-line $75.00 Family Cap reconciliation.
+ * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, database-driven division/style/distance normalization, capacity guards, and per-line $75.00 Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 2.0.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -75,26 +75,106 @@ if ( ! function_exists( 'sywat_waitlist_get_posted_tournament' ) ) {
 }
 
 /**
- * Clean up any legacy 'No Show' division/gender/style flags on a waitlisted record
- * before promoting or moving it onto an active Pre-Reg shooting line.
+ * Resolve canonical distance ('Cub' or '20yd') for a registration record using
+ * database-configured division settings first, with safe fallback to stored distance.
+ *
+ * @param array $record Registration record.
+ * @return string       Canonical distance ('Cub' or '20yd').
+ */
+if ( ! function_exists( 'sywat_waitlist_resolve_record_distance' ) ) {
+    function sywat_waitlist_resolve_record_distance( $record ) {
+        $raw_div = isset( $record['division'] ) ? trim( (string) $record['division'] ) : '';
+        if ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
+            return sywat_shooting_styles_get_division_distance( $raw_div );
+        }
+        return sywat_waitlist_normalize_distance( isset( $record['distance'] ) ? $record['distance'] : '20yd' );
+    }
+}
+
+/**
+ * Resolve default active division label from database configuration for a target distance ('Cub' vs '20yd').
+ *
+ * @param string $dist_val Target distance ('Cub' or '20yd').
+ * @return string          Canonical active division label.
+ */
+if ( ! function_exists( 'sywat_waitlist_get_default_division_for_distance' ) ) {
+    function sywat_waitlist_get_default_division_for_distance( $dist_val ) {
+        $want_cub = ( strcasecmp( trim( (string) $dist_val ), 'Cub' ) === 0 );
+
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $records = sywat_get_division_records( false );
+            if ( is_array( $records ) ) {
+                foreach ( $records as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    $rec_dist = ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd';
+                    if ( $want_cub && $rec_dist === 'Cub' ) {
+                        return $rec['label'];
+                    }
+                    if ( ! $want_cub && $rec_dist === '20yd' && isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Adult' ) {
+                        return $rec['label'];
+                    }
+                }
+                if ( ! $want_cub ) {
+                    foreach ( $records as $rec ) {
+                        if ( ! empty( $rec['label'] ) && ( ! isset( $rec['distance'] ) || $rec['distance'] !== 'Cub' ) ) {
+                            return $rec['label'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $want_cub ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+    }
+}
+
+/**
+ * Clean up any legacy 'No Show' division/gender/style flags and normalize division,
+ * shooting style, and distance against database configuration before promoting or moving
+ * a waitlisted record onto an active Pre-Reg shooting line.
  *
  * @param array  $record   Registration record passed by reference.
- * @param string $dist_val Normalized distance ('20yd' or 'Cub').
+ * @param string $dist_val Normalized distance ('20yd' or 'Cub') passed by reference.
  * @return void
  */
 if ( ! function_exists( 'sywat_waitlist_sanitize_promoted_record' ) ) {
-    function sywat_waitlist_sanitize_promoted_record( &$record, $dist_val ) {
+    function sywat_waitlist_sanitize_promoted_record( &$record, &$dist_val ) {
         $raw_div = isset( $record['division'] ) ? trim( (string) $record['division'] ) : '';
-        if ( $raw_div === '' || strcasecmp( $raw_div, 'No Show' ) === 0 ) {
-            $record['division'] = ( $dist_val === 'Cub' ) ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+        if ( $raw_div === '' || $raw_div === '—' || strcasecmp( $raw_div, 'No Show' ) === 0 ) {
+            $record['division'] = sywat_waitlist_get_default_division_for_distance( $dist_val );
+        } elseif ( function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+            $record['division'] = sywat_shooting_styles_normalize_division( $raw_div );
         }
 
         if ( isset( $record['gender'] ) && strcasecmp( trim( (string) $record['gender'] ), 'No Show' ) === 0 ) {
             $record['gender'] = '';
         }
 
-        if ( isset( $record['style'] ) && strcasecmp( trim( (string) $record['style'] ), 'No Show' ) === 0 ) {
+        $raw_style = isset( $record['style'] ) ? trim( (string) $record['style'] ) : '';
+        if ( strcasecmp( $raw_style, 'No Show' ) === 0 ) {
             $record['style'] = '';
+        } elseif ( $raw_style !== '' && $raw_style !== '—' && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
+            $record['style'] = sywat_shooting_styles_normalize_style( $raw_style );
+        }
+
+        if ( ! empty( $record['style'] ) && ! empty( $record['division'] ) && function_exists( 'sywat_resolve_style_and_division' ) ) {
+            $resolved = sywat_resolve_style_and_division( $record['style'], $record['division'] );
+            if ( is_array( $resolved ) ) {
+                if ( ! empty( $resolved['style'] ) ) {
+                    $record['style'] = $resolved['style'];
+                }
+                if ( ! empty( $resolved['division'] ) ) {
+                    $record['division'] = $resolved['division'];
+                }
+            }
+        }
+
+        if ( function_exists( 'sywat_shooting_styles_get_division_distance' ) && ! empty( $record['division'] ) ) {
+            $dist_val = sywat_shooting_styles_get_division_distance( $record['division'] );
+        } else {
+            $dist_val = sywat_waitlist_normalize_distance( $dist_val );
         }
 
         $record['checked_in'] = 0;
@@ -311,7 +391,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         $needed_20  = 0;
         $needed_cub = 0;
         foreach ( $candidates as $cand ) {
-            $dist = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist = sywat_waitlist_resolve_record_distance( $cand );
             if ( $dist === 'Cub' ) {
                 $needed_cub++;
             } else {
@@ -347,7 +427,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         foreach ( $candidates as $cand ) {
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
-            $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist_val = sywat_waitlist_resolve_record_distance( $cand );
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
@@ -482,7 +562,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             if ( sywat_waitlist_has_line_duplicate( $registrations, $tourn_name, $target_line_raw, $cand['name'], $cand['id'], $t_lines ) ) {
                 $duplicate_names[] = $cand['name'];
             }
-            $dist = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist = sywat_waitlist_resolve_record_distance( $cand );
             if ( $dist === 'Cub' ) {
                 $needed_cub++;
             } else {
@@ -543,7 +623,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
 
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
-            $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist_val = sywat_waitlist_resolve_record_distance( $cand );
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
