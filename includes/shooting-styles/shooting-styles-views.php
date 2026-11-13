@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Shooting Styles & Divisions Administration Views Renderer
  * Path: includes/shooting-styles/shooting-styles-views.php
- * Description: Renders the [sywat_shooting_styles] Administration GUI with card-docked tabs, one-click Move Up / Move Down row reordering, and modal editors for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
+ * Description: Renders the [sywat_shooting_styles] Administration GUI with card-docked tabs, one-click Move Up / Move Down row reordering, standardized button icons, and modal editors for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
  * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, accessible inline SVGs (aria-hidden="true"), theme-proof code spans, delegated data-sywat-action attributes.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -105,9 +105,9 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                             <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" data-sywat-confirm="Restore all shooting styles and age divisions to default NFAA settings? Custom styles or rule edits will be overwritten.">
                                 <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                 <input type="hidden" name="sywat_styles_action" value="reset_nfaa_defaults">
-                                <button type="submit" class="sywat-btn sywat-btn-secondary">Reset NFAA Defaults</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">Reset NFAA Defaults</button>
                             </form>
-                            <button type="button" class="sywat-btn sywat-btn-success" data-sywat-action="open-add-style-modal">+ Add Shooting Style</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" data-sywat-action="open-add-style-modal">Add Shooting Style</button>
                         </div>
                     </div>
 
@@ -118,7 +118,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                         <div class="sywat-table-header-controls">
                             <div class="sywat-search-input-group">
                                 <input type="text" id="sywat_styles_search_input" placeholder="Search styles..." autocomplete="off">
-                                <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="clear-styles-search">Clear</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-styles-search">Clear</button>
                             </div>
                         </div>
                     </div>
@@ -228,7 +228,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                 <div class="sywat-table-actions-vertical">
                                                     <button
                                                         type="button"
-                                                        class="sywat-btn sywat-btn-primary sywat-btn-full"
+                                                        class="sywat-btn sywat-btn-primary sywat-btn-full sywat-btn-icon-edit"
                                                         data-sywat-action="open-edit-style-modal"
                                                         data-slug="<?php echo esc_attr( $st['slug'] ); ?>"
                                                         data-code="<?php echo esc_attr( $st['code'] ); ?>"
@@ -255,7 +255,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                         <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                         <input type="hidden" name="sywat_styles_action" value="delete_style">
                                                         <input type="hidden" name="style_slug" value="<?php echo esc_attr( $st['slug'] ); ?>">
-                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full">Delete</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full sywat-btn-icon-delete">Delete</button>
                                                     </form>
                                                 </div>
                                             </td>
@@ -266,7 +266,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                             </table>
                         </div>
                     <?php else : ?>
-                        <p class="sywat-empty-text">No shooting styles configured. Click <strong>+ Add Shooting Style</strong> or <strong>Reset NFAA Defaults</strong>.</p>
+                        <p class="sywat-empty-text">No shooting styles configured. Click <strong>Add Shooting Style</strong> or <strong>Reset NFAA Defaults</strong>.</p>
                     <?php endif; ?>
 
                 <?php else : ?>
@@ -289,9 +289,9 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                             <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" data-sywat-confirm="Restore all shooting styles and age divisions to default NFAA settings? Custom styles or rule edits will be overwritten.">
                                 <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                 <input type="hidden" name="sywat_styles_action" value="reset_nfaa_defaults">
-                                <button type="submit" class="sywat-btn sywat-btn-secondary">Reset NFAA Defaults</button>
+                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">Reset NFAA Defaults</button>
                             </form>
-                            <button type="button" class="sywat-btn sywat-btn-success" data-sywat-action="open-add-division-modal">+ Add Division</button>
+                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" data-sywat-action="open-add-division-modal">Add Division</button>
                         </div>
                     </div>
 
@@ -302,7 +302,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                         <div class="sywat-table-header-controls">
                             <div class="sywat-search-input-group">
                                 <input type="text" id="sywat_divisions_search_input" placeholder="Search divisions..." autocomplete="off">
-                                <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="clear-divisions-search">Clear</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-divisions-search">Clear</button>
                             </div>
                         </div>
                     </div>
@@ -398,7 +398,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                 <div class="sywat-table-actions-vertical">
                                                     <button
                                                         type="button"
-                                                        class="sywat-btn sywat-btn-primary sywat-btn-full"
+                                                        class="sywat-btn sywat-btn-primary sywat-btn-full sywat-btn-icon-edit"
                                                         data-sywat-action="open-edit-division-modal"
                                                         data-slug="<?php echo esc_attr( $div_rec['slug'] ); ?>"
                                                         data-code="<?php echo esc_attr( $div_rec['code'] ); ?>"
@@ -423,7 +423,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                         <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                         <input type="hidden" name="sywat_styles_action" value="delete_division">
                                                         <input type="hidden" name="div_slug" value="<?php echo esc_attr( $div_rec['slug'] ); ?>">
-                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full">Delete</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full sywat-btn-icon-delete">Delete</button>
                                                     </form>
                                                 </div>
                                             </td>
@@ -434,7 +434,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                             </table>
                         </div>
                     <?php else : ?>
-                        <p class="sywat-empty-text">No divisions configured. Click <strong>+ Add Division</strong> or <strong>Reset NFAA Defaults</strong>.</p>
+                        <p class="sywat-empty-text">No divisions configured. Click <strong>Add Division</strong> or <strong>Reset NFAA Defaults</strong>.</p>
                     <?php endif; ?>
                 <?php endif; ?>
 
@@ -535,7 +535,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
 
                     <div class="sywat-modal-footer">
                         <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="close-style-modal">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-success">Save Shooting Style</button>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Shooting Style</button>
                     </div>
                 </form>
             </div>
@@ -610,7 +610,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
 
                     <div class="sywat-modal-footer">
                         <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="close-division-modal">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-success">Save Division</button>
+                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Division</button>
                     </div>
                 </form>
             </div>
