@@ -2,10 +2,10 @@
 /**
  * POC Sub-Module: TFAA Gender & Pro Status Reconciliation Engine
  * Path: includes/members/reconcile/tfaa-reconcile-engine.php
- * Description: Temporary POC utility comparing synced TFAA shooter records (sywat_shooter_genders_cache and historical tournament registrations) against the unified Member Directory (Primary Heads, Household Dependents, and Unassigned Pool) to backfill missing gender/pro attributes and surface unmatched TFAA names.
+ * Description: Temporary POC utility comparing synced TFAA shooter records (sywat_shooter_genders_cache and tournament registration batches) against the unified Member Directory (Primary Heads, Household Dependents, and Unassigned Pool) to backfill missing gender/pro attributes and surface unmatched TFAA names.
  * Compliance: Zero HTML layout templates. Returns standardized data arrays and alert notices. Self-contained for easy removal post-POC.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,197 +29,221 @@ if ( ! function_exists( 'sywat_get_tfaa_reconciliation_report' ) ) {
     /**
      * Build on-demand reconciliation audit comparing TFAA synced data against all flat directory archers.
      *
-     * @return array Structured report containing 'matched_updates', 'unmatched_names', 'mappable_members', and 'stats'.
+     * @param array|null $preloaded_archers Optional pre-fetched flat archer array to avoid duplicate user queries.
+     * @return array Structured report containing 'matched_updates', 'unmatched_names', 'mappable_members', 'stats', and optional 'error'.
      */
-    function sywat_get_tfaa_reconciliation_report() {
+    function sywat_get_tfaa_reconciliation_report( $preloaded_archers = null ) {
         global $wpdb;
 
-        $gender_cache  = get_option( 'sywat_shooter_genders_cache', array() );
-        $ignored_names = get_option( 'sywat_ignored_tfaa_names', array() );
-        if ( ! is_array( $gender_cache ) ) $gender_cache = array();
-        if ( ! is_array( $ignored_names ) ) $ignored_names = array();
-
-        // Build TFAA source map from cache + historical tournament registrations (recovers Title-Case names & Pro status)
-        $tfaa_pool = array();
-
-        foreach ( $gender_cache as $norm_key => $raw_gender ) {
-            $clean_key = sywat_reconcile_normalize_name( $norm_key );
-            if ( empty( $clean_key ) ) continue;
-
-            $g_lower = strtolower( trim( (string) $raw_gender ) );
-            $gender  = in_array( $g_lower, array( 'male', 'female' ), true ) ? $g_lower : '';
-
-            $tfaa_pool[ $clean_key ] = array(
-                'norm_name'    => $clean_key,
-                'display_name' => ucwords( $clean_key ),
-                'gender'       => $gender,
-                'is_pro'       => 'no',
-                'guest_only'   => false,
-                'seen_non_guest' => false,
-            );
-        }
-
-        // Single bulk query across synced tournament registrations to refine Title-Case names, Pro status, and Guest filtering
-        $reg_rows = $wpdb->get_col(
-            $wpdb->prepare(
-                "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-                $wpdb->esc_like( 'sywat_t_' ) . '%'
-            )
+        $empty_report = array(
+            'matched_updates'  => array(),
+            'unmatched_names'  => array(),
+            'mappable_members' => array(),
+            'stats'            => array(
+                'tfaa_total'     => 0,
+                'ready_updates'  => 0,
+                'unmatched'      => 0,
+                'already_synced' => 0,
+            ),
+            'error'            => '',
         );
 
-        if ( ! empty( $reg_rows ) ) {
-            foreach ( $reg_rows as $raw_val ) {
-                $reg = maybe_unserialize( $raw_val );
-                if ( ! is_array( $reg ) || empty( $reg['name'] ) ) continue;
+        try {
+            $gender_cache  = get_option( 'sywat_shooter_genders_cache', array() );
+            $ignored_names = get_option( 'sywat_ignored_tfaa_names', array() );
+            if ( ! is_array( $gender_cache ) ) $gender_cache = array();
+            if ( ! is_array( $ignored_names ) ) $ignored_names = array();
 
-                $raw_name = trim( (string) $reg['name'] );
-                $norm_key = sywat_reconcile_normalize_name( $raw_name );
+            $tfaa_pool = array();
+
+            foreach ( $gender_cache as $norm_key => $raw_gender ) {
+                $clean_key = sywat_reconcile_normalize_name( $norm_key );
+                if ( empty( $clean_key ) ) continue;
+
+                $g_lower = strtolower( trim( (string) $raw_gender ) );
+                $gender  = in_array( $g_lower, array( 'male', 'female' ), true ) ? $g_lower : '';
+
+                $tfaa_pool[ $clean_key ] = array(
+                    'norm_name'      => $clean_key,
+                    'display_name'   => ucwords( $clean_key ),
+                    'gender'         => $gender,
+                    'is_pro'         => 'no',
+                    'seen_non_guest' => false,
+                );
+            }
+
+            // Lightweight query against tournament master registration options (sywat_registrations_*) instead of scanning all wp_options rows
+            $master_reg_rows = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                    $wpdb->esc_like( 'sywat_registrations_' ) . '%'
+                )
+            );
+
+            if ( ! empty( $master_reg_rows ) && is_array( $master_reg_rows ) ) {
+                foreach ( $master_reg_rows as $raw_batch ) {
+                    $batch = maybe_unserialize( $raw_batch );
+                    if ( ! is_array( $batch ) ) continue;
+
+                    foreach ( $batch as $reg ) {
+                        if ( ! is_array( $reg ) || empty( $reg['name'] ) ) continue;
+
+                        $raw_name = trim( (string) $reg['name'] );
+                        $norm_key = sywat_reconcile_normalize_name( $raw_name );
+                        if ( empty( $norm_key ) ) continue;
+
+                        $r_type   = isset( $reg['type'] ) ? strtolower( trim( (string) $reg['type'] ) ) : '';
+                        $r_style  = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+                        $r_gender = isset( $reg['gender'] ) ? strtolower( trim( (string) $reg['gender'] ) ) : '';
+                        $is_guest = ( $r_type === 'guest' || stripos( $r_style, 'guest' ) !== false || stripos( $raw_name, '[GUEST]' ) !== false );
+                        $is_pro   = ( ! $is_guest && stripos( $r_style, 'pro' ) !== false );
+
+                        if ( ! isset( $tfaa_pool[ $norm_key ] ) ) {
+                            if ( $is_guest ) {
+                                continue;
+                            }
+                            $tfaa_pool[ $norm_key ] = array(
+                                'norm_name'      => $norm_key,
+                                'display_name'   => trim( preg_replace( '/\[.*?\]/', '', $raw_name ) ),
+                                'gender'         => in_array( $r_gender, array( 'male', 'female' ), true ) ? $r_gender : '',
+                                'is_pro'         => $is_pro ? 'yes' : 'no',
+                                'seen_non_guest' => true,
+                            );
+                        } else {
+                            if ( ! $is_guest ) {
+                                $tfaa_pool[ $norm_key ]['seen_non_guest'] = true;
+                                $clean_title = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
+                                if ( ! empty( $clean_title ) ) {
+                                    $tfaa_pool[ $norm_key ]['display_name'] = $clean_title;
+                                }
+                                if ( empty( $tfaa_pool[ $norm_key ]['gender'] ) && in_array( $r_gender, array( 'male', 'female' ), true ) ) {
+                                    $tfaa_pool[ $norm_key ]['gender'] = $r_gender;
+                                }
+                                if ( $is_pro ) {
+                                    $tfaa_pool[ $norm_key ]['is_pro'] = 'yes';
+                                }
+                            }
+                        }
+                    }
+                    unset( $batch );
+                }
+                unset( $master_reg_rows );
+            }
+
+            // Reuse preloaded flat directory archers when supplied
+            $flat_archers = is_array( $preloaded_archers )
+                ? $preloaded_archers
+                : ( function_exists( 'sywat_get_all_flat_archers' ) ? sywat_get_all_flat_archers() : array() );
+
+            $directory_by_key = array();
+            $mappable_members = array();
+
+            foreach ( $flat_archers as $arch ) {
+                if ( ! is_array( $arch ) ) continue;
+                $norm_key = sywat_reconcile_normalize_name( isset( $arch['display_name'] ) ? $arch['display_name'] : '' );
                 if ( empty( $norm_key ) ) continue;
 
-                $r_type   = isset( $reg['type'] ) ? strtolower( trim( (string) $reg['type'] ) ) : '';
-                $r_style  = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
-                $r_gender = isset( $reg['gender'] ) ? strtolower( trim( (string) $reg['gender'] ) ) : '';
-                $is_guest = ( $r_type === 'guest' || stripos( $r_style, 'guest' ) !== false || stripos( $raw_name, '[GUEST]' ) !== false );
-                $is_pro   = ( ! $is_guest && stripos( $r_style, 'pro' ) !== false );
+                $a_type   = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
+                $a_uid    = isset( $arch['user_id'] ) ? intval( $arch['user_id'] ) : 0;
+                $a_sys_id = isset( $arch['system_id'] ) ? (string) $arch['system_id'] : '';
+                $a_head   = isset( $arch['head_user_id'] ) ? intval( $arch['head_user_id'] ) : 0;
+                $a_gender = isset( $arch['gender'] ) ? strtolower( trim( (string) $arch['gender'] ) ) : 'unassigned';
+                $a_pro    = isset( $arch['is_pro'] ) ? strtolower( trim( (string) $arch['is_pro'] ) ) : 'no';
 
-                if ( ! isset( $tfaa_pool[ $norm_key ] ) ) {
-                    if ( $is_guest ) {
-                        continue;
-                    }
-                    $tfaa_pool[ $norm_key ] = array(
-                        'norm_name'      => $norm_key,
-                        'display_name'   => trim( preg_replace( '/\[.*?\]/', '', $raw_name ) ),
-                        'gender'         => in_array( $r_gender, array( 'male', 'female' ), true ) ? $r_gender : '',
-                        'is_pro'         => $is_pro ? 'yes' : 'no',
-                        'guest_only'     => false,
-                        'seen_non_guest' => ! $is_guest,
-                    );
+                if ( $a_type === 'head' && $a_uid > 0 ) {
+                    $target_key = 'head:' . $a_uid;
+                } elseif ( $a_type === 'dependent' && $a_head > 0 && $a_sys_id !== '' ) {
+                    $target_key = 'dep:' . $a_head . ':' . $a_sys_id;
+                } elseif ( $a_type === 'unassigned' && $a_sys_id !== '' ) {
+                    $target_key = 'pool:' . $a_sys_id;
                 } else {
-                    if ( ! $is_guest ) {
-                        $tfaa_pool[ $norm_key ]['seen_non_guest'] = true;
-                        $clean_title = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
-                        if ( ! empty( $clean_title ) ) {
-                            $tfaa_pool[ $norm_key ]['display_name'] = $clean_title;
-                        }
-                        if ( empty( $tfaa_pool[ $norm_key ]['gender'] ) && in_array( $r_gender, array( 'male', 'female' ), true ) ) {
-                            $tfaa_pool[ $norm_key ]['gender'] = $r_gender;
-                        }
-                        if ( $is_pro ) {
-                            $tfaa_pool[ $norm_key ]['is_pro'] = 'yes';
-                        }
-                    }
+                    continue;
+                }
+
+                $record = array(
+                    'target_key'   => $target_key,
+                    'account_type' => $a_type,
+                    'user_id'      => $a_uid,
+                    'system_id'    => $a_sys_id,
+                    'head_user_id' => $a_head,
+                    'head_name'    => isset( $arch['head_name'] ) ? $arch['head_name'] : '',
+                    'display_name' => $arch['display_name'],
+                    'gender'       => ( $a_gender === 'male' || $a_gender === 'female' ) ? $a_gender : 'unassigned',
+                    'is_pro'       => ( $a_pro === 'yes' ) ? 'yes' : 'no',
+                );
+
+                $directory_by_key[ $norm_key ][] = $record;
+
+                if ( $record['gender'] === 'unassigned' || $record['is_pro'] === 'no' ) {
+                    $mappable_members[] = $record;
                 }
             }
-        }
 
-        // Load unified flat directory archers (Heads, Dependents, Unassigned Pool)
-        $flat_archers     = function_exists( 'sywat_get_all_flat_archers' ) ? sywat_get_all_flat_archers() : array();
-        $directory_by_key = array();
-        $mappable_members = array();
+            $matched_updates = array();
+            $unmatched_names = array();
+            $already_synced  = 0;
 
-        foreach ( $flat_archers as $idx => $arch ) {
-            $norm_key = sywat_reconcile_normalize_name( isset( $arch['display_name'] ) ? $arch['display_name'] : '' );
-            if ( empty( $norm_key ) ) continue;
+            foreach ( $tfaa_pool as $norm_key => $tfaa_item ) {
+                if ( isset( $ignored_names[ $norm_key ] ) ) {
+                    continue;
+                }
 
-            $a_type   = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
-            $a_uid    = isset( $arch['user_id'] ) ? intval( $arch['user_id'] ) : 0;
-            $a_sys_id = isset( $arch['system_id'] ) ? (string) $arch['system_id'] : '';
-            $a_head   = isset( $arch['head_user_id'] ) ? intval( $arch['head_user_id'] ) : 0;
-            $a_gender = isset( $arch['gender'] ) ? strtolower( trim( (string) $arch['gender'] ) ) : 'unassigned';
-            $a_pro    = isset( $arch['is_pro'] ) ? strtolower( trim( (string) $arch['is_pro'] ) ) : 'no';
+                if ( isset( $directory_by_key[ $norm_key ] ) ) {
+                    foreach ( $directory_by_key[ $norm_key ] as $dir_rec ) {
+                        $needs_gender = ( $dir_rec['gender'] === 'unassigned' && ! empty( $tfaa_item['gender'] ) );
+                        $needs_pro    = ( $dir_rec['is_pro'] === 'no' && $tfaa_item['is_pro'] === 'yes' );
 
-            // Unique composite target key: head:<uid> | dep:<head_uid>:<sys_id> | pool:<sys_id>
-            if ( $a_type === 'head' && $a_uid > 0 ) {
-                $target_key = 'head:' . $a_uid;
-            } elseif ( $a_type === 'dependent' && $a_head > 0 && $a_sys_id !== '' ) {
-                $target_key = 'dep:' . $a_head . ':' . $a_sys_id;
-            } elseif ( $a_type === 'unassigned' && $a_sys_id !== '' ) {
-                $target_key = 'pool:' . $a_sys_id;
-            } else {
-                continue;
-            }
-
-            $record = array(
-                'target_key'   => $target_key,
-                'account_type' => $a_type,
-                'user_id'      => $a_uid,
-                'system_id'    => $a_sys_id,
-                'head_user_id' => $a_head,
-                'head_name'    => isset( $arch['head_name'] ) ? $arch['head_name'] : '',
-                'display_name' => $arch['display_name'],
-                'gender'       => ( $a_gender === 'male' || $a_gender === 'female' ) ? $a_gender : 'unassigned',
-                'is_pro'       => ( $a_pro === 'yes' ) ? 'yes' : 'no',
-            );
-
-            $directory_by_key[ $norm_key ][] = $record;
-
-            // Eligible for manual nickname mapping if missing gender or not yet marked Pro
-            if ( $record['gender'] === 'unassigned' || $record['is_pro'] === 'no' ) {
-                $mappable_members[] = $record;
-            }
-        }
-
-        $matched_updates = array();
-        $unmatched_names = array();
-        $already_synced  = 0;
-
-        foreach ( $tfaa_pool as $norm_key => $tfaa_item ) {
-            if ( isset( $ignored_names[ $norm_key ] ) ) {
-                continue;
-            }
-
-            if ( isset( $directory_by_key[ $norm_key ] ) ) {
-                foreach ( $directory_by_key[ $norm_key ] as $dir_rec ) {
-                    $needs_gender = ( $dir_rec['gender'] === 'unassigned' && ! empty( $tfaa_item['gender'] ) );
-                    $needs_pro    = ( $dir_rec['is_pro'] === 'no' && $tfaa_item['is_pro'] === 'yes' );
-
-                    if ( $needs_gender || $needs_pro ) {
-                        $matched_updates[] = array(
-                            'target_key'      => $dir_rec['target_key'],
-                            'account_type'    => $dir_rec['account_type'],
-                            'display_name'    => $dir_rec['display_name'],
-                            'head_name'       => $dir_rec['head_name'],
-                            'current_gender'  => $dir_rec['gender'],
-                            'new_gender'      => $needs_gender ? $tfaa_item['gender'] : '',
-                            'current_is_pro'  => $dir_rec['is_pro'],
-                            'new_is_pro'      => $needs_pro ? 'yes' : '',
+                        if ( $needs_gender || $needs_pro ) {
+                            $matched_updates[] = array(
+                                'target_key'     => $dir_rec['target_key'],
+                                'account_type'   => $dir_rec['account_type'],
+                                'display_name'   => $dir_rec['display_name'],
+                                'head_name'      => $dir_rec['head_name'],
+                                'current_gender' => $dir_rec['gender'],
+                                'new_gender'     => $needs_gender ? $tfaa_item['gender'] : '',
+                                'current_is_pro' => $dir_rec['is_pro'],
+                                'new_is_pro'     => $needs_pro ? 'yes' : '',
+                            );
+                        } else {
+                            $already_synced++;
+                        }
+                    }
+                } else {
+                    if ( ! empty( $tfaa_item['gender'] ) || $tfaa_item['is_pro'] === 'yes' ) {
+                        $unmatched_names[] = array(
+                            'norm_name'    => $norm_key,
+                            'display_name' => $tfaa_item['display_name'],
+                            'gender'       => $tfaa_item['gender'],
+                            'is_pro'       => $tfaa_item['is_pro'],
                         );
-                    } else {
-                        $already_synced++;
                     }
                 }
-            } else {
-                // Only flag unmatched if we have at least gender or pro info
-                if ( ! empty( $tfaa_item['gender'] ) || $tfaa_item['is_pro'] === 'yes' ) {
-                    $unmatched_names[] = array(
-                        'norm_name'    => $norm_key,
-                        'display_name' => $tfaa_item['display_name'],
-                        'gender'       => $tfaa_item['gender'],
-                        'is_pro'       => $tfaa_item['is_pro'],
-                    );
-                }
             }
+
+            usort( $matched_updates, function( $a, $b ) {
+                return strcasecmp( $a['display_name'], $b['display_name'] );
+            } );
+
+            usort( $unmatched_names, function( $a, $b ) {
+                return strcasecmp( $a['display_name'], $b['display_name'] );
+            } );
+
+            return array(
+                'matched_updates'  => $matched_updates,
+                'unmatched_names'  => $unmatched_names,
+                'mappable_members' => $mappable_members,
+                'stats'            => array(
+                    'tfaa_total'     => count( $tfaa_pool ),
+                    'ready_updates'  => count( $matched_updates ),
+                    'unmatched'      => count( $unmatched_names ),
+                    'already_synced' => $already_synced,
+                ),
+                'error'            => '',
+            );
+        } catch ( Throwable $e ) {
+            $empty_report['error'] = 'Reconciliation scan error: ' . $e->getMessage();
+            return $empty_report;
         }
-
-        usort( $matched_updates, function( $a, $b ) {
-            return strcasecmp( $a['display_name'], $b['display_name'] );
-        } );
-
-        usort( $unmatched_names, function( $a, $b ) {
-            return strcasecmp( $a['display_name'], $b['display_name'] );
-        } );
-
-        return array(
-            'matched_updates'  => $matched_updates,
-            'unmatched_names'  => $unmatched_names,
-            'mappable_members' => $mappable_members,
-            'stats'            => array(
-                'tfaa_total'     => count( $tfaa_pool ),
-                'ready_updates'  => count( $matched_updates ),
-                'unmatched'      => count( $unmatched_names ),
-                'already_synced' => $already_synced,
-            ),
-        );
     }
 }
 
@@ -328,7 +352,6 @@ if ( ! function_exists( 'sywat_handle_tfaa_reconcile_post' ) ) {
         $added_pool_cnt  = 0;
         $dismissed_count = 0;
 
-        // 1. Apply checked exact-match directory updates
         $selected_targets = isset( $_POST['reconcile_targets'] ) && is_array( $_POST['reconcile_targets'] )
             ? array_map( 'sanitize_text_field', wp_unslash( $_POST['reconcile_targets'] ) )
             : array();
@@ -348,7 +371,6 @@ if ( ! function_exists( 'sywat_handle_tfaa_reconcile_post' ) ) {
             }
         }
 
-        // 2. Process unmatched TFAA archer actions
         $unmatched_actions = isset( $_POST['unmatched_action'] ) && is_array( $_POST['unmatched_action'] )
             ? wp_unslash( $_POST['unmatched_action'] )
             : array();
