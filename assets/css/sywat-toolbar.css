@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Toolbars, Auth Header & Inline Filter Controls
    Path: assets/css/sywat-toolbar.css
-   Version: 6.8.3
+   Version: 6.9.0
    ========================================================================== */
 
 /* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
@@ -24,7 +24,7 @@
 .sywat-auth-dropdown:hover .sywat-dropdown-caret { transform: rotate(180deg); color: #7dd3fc; }
 .sywat-auth-dropdown-menu { position: absolute; top: 100%; left: 0; background-color: var(--sywat-navy); min-width: 210px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35); border: 1px solid var(--sywat-text); border-radius: 8px; padding: 6px 0; z-index: 99999; margin-top: 6px; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease; transition-delay: 0.15s; }
 .sywat-auth-dropdown-menu::before { content: ""; position: absolute; top: -12px; left: 0; width: 100%; height: 12px; background: transparent; }
-.sywat-auth-dropdown-menu a { color: var(--sywat-border-light); padding: 10px 16px; text-decoration: none; display: block; font-size: 13px; font-weight: 600; white-space: nowrap !important; transition: background 0.15s ease, color 0.15s ease; }
+.sywat-auth-dropdown-menu a { color: var(--sywat-border-light); padding: 10px 16px; text-decoration: none; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; white-space: nowrap !important; transition: background 0.15s ease, color 0.15s ease; }
 .sywat-auth-dropdown-menu a:hover { background-color: var(--sywat-navy-soft); color: var(--sywat-accent); }
 .sywat-auth-dropdown:hover .sywat-auth-dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); transition-delay: 0s; }
 
