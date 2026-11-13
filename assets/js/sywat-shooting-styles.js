@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Shooting Styles & Divisions Client Controller
  * Path: assets/js/sywat-shooting-styles.js
- * Description: Namespaced vanilla JS module (window.SYWAT.shootingStyles) managing the Shooting Styles & Divisions Administration modals, dynamic rule-mode toggles, live table search, confirmation dialogs, and reusable client-side style/division rule enforcement.
+ * Description: Namespaced vanilla JS module (window.SYWAT.shootingStyles) managing the Shooting Styles & Divisions Administration modals, dynamic rule-mode toggles, live table search on both tabs, confirmation dialogs, and reusable client-side style/division rule enforcement.
  * Compliance: Zero jQuery, zero inline style.* mutations, zero document-level keydown handlers, delegated event listeners, guarded DOM initialization.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.1.0
  */
 
 (function() {
@@ -172,12 +172,13 @@
             if (statusEl)   statusEl.value   = triggerBtn.getAttribute('data-status') || 'active';
             if (aliasesEl)  aliasesEl.value  = triggerBtn.getAttribute('data-aliases') || '';
         } else {
+            const rowCount = document.querySelectorAll('.sywat-division-config-row').length;
             if (origSlugEl) origSlugEl.value = '';
             if (labelEl)    labelEl.value    = '';
             if (codeEl)     codeEl.value     = '';
             if (distEl)     distEl.value     = '20yd';
             if (tierEl)     tierEl.value     = 'Adult';
-            if (sortEl)     sortEl.value     = '8';
+            if (sortEl)     sortEl.value     = String(rowCount + 1);
             if (statusEl)   statusEl.value   = 'active';
             if (aliasesEl)  aliasesEl.value  = '';
         }
@@ -207,6 +208,24 @@
         const query = (rawQuery || '').toLowerCase().trim();
         document.querySelectorAll('.sywat-style-config-row').forEach(function(row) {
             const haystack = (row.getAttribute('data-style-search') || '').toLowerCase();
+            if (!query || haystack.indexOf(query) !== -1) {
+                row.classList.remove('sywat-hidden');
+            } else {
+                row.classList.add('sywat-hidden');
+            }
+        });
+    }
+
+    /**
+     * Filter Age Divisions table rows using CSS class toggles.
+     *
+     * @param {string} rawQuery Search input text.
+     * @return {void}
+     */
+    function applyDivisionsSearchFilter(rawQuery) {
+        const query = (rawQuery || '').toLowerCase().trim();
+        document.querySelectorAll('.sywat-division-config-row').forEach(function(row) {
+            const haystack = (row.getAttribute('data-division-search') || '').toLowerCase();
             if (!query || haystack.indexOf(query) !== -1) {
                 row.classList.remove('sywat-hidden');
             } else {
@@ -330,6 +349,7 @@
         closeDivisionModal: closeDivisionModal,
         syncRuleModeFields: syncRuleModeFields,
         applySearchFilter: applyStylesSearchFilter,
+        applyDivisionsSearchFilter: applyDivisionsSearchFilter,
         findStyleConfig: findStyleConfig,
         applyStyleRules: applyStyleRules
     };
@@ -367,6 +387,14 @@
                 applyStylesSearchFilter('');
                 searchInput.focus();
             }
+        } else if (action === 'clear-divisions-search') {
+            event.preventDefault();
+            const divSearchInput = document.getElementById('sywat_divisions_search_input');
+            if (divSearchInput) {
+                divSearchInput.value = '';
+                applyDivisionsSearchFilter('');
+                divSearchInput.focus();
+            }
         }
     });
 
@@ -377,10 +405,13 @@
         syncRuleModeFields(actionEl.value);
     });
 
-    // Delegated Live Search Input Listener
+    // Delegated Live Search Input Listeners (Styles & Divisions Tabs)
     document.addEventListener('input', function(event) {
-        if (event.target && event.target.id === 'sywat_styles_search_input') {
+        if (!event.target) return;
+        if (event.target.id === 'sywat_styles_search_input') {
             applyStylesSearchFilter(event.target.value);
+        } else if (event.target.id === 'sywat_divisions_search_input') {
+            applyDivisionsSearchFilter(event.target.value);
         }
     });
 
@@ -395,16 +426,18 @@
         }
     });
 
-    // Guarded Initialization, Element-Scoped Keydown Guard & Auto-Dismiss System Notices
+    // Guarded Initialization, Element-Scoped Keydown Guards & Auto-Dismiss System Notices
     function initSywatShootingStyles() {
-        const searchInput = document.getElementById('sywat_styles_search_input');
-        if (searchInput) {
-            searchInput.addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                }
-            });
-        }
+        ['sywat_styles_search_input', 'sywat_divisions_search_input'].forEach(function(inputId) {
+            const inputEl = document.getElementById(inputId);
+            if (inputEl) {
+                inputEl.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                    }
+                });
+            }
+        });
 
         const noticeEl = document.getElementById('sywat-notice');
         if (noticeEl) {
