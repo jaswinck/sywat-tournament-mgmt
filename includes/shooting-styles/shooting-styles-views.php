@@ -3,9 +3,9 @@
  * Sub-Module: Shooting Styles & Divisions Administration Views Renderer
  * Path: includes/shooting-styles/shooting-styles-views.php
  * Description: Renders the [sywat_shooting_styles] Administration GUI for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
- * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, accessible inline SVGs (aria-hidden="true"), delegated data-sywat-action attributes.
+ * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, accessible inline SVGs (aria-hidden="true"), theme-proof code spans, delegated data-sywat-action attributes.
  * Author: SYWAT Archery
- * Version: 1.0.2
+ * Version: 1.0.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -108,7 +108,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                     ?>
                                     <tr class="sywat-style-config-row" data-style-search="<?php echo esc_attr( $search_haystack ); ?>">
                                         <td class="sywat-col-center"><strong><?php echo intval( $st['sort_order'] ); ?></strong></td>
-                                        <td class="sywat-col-center"><code><?php echo esc_html( $st['code'] ); ?></code></td>
+                                        <td class="sywat-col-center"><span class="sywat-meta-code-primary"><?php echo esc_html( $st['code'] ); ?></span></td>
                                         <td>
                                             <strong><?php echo esc_html( $st['label'] ); ?></strong>
                                             <?php if ( $aliases_str !== '' ) : ?>
@@ -225,7 +225,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                     ?>
                                     <tr>
                                         <td class="sywat-col-center"><strong><?php echo intval( $div_rec['sort_order'] ); ?></strong></td>
-                                        <td class="sywat-col-center"><code><?php echo esc_html( $div_rec['code'] ); ?></code></td>
+                                        <td class="sywat-col-center"><span class="sywat-meta-code-primary"><?php echo esc_html( $div_rec['code'] ); ?></span></td>
                                         <td>
                                             <strong><?php echo esc_html( $div_rec['label'] ); ?></strong>
                                             <?php if ( $div_aliases !== '' ) : ?>
