@@ -2,11 +2,14 @@
 /**
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
+ * Description: Renders the public multi-tournament Season Standings leaderboards with database-ordered division & style filters and live search.
  * Author: SYWAT Archery
- * Version: 4.4.0
+ * Version: 7.0.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 if ( ! function_exists( 'sywat_format_score_cell' ) ) {
     function sywat_format_score_cell( $score_item ) {
@@ -21,7 +24,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
     function sywat_render_public_season_standings( $selected_season_slug ) {
         $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
         if ( empty( $selected_season_slug ) ) {
-            $active_s = function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season() : array();
+            $active_s             = function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season() : array();
             $selected_season_slug = isset( $active_s['slug'] ) ? $active_s['slug'] : key( $seasons );
         }
 
@@ -36,30 +39,44 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         foreach ( $groups as $g ) {
             $clean_d = trim( preg_replace( '/\s*\([^)]*\)/', '', $g['division'] ) );
             if ( ! empty( $clean_d ) ) {
-                $all_divisions[strtolower( $clean_d )] = $clean_d;
+                $all_divisions[ strtolower( $clean_d ) ] = $clean_d;
             }
             foreach ( $g['styles'] as $s_name => $archers ) {
-                $all_styles[strtolower( trim( $s_name ) )] = trim( $s_name );
+                $all_styles[ strtolower( trim( $s_name ) ) ] = trim( $s_name );
                 $total_season_shooters += count( $archers );
             }
         }
-        ksort($all_divisions);
 
+        // Sort Division filter options using database-configured NFAA age progression
+        uasort( $all_divisions, function( $divA, $divB ) {
+            $wA = function_exists( 'sywat_get_div_gen_sort_weight' ) ? sywat_get_div_gen_sort_weight( $divA, 'Male' ) : 50;
+            $wB = function_exists( 'sywat_get_div_gen_sort_weight' ) ? sywat_get_div_gen_sort_weight( $divB, 'Male' ) : 50;
+            if ( $wA !== $wB ) {
+                return $wA <=> $wB;
+            }
+            return strcasecmp( $divA, $divB );
+        } );
+
+        // Sort Style filter options using database-configured style order
         uksort( $all_styles, function( $a, $b ) {
             $wA = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $a ) : 50;
             $wB = function_exists( 'sywat_get_style_sort_weight' ) ? sywat_get_style_sort_weight( $b ) : 50;
-            if ( $wA !== $wB ) return $wA - $wB;
+            if ( $wA !== $wB ) {
+                return $wA - $wB;
+            }
             return strcasecmp( $a, $b );
-        });
+        } );
+
+        $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
         ?>
 
         <div class="sywat-public-card">
             <!-- TOP CARD HEADER BAR: TITLE + SUBTITLE (LEFT) & CLEAN INLINE SEASON SELECTOR (RIGHT) -->
             <div class="sywat-card-header-bar">
                 <div>
-                    <h2>🎯 Season Standings</h2>
+                    <h2>🏆 Season Standings</h2>
                     <div class="sywat-subtitle">
-                        Leaderboards aggregated across Top <strong><?php echo $best_n; ?></strong> Qualifiers + State Championship.
+                        Leaderboards aggregated across Top <strong><?php echo intval( $best_n ); ?></strong> Qualifiers + State Championship.
                     </div>
                 </div>
 
@@ -67,7 +84,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                     <input type="hidden" name="view" value="standings">
                     <label for="sywat_season_select"><strong>Season:</strong></label>
                     <select name="season" id="sywat_season_select" onchange="this.form.submit()">
-                        <?php foreach ( $seasons as $slug => $s ): ?>
+                        <?php foreach ( $seasons as $slug => $s ) : ?>
                             <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
                                 <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
                             </option>
@@ -80,10 +97,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             <div class="sywat-filter-bar">
                 <!-- 1. Division Filter -->
                 <div class="sywat-field-group">
-                    <label>Division</label>
+                    <label for="sywat_standings_filter_div">Division</label>
                     <select id="sywat_standings_filter_div" onchange="sywatApplyStandingsFilters()">
                         <option value="all">All Divisions</option>
-                        <?php foreach ( $all_divisions as $d_slug => $d_label ): ?>
+                        <?php foreach ( $all_divisions as $d_slug => $d_label ) : ?>
                             <option value="<?php echo esc_attr( $d_slug ); ?>"><?php echo esc_html( $d_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -91,7 +108,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                 <!-- 2. Gender Filter -->
                 <div class="sywat-field-group">
-                    <label>Gender</label>
+                    <label for="sywat_standings_filter_gen">Gender</label>
                     <select id="sywat_standings_filter_gen" onchange="sywatApplyStandingsFilters()">
                         <option value="all">All Genders</option>
                         <option value="male">Male</option>
@@ -101,10 +118,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                 <!-- 3. Style Filter -->
                 <div class="sywat-field-group">
-                    <label>Style</label>
+                    <label for="sywat_standings_filter_style">Style</label>
                     <select id="sywat_standings_filter_style" onchange="sywatApplyStandingsFilters()">
                         <option value="all">All Styles</option>
-                        <?php foreach ( $all_styles as $st_slug => $st_label ): ?>
+                        <?php foreach ( $all_styles as $st_slug => $st_label ) : ?>
                             <option value="<?php echo esc_attr( $st_slug ); ?>"><?php echo esc_html( $st_label ); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -112,7 +129,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                 <!-- 4. Search Archer Field & Reset Button -->
                 <div class="sywat-field-group">
-                    <label>Search Archer</label>
+                    <label for="sywat_standings_search">Search Archer</label>
                     <div class="sywat-search-input-wrapper">
                         <input type="text" id="sywat_standings_search" oninput="sywatApplyStandingsFilters()" placeholder="Type archer name...">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="sywatResetStandingsFilters()">Reset Filters</button>
@@ -122,23 +139,23 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
             <!-- DYNAMIC PARTICIPATION STAT BANNER -->
             <div id="sywat_standings_counter" class="sywat-counter-banner">
-                🎯 Total Season Shooters: <strong><?php echo $total_season_shooters; ?></strong>
+                🎯 Total Season Shooters: <strong><?php echo intval( $total_season_shooters ); ?></strong>
             </div>
 
-            <?php if ( empty( $groups ) ): ?>
+            <?php if ( empty( $groups ) ) : ?>
                 <p class="sywat-empty-notice">No completed scores recorded yet for this season.</p>
-            <?php else: ?>
-                <?php foreach ( $groups as $dg_key => $group_data ): ?>
-                    <?php 
+            <?php else : ?>
+                <?php foreach ( $groups as $dg_key => $group_data ) : ?>
+                    <?php
                         $card_div_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['division'] ) ) );
                         $card_gen_slug = strtolower( trim( preg_replace( '/\s*\([^)]*\)/', '', $group_data['gender'] ) ) );
                     ?>
                     <div class="sywat-div-gen-card" data-division="<?php echo esc_attr( $card_div_slug ); ?>" data-gender="<?php echo esc_attr( $card_gen_slug ); ?>">
 
-                        <?php foreach ( $group_data['styles'] as $style_name => $archers ): ?>
-                            <?php 
-                                $style_slug = strtolower( trim( $style_name ) );
-                                $combined_title = function_exists('sywat_format_combined_category_header') 
+                        <?php foreach ( $group_data['styles'] as $style_name => $archers ) : ?>
+                            <?php
+                                $style_slug     = strtolower( trim( $style_name ) );
+                                $combined_title = function_exists( 'sywat_format_combined_category_header' )
                                     ? sywat_format_combined_category_header( $group_data['division'], $group_data['gender'], $style_name )
                                     : trim( $group_data['division'] . ' ' . $group_data['gender'] . ' ' . $style_name );
                             ?>
@@ -161,12 +178,12 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php 
+                                            <?php
                                             $current_rank   = 1;
                                             $prev_tot_score = null;
                                             $prev_tot_x     = null;
 
-                                            foreach ( $archers as $idx => $a ): 
+                                            foreach ( $archers as $idx => $a ) :
                                                 $tot_s = intval( $a['total_score'] );
                                                 $tot_x = intval( $a['total_x_count'] );
 
@@ -203,19 +220,19 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             <?php endif; ?>
         </div>
 
-        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
+        <script <?php echo $script_optout_attrs; ?>>
         function sywatApplyStandingsFilters() {
-            const divFilter   = document.getElementById('sywat_standings_filter_div').value.toLowerCase().trim();
-            const genFilter   = document.getElementById('sywat_standings_filter_gen').value.toLowerCase().trim();
-            const styleFilter = document.getElementById('sywat_standings_filter_style').value.toLowerCase().trim();
-            const searchFilter= document.getElementById('sywat_standings_search').value.toLowerCase().trim();
+            const divFilter    = document.getElementById('sywat_standings_filter_div').value.toLowerCase().trim();
+            const genFilter    = document.getElementById('sywat_standings_filter_gen').value.toLowerCase().trim();
+            const styleFilter  = document.getElementById('sywat_standings_filter_style').value.toLowerCase().trim();
+            const searchFilter = document.getElementById('sywat_standings_search').value.toLowerCase().trim();
 
             const cards = document.querySelectorAll('.sywat-div-gen-card');
 
-            let totalCount = 0;
+            let totalCount   = 0;
             let visibleCount = 0;
 
-            cards.forEach(card => {
+            cards.forEach(function(card) {
                 const cardDiv = (card.getAttribute('data-division') || '').toLowerCase().trim();
                 const cardGen = (card.getAttribute('data-gender') || '').toLowerCase().trim();
 
@@ -225,21 +242,21 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                 let cardHasVisibleBlock = false;
                 const styleBlocks = card.querySelectorAll('.sywat-style-block');
 
-                styleBlocks.forEach(block => {
+                styleBlocks.forEach(function(block) {
                     const blockStyle = (block.getAttribute('data-style') || '').toLowerCase().trim();
                     const styleMatch = (styleFilter === 'all' || blockStyle === styleFilter);
 
                     let blockHasVisibleRow = false;
                     const rows = block.querySelectorAll('.sywat-standings-row');
 
-                    rows.forEach(row => {
-                        const name = (row.getAttribute('data-name') || '').toLowerCase();
+                    rows.forEach(function(row) {
+                        const name        = (row.getAttribute('data-name') || '').toLowerCase();
                         const searchMatch = (!searchFilter || name.includes(searchFilter));
 
                         totalCount++;
 
                         if (divMatch && genMatch && styleMatch && searchMatch) {
-                            row.style.display = '';
+                            row.style.display  = '';
                             blockHasVisibleRow = true;
                             visibleCount++;
                         } else {
@@ -273,10 +290,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
         }
 
         function sywatResetStandingsFilters() {
-            document.getElementById('sywat_standings_filter_div').value = 'all';
-            document.getElementById('sywat_standings_filter_gen').value = 'all';
+            document.getElementById('sywat_standings_filter_div').value   = 'all';
+            document.getElementById('sywat_standings_filter_gen').value   = 'all';
             document.getElementById('sywat_standings_filter_style').value = 'all';
-            document.getElementById('sywat_standings_search').value = '';
+            document.getElementById('sywat_standings_search').value       = '';
             sywatApplyStandingsFilters();
         }
         </script>
