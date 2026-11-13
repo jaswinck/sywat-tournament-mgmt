@@ -3,7 +3,7 @@
  * Sub-Module: Check-In Desk Data Layer
  * File: includes/checkin/checkin-data.php
  * Author: SYWAT Archery
- * Version: 6.8.3
+ * Version: 6.8.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -92,6 +92,7 @@ function sywat_desk_get_data() {
     $requested_tourn   = isset($_REQUEST['selected_tournament']) ? sanitize_text_field(wp_unslash($_REQUEST['selected_tournament'])) : '';
     $selected_line_idx = isset($_REQUEST['selected_line_idx'])   ? sanitize_text_field(wp_unslash($_REQUEST['selected_line_idx']))   : 'all';
     $search_query      = isset($_REQUEST['search_query'])        ? sanitize_text_field(wp_unslash($_REQUEST['search_query']))        : '';
+    $saved_user_t      = $user->ID ? trim((string) get_user_meta($user->ID, 'sywat_desk_selected_tournament', true)) : '';
 
     // Identify active season slugs/names so archived season events do not clutter the dropdown
     $seasons            = function_exists('sywat_get_seasons') ? sywat_get_seasons() : get_option('sywat_seasons_list', array());
@@ -116,7 +117,9 @@ function sywat_desk_get_data() {
         }
 
         $is_explicitly_requested = (!empty($requested_tourn) && strcasecmp($t_name, $requested_tourn) === 0);
-        if (!$is_explicitly_requested && !empty($active_season_keys)) {
+        $is_saved_preference     = ($saved_user_t !== '' && strcasecmp($t_name, $saved_user_t) === 0);
+
+        if (!$is_explicitly_requested && !$is_saved_preference && !empty($active_season_keys)) {
             $t_season = '';
             if (is_array($t_data)) {
                 $t_season = !empty($t_data['season_slug']) ? $t_data['season_slug'] : (!empty($t_data['season']) ? $t_data['season'] : '');
@@ -142,7 +145,7 @@ function sywat_desk_get_data() {
     $sorted_keys = array_keys($scoped_raw);
     usort($sorted_keys, 'strnatcasecmp');
 
-    // Resolve selected tournament with exact or case-insensitive match
+    // 1. Resolve explicitly requested tournament with exact or case-insensitive match
     $selected_tournament = '';
     if (!empty($requested_tourn)) {
         if (isset($scoped_raw[$requested_tourn])) {
@@ -157,23 +160,62 @@ function sywat_desk_get_data() {
         }
     }
 
-    // Prefer globally active tournament if set and no explicit request was provided
+    // 2. Sticky User Preference: Restore last tournament selected across Register / Check-In / Scores
+    if (empty($selected_tournament) && $saved_user_t !== '') {
+        if (isset($scoped_raw[$saved_user_t])) {
+            $selected_tournament = $saved_user_t;
+        } else {
+            foreach ($sorted_keys as $k) {
+                if (strcasecmp($k, $saved_user_t) === 0) {
+                    $selected_tournament = $k;
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Active Volunteer Hub tournament or global active tournament
     if (empty($selected_tournament)) {
-        $global_curr = get_option('sywat_current_tournament', '');
-        if (!empty($global_curr) && isset($scoped_raw[$global_curr])) {
-            $selected_tournament = $global_curr;
+        $active_hubs = get_option('sywat_active_tournaments', array());
+        if (is_array($active_hubs) && !empty($active_hubs)) {
+            $hub_any = '';
+            foreach ($sorted_keys as $k) {
+                if (in_array($k, $active_hubs, true)) {
+                    $t_shop = function_exists('sywat_get_tournament_shop_id')
+                        ? (string) sywat_get_tournament_shop_id($scoped_raw[$k])
+                        : (isset($scoped_raw[$k]['shop_id']) ? (string) $scoped_raw[$k]['shop_id'] : '');
+                    if (!empty($user_shop_id) && $t_shop === (string) $user_shop_id) {
+                        $selected_tournament = $k;
+                        break;
+                    }
+                    if ($hub_any === '') {
+                        $hub_any = $k;
+                    }
+                }
+            }
+            if (empty($selected_tournament) && $hub_any !== '') {
+                $selected_tournament = $hub_any;
+            }
         }
     }
 
-    // Fallback to saved user meta
-    if (empty($selected_tournament) && $user->ID) {
-        $saved_t = get_user_meta($user->ID, 'sywat_desk_selected_tournament', true);
-        if (!empty($saved_t) && isset($scoped_raw[$saved_t])) {
-            $selected_tournament = $saved_t;
+    if (empty($selected_tournament)) {
+        $global_curr = trim((string) get_option('sywat_current_tournament', ''));
+        if ($global_curr !== '') {
+            if (isset($scoped_raw[$global_curr])) {
+                $selected_tournament = $global_curr;
+            } else {
+                foreach ($sorted_keys as $k) {
+                    if (strcasecmp($k, $global_curr) === 0) {
+                        $selected_tournament = $k;
+                        break;
+                    }
+                }
+            }
         }
     }
 
-    // Fallback to nearest upcoming event (user shop first, then overall), else first A–Z
+    // 4. Fallback to nearest upcoming event (user shop first, then overall), else first A–Z
     if (empty($selected_tournament) && !empty($sorted_keys)) {
         $today_ymd     = current_time('Y-m-d');
         $shop_upcoming = array();
