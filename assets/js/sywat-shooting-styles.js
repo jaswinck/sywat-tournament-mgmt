@@ -2,9 +2,9 @@
  * SYWAT Archery - Shooting Styles & Divisions Client Controller
  * Path: assets/js/sywat-shooting-styles.js
  * Description: Namespaced vanilla JS module (window.SYWAT.shootingStyles) managing the Shooting Styles & Divisions Administration modals, dynamic rule-mode toggles, live table search, confirmation dialogs, and reusable client-side style/division rule enforcement.
- * Compliance: Zero jQuery, zero inline style.* mutations, delegated event listeners, guarded DOM initialization.
+ * Compliance: Zero jQuery, zero inline style.* mutations, zero document-level keydown handlers, delegated event listeners, guarded DOM initialization.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 (function() {
@@ -71,7 +71,7 @@
         const isEdit = Boolean(triggerBtn && triggerBtn.getAttribute('data-slug'));
 
         if (titleEl) {
-            titleEl.textContent = isEdit ? '✏️ Edit Shooting Style' : '🏹 Add Shooting Style';
+            titleEl.textContent = isEdit ? 'Edit Shooting Style' : 'Add Shooting Style';
         }
 
         if (isEdit) {
@@ -159,7 +159,7 @@
         const isEdit = Boolean(triggerBtn && triggerBtn.getAttribute('data-slug'));
 
         if (titleEl) {
-            titleEl.textContent = isEdit ? '✏️ Edit Age Division' : '🎯 Add Age Division';
+            titleEl.textContent = isEdit ? 'Edit Age Division' : 'Add Age Division';
         }
 
         if (isEdit) {
@@ -384,13 +384,6 @@
         }
     });
 
-    // Prevent Enter Key Form Submission inside Live Search Input
-    document.addEventListener('keydown', function(event) {
-        if (event.target && event.target.id === 'sywat_styles_search_input' && event.key === 'Enter') {
-            event.preventDefault();
-        }
-    });
-
     // Delegated Form Confirmation Listener
     document.addEventListener('submit', function(event) {
         const form = event.target;
@@ -402,8 +395,17 @@
         }
     });
 
-    // Guarded Initialization & Auto-Dismiss System Notices
+    // Guarded Initialization, Element-Scoped Keydown Guard & Auto-Dismiss System Notices
     function initSywatShootingStyles() {
+        const searchInput = document.getElementById('sywat_styles_search_input');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                }
+            });
+        }
+
         const noticeEl = document.getElementById('sywat-notice');
         if (noticeEl) {
             setTimeout(function() {
