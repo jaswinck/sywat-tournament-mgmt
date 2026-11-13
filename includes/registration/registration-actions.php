@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
- * Description: Handles multi-archer phone intake, active-only per-line $75.00 Family Cap evaluation, waitlist triage ('all' vs. 'remainder'), and atomic multi-store persistence.
+ * Description: Handles multi-archer phone intake, database-driven division/fee-tier resolution, active-only per-line $75.00 Family Cap evaluation, waitlist triage ('all' vs. 'remainder'), and atomic multi-store persistence.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 7.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -95,8 +95,45 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please add at least one archer name.</div>';
         }
 
-        $youth_divisions = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
-        $valid_archers   = array();
+        // Resolve default Cub and 20yd Adult fallback divisions from database configuration
+        $default_cub_div  = 'Cub (8 - 11)';
+        $default_20yd_div = 'Adult (18 - 49)';
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $active_divs = sywat_get_division_records( false );
+            if ( is_array( $active_divs ) && ! empty( $active_divs ) ) {
+                $found_cub  = '';
+                $found_20yd = '';
+                $first_20yd = '';
+                foreach ( $active_divs as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    $rec_dist = isset( $rec['distance'] ) ? $rec['distance'] : '20yd';
+                    $rec_tier = isset( $rec['rate_tier'] ) ? $rec['rate_tier'] : 'Adult';
+                    if ( $rec_dist === 'Cub' && $found_cub === '' ) {
+                        $found_cub = $rec['label'];
+                    } elseif ( $rec_dist !== 'Cub' ) {
+                        if ( $first_20yd === '' ) {
+                            $first_20yd = $rec['label'];
+                        }
+                        if ( $rec_tier === 'Adult' && $found_20yd === '' ) {
+                            $found_20yd = $rec['label'];
+                        }
+                    }
+                }
+                if ( $found_cub !== '' ) {
+                    $default_cub_div = $found_cub;
+                }
+                if ( $found_20yd !== '' ) {
+                    $default_20yd_div = $found_20yd;
+                } elseif ( $first_20yd !== '' ) {
+                    $default_20yd_div = $first_20yd;
+                }
+            }
+        }
+
+        $legacy_youth_divisions = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
+        $valid_archers          = array();
 
         foreach ( $archers_raw as $a ) {
             $name = trim( sanitize_text_field( $a['name'] ?? '' ) );
@@ -107,18 +144,33 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $distance = function_exists( 'sywat_normalize_dist' )
                 ? sywat_normalize_dist( sanitize_text_field( $a['distance'] ?? '20yd' ) )
                 : sanitize_text_field( $a['distance'] ?? '20yd' );
-            $division = sanitize_text_field( $a['division'] ?? '' );
+            $division = trim( sanitize_text_field( $a['division'] ?? '' ) );
 
-            if ( empty( $division ) ) {
-                $division = ( $distance === 'Cub' ) ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+            if ( $division !== '' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+                $division = sywat_shooting_styles_normalize_division( $division );
             }
 
-            $is_youth_tier = in_array( $division, $youth_divisions, true ) || ( $distance === 'Cub' );
-            $paid_tier     = $is_youth_tier ? 'Youth' : 'Adult';
-            $raw_l_idx     = ! empty( $a['line_idx'] ) || ( isset( $a['line_idx'] ) && (string) $a['line_idx'] === '0' )
+            if ( empty( $division ) ) {
+                $division = ( $distance === 'Cub' ) ? $default_cub_div : $default_20yd_div;
+            } elseif ( function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
+                $div_dist = sywat_shooting_styles_get_division_distance( $division );
+                if ( $div_dist === 'Cub' ) {
+                    $distance = 'Cub';
+                }
+            }
+
+            if ( $distance === 'Cub' ) {
+                $paid_tier = 'Youth';
+            } elseif ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
+                $paid_tier = sywat_shooting_styles_get_division_rate_tier( $division );
+            } else {
+                $paid_tier = in_array( $division, $legacy_youth_divisions, true ) ? 'Youth' : 'Adult';
+            }
+
+            $raw_l_idx    = ! empty( $a['line_idx'] ) || ( isset( $a['line_idx'] ) && (string) $a['line_idx'] === '0' )
                 ? sanitize_text_field( $a['line_idx'] )
                 : $default_line_idx;
-            $resolved_idx  = sywat_registration_resolve_line_idx( $raw_l_idx, $t_lines );
+            $resolved_idx = sywat_registration_resolve_line_idx( $raw_l_idx, $t_lines );
 
             $valid_archers[] = array(
                 'name'      => $name,
