@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with sticky tournament carryover, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Author: SYWAT Archery
- * Version: 6.9.2
+ * Version: 6.9.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -71,13 +71,14 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
         }
 
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_t, $active_hubs, true );
+        $tab_query_args = ! empty( $selected_t ) ? array( 'selected_tournament' => $selected_t ) : array();
         ?>
         <!-- Master Navigation Tabs (Card-Docked) -->
         <div class="sywat-nav-tabs no-print">
             <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-            <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
-            <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
-            <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
+            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
             <?php if ( $can_manage_seasons ) : ?>
                 <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
             <?php endif; ?>
