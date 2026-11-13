@@ -5,7 +5,7 @@
  * Description: Renders the [sywat_shooting_styles] Administration GUI for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
  * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, delegated data-sywat-action attributes.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -87,7 +87,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                     <th class="sywat-col-center">Pro</th>
                                     <th>Division / Age Rule</th>
                                     <th class="sywat-col-center">Status</th>
-                                    <th class="sywat-col-center">Actions</th>
+                                    <th class="sywat-col-center sywat-col-action">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -133,10 +133,10 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                             <?php endif; ?>
                                         </td>
                                         <td class="sywat-col-center">
-                                            <div class="sywat-table-actions">
+                                            <div class="sywat-table-actions-vertical">
                                                 <button
                                                     type="button"
-                                                    class="sywat-btn sywat-btn-primary"
+                                                    class="sywat-btn sywat-btn-primary sywat-btn-full"
                                                     data-sywat-action="open-edit-style-modal"
                                                     data-slug="<?php echo esc_attr( $st['slug'] ); ?>"
                                                     data-code="<?php echo esc_attr( $st['code'] ); ?>"
@@ -150,20 +150,20 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                     data-forced-division="<?php echo esc_attr( isset( $st['forced_division'] ) ? $st['forced_division'] : '' ); ?>"
                                                 >Edit</button>
 
-                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>">
+                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" class="sywat-table-action-form">
                                                     <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                     <input type="hidden" name="sywat_styles_action" value="toggle_style_status">
                                                     <input type="hidden" name="style_slug" value="<?php echo esc_attr( $st['slug'] ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-secondary">
+                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-full">
                                                         <?php echo $is_active ? 'Retire' : 'Activate'; ?>
                                                     </button>
                                                 </form>
 
-                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" data-sywat-confirm="Permanently delete shooting style '<?php echo esc_attr( $st['label'] ); ?>'? Tip: Use 'Retire' if historical tournaments still reference this style.">
+                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" class="sywat-table-action-form" data-sywat-confirm="Permanently delete shooting style '<?php echo esc_attr( $st['label'] ); ?>'? Tip: Use 'Retire' if historical tournaments still reference this style.">
                                                     <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                     <input type="hidden" name="sywat_styles_action" value="delete_style">
                                                     <input type="hidden" name="style_slug" value="<?php echo esc_attr( $st['slug'] ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-danger">Delete</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full">Delete</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -199,7 +199,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                     <th class="sywat-col-center">Distance</th>
                                     <th class="sywat-col-center">Fee Tier</th>
                                     <th class="sywat-col-center">Status</th>
-                                    <th class="sywat-col-center">Actions</th>
+                                    <th class="sywat-col-center sywat-col-action">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -231,10 +231,10 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                             <?php endif; ?>
                                         </td>
                                         <td class="sywat-col-center">
-                                            <div class="sywat-table-actions">
+                                            <div class="sywat-table-actions-vertical">
                                                 <button
                                                     type="button"
-                                                    class="sywat-btn sywat-btn-primary"
+                                                    class="sywat-btn sywat-btn-primary sywat-btn-full"
                                                     data-sywat-action="open-edit-division-modal"
                                                     data-slug="<?php echo esc_attr( $div_rec['slug'] ); ?>"
                                                     data-code="<?php echo esc_attr( $div_rec['code'] ); ?>"
@@ -246,20 +246,20 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                     data-status="<?php echo esc_attr( $div_rec['status'] ); ?>"
                                                 >Edit</button>
 
-                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>">
+                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" class="sywat-table-action-form">
                                                     <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                     <input type="hidden" name="sywat_styles_action" value="toggle_division_status">
                                                     <input type="hidden" name="div_slug" value="<?php echo esc_attr( $div_rec['slug'] ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-secondary">
+                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-full">
                                                         <?php echo $div_active ? 'Retire' : 'Activate'; ?>
                                                     </button>
                                                 </form>
 
-                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" data-sywat-confirm="Permanently delete division '<?php echo esc_attr( $div_rec['label'] ); ?>'?">
+                                                <form method="post" action="<?php echo esc_url( $page_url ); ?>" class="sywat-table-action-form" data-sywat-confirm="Permanently delete division '<?php echo esc_attr( $div_rec['label'] ); ?>'?">
                                                     <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
                                                     <input type="hidden" name="sywat_styles_action" value="delete_division">
                                                     <input type="hidden" name="div_slug" value="<?php echo esc_attr( $div_rec['slug'] ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-danger">Delete</button>
+                                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full">Delete</button>
                                                 </form>
                                             </div>
                                         </td>
