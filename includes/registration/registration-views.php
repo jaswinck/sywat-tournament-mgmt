@@ -2,11 +2,14 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
+ * Description: Renders the [sywat_register] Registration Desk portal, dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Author: SYWAT Archery
- * Version: 6.8.3
+ * Version: 6.9.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Helper: Filter scoped tournaments to active season(s) and build an ordered option map
@@ -160,7 +163,9 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
-        if ( ! is_array( $tournaments ) ) $tournaments = array();
+        if ( ! is_array( $tournaments ) ) {
+            $tournaments = array();
+        }
 
         // Scope Tournaments to User's Assigned Shop
         $scoped_tournaments = array();
@@ -175,6 +180,8 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         $requested_tourn = '';
         if ( isset( $_REQUEST['selected_tournament'] ) ) {
             $requested_tourn = sanitize_text_field( wp_unslash( $_REQUEST['selected_tournament'] ) );
+        } elseif ( isset( $_REQUEST['waitlist_tournament'] ) ) {
+            $requested_tourn = sanitize_text_field( wp_unslash( $_REQUEST['waitlist_tournament'] ) );
         } elseif ( isset( $_GET['view_tournament'] ) ) {
             $requested_tourn = sanitize_text_field( wp_unslash( $_GET['view_tournament'] ) );
         }
@@ -214,7 +221,9 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             $is_valid_nonce = ! empty( $nonce_val ) && wp_verify_nonce( $nonce_val, 'sywat_desk_action' );
             if ( $is_valid_nonce ) {
                 $action = sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) );
-                if ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
+                if ( function_exists( 'sywat_waitlist_is_supported_action' ) && sywat_waitlist_is_supported_action( $action ) && function_exists( 'sywat_waitlist_dispatch_post_action' ) ) {
+                    $notice = sywat_waitlist_dispatch_post_action( $tournaments, $registrations );
+                } elseif ( $action === 'register_shooter' && function_exists( 'sywat_handle_register_shooter' ) ) {
                     $notice = sywat_handle_register_shooter( $tournaments, $registrations );
                 } elseif ( $action === 'import_shooters' && function_exists( 'sywat_handle_import_shooters' ) ) {
                     $import_tourn    = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : $selected_tournament;
@@ -246,13 +255,13 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             <div class="sywat-nav-tabs no-print">
                 <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
                 <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register active">Register Shooters</a>
-                <?php if ( $can_access_desk ): ?>
+                <?php if ( $can_access_desk ) : ?>
                     <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <?php endif; ?>
-                <?php if ( $can_edit_scores ): ?>
+                <?php if ( $can_edit_scores ) : ?>
                     <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
                 <?php endif; ?>
-                <?php if ( $can_manage_seasons ): ?>
+                <?php if ( $can_manage_seasons ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
                 <?php endif; ?>
             </div>
@@ -272,10 +281,10 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                             <div class="sywat-field-group">
                                 <label for="sywat_selected_tournament">Active Tournament:</label>
                                 <select id="sywat_selected_tournament" name="selected_tournament" onchange="this.form.submit()">
-                                    <?php if ( empty( $ordered_tournaments ) ): ?>
+                                    <?php if ( empty( $ordered_tournaments ) ) : ?>
                                         <option value="">No Tournaments Configured</option>
-                                    <?php else: ?>
-                                        <?php foreach ( $ordered_tournaments as $t_name => $t_label ): ?>
+                                    <?php else : ?>
+                                        <?php foreach ( $ordered_tournaments as $t_name => $t_label ) : ?>
                                             <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $selected_tournament, $t_name ); ?>>
                                                 <?php echo esc_html( $t_label ); ?>
                                             </option>
@@ -287,16 +296,36 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                     </div>
                 </div>
 
-                <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) ): ?>
+                <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) ) : ?>
                     <?php
                     if ( function_exists( 'sywat_render_registration_modal' ) ) {
                         sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
                     }
                     ?>
-                <?php else: ?>
+                <?php else : ?>
                     <p class="sywat-label-subtext">Please select or create a tournament to begin registering shooters.</p>
                 <?php endif; ?>
             </div>
+
+            <?php
+            // Dedicated Waitlist Management Modal (#sywat_waitlist_modal)
+            if ( function_exists( 'sywat_maybe_render_waitlist_modal' ) ) {
+                $register_clean_url = add_query_arg(
+                    array( 'selected_tournament' => $selected_tournament ),
+                    sywat_page_url( 'register' )
+                );
+                sywat_maybe_render_waitlist_modal(
+                    $tournaments,
+                    $registrations,
+                    $selected_tournament,
+                    $register_clean_url,
+                    'register',
+                    array(
+                        'close_url' => $register_clean_url,
+                    )
+                );
+            }
+            ?>
         </div>
         <?php
         return ob_get_clean();
