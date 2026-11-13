@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Fee Calculation, Per-Line Family Cap Reconciler & Persistence Helpers
  * Path: includes/waitlist/waitlist-helpers.php
- * Description: Pure business-rule helpers for Youth/Adult rate evaluation, strict per-line $75.00 Family Cap reconciliation when archers are promoted, moved, edited, or removed, and atomic multi-store registration persistence.
+ * Description: Pure business-rule helpers for Youth/Adult rate evaluation, strict per-line $75.00 Family Cap reconciliation, household-wide balance resolution, and atomic multi-store registration persistence.
  * Compliance: Pure helper layer — zero HTML echo, zero POST handling, zero script/style output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -79,6 +79,112 @@ if ( ! function_exists( 'sywat_waitlist_get_paid_tier' ) ) {
             return 'Field Governor';
         }
         return sywat_waitlist_is_youth_division( $division, $distance ) ? 'Youth' : 'Adult';
+    }
+}
+
+/**
+ * Evaluate household-wide unpaid balance across all active members sharing the same
+ * family_id or booking_id on the same shooting line so no family member can check in
+ * while a family balance remains unpaid.
+ *
+ * @param array $reg           Target archer registration record.
+ * @param array $registrations All registrations for the active tournament.
+ * @param array $t_lines       Optional tournament lines array for index resolution.
+ * @return array               Household balance summary ('has_family', 'family_id', 'group_due', 'individual_due', 'effective_due', 'is_family_capped').
+ */
+if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
+    function sywat_get_household_balance_info( $reg, $registrations, $t_lines = array() ) {
+        $ind_due = ( is_array( $reg ) && isset( $reg['balance_due'] ) ) ? max( 0.00, floatval( $reg['balance_due'] ) ) : 0.00;
+        $paid    = ( is_array( $reg ) && isset( $reg['paid'] ) ) ? trim( (string) $reg['paid'] ) : '';
+        $fam_id  = ( is_array( $reg ) && ! empty( $reg['family_id'] ) ) ? trim( (string) $reg['family_id'] ) : '';
+        $book_id = ( is_array( $reg ) && ! empty( $reg['booking_id'] ) ) ? trim( (string) $reg['booking_id'] ) : '';
+
+        $is_family_paid = ( strcasecmp( $paid, 'Family' ) === 0 )
+            || ( is_array( $reg ) && ! empty( $reg['rate_type'] ) && stripos( (string) $reg['rate_type'], 'family' ) !== false );
+
+        if ( ! is_array( $reg ) || ( $fam_id === '' && $book_id === '' && ! $is_family_paid ) || ! is_array( $registrations ) ) {
+            return array(
+                'has_family'       => false,
+                'family_id'        => '',
+                'group_due'        => $ind_due,
+                'individual_due'   => $ind_due,
+                'effective_due'    => $ind_due,
+                'is_family_capped' => false,
+            );
+        }
+
+        $target_tourn = isset( $reg['tournament'] ) ? trim( (string) $reg['tournament'] ) : '';
+        $target_line  = function_exists( 'sywat_waitlist_resolve_line_idx' )
+            ? sywat_waitlist_resolve_line_idx( $reg, $t_lines )
+            : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+
+        $group_due_sum    = 0.00;
+        $active_member_ct = 0;
+        $raw_rate_sum     = 0.00;
+        $any_family_tag   = $is_family_paid;
+
+        foreach ( $registrations as $other ) {
+            if ( ! is_array( $other ) ) {
+                continue;
+            }
+            if ( $target_tourn !== '' && isset( $other['tournament'] ) && strcasecmp( trim( (string) $other['tournament'] ), $target_tourn ) !== 0 ) {
+                continue;
+            }
+
+            $status = isset( $other['status'] ) ? trim( (string) $other['status'] ) : '';
+            if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                continue;
+            }
+
+            $other_line = function_exists( 'sywat_waitlist_resolve_line_idx' )
+                ? sywat_waitlist_resolve_line_idx( $other, $t_lines )
+                : ( isset( $other['line_index'] ) ? (string) $other['line_index'] : '0' );
+
+            if ( $other_line !== $target_line ) {
+                continue;
+            }
+
+            $other_fam  = ! empty( $other['family_id'] ) ? trim( (string) $other['family_id'] ) : '';
+            $other_book = ! empty( $other['booking_id'] ) ? trim( (string) $other['booking_id'] ) : '';
+
+            $matched = false;
+            if ( $fam_id !== '' && $other_fam === $fam_id ) {
+                $matched = true;
+            } elseif ( $book_id !== '' && $other_book === $book_id ) {
+                $matched = true;
+            }
+
+            if ( ! $matched ) {
+                continue;
+            }
+
+            $active_member_ct++;
+            $other_due      = isset( $other['balance_due'] ) ? max( 0.00, floatval( $other['balance_due'] ) ) : 0.00;
+            $group_due_sum += $other_due;
+
+            $o_div  = isset( $other['division'] ) ? $other['division'] : '';
+            $o_dist = isset( $other['distance'] ) ? $other['distance'] : '20yd';
+            $o_paid = isset( $other['paid'] ) ? trim( (string) $other['paid'] ) : '';
+
+            if ( strcasecmp( $o_paid, 'Family' ) === 0 ) {
+                $any_family_tag = true;
+            }
+            if ( strcasecmp( $o_paid, 'Field Governor' ) !== 0 ) {
+                $raw_rate_sum += sywat_waitlist_get_individual_rate( $o_div, $o_dist );
+            }
+        }
+
+        $effective_due    = round( max( $ind_due, $group_due_sum ), 2 );
+        $is_family_capped = $any_family_tag && ( $active_member_ct >= 3 || $raw_rate_sum >= 75.00 || $effective_due >= 75.00 );
+
+        return array(
+            'has_family'       => ( $active_member_ct > 1 || $any_family_tag ),
+            'family_id'        => $fam_id !== '' ? $fam_id : $book_id,
+            'group_due'        => round( $group_due_sum, 2 ),
+            'individual_due'   => round( $ind_due, 2 ),
+            'effective_due'    => $effective_due,
+            'is_family_capped' => $is_family_capped,
+        );
     }
 }
 
@@ -159,14 +265,6 @@ if ( ! function_exists( 'sywat_waitlist_persist_record' ) ) {
  * Reconcile paid tiers and balances for all active (non-waitlisted, non-cancelled)
  * members of a family group on a single shooting line.
  *
- * Enforces SYWAT rules:
- * - Family Cap ($75.00 max) is strictly scoped to a single shooting line.
- * - Requires 3 or more active billable archers in the same family_id on that line
- *   whose combined individual rates equal or exceed $75.00.
- * - Preserves any payments already collected on that line so promoted or moved
- *   archers are only billed the remaining net difference.
- * - Ensures any remaining Waitlist members of that family_id stay at $0.00 due.
- *
  * @param string $tourn_name    Active tournament name.
  * @param string $line_idx      Target shooting line index.
  * @param string $family_id     Family group identifier.
@@ -188,11 +286,11 @@ if ( ! function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
             );
         }
 
-        $active_indices = array();
-        $prior_due_sum  = 0.00;
-        $prior_paid_sum = 0.00;
-        $had_explicit_paid_tracking = false;
-        $was_previously_capped      = false;
+        $active_indices              = array();
+        $prior_due_sum               = 0.00;
+        $prior_paid_sum              = 0.00;
+        $had_explicit_paid_tracking  = false;
+        $was_previously_capped       = false;
         $prior_active_individual_sum = 0.00;
 
         foreach ( $registrations as $idx => $reg ) {
@@ -292,8 +390,6 @@ if ( ! function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
         $remaining_line_due = max( 0.00, round( $target_line_total - $amount_already_paid, 2 ) );
 
         if ( $is_family_capped ) {
-            // Assign 'Family' paid status to all active billable members; assign remaining net due to
-            // the newly promoted / unpaid primary holder and $0.00 to sibling records.
             $due_holder_pos = 0;
             foreach ( $active_indices as $pos => $item ) {
                 if ( $item['just_promoted'] ) {
@@ -315,7 +411,6 @@ if ( ! function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
                 sywat_waitlist_persist_record( $reg_copy, $registrations );
             }
         } else {
-            // Below 3 active archers or < $75 raw total: apply individual Youth ($25) / Adult ($30) tiers
             $running_paid_credit = $amount_already_paid;
 
             foreach ( $active_indices as $item ) {
