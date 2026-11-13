@@ -4,7 +4,7 @@
  * Path: includes/shooting-styles/shooting-styles-actions.php
  * Description: Processes nonce-verified POST mutations for adding, editing, retiring, deleting, and resetting NFAA shooting styles and age divisions in WordPress options.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -135,7 +135,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             }
 
             $verb = ( $orig_slug !== '' ) ? 'updated' : 'added';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ Shooting style <strong>' . esc_html( $label ) . '</strong> ' . esc_html( $verb ) . ' successfully.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting style <strong>' . esc_html( $label ) . '</strong> ' . esc_html( $verb ) . ' successfully.</div>';
         }
 
         // 2. Toggle Shooting Style Active / Retired Status
@@ -155,7 +155,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             }
 
             $state_label = ( $new_status === 'active' ) ? 'activated' : 'retired (hidden from new registrations)';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ Shooting style <strong>' . esc_html( $styles[ $slug ]['label'] ) . '</strong> ' . esc_html( $state_label ) . '.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting style <strong>' . esc_html( $styles[ $slug ]['label'] ) . '</strong> ' . esc_html( $state_label ) . '.</div>';
         }
 
         // 3. Delete Shooting Style
@@ -174,7 +174,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
                 sywat_save_shooting_styles( $styles );
             }
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ Shooting style <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting style <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
         }
 
         // 4. Add or Edit Age Division
@@ -231,7 +231,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             }
 
             $verb = ( $orig_slug !== '' ) ? 'updated' : 'added';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ Division <strong>' . esc_html( $label ) . '</strong> ' . esc_html( $verb ) . ' successfully.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $label ) . '</strong> ' . esc_html( $verb ) . ' successfully.</div>';
         }
 
         // 5. Toggle Division Active / Retired Status
@@ -251,7 +251,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             }
 
             $state_label = ( $new_status === 'active' ) ? 'activated' : 'retired';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ Division <strong>' . esc_html( $divisions[ $slug ]['label'] ) . '</strong> ' . esc_html( $state_label ) . '.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $divisions[ $slug ]['label'] ) . '</strong> ' . esc_html( $state_label ) . '.</div>';
         }
 
         // 6. Delete Division
@@ -270,7 +270,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
                 sywat_save_divisions( $divisions );
             }
 
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ Division <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Division <strong>' . esc_html( $deleted_label ) . '</strong> removed.</div>';
         }
 
         // 7. Reset All Styles & Divisions to NFAA Defaults
@@ -278,7 +278,7 @@ if ( ! function_exists( 'sywat_shooting_styles_handle_post_actions' ) ) {
             if ( function_exists( 'sywat_shooting_styles_reset_defaults' ) ) {
                 sywat_shooting_styles_reset_defaults();
             }
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">✅ Shooting styles and age divisions have been restored to NFAA defaults.</div>';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Shooting styles and age divisions have been restored to NFAA defaults.</div>';
         }
 
         return '';
