@@ -27,7 +27,7 @@ if ( ! function_exists( 'sywat_shortcode_tags' ) ) {
         $tags = array(
             'sywat_admin', 'sywat_manage', 'sywat_manage_tournaments', 'sywat_volunteer_hub',
             'sywat_members', 'sywat_register', 'sywat_desk', 'sywat_scores', 'sywat_results',
-            'sywat_login', 'sywat_public_shops', 'sywat_manage_shops',
+            'sywat_login', 'sywat_public_shops', 'sywat_manage_shops', 'sywat_shooting_styles',
         );
         return apply_filters( 'sywat_shortcode_tags', $tags );
     }
@@ -104,6 +104,7 @@ if ( ! function_exists( 'sywat_page_defaults' ) ) {
             'login'              => array( '/login/', 'Login page' ),
             'results'            => array( '/results/', 'Results & Standings page' ),
             'member_directory'   => array( '/member-directory/', 'Member Directory page' ),
+            'shooting_styles'    => array( '/shooting-styles/', 'Shooting Styles & Rules page' ),
             'after_login_manager'=> array( '/tournaments', 'After login: tournament managers go to' ),
             'after_login_shop'   => array( '/desk', 'After login: shop operators go to' ),
         );
