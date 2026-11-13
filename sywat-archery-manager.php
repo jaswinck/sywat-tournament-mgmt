@@ -46,6 +46,7 @@ require_once SYWAT_PLUGIN_DIR . 'includes/tournaments/class-sywat-tournament-con
 require_once SYWAT_PLUGIN_DIR . 'includes/members/class-sywat-members.php';               // Member Management Sub-System ([sywat_members])
 require_once SYWAT_PLUGIN_DIR . 'includes/registration/class-sywat-registration.php';      // Intake & Phone Registration Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';                  // Roster Administration & Line Purging Engine
+require_once SYWAT_PLUGIN_DIR . 'includes/waitlist/class-sywat-waitlist.php';              // Waitlist Queue Management & Family Cap Reconciliation Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/class-sywat-accounting.php';                     // Financial Split Calculations & Invoicing
 require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';                     // Multi-Tenant Shop Management Engine
 
