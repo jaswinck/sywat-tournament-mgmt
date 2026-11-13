@@ -3,9 +3,9 @@
  * Sub-Module: Shooting Styles & Divisions Administration Views Renderer
  * Path: includes/shooting-styles/shooting-styles-views.php
  * Description: Renders the [sywat_shooting_styles] Administration GUI for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
- * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, delegated data-sywat-action attributes.
+ * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, accessible inline SVGs (aria-hidden="true"), delegated data-sywat-action attributes.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -49,7 +49,14 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
             <div class="sywat-card no-print">
                 <div class="sywat-card-header-bar">
                     <div>
-                        <h2>🏹 Shooting Styles &amp; Division Rules</h2>
+                        <h2>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2"></circle>
+                            </svg>
+                            Shooting Styles &amp; Division Rules
+                        </h2>
                         <div class="sywat-subtitle">Configure NFAA shooting styles, export codes, leaderboard order, and automatic age/division enforcement rules.</div>
                     </div>
 
@@ -93,10 +100,10 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                             <tbody>
                                 <?php foreach ( $styles as $slug => $st ) : ?>
                                     <?php
-                                        $rule_mode = isset( $st['rule_mode'] ) ? $st['rule_mode'] : 'all';
-                                        $is_active = ( isset( $st['status'] ) && $st['status'] === 'active' );
-                                        $aliases_str = ! empty( $st['aliases'] ) && is_array( $st['aliases'] ) ? implode( ', ', $st['aliases'] ) : '';
-                                        $allowed_json = wp_json_encode( ! empty( $st['allowed_divisions'] ) ? array_values( $st['allowed_divisions'] ) : array() );
+                                        $rule_mode       = isset( $st['rule_mode'] ) ? $st['rule_mode'] : 'all';
+                                        $is_active       = ( isset( $st['status'] ) && $st['status'] === 'active' );
+                                        $aliases_str     = ! empty( $st['aliases'] ) && is_array( $st['aliases'] ) ? implode( ', ', $st['aliases'] ) : '';
+                                        $allowed_json    = wp_json_encode( ! empty( $st['allowed_divisions'] ) ? array_values( $st['allowed_divisions'] ) : array() );
                                         $search_haystack = strtolower( $st['label'] . ' ' . $st['code'] . ' ' . $aliases_str );
                                     ?>
                                     <tr class="sywat-style-config-row" data-style-search="<?php echo esc_attr( $search_haystack ); ?>">
@@ -179,7 +186,15 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                 <!-- Secondary Section: Age Divisions -->
                 <div class="sywat-table-header-bar">
                     <div>
-                        <h2>🎯 Age Divisions (<?php echo intval( count( $divisions ) ); ?>)</h2>
+                        <h2>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Age Divisions (<?php echo intval( count( $divisions ) ); ?>)
+                        </h2>
                         <div class="sywat-subtitle">Configure age brackets, shooting distances (20yd vs. Cub 10yd), and Youth/Adult fee tiers.</div>
                     </div>
 
@@ -279,7 +294,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header">
                     <div>
-                        <h3 id="sywat_style_modal_title">🏹 Add Shooting Style</h3>
+                        <h3 id="sywat_style_modal_title">Add Shooting Style</h3>
                         <div class="sywat-subtitle">Configure style display label, export code, sort order, and division eligibility rules.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Shooting Style Modal" data-sywat-action="close-style-modal">&times;</button>
@@ -315,8 +330,8 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                 </select>
                             </div>
                             <div class="sywat-field-group">
-                                <label for="sywat_style_is_pro">Pro Category</label>
-                                <label class="sywat-checkbox-label sywat-mt-3">
+                                <label>Pro Category</label>
+                                <label class="sywat-checkbox-label sywat-mt-3" for="sywat_style_is_pro">
                                     <input type="checkbox" id="sywat_style_is_pro" name="style_is_pro" value="1">
                                     Pro Division Style
                                 </label>
@@ -379,7 +394,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header">
                     <div>
-                        <h3 id="sywat_div_modal_title">🎯 Add Age Division</h3>
+                        <h3 id="sywat_div_modal_title">Add Age Division</h3>
                         <div class="sywat-subtitle">Configure division display name, export code, distance, and Youth/Adult fee tier.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Division Modal" data-sywat-action="close-division-modal">&times;</button>
