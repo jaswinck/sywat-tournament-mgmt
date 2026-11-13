@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Shooting Styles & Divisions Administration Views Renderer
  * Path: includes/shooting-styles/shooting-styles-views.php
- * Description: Renders the [sywat_shooting_styles] Administration GUI with card-docked tabs for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
+ * Description: Renders the [sywat_shooting_styles] Administration GUI with card-docked tabs, one-click Move Up / Move Down row reordering, and modal editors for managing NFAA shooting styles, division/age restriction & force-override rules, and age divisions without code edits.
  * Compliance: Zero inline style attributes, zero embedded scripts, native modal close controls, accessible inline SVGs (aria-hidden="true"), theme-proof code spans, delegated data-sywat-action attributes.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -125,6 +125,10 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
 
                     <!-- Shooting Styles Table -->
                     <?php if ( ! empty( $styles ) ) : ?>
+                        <?php
+                            $style_index = 0;
+                            $style_count = count( $styles );
+                        ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table">
                                 <thead>
@@ -148,7 +152,47 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                             $search_haystack = strtolower( $st['label'] . ' ' . $st['code'] . ' ' . $aliases_str );
                                         ?>
                                         <tr class="sywat-style-config-row" data-style-search="<?php echo esc_attr( $search_haystack ); ?>">
-                                            <td class="sywat-col-center"><strong><?php echo intval( $st['sort_order'] ); ?></strong></td>
+                                            <td class="sywat-col-center">
+                                                <div class="sywat-order-controls">
+                                                    <span class="sywat-order-num"><?php echo intval( $st['sort_order'] ); ?></span>
+
+                                                    <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" class="sywat-order-form">
+                                                        <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_styles_action" value="move_style">
+                                                        <input type="hidden" name="style_slug" value="<?php echo esc_attr( $st['slug'] ); ?>">
+                                                        <input type="hidden" name="direction" value="up">
+                                                        <button
+                                                            type="submit"
+                                                            class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                            title="Move Up"
+                                                            aria-label="Move <?php echo esc_attr( $st['label'] ); ?> up"
+                                                            <?php echo ( $style_index === 0 ) ? 'disabled' : ''; ?>
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                                <polyline points="18 15 12 9 6 15"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+
+                                                    <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" class="sywat-order-form">
+                                                        <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_styles_action" value="move_style">
+                                                        <input type="hidden" name="style_slug" value="<?php echo esc_attr( $st['slug'] ); ?>">
+                                                        <input type="hidden" name="direction" value="down">
+                                                        <button
+                                                            type="submit"
+                                                            class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                            title="Move Down"
+                                                            aria-label="Move <?php echo esc_attr( $st['label'] ); ?> down"
+                                                            <?php echo ( $style_index >= $style_count - 1 ) ? 'disabled' : ''; ?>
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                                <polyline points="6 9 12 15 18 9"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
                                             <td class="sywat-col-center"><span class="sywat-meta-code-primary"><?php echo esc_html( $st['code'] ); ?></span></td>
                                             <td>
                                                 <strong><?php echo esc_html( $st['label'] ); ?></strong>
@@ -216,6 +260,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                 </div>
                                             </td>
                                         </tr>
+                                        <?php $style_index++; ?>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
@@ -263,6 +308,10 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                     </div>
 
                     <?php if ( ! empty( $divisions ) ) : ?>
+                        <?php
+                            $div_index = 0;
+                            $div_count = count( $divisions );
+                        ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table">
                                 <thead>
@@ -284,7 +333,47 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                             $div_haystack = strtolower( $div_rec['label'] . ' ' . $div_rec['code'] . ' ' . $div_aliases . ' ' . $div_rec['distance'] . ' ' . $div_rec['rate_tier'] );
                                         ?>
                                         <tr class="sywat-division-config-row" data-division-search="<?php echo esc_attr( $div_haystack ); ?>">
-                                            <td class="sywat-col-center"><strong><?php echo intval( $div_rec['sort_order'] ); ?></strong></td>
+                                            <td class="sywat-col-center">
+                                                <div class="sywat-order-controls">
+                                                    <span class="sywat-order-num"><?php echo intval( $div_rec['sort_order'] ); ?></span>
+
+                                                    <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" class="sywat-order-form">
+                                                        <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_styles_action" value="move_division">
+                                                        <input type="hidden" name="div_slug" value="<?php echo esc_attr( $div_rec['slug'] ); ?>">
+                                                        <input type="hidden" name="direction" value="up">
+                                                        <button
+                                                            type="submit"
+                                                            class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                            title="Move Up"
+                                                            aria-label="Move <?php echo esc_attr( $div_rec['label'] ); ?> up"
+                                                            <?php echo ( $div_index === 0 ) ? 'disabled' : ''; ?>
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                                <polyline points="18 15 12 9 6 15"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+
+                                                    <form method="post" action="<?php echo esc_url( $tab_action_url ); ?>" class="sywat-order-form">
+                                                        <?php wp_nonce_field( 'sywat_shooting_styles_action', 'sywat_styles_nonce' ); ?>
+                                                        <input type="hidden" name="sywat_styles_action" value="move_division">
+                                                        <input type="hidden" name="div_slug" value="<?php echo esc_attr( $div_rec['slug'] ); ?>">
+                                                        <input type="hidden" name="direction" value="down">
+                                                        <button
+                                                            type="submit"
+                                                            class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                            title="Move Down"
+                                                            aria-label="Move <?php echo esc_attr( $div_rec['label'] ); ?> down"
+                                                            <?php echo ( $div_index >= $div_count - 1 ) ? 'disabled' : ''; ?>
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                                <polyline points="6 9 12 15 18 9"></polyline>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
                                             <td class="sywat-col-center"><span class="sywat-meta-code-primary"><?php echo esc_html( $div_rec['code'] ); ?></span></td>
                                             <td>
                                                 <strong><?php echo esc_html( $div_rec['label'] ); ?></strong>
@@ -339,6 +428,7 @@ if ( ! function_exists( 'render_sywat_shooting_styles_app' ) ) {
                                                 </div>
                                             </td>
                                         </tr>
+                                        <?php $div_index++; ?>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
