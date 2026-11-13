@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
- * Description: Renders the Registered Archer Roster modal with alphabetical active shooters separated from the FIFO family-grouped Waitlist Queue component.
+ * Description: Renders the Registered Archer Roster modal with alphabetical active shooters and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 6.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -62,7 +62,7 @@ if ( ! function_exists( 'sywat_roster_format_line_display' ) ) {
 }
 
 /**
- * Component Renderer: Archer Roster Management Table, Waitlist Queue & Controls
+ * Component Renderer: Archer Roster Management Table & Direct Waitlist Modal Trigger
  *
  * @param string $selected_tournament Active tournament name.
  * @param array  $available_lines     Configured shooting lines for the tournament.
@@ -199,25 +199,34 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             }
         }
 
-        // Separate Active Shooters (sorted A–Z) from Waitlisted Archers (rendered in FIFO Waitlist Queue below)
-        $active_registrations = array_filter( $filtered_registrations, function( $reg ) {
+        // Separate Active Shooters (sorted A–Z) from Waitlisted Archers (managed via dedicated Waitlist Modal)
+        $active_registrations  = array();
+        $filtered_waitlist_cnt = 0;
+
+        foreach ( $filtered_registrations as $reg ) {
             $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
-            if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
-                return false;
+            if ( strcasecmp( $status, 'Waitlist' ) === 0 ) {
+                $filtered_waitlist_cnt++;
+                continue;
             }
-            return true;
-        } );
+            if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                continue;
+            }
+            $active_registrations[] = $reg;
+        }
 
         usort( $active_registrations, function( $a, $b ) {
             return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
         } );
 
-        // Enqueue Roster & Waitlist Client Scripts
+        $waitlist_target_line = ( (string) $filter_line_idx !== '' ) ? (string) $filter_line_idx : 'all';
+        $waitlist_modal_url   = ( $filtered_waitlist_cnt > 0 && function_exists( 'sywat_waitlist_get_modal_url' ) )
+            ? sywat_waitlist_get_modal_url( $selected_tournament, $waitlist_target_line, $close_target_url )
+            : '';
+
+        // Enqueue Roster Client Scripts
         if ( function_exists( 'sywat_render_roster_scripts' ) ) {
             sywat_render_roster_scripts( $existing_families_by_line );
-        }
-        if ( function_exists( 'sywat_enqueue_waitlist_scripts' ) ) {
-            sywat_enqueue_waitlist_scripts();
         }
         ?>
 
@@ -298,6 +307,14 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     <!-- Active Registered Archers Table (Sorted Alphabetically) -->
                     <div class="sywat-table-header-bar sywat-modal-section-header">
                         <h2>Active Roster (<?php echo intval( count( $active_registrations ) ); ?>)</h2>
+                        <?php if ( $filtered_waitlist_cnt > 0 && ! empty( $waitlist_modal_url ) ) : ?>
+                            <div class="sywat-table-header-controls">
+                                <a href="<?php echo esc_url( $waitlist_modal_url ); ?>" class="sywat-btn sywat-btn-warning sywat-waitlist-trigger-btn" title="Open Dedicated Waitlist Management Window">
+                                    <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
+                                    <span>View Waitlist (<?php echo intval( $filtered_waitlist_cnt ); ?>)</span>
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <?php if ( empty( $active_registrations ) ) : ?>
@@ -394,24 +411,6 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                             </table>
                         </div>
                     <?php endif; ?>
-
-                    <!-- Dedicated FIFO Family-Grouped Waitlist Queue Component -->
-                    <?php
-                    if ( function_exists( 'sywat_render_waitlist_panel' ) ) {
-                        sywat_render_waitlist_panel(
-                            $selected_tournament,
-                            $available_lines,
-                            $registrations,
-                            $filter_line_idx,
-                            $roster_post_url,
-                            'roster',
-                            array(
-                                'return_to'     => $return_to,
-                                'edit_base_url' => $manage_base_url,
-                            )
-                        );
-                    }
-                    ?>
                 </div>
 
                 <!-- Standard Pinned Footer -->
