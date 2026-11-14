@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Shared Shooting Styles & Age Division Rule Engine
  * Path: assets/js/sywat-shooting-styles.js
- * Description: Database-driven rule controller enforcing allowed divisions, force-division overrides, automatic dropdown switching, inline user warnings, and fee/distance metadata lookups across Registration, Roster, and Check-In portals.
+ * Description: Database-driven rule controller enforcing allowed divisions, forced-division overrides, automatic dropdown switching, inline user warnings, and fee/distance metadata lookups across Registration, Roster, and Check-In portals.
  * Compliance: Zero jQuery, zero inline style.* mutations, zero hardcoded style/division names.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 (function() {
@@ -176,20 +176,55 @@
     }
 
     /**
-     * Resolve the list of permitted division objects for a given style record,
+     * Resolve effective rule mode ('all', 'restrict', or 'force') and forced division string
+     * from a style configuration record.
+     *
+     * @param {Object} styleRec Shooting style config object.
+     * @return {Object}         { ruleMode: string, forcedDivision: string }
+     */
+    function getStyleRuleMeta(styleRec) {
+        if (!styleRec) {
+            return { ruleMode: 'all', forcedDivision: '' };
+        }
+
+        const forcedDiv = String(styleRec.forced_division || styleRec.force_division || '').trim();
+        let ruleMode    = String(styleRec.rule_mode || '').trim().toLowerCase();
+
+        if (ruleMode !== 'all' && ruleMode !== 'restrict' && ruleMode !== 'force') {
+            if (forcedDiv !== '') {
+                ruleMode = 'force';
+            } else if (Array.isArray(styleRec.allowed_divisions) && styleRec.allowed_divisions.length > 0) {
+                ruleMode = 'restrict';
+            } else {
+                ruleMode = 'all';
+            }
+        }
+
+        return {
+            ruleMode: ruleMode,
+            forcedDivision: forcedDiv
+        };
+    }
+
+    /**
+     * Resolve the list of target/permitted division objects for a given style record,
      * ordered by configured database sort_order. Empty array means all divisions allowed.
      *
      * @param {Object} styleRec Shooting style config object.
-     * @return {Array}          Sorted array of permitted division config objects.
+     * @return {Array}          Sorted array of division config objects.
      */
     function getPermittedDivisionsForStyle(styleRec) {
         if (!styleRec) return [];
 
-        const rawAllowed = [];
-        if (styleRec.force_division && String(styleRec.force_division).trim() !== '') {
-            rawAllowed.push(styleRec.force_division);
+        const meta = getStyleRuleMeta(styleRec);
+        if (meta.ruleMode === 'all') {
+            return [];
         }
-        if (Array.isArray(styleRec.allowed_divisions) && styleRec.allowed_divisions.length > 0) {
+
+        const rawAllowed = [];
+        if (meta.ruleMode === 'force' && meta.forcedDivision !== '') {
+            rawAllowed.push(meta.forcedDivision);
+        } else if (meta.ruleMode === 'restrict' && Array.isArray(styleRec.allowed_divisions)) {
             styleRec.allowed_divisions.forEach(function(item) {
                 if (item && String(item).trim() !== '') {
                     rawAllowed.push(item);
@@ -237,14 +272,22 @@
     }
 
     /**
-     * Check whether a given division value is permitted for a shooting style record.
+     * Check whether a given division value is selectable without disabling the style option.
+     * - 'all'   : Always true.
+     * - 'force' : Always true (selecting the style switches the archer's division to forced_division).
+     * - 'restrict': True only if divValue is in allowed_divisions.
      *
      * @param {Object} styleRec Shooting style config object.
      * @param {string} divValue Selected division value from dropdown.
-     * @return {boolean}        True if permitted (or if style has no restrictions).
+     * @return {boolean}        True if selectable for divValue.
      */
     function isDivisionPermitted(styleRec, divValue) {
         if (!styleRec || !divValue || normalizeToken(divValue) === 'no show') {
+            return true;
+        }
+
+        const meta = getStyleRuleMeta(styleRec);
+        if (meta.ruleMode === 'all' || meta.ruleMode === 'force') {
             return true;
         }
 
@@ -266,10 +309,10 @@
     }
 
     /**
-     * Format a human-readable list of allowed division names from database records.
+     * Format a human-readable list of division names from database records.
      *
      * @param {Array} permittedDivs Array of division config objects.
-     * @return {string}             Formatted label list (e.g., "Adult (18 - 49)" or "Adult (18 - 49), Senior (50 - 59)").
+     * @return {string}             Formatted label list.
      */
     function formatAllowedDivisionList(permittedDivs) {
         if (!Array.isArray(permittedDivs) || permittedDivs.length === 0) {
@@ -354,13 +397,13 @@
 
     /**
      * Main Rule Enforcement Controller:
-     * - When trigger === 'style': If the selected style requires a specific division or restricts
-     *   divisions and the current division is ineligible, automatically switches divisionEl.value
-     *   to the required/first allowed division in database order, recalculates fees/distance, and
-     *   displays a dynamic warning banner.
+     * - When trigger === 'style': If the selected style has rule_mode === 'force' (e.g., LB – Longbow)
+     *   or rule_mode === 'restrict' (e.g., Genesis, FS Pro, FSL, TRAD) and the current division is
+     *   ineligible, automatically switches divisionEl.value to the required/first allowed division
+     *   in database order, recalculates fees/distance, and displays an inline warning banner.
      * - When trigger === 'division': Disables styles disallowed for the chosen division; if the
-     *   currently selected style is now disallowed, resets it to the first permitted style and
-     *   displays a dynamic warning banner.
+     *   currently selected style is now disallowed (or was a 'force' style whose forced division was
+     *   changed away), updates the dropdown and displays an inline warning banner.
      *
      * @param {HTMLSelectElement} styleEl    Style select element.
      * @param {HTMLSelectElement} divisionEl Division select element.
@@ -402,21 +445,21 @@
                 return false;
             }
 
+            const meta          = getStyleRuleMeta(styleRec);
             const permittedDivs = getPermittedDivisionsForStyle(styleRec);
-            if (permittedDivs.length === 0) {
+
+            if (meta.ruleMode === 'all' || permittedDivs.length === 0) {
                 setRuleNotice(styleEl, divisionEl, '');
                 syncStyleOptionStates(styleEl, divisionEl);
                 return false;
             }
 
-            const currentDivVal = divisionEl.value || '';
-            const hasForceDiv   = Boolean(styleRec.force_division && String(styleRec.force_division).trim() !== '');
+            const currentDivVal       = divisionEl.value || '';
+            let needsDivisionSwitch   = false;
 
-            // Check if current division is already valid (and matches force_division if set)
-            let needsDivisionSwitch = false;
-            if (hasForceDiv) {
-                const forcedObj  = findDivision(styleRec.force_division);
-                const forcedNorm = normalizeToken(forcedObj ? forcedObj.label : styleRec.force_division);
+            if (meta.ruleMode === 'force' && meta.forcedDivision !== '') {
+                const forcedObj  = findDivision(meta.forcedDivision);
+                const forcedNorm = normalizeToken(forcedObj ? forcedObj.label : meta.forcedDivision);
                 const currDivObj = findDivision(currentDivVal);
                 const currNorm   = normalizeToken(currDivObj ? currDivObj.label : currentDivVal);
                 needsDivisionSwitch = (currNorm !== forcedNorm);
@@ -430,7 +473,7 @@
                 return false;
             }
 
-            // Locate matching <option> in divisionEl for the first permitted division
+            // Locate matching <option> in divisionEl for the required / first allowed division
             let targetOptionValue = '';
             let targetDivLabel    = '';
 
@@ -494,18 +537,44 @@
         }
 
         const activeStyleRec = findStyle(currentStyleVal);
-        if (!activeStyleRec || isDivisionPermitted(activeStyleRec, currentDivVal)) {
+        if (!activeStyleRec) {
             if (trigger !== 'init') {
                 setRuleNotice(styleEl, divisionEl, '');
             }
             return false;
         }
 
-        // Current style is NOT permitted in the newly selected division — pick first enabled active style
+        const activeMeta = getStyleRuleMeta(activeStyleRec);
+
+        // Check if current style violates either 'restrict' or 'force' for the chosen division
+        let isConflict = false;
+        if (activeMeta.ruleMode === 'force' && activeMeta.forcedDivision !== '') {
+            const forcedObj  = findDivision(activeMeta.forcedDivision);
+            const forcedNorm = normalizeToken(forcedObj ? forcedObj.label : activeMeta.forcedDivision);
+            const currDivObj = findDivision(currentDivVal);
+            const currNorm   = normalizeToken(currDivObj ? currDivObj.label : currentDivVal);
+            isConflict = (currNorm !== forcedNorm);
+        } else if (activeMeta.ruleMode === 'restrict') {
+            isConflict = !isDivisionPermitted(activeStyleRec, currentDivVal);
+        }
+
+        if (!isConflict) {
+            if (trigger !== 'init') {
+                setRuleNotice(styleEl, divisionEl, '');
+            }
+            return false;
+        }
+
+        // Current style is NOT valid for the newly selected division — pick first enabled active style
         let fallbackOption = null;
         for (let i = 0; i < styleEl.options.length; i++) {
             const opt = styleEl.options[i];
             if (!opt.value || opt.disabled || normalizeToken(opt.value) === 'no show') {
+                continue;
+            }
+            const candRec  = findStyle(opt.value);
+            const candMeta = getStyleRuleMeta(candRec);
+            if (candMeta.ruleMode === 'force') {
                 continue;
             }
             fallbackOption = opt;
