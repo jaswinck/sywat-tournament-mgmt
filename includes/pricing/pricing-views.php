@@ -5,7 +5,7 @@
  * Description: Renders the [sywat_pricing] administration interface for managing round pricing profiles (Indoor, Field, Field 50, Known 3D, 900, and custom formats), per-division rate overrides, household family cap rules, and configurable first-time/lapsed shooter promotional rules.
  * Compliance: Pure view layer — zero direct SQL queries, zero inline style attributes, zero inline event handlers, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,8 +19,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
     function render_sywat_pricing_portal() {
-        if ( ! function_exists( 'sywat_can_manage_seasons' ) || ! sywat_can_manage_seasons() ) {
+        if ( ! is_user_logged_in() || ! function_exists( 'sywat_can_manage_seasons' ) || ! sywat_can_manage_seasons() ) {
             return '<div class="sywat-alert sywat-alert-danger">Access denied. TFAA Leadership privileges are required to manage pricing formats.</div>';
+        }
+
+        if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+            define( 'DONOTCACHEPAGE', true );
+        }
+        nocache_headers();
+
+        if ( function_exists( 'sywat_enqueue_pricing_scripts' ) ) {
+            sywat_enqueue_pricing_scripts();
         }
 
         // Execute POST mutations prior to loading fresh profile list
@@ -35,36 +44,35 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
         $total_profiles  = count( $ordered_slugs );
         $active_count    = count( $active_profiles );
 
-        $manage_tournaments_url = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'manage_tournaments' ) : '';
-        $shooting_styles_url    = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'shooting_styles' ) : '';
-        $pricing_url            = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'pricing' ) : '';
+        $pricing_url = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'pricing' ) : '';
 
         ob_start();
         ?>
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <?php if ( ! empty( $manage_tournaments_url ) || ! empty( $shooting_styles_url ) ) : ?>
-                <div class="sywat-nav-tabs no-print">
-                    <?php if ( ! empty( $manage_tournaments_url ) ) : ?>
-                        <a href="<?php echo esc_url( $manage_tournaments_url ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-                        <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', $manage_tournaments_url ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
-                    <?php endif; ?>
-                    <?php if ( ! empty( $shooting_styles_url ) ) : ?>
-                        <a href="<?php echo esc_url( $shooting_styles_url ); ?>" class="sywat-tab-item">Styles &amp; Divisions</a>
-                    <?php endif; ?>
-                    <?php if ( ! empty( $pricing_url ) ) : ?>
-                        <a href="<?php echo esc_url( $pricing_url ); ?>" class="sywat-tab-item active">Pricing &amp; Formats</a>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+            <!-- Card-Docked Navigation Tab -->
+            <div class="sywat-nav-tabs no-print" role="tablist" aria-label="Pricing and Round Formats Section">
+                <a
+                    href="<?php echo esc_url( $pricing_url ); ?>"
+                    class="sywat-tab-item active"
+                    aria-current="page"
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    <span>Pricing &amp; Round Formats</span>
+                </a>
+            </div>
 
+            <!-- Master Unified Card -->
             <div class="sywat-card no-print">
                 <!-- TOP CARD HEADER BAR -->
                 <div class="sywat-card-header-bar">
                     <div>
                         <h2>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <line x1="12" y1="1" x2="12" y2="23"></line>
                                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                             </svg>
@@ -73,8 +81,8 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         <div class="sywat-subtitle">Configure entry fees, per-division overrides, household family caps, and first-time/lapsed shooter promotional rules across Indoor, Field, Field 50, Known 3D, 900, and custom formats.</div>
                     </div>
 
-                    <div class="sywat-table-header-actions">
-                        <form method="post" class="sywat-table-action-form" data-sywat-confirm="Restore all pricing formats, family cap limits, and promoter presets to SYWAT / TFAA defaults?">
+                    <div class="sywat-header-inline-controls">
+                        <form method="post" data-sywat-confirm="Restore all pricing formats, family cap limits, and promoter presets to SYWAT / TFAA defaults?">
                             <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                             <input type="hidden" name="sywat_pricing_action" value="reset_pricing_defaults">
                             <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">Reset Defaults</button>
@@ -115,12 +123,13 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             <thead>
                                 <tr>
                                     <th class="sywat-col-center">Order</th>
+                                    <th class="sywat-col-center">Code</th>
                                     <th>Format &amp; Round</th>
                                     <th>Entry Fee Tiers</th>
                                     <th>Household Family Cap</th>
                                     <th>Promoter Free Entry Rule</th>
                                     <th class="sywat-col-center">Status</th>
-                                    <th class="sywat-col-right">Actions</th>
+                                    <th class="sywat-col-center sywat-col-action">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -164,37 +173,63 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
 
                                         <!-- Order Controls -->
                                         <td class="sywat-col-center">
-                                            <div class="sywat-table-actions">
-                                                <form method="post" class="sywat-table-action-form">
+                                            <div class="sywat-order-controls">
+                                                <span class="sywat-order-num"><?php echo intval( $pos_index + 1 ); ?></span>
+
+                                                <form method="post" class="sywat-order-form">
                                                     <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                                                     <input type="hidden" name="sywat_pricing_action" value="move_pricing_profile">
                                                     <input type="hidden" name="profile_slug" value="<?php echo esc_attr( $slug ); ?>">
                                                     <input type="hidden" name="direction" value="up">
-                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" <?php disabled( $is_first ); ?> aria-label="Move <?php echo esc_attr( $prof['label'] ); ?> up">&uarr;</button>
+                                                    <button
+                                                        type="submit"
+                                                        class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                        title="Move Up"
+                                                        aria-label="Move <?php echo esc_attr( $prof['label'] ); ?> up"
+                                                        <?php disabled( $is_first ); ?>
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <polyline points="18 15 12 9 6 15"></polyline>
+                                                        </svg>
+                                                    </button>
                                                 </form>
 
-                                                <form method="post" class="sywat-table-action-form">
+                                                <form method="post" class="sywat-order-form">
                                                     <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                                                     <input type="hidden" name="sywat_pricing_action" value="move_pricing_profile">
                                                     <input type="hidden" name="profile_slug" value="<?php echo esc_attr( $slug ); ?>">
                                                     <input type="hidden" name="direction" value="down">
-                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" <?php disabled( $is_last ); ?> aria-label="Move <?php echo esc_attr( $prof['label'] ); ?> down">&darr;</button>
+                                                    <button
+                                                        type="submit"
+                                                        class="sywat-btn sywat-btn-secondary sywat-btn-order"
+                                                        title="Move Down"
+                                                        aria-label="Move <?php echo esc_attr( $prof['label'] ); ?> down"
+                                                        <?php disabled( $is_last ); ?>
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                                        </svg>
+                                                    </button>
                                                 </form>
                                             </div>
+                                        </td>
+
+                                        <!-- Short Code -->
+                                        <td class="sywat-col-center">
+                                            <span class="sywat-meta-code-primary"><?php echo esc_html( $prof['code'] ); ?></span>
                                         </td>
 
                                         <!-- Format & Round -->
                                         <td>
                                             <strong><?php echo esc_html( $prof['label'] ); ?></strong>
                                             <?php if ( ! empty( $prof['round_subtitle'] ) ) : ?>
-                                                <span class="sywat-label-subtext">(<?php echo esc_html( $prof['round_subtitle'] ); ?>)</span>
+                                                <div class="sywat-subtitle"><?php echo esc_html( $prof['round_subtitle'] ); ?></div>
                                             <?php endif; ?>
-                                            <div>
-                                                <span class="sywat-badge"><?php echo esc_html( $prof['code'] ); ?></span>
-                                                <?php if ( $is_default ) : ?>
+                                            <?php if ( $is_default ) : ?>
+                                                <div>
                                                     <span class="sywat-badge sywat-badge-open">Global Default</span>
-                                                <?php endif; ?>
-                                            </div>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
 
                                         <!-- Entry Fee Tiers -->
@@ -204,7 +239,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                             <?php if ( $prof['pro_rate'] !== '' && is_numeric( $prof['pro_rate'] ) ) : ?>
                                                 <div><strong>Pro Category:</strong> $<?php echo esc_html( number_format( floatval( $prof['pro_rate'] ), 2 ) ); ?></div>
                                             <?php endif; ?>
-                                            <div class="sywat-label-subtext">
+                                            <div class="sywat-subtitle">
                                                 Field Gov: $<?php echo esc_html( number_format( floatval( $prof['field_governor_rate'] ), 2 ) ); ?>
                                                 <?php if ( $ov_count > 0 ) : ?>
                                                     &bull; <?php echo intval( $ov_count ); ?> division <?php echo ( $ov_count === 1 ? 'override' : 'overrides' ); ?>
@@ -218,12 +253,12 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                                 <div>
                                                     <span class="sywat-badge sywat-badge-prereg">Cap: $<?php echo esc_html( number_format( floatval( $prof['family_cap_amount'] ), 2 ) ); ?></span>
                                                 </div>
-                                                <div class="sywat-label-subtext">
+                                                <div class="sywat-subtitle">
                                                     <?php echo intval( $prof['family_min_archers'] ); ?>+ Archers &bull;
-                                                    <?php echo ( $prof['family_cap_scope'] === 'tournament' ) ? 'Per Tournament' : 'Per Shooting Line'; ?>
+                                                    <?php echo ( $prof['family_cap_scope'] === 'tournament' ) ? 'Per Tournament' : 'Per Line'; ?>
                                                 </div>
                                             <?php else : ?>
-                                                <span class="sywat-label-subtext">Disabled (Individual Rates Only)</span>
+                                                <span class="sywat-subtitle">Disabled (Individual Rates)</span>
                                             <?php endif; ?>
                                         </td>
 
@@ -233,41 +268,45 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                                 <div>
                                                     <span class="sywat-badge sywat-badge-open">Active ($0.00 Promo)</span>
                                                 </div>
-                                                <div class="sywat-label-subtext">
+                                                <div class="sywat-subtitle">
                                                     Lookback: <strong><?php echo intval( $prof['promo_lookback_value'] ) . ' ' . esc_html( $prof['promo_lookback_unit'] ); ?></strong>
-                                                    (<?php echo esc_html( implode( ', ', $history_labels ) ); ?>)
+                                                    <?php if ( ! empty( $history_labels ) ) : ?>
+                                                        (<?php echo esc_html( implode( ', ', $history_labels ) ); ?>)
+                                                    <?php endif; ?>
                                                 </div>
-                                                <div class="sywat-label-subtext">
+                                                <div class="sywat-subtitle">
                                                     Limit: <?php echo esc_html( $usage_limit_text ); ?>
                                                 </div>
                                             <?php else : ?>
-                                                <span class="sywat-label-subtext">Not Enabled</span>
+                                                <span class="sywat-subtitle">Not Enabled</span>
                                             <?php endif; ?>
                                         </td>
 
                                         <!-- Status -->
                                         <td class="sywat-col-center">
                                             <?php if ( $is_active ) : ?>
-                                                <span class="sywat-text-active">Active</span>
+                                                <span class="sywat-badge sywat-badge-open">Active</span>
                                             <?php else : ?>
-                                                <span class="sywat-text-archived">Retired</span>
+                                                <span class="sywat-badge sywat-badge-full">Retired</span>
                                             <?php endif; ?>
                                         </td>
 
-                                        <!-- Row Actions -->
-                                        <td class="sywat-col-right">
-                                            <div class="sywat-table-actions">
-                                                <button type="button"
-                                                        class="sywat-btn sywat-btn-primary sywat-btn-sm sywat-btn-icon-edit"
-                                                        data-sywat-action="open-edit-pricing-modal"
-                                                        data-profile="<?php echo esc_attr( $profile_json ); ?>">Edit</button>
+                                        <!-- Stacked Row Actions -->
+                                        <td class="sywat-col-center">
+                                            <div class="sywat-table-actions-vertical">
+                                                <button
+                                                    type="button"
+                                                    class="sywat-btn sywat-btn-primary sywat-btn-full sywat-btn-icon-edit"
+                                                    data-sywat-action="open-edit-pricing-modal"
+                                                    data-profile="<?php echo esc_attr( $profile_json ); ?>"
+                                                >Edit</button>
 
                                                 <?php if ( $is_active && ! $is_default ) : ?>
                                                     <form method="post" class="sywat-table-action-form">
                                                         <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                                                         <input type="hidden" name="sywat_pricing_action" value="set_default_profile">
                                                         <input type="hidden" name="profile_slug" value="<?php echo esc_attr( $slug ); ?>">
-                                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm">Set Default</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-full">Set Default</button>
                                                     </form>
                                                 <?php endif; ?>
 
@@ -275,7 +314,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                                     <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                                                     <input type="hidden" name="sywat_pricing_action" value="toggle_profile_status">
                                                     <input type="hidden" name="profile_slug" value="<?php echo esc_attr( $slug ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm">
+                                                    <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-full">
                                                         <?php echo $is_active ? 'Retire' : 'Activate'; ?>
                                                     </button>
                                                 </form>
@@ -285,7 +324,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                                         <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                                                         <input type="hidden" name="sywat_pricing_action" value="delete_pricing_profile">
                                                         <input type="hidden" name="profile_slug" value="<?php echo esc_attr( $slug ); ?>">
-                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-sm sywat-btn-icon-delete">Delete</button>
+                                                        <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-full sywat-btn-icon-delete">Delete</button>
                                                     </form>
                                                 <?php endif; ?>
                                             </div>
@@ -330,7 +369,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
 
                             <div class="sywat-field-group">
                                 <label for="sywat_pf_code">Short Code *</label>
-                                <input type="text" name="profile_code" id="sywat_pf_code" placeholder="e.g., F50" required>
+                                <input type="text" name="profile_code" id="sywat_pf_code" placeholder="e.g., F50" maxlength="12" required>
                             </div>
                         </div>
 
@@ -355,7 +394,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         </div>
 
                         <div class="sywat-field-group sywat-mt-3">
-                            <label>
+                            <label class="sywat-checkbox-label" for="sywat_pf_is_default">
                                 <input type="checkbox" name="profile_is_default" id="sywat_pf_is_default" value="1">
                                 Set as Global Default Pricing Format (fallback when a tournament has no season or format selected)
                             </label>
@@ -421,7 +460,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label>
+                            <label class="sywat-checkbox-label" for="sywat_pf_family_cap_enabled">
                                 <input type="checkbox" name="family_cap_enabled" id="sywat_pf_family_cap_enabled" value="1" data-sywat-action="toggle-family-cap-fields" checked>
                                 Enable Household Family Cap for this format
                             </label>
@@ -453,7 +492,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label>
+                            <label class="sywat-checkbox-label" for="sywat_pf_promo_enabled">
                                 <input type="checkbox" name="promo_enabled" id="sywat_pf_promo_enabled" value="1" data-sywat-action="toggle-promo-fields">
                                 Allow $0.00 Promotional Free Entries on this format (when enabled on the active Season)
                             </label>
@@ -499,9 +538,9 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             <?php if ( ! empty( $all_profiles ) ) : ?>
                                 <div class="sywat-field-group sywat-mt-3">
                                     <label>Qualifying Prior-Experience Formats <span class="sywat-label-subtext">(Archers who shot any checked format within the lookback window pay standard rates)</span></label>
-                                    <div class="sywat-form-grid-3">
+                                    <div class="sywat-role-grid sywat-form-grid-3">
                                         <?php foreach ( $all_profiles as $hp_slug => $hp_rec ) : ?>
-                                            <label>
+                                            <label class="sywat-checkbox-label">
                                                 <input type="checkbox"
                                                        name="promo_history_profiles[]"
                                                        class="sywat-pf-promo-history-cb"
