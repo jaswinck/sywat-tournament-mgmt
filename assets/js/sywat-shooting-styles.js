@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Shared Shooting Styles & Age Division Rule Engine
  * Path: assets/js/sywat-shooting-styles.js
- * Description: Database-driven rule controller enforcing allowed divisions, forced-division overrides, automatic dropdown switching, inline user warnings, and fee/distance metadata lookups across Registration, Roster, and Check-In portals.
+ * Description: Database-driven rule controller enforcing allowed divisions, forced-division overrides, bidirectional automatic dropdown switching, persistent inline user warnings, and fee/distance metadata lookups across Registration, Roster, and Check-In portals.
  * Compliance: Zero jQuery, zero inline style.* mutations, zero hardcoded style/division names.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 (function() {
@@ -272,14 +272,11 @@
     }
 
     /**
-     * Check whether a given division value is selectable without disabling the style option.
-     * - 'all'   : Always true.
-     * - 'force' : Always true (selecting the style switches the archer's division to forced_division).
-     * - 'restrict': True only if divValue is in allowed_divisions.
+     * Check whether a given division value is permitted for a shooting style record.
      *
      * @param {Object} styleRec Shooting style config object.
      * @param {string} divValue Selected division value from dropdown.
-     * @return {boolean}        True if selectable for divValue.
+     * @return {boolean}        True if permitted (or if style has no restrictions).
      */
     function isDivisionPermitted(styleRec, divValue) {
         if (!styleRec || !divValue || normalizeToken(divValue) === 'no show') {
@@ -287,7 +284,7 @@
         }
 
         const meta = getStyleRuleMeta(styleRec);
-        if (meta.ruleMode === 'all' || meta.ruleMode === 'force') {
+        if (meta.ruleMode === 'all') {
             return true;
         }
 
@@ -325,13 +322,16 @@
 
     /**
      * Render or clear an inline warning notice directly beneath the Style/Division field group.
+     * Protects freshly rendered auto-switch notices from being cleared by synchronous follow-up
+     * restriction checks in the same tick.
      *
      * @param {HTMLSelectElement} styleEl    Style select element.
      * @param {HTMLSelectElement} divisionEl Division select element.
      * @param {string}            htmlMsg    Safe HTML warning message, or empty string to clear.
+     * @param {number}            lockMs     Optional milliseconds to protect this notice from immediate clearing.
      * @return {void}
      */
-    function setRuleNotice(styleEl, divisionEl, htmlMsg) {
+    function setRuleNotice(styleEl, divisionEl, htmlMsg, lockMs) {
         const anchorEl = styleEl || divisionEl;
         if (!anchorEl) return;
 
@@ -341,10 +341,21 @@
         let noticeEl = fieldGroup.querySelector('.sywat-style-rule-notice');
 
         if (!htmlMsg) {
+            const lockUntil = parseInt(anchorEl.dataset.sywatNoticeLockUntil || '0', 10);
+            if (lockUntil && Date.now() < lockUntil) {
+                return;
+            }
+            delete anchorEl.dataset.sywatNoticeLockUntil;
             if (noticeEl) {
                 noticeEl.remove();
             }
             return;
+        }
+
+        if (lockMs && lockMs > 0) {
+            anchorEl.dataset.sywatNoticeLockUntil = String(Date.now() + lockMs);
+        } else {
+            delete anchorEl.dataset.sywatNoticeLockUntil;
         }
 
         if (!noticeEl) {
@@ -359,51 +370,28 @@
     }
 
     /**
-     * Synchronize disabled state on Style <option> elements based on the currently selected Division.
+     * Ensure all active style options remain selectable so choosing any restricted or forced
+     * style triggers the automatic division update and inline warning banner.
      *
-     * @param {HTMLSelectElement} styleEl    Style select element.
-     * @param {HTMLSelectElement} divisionEl Division select element.
+     * @param {HTMLSelectElement} styleEl Style select element.
      * @return {void}
      */
-    function syncStyleOptionStates(styleEl, divisionEl) {
-        if (!styleEl || !styleEl.options || !divisionEl) return;
-
-        const currentDiv = divisionEl.value || '';
-        if (!currentDiv || normalizeToken(currentDiv) === 'no show') {
-            for (let i = 0; i < styleEl.options.length; i++) {
-                styleEl.options[i].disabled = false;
-            }
-            return;
-        }
-
+    function syncStyleOptionStates(styleEl) {
+        if (!styleEl || !styleEl.options) return;
         for (let i = 0; i < styleEl.options.length; i++) {
-            const opt = styleEl.options[i];
-            const val = opt.value || '';
-
-            if (!val || normalizeToken(val) === 'no show') {
-                opt.disabled = false;
-                continue;
-            }
-
-            const styleRec = findStyle(val);
-            if (!styleRec) {
-                opt.disabled = false;
-                continue;
-            }
-
-            opt.disabled = !isDivisionPermitted(styleRec, currentDiv);
+            styleEl.options[i].disabled = false;
         }
     }
 
     /**
-     * Main Rule Enforcement Controller:
+     * Bidirectional Rule Enforcement Controller:
      * - When trigger === 'style': If the selected style has rule_mode === 'force' (e.g., LB – Longbow)
      *   or rule_mode === 'restrict' (e.g., Genesis, FS Pro, FSL, TRAD) and the current division is
      *   ineligible, automatically switches divisionEl.value to the required/first allowed division
-     *   in database order, recalculates fees/distance, and displays an inline warning banner.
-     * - When trigger === 'division': Disables styles disallowed for the chosen division; if the
-     *   currently selected style is now disallowed (or was a 'force' style whose forced division was
-     *   changed away), updates the dropdown and displays an inline warning banner.
+     *   in database order, recalculates fees/distance, and displays a persistent inline warning banner.
+     * - When trigger === 'division': If the currently selected style is not valid for the newly
+     *   chosen division, updates styleEl.value to the first unrestricted style and displays an
+     *   inline warning banner.
      *
      * @param {HTMLSelectElement} styleEl    Style select element.
      * @param {HTMLSelectElement} divisionEl Division select element.
@@ -420,28 +408,28 @@
         // Ignore synthetic change events dispatched during an automatic rule update
         if (trigger === 'division' && divisionEl.dataset.sywatAutoUpdating === '1') {
             delete divisionEl.dataset.sywatAutoUpdating;
-            syncStyleOptionStates(styleEl, divisionEl);
+            syncStyleOptionStates(styleEl);
             return false;
         }
         if (trigger === 'style' && styleEl.dataset.sywatAutoUpdating === '1') {
             delete styleEl.dataset.sywatAutoUpdating;
-            syncStyleOptionStates(styleEl, divisionEl);
+            syncStyleOptionStates(styleEl);
             return false;
         }
 
         // Case 1: User selected a Shooting Style
         if (trigger === 'style') {
+            syncStyleOptionStates(styleEl);
+
             const selectedStyleVal = styleEl.value || '';
             if (!selectedStyleVal || normalizeToken(selectedStyleVal) === 'no show') {
-                setRuleNotice(styleEl, divisionEl, '');
-                syncStyleOptionStates(styleEl, divisionEl);
+                setRuleNotice(styleEl, divisionEl, '', 0);
                 return false;
             }
 
             const styleRec = findStyle(selectedStyleVal);
             if (!styleRec) {
-                setRuleNotice(styleEl, divisionEl, '');
-                syncStyleOptionStates(styleEl, divisionEl);
+                setRuleNotice(styleEl, divisionEl, '', 0);
                 return false;
             }
 
@@ -449,13 +437,12 @@
             const permittedDivs = getPermittedDivisionsForStyle(styleRec);
 
             if (meta.ruleMode === 'all' || permittedDivs.length === 0) {
-                setRuleNotice(styleEl, divisionEl, '');
-                syncStyleOptionStates(styleEl, divisionEl);
+                setRuleNotice(styleEl, divisionEl, '', 0);
                 return false;
             }
 
-            const currentDivVal       = divisionEl.value || '';
-            let needsDivisionSwitch   = false;
+            const currentDivVal     = divisionEl.value || '';
+            let needsDivisionSwitch = false;
 
             if (meta.ruleMode === 'force' && meta.forcedDivision !== '') {
                 const forcedObj  = findDivision(meta.forcedDivision);
@@ -468,8 +455,7 @@
             }
 
             if (!needsDivisionSwitch) {
-                setRuleNotice(styleEl, divisionEl, '');
-                syncStyleOptionStates(styleEl, divisionEl);
+                setRuleNotice(styleEl, divisionEl, '', 0);
                 return false;
             }
 
@@ -494,12 +480,13 @@
             }
 
             if (!targetOptionValue) {
-                syncStyleOptionStates(styleEl, divisionEl);
                 return false;
             }
 
+            const prevDivObj   = findDivision(currentDivVal);
+            const prevDivLabel = (prevDivObj && prevDivObj.label) ? prevDivObj.label : currentDivVal;
+
             divisionEl.value = targetOptionValue;
-            syncStyleOptionStates(styleEl, divisionEl);
 
             if (!silent) {
                 const styleLabel  = styleRec.label || selectedStyleVal;
@@ -507,12 +494,17 @@
                 let msg = '';
 
                 if (permittedDivs.length === 1) {
-                    msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is restricted to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>. Division was automatically updated.';
+                    if (prevDivLabel) {
+                        msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is restricted to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong> and cannot be used in <strong>' + escapeHtmlRule(prevDivLabel) + '</strong>. Division was automatically updated to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>.';
+                    } else {
+                        msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is restricted to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>. Division was automatically set to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>.';
+                    }
                 } else {
                     msg = '⚠️ <strong>' + escapeHtmlRule(styleLabel) + '</strong> is only permitted in <strong>' + escapeHtmlRule(allowedText) + '</strong>. Division was automatically updated to <strong>' + escapeHtmlRule(targetDivLabel) + '</strong>.';
                 }
 
-                setRuleNotice(styleEl, divisionEl, msg);
+                // Lock notice for 250ms so chained division-restriction callbacks do not erase it
+                setRuleNotice(styleEl, divisionEl, msg, 250);
             }
 
             // Notify downstream distance/fee listeners (Registration fee summary, etc.)
@@ -524,14 +516,14 @@
         }
 
         // Case 2: Division changed or initial form hydration
-        syncStyleOptionStates(styleEl, divisionEl);
+        syncStyleOptionStates(styleEl);
 
         const currentDivVal   = divisionEl.value || '';
         const currentStyleVal = styleEl.value || '';
 
         if (!currentDivVal || normalizeToken(currentDivVal) === 'no show' || !currentStyleVal || normalizeToken(currentStyleVal) === 'no show') {
             if (trigger !== 'init') {
-                setRuleNotice(styleEl, divisionEl, '');
+                setRuleNotice(styleEl, divisionEl, '', 0);
             }
             return false;
         }
@@ -539,7 +531,7 @@
         const activeStyleRec = findStyle(currentStyleVal);
         if (!activeStyleRec) {
             if (trigger !== 'init') {
-                setRuleNotice(styleEl, divisionEl, '');
+                setRuleNotice(styleEl, divisionEl, '', 0);
             }
             return false;
         }
@@ -560,12 +552,12 @@
 
         if (!isConflict) {
             if (trigger !== 'init') {
-                setRuleNotice(styleEl, divisionEl, '');
+                setRuleNotice(styleEl, divisionEl, '', 0);
             }
             return false;
         }
 
-        // Current style is NOT valid for the newly selected division — pick first enabled active style
+        // Current style is NOT valid for the newly selected division — pick first enabled unrestricted style
         let fallbackOption = null;
         for (let i = 0; i < styleEl.options.length; i++) {
             const opt = styleEl.options[i];
@@ -574,7 +566,7 @@
             }
             const candRec  = findStyle(opt.value);
             const candMeta = getStyleRuleMeta(candRec);
-            if (candMeta.ruleMode === 'force') {
+            if (candMeta.ruleMode === 'force' || (candMeta.ruleMode === 'restrict' && !isDivisionPermitted(candRec, currentDivVal))) {
                 continue;
             }
             fallbackOption = opt;
@@ -606,7 +598,7 @@
                 msg = '⚠️ <strong>' + escapeHtmlRule(prevStyleLabel) + '</strong> is not permitted in <strong>' + escapeHtmlRule(currentDivLbl) + '</strong>. Style was updated to <strong>' + escapeHtmlRule(newStyleLabel) + '</strong>.';
             }
 
-            setRuleNotice(styleEl, divisionEl, msg);
+            setRuleNotice(styleEl, divisionEl, msg, 0);
         }
 
         styleEl.dataset.sywatAutoUpdating = '1';
