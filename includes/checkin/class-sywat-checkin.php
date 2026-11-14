@@ -2,10 +2,10 @@
 /**
  * Module: Check-In Desk Portal Controller
  * Path: includes/checkin/class-sywat-checkin.php
- * Description: Main entry point and shortcode definition for the Check-In Desk portal, enqueueing the shared Shooting Styles & Division Rule engine.
+ * Description: Main entry point and shortcode definition for the Check-In Desk portal, enqueueing the shared Shooting Styles & Division Rule engine and active tournament pricing/promoter data.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -70,8 +70,8 @@ if ( ! function_exists( 'render_sywat_desk_app' ) ) {
 }
 
 /**
- * Enqueues external JS asset and injects localized JSON datasets using 18-month historical results
- * and database-configured shooting styles & age divisions.
+ * Enqueues external JS asset and injects localized JSON datasets using 18-month historical results,
+ * database-configured shooting styles & age divisions, and active tournament pricing/promoter rules.
  *
  * @param array $data Aggregated state dataset.
  * @return void
@@ -90,7 +90,7 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
 
         $handle  = 'sywat-checkin-js';
         $js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin.js';
-        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.0.0' );
+        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.1.0' );
         $deps    = ( wp_script_is( 'sywat-shooting-styles-js', 'registered' ) || wp_script_is( 'sywat-shooting-styles-js', 'enqueued' ) )
             ? array( 'sywat-shooting-styles-js' )
             : array();
@@ -98,12 +98,20 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
         wp_enqueue_script( $handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin.js', $deps, $version, true );
 
         $divisions_meta = isset( $data['divisions_meta'] ) && is_array( $data['divisions_meta'] ) ? $data['divisions_meta'] : array();
+        $pricing_bundle = array(
+            'tournamentName' => isset( $data['selected_tournament'] ) ? $data['selected_tournament'] : '',
+            'defaultProfile' => isset( $data['default_pricing_profile'] ) ? $data['default_pricing_profile'] : 'indoor',
+            'isMultiRound'   => ! empty( $data['is_multi_round'] ),
+            'profiles'       => isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array(),
+            'promoRules'     => isset( $data['promo_rules'] ) && is_array( $data['promo_rules'] ) ? $data['promo_rules'] : array(),
+        );
 
         $inline_js = 'window.sywatHistory = ' . wp_json_encode( $data['history_profiles'] ) . '; ' .
                      'window.tfaaData = ' . wp_json_encode( $data['tfaa_data_bundle'] ) . '; ' .
                      'window.sywatDeskTfaaShooters = ' . wp_json_encode( array_values( $js_tfaa_desk_data ) ) . '; ' .
                      'window.existingFamiliesByLine = ' . wp_json_encode( $data['existing_families_by_line'] ) . '; ' .
-                     'window.sywatDeskDivisions = ' . wp_json_encode( $divisions_meta ) . ';';
+                     'window.sywatDeskDivisions = ' . wp_json_encode( $divisions_meta ) . '; ' .
+                     'window.sywatDeskPricing = ' . wp_json_encode( $pricing_bundle ) . ';';
 
         wp_add_inline_script( $handle, $inline_js, 'before' );
     }
