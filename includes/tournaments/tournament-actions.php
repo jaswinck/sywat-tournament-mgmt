@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
- * Description: Handles tournament/season POST actions, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles and promoter flags, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
  * Author: SYWAT Archery
- * Version: 7.12.0
+ * Version: 7.13.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -144,20 +144,38 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
             $seasons    = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
             $orig_slug  = isset( $_POST['original_season_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['original_season_slug'] ) ) : '';
-            $s_type     = sanitize_text_field( wp_unslash( $_POST['season_type'] ) );
-            $start_date = sanitize_text_field( wp_unslash( $_POST['start_date'] ) );
-            $end_date   = sanitize_text_field( wp_unslash( $_POST['end_date'] ) );
-            $s_status   = sanitize_text_field( wp_unslash( $_POST['season_status'] ) );
-            $s_best_n   = intval( $_POST['season_best_n'] );
+            $s_type     = isset( $_POST['season_type'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['season_type'] ) ) ) : '';
+            $start_date = isset( $_POST['start_date'] ) ? sanitize_text_field( wp_unslash( $_POST['start_date'] ) ) : '';
+            $end_date   = isset( $_POST['end_date'] ) ? sanitize_text_field( wp_unslash( $_POST['end_date'] ) ) : '';
+            $s_status   = isset( $_POST['season_status'] ) ? sanitize_text_field( wp_unslash( $_POST['season_status'] ) ) : 'active';
+            $s_best_n   = isset( $_POST['season_best_n'] ) ? intval( wp_unslash( $_POST['season_best_n'] ) ) : 3;
 
             // Validate Season Type Selection
-            if ( empty( $s_type ) || ! in_array( $s_type, array( 'Indoor', 'Outdoor', 'Field 50' ), true ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid Season Type (Indoor, Outdoor, or Field 50).</div>';
+            if ( empty( $s_type ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a valid Season Type.</div>';
             }
 
             if ( empty( $start_date ) || empty( $end_date ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select both Start and End dates for the season.</div>';
             }
+
+            // Sanitize Enabled Pricing & Round Profiles for this Season
+            $raw_s_profiles     = isset( $_POST['season_pricing_profiles'] ) && is_array( $_POST['season_pricing_profiles'] )
+                ? wp_unslash( $_POST['season_pricing_profiles'] )
+                : array();
+            $s_pricing_profiles = array();
+            foreach ( $raw_s_profiles as $sp_slug ) {
+                $clean_sp = sanitize_title( (string) $sp_slug );
+                if ( $clean_sp !== '' && ! in_array( $clean_sp, $s_pricing_profiles, true ) ) {
+                    $s_pricing_profiles[] = $clean_sp;
+                }
+            }
+            if ( empty( $s_pricing_profiles ) && function_exists( 'sywat_get_season_pricing_profiles' ) ) {
+                $fallback_profs     = sywat_get_season_pricing_profiles( array( 'type' => $s_type ) );
+                $s_pricing_profiles = array_keys( $fallback_profs );
+            }
+
+            $s_promo_enabled = ! empty( $_POST['season_promo_enabled'] );
 
             // Automatically Calculate Year Label from Start and End Dates
             $s_start_year = date( 'Y', strtotime( $start_date ) );
@@ -181,14 +199,16 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $seasons[ $s_slug ] = array(
-                'slug'         => $s_slug,
-                'name'         => $s_name,
-                'type'         => $s_type,
-                'start_date'   => $start_date,
-                'end_date'     => $end_date,
-                'year_label'   => $year_label,
-                'status'       => $s_status,
-                'best_n_count' => $s_best_n > 0 ? $s_best_n : 3,
+                'slug'             => $s_slug,
+                'name'             => $s_name,
+                'type'             => $s_type,
+                'start_date'       => $start_date,
+                'end_date'         => $end_date,
+                'year_label'       => $year_label,
+                'status'           => $s_status,
+                'best_n_count'     => $s_best_n > 0 ? $s_best_n : 3,
+                'pricing_profiles' => $s_pricing_profiles,
+                'promo_enabled'    => $s_promo_enabled,
             );
 
             update_option( 'sywat_seasons_list', $seasons );
@@ -239,6 +259,13 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $target_season = isset( $processed['target_season'] ) ? $processed['target_season'] : '2026-2027 Indoor';
             $created_count = 0;
 
+            // Resolve inherited Pricing Profiles for imported tournaments in this season
+            $imported_t_profiles = array();
+            if ( function_exists( 'sywat_get_tournament_pricing_profiles' ) ) {
+                $resolved_imp_profs  = sywat_get_tournament_pricing_profiles( array( 'season_slug' => $target_season ) );
+                $imported_t_profiles = array_keys( $resolved_imp_profs );
+            }
+
             // Extract shop lookup map for assigning shop_id on import
             $all_shops       = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
             $shop_name_to_id = array();
@@ -269,6 +296,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     'start_date'           => $t['start_date_formatted'],
                     'end_date'             => $t['end_date_formatted'],
                     'event_type'           => $t['event_type'],
+                    'pricing_profiles'     => $imported_t_profiles,
                     'notes'                => sanitize_textarea_field( $t['notes'] ),
                     'lines'                => $t['line_slots'],
                     'registration_enabled' => $t['registration_enabled'],
@@ -482,6 +510,26 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $orig_shop_id    = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $existing_record ) : ( isset( $existing_record['shop_id'] ) ? $existing_record['shop_id'] : '' );
             $orig_season     = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $existing_record ) : ( isset( $existing_record['season_slug'] ) ? $existing_record['season_slug'] : '' );
 
+            // Resolve Offered Round / Pricing Format(s) for this Tournament
+            $raw_t_profiles     = isset( $_POST['tournament_pricing_profiles'] ) && is_array( $_POST['tournament_pricing_profiles'] )
+                ? wp_unslash( $_POST['tournament_pricing_profiles'] )
+                : array();
+            $t_pricing_profiles = array();
+            foreach ( $raw_t_profiles as $tp_slug ) {
+                $clean_tp = sanitize_title( (string) $tp_slug );
+                if ( $clean_tp !== '' && ! in_array( $clean_tp, $t_pricing_profiles, true ) ) {
+                    $t_pricing_profiles[] = $clean_tp;
+                }
+            }
+            if ( empty( $t_pricing_profiles ) ) {
+                if ( ! empty( $existing_record['pricing_profiles'] ) && is_array( $existing_record['pricing_profiles'] ) ) {
+                    $t_pricing_profiles = $existing_record['pricing_profiles'];
+                } elseif ( function_exists( 'sywat_get_tournament_pricing_profiles' ) ) {
+                    $inherited_profs    = sywat_get_tournament_pricing_profiles( array( 'season_slug' => $season_slug ) );
+                    $t_pricing_profiles = array_keys( $inherited_profs );
+                }
+            }
+
             // Resolve shop name metadata from master shop list
             $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops', get_option( 'sywat_shops_list', array() ) ) );
             $resolved_shop_name = '';
@@ -635,6 +683,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 'start_date'           => $start_date,
                 'end_date'             => $end_date,
                 'event_type'           => $existing_ev_type,
+                'pricing_profiles'     => $t_pricing_profiles,
                 'notes'                => $existing_notes,
                 'registration_enabled' => $existing_reg_en,
                 'tfaa_event_id'        => $tfaa_event_id,
