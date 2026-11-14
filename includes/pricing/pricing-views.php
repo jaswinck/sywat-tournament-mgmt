@@ -5,7 +5,7 @@
  * Description: Renders the [sywat_pricing] administration interface for managing round pricing profiles (Indoor, Field, Field 50, Known 3D, 900, and custom formats), per-division rate overrides, household family cap rules, and configurable first-time/lapsed shooter promotional rules.
  * Compliance: Pure view layer — zero direct SQL queries, zero inline style attributes, zero inline event handlers, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -349,8 +349,8 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                     <button type="button" class="sywat-modal-close" data-sywat-action="close-pricing-modal" aria-label="Close pricing format modal">&times;</button>
                 </div>
 
-                <form method="post" id="sywat_pricing_profile_form">
-                    <div class="sywat-modal-body">
+                <div class="sywat-modal-body">
+                    <form method="post" id="sywat_pricing_profile_form">
                         <?php wp_nonce_field( 'sywat_pricing_action', 'sywat_pricing_nonce' ); ?>
                         <input type="hidden" name="sywat_pricing_action" value="save_pricing_profile">
                         <input type="hidden" name="orig_profile_slug" id="sywat_pf_orig_slug" value="">
@@ -555,13 +555,13 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                 </div>
                             <?php endif; ?>
                         </div>
-                    </div>
 
-                    <div class="sywat-modal-footer">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="close-pricing-modal">Cancel</button>
-                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Pricing Format</button>
-                    </div>
-                </form>
+                        <div class="sywat-modal-form-actions">
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="close-pricing-modal">Cancel</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Pricing Format</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
         <?php
