@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
- * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles and promoter flags, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles and promoter flags, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
  * Author: SYWAT Archery
- * Version: 7.13.0
+ * Version: 7.14.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -506,6 +506,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             // Capture existing record attributes before save so capacity/URL edits never wipe metadata or trigger unwanted re-sequencing
             $lookup_handle   = ( ! empty( $old_name ) && isset( $tournaments[ $old_name ] ) ) ? $old_name : $t_name;
             $existing_record = ( isset( $tournaments[ $lookup_handle ] ) && is_array( $tournaments[ $lookup_handle ] ) ) ? $tournaments[ $lookup_handle ] : array();
+            $existing_lines  = ( isset( $existing_record['lines'] ) && is_array( $existing_record['lines'] ) ) ? $existing_record['lines'] : array();
             $orig_start_date = isset( $existing_record['start_date'] ) ? $existing_record['start_date'] : '';
             $orig_shop_id    = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $existing_record ) : ( isset( $existing_record['shop_id'] ) ? $existing_record['shop_id'] : '' );
             $orig_season     = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $existing_record ) : ( isset( $existing_record['season_slug'] ) ? $existing_record['season_slug'] : '' );
@@ -622,6 +623,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 }
             }
 
+            // Sort lines chronologically (Fri -> Sat -> Sun, then by start time)
+            if ( count( $new_lines ) > 1 && function_exists( 'sywat_compare_tournament_lines' ) ) {
+                usort( $new_lines, 'sywat_compare_tournament_lines' );
+            }
+
             // Carry forward existing publishing, classification & resolved TFAA metadata if present
             $is_scores_pub     = isset( $existing_record['scores_published'] ) ? $existing_record['scores_published'] : false;
             $published_at      = isset( $existing_record['published_at'] ) ? $existing_record['published_at'] : '';
@@ -663,6 +669,118 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 if ( in_array( $old_name, $active_tournaments, true ) ) {
                     $active_tournaments   = array_diff( $active_tournaments, array( $old_name ) );
                     $active_tournaments[] = $t_name;
+                }
+            }
+
+            // Remap existing registrations and closed-line locks if line order changed on save
+            if ( ! empty( $existing_lines ) && ! empty( $new_lines ) ) {
+                $normalize_line_key = function( $raw_line_str ) {
+                    $s = strtolower( trim( preg_replace( '/\s+/', ' ', (string) $raw_line_str ) ) );
+                    $s = preg_replace( '/:00\s*(am|pm)/i', '$1', $s );
+                    $s = preg_replace( '/(\d)\s+(am|pm)/i', '$1$2', $s );
+                    return $s;
+                };
+
+                $old_idx_to_key = array();
+                foreach ( $existing_lines as $old_i => $old_l ) {
+                    if ( is_array( $old_l ) ) {
+                        $o_label = ! empty( $old_l['name'] )
+                            ? (string) $old_l['name']
+                            : trim( ( isset( $old_l['day'] ) ? $old_l['day'] : '' ) . ' ' . ( isset( $old_l['time'] ) ? $old_l['time'] : '' ) );
+                        if ( $o_label !== '' ) {
+                            $old_idx_to_key[ (string) $old_i ] = $normalize_line_key( $o_label );
+                        }
+                    }
+                }
+
+                $new_key_to_idx = array();
+                foreach ( $new_lines as $new_i => $new_l ) {
+                    if ( is_array( $new_l ) ) {
+                        $n_label = ! empty( $new_l['name'] )
+                            ? (string) $new_l['name']
+                            : trim( ( isset( $new_l['day'] ) ? $new_l['day'] : '' ) . ' ' . ( isset( $new_l['time'] ) ? $new_l['time'] : '' ) );
+                        if ( $n_label !== '' ) {
+                            $new_key_to_idx[ $normalize_line_key( $n_label ) ] = $new_i;
+                        }
+                    }
+                }
+
+                $idx_remap   = array();
+                $needs_remap = false;
+                foreach ( $old_idx_to_key as $old_i_str => $norm_lbl ) {
+                    if ( isset( $new_key_to_idx[ $norm_lbl ] ) ) {
+                        $mapped_i                  = $new_key_to_idx[ $norm_lbl ];
+                        $idx_remap[ $old_i_str ]   = $mapped_i;
+                        if ( (string) $mapped_i !== $old_i_str ) {
+                            $needs_remap = true;
+                        }
+                    }
+                }
+
+                if ( $needs_remap ) {
+                    if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
+                        $registrations = sywat_get_all_registrations();
+                    }
+
+                    foreach ( $registrations as &$reg ) {
+                        if ( ! isset( $reg['tournament'] ) ) {
+                            continue;
+                        }
+                        $matches_event = ( strcasecmp( $reg['tournament'], $t_name ) === 0 || sanitize_title( $reg['tournament'] ) === $new_slug )
+                                      || ( ! empty( $old_name ) && strcasecmp( $reg['tournament'], $old_name ) === 0 );
+                        if ( ! $matches_event ) {
+                            continue;
+                        }
+
+                        $curr_idx_str = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
+                        $target_idx   = null;
+
+                        if ( $curr_idx_str !== '' && isset( $idx_remap[ $curr_idx_str ] ) ) {
+                            $target_idx = $idx_remap[ $curr_idx_str ];
+                        } elseif ( ! empty( $reg['line_name'] ) ) {
+                            $norm_reg_line = $normalize_line_key( $reg['line_name'] );
+                            if ( isset( $new_key_to_idx[ $norm_reg_line ] ) ) {
+                                $target_idx = $new_key_to_idx[ $norm_reg_line ];
+                            }
+                        }
+
+                        if ( $target_idx !== null && isset( $new_lines[ $target_idx ] ) ) {
+                            $reg['line_index'] = $target_idx;
+                            $reg['line_name']  = $new_lines[ $target_idx ]['name'];
+                            if ( ! empty( $reg['id'] ) ) {
+                                update_option( 'sywat_t_' . $new_slug . '_' . $reg['id'], $reg, false );
+                            }
+                        }
+                    }
+                    unset( $reg );
+
+                    $closed_lines = get_option( 'sywat_closed_lines_' . $new_slug, null );
+                    if ( is_array( $closed_lines ) && ! empty( $closed_lines ) ) {
+                        $remapped_closed = array();
+                        foreach ( $closed_lines as $c_val ) {
+                            $c_str = (string) $c_val;
+                            if ( isset( $idx_remap[ $c_str ] ) ) {
+                                $remapped_closed[] = $idx_remap[ $c_str ];
+                            } else {
+                                $remapped_closed[] = $c_val;
+                            }
+                        }
+                        update_option( 'sywat_closed_lines_' . $new_slug, array_values( array_unique( $remapped_closed ) ), false );
+                    }
+
+                    $line_locks = get_option( 'sywat_locks_' . $new_slug, null );
+                    if ( is_array( $line_locks ) && ! empty( $line_locks ) ) {
+                        $remapped_locks = array();
+                        foreach ( $line_locks as $l_key => $l_val ) {
+                            $l_str = (string) $l_key;
+                            if ( isset( $idx_remap[ $l_str ] ) ) {
+                                $remapped_locks[ $idx_remap[ $l_str ] ] = $l_val;
+                            } else {
+                                $remapped_locks[ $l_key ] = $l_val;
+                            }
+                        }
+                        update_option( 'sywat_locks_' . $new_slug, $remapped_locks, false );
+                    }
                 }
             }
 
