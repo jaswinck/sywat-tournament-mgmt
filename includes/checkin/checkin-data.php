@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Data Layer
  * Path: includes/checkin/checkin-data.php
- * Description: Fetches and prepares Check-In Desk state datasets, integrating database-configured NFAA shooting styles and age divisions with zero extra database queries per loop.
+ * Description: Fetches and prepares Check-In Desk state datasets, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with zero extra database queries per loop.
+ * Compliance: Pure data layer — zero HTML echo, zero POST mutations, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -78,9 +79,97 @@ if ( ! function_exists( 'sywat_desk_run_migrations' ) ) {
 }
 
 /**
+ * Build an O(1) client-side Promoter eligibility lookup map per offered round profile
+ * for the active Check-In Desk tournament so walk-in intake surfaces $0.00 promotional
+ * eligibility live.
+ *
+ * @param string     $selected_tournament Active tournament name.
+ * @param array|null $t_data              Full tournament config array (or null).
+ * @param array      $t_profiles          Ordered map of pricing profiles offered by the tournament.
+ * @param array      $seasons             Seasons master list.
+ * @param array      $current_tourn_regs  Current tournament registrations.
+ * @return array                          Map keyed by profile slug ('active', 'label', 'ineligible').
+ */
+if ( ! function_exists( 'sywat_desk_build_promo_rules_payload' ) ) {
+    function sywat_desk_build_promo_rules_payload( $selected_tournament, $t_data, $t_profiles, $seasons, $current_tourn_regs ) {
+        $payload = array();
+
+        if ( empty( $selected_tournament ) || ! is_array( $t_profiles ) || empty( $t_profiles ) ) {
+            return $payload;
+        }
+
+        $season_slug = '';
+        if ( is_array( $t_data ) ) {
+            $season_slug = ! empty( $t_data['season_slug'] ) ? $t_data['season_slug'] : ( ! empty( $t_data['season'] ) ? $t_data['season'] : '' );
+        }
+        $season_rec      = ( $season_slug !== '' && is_array( $seasons ) && isset( $seasons[ $season_slug ] ) ) ? $seasons[ $season_slug ] : null;
+        $season_promo_on = is_array( $season_rec ) && ! empty( $season_rec['promo_enabled'] );
+
+        // Only load full cross-tournament registration history if promo is active on season + at least one profile
+        $any_prof_promo = false;
+        if ( $season_promo_on ) {
+            foreach ( $t_profiles as $prof ) {
+                if ( ! empty( $prof['promo_enabled'] ) ) {
+                    $any_prof_promo = true;
+                    break;
+                }
+            }
+        }
+
+        $all_regs        = array();
+        $candidate_names = array();
+        if ( $any_prof_promo ) {
+            $all_regs = function_exists( 'sywat_get_all_registrations' )
+                ? sywat_get_all_registrations()
+                : ( is_array( $current_tourn_regs ) ? $current_tourn_regs : array() );
+
+            if ( is_array( $all_regs ) ) {
+                foreach ( $all_regs as $reg ) {
+                    if ( is_array( $reg ) && ! empty( $reg['name'] ) ) {
+                        $norm = strtolower( trim( (string) $reg['name'] ) );
+                        if ( $norm !== '' ) {
+                            $candidate_names[ $norm ] = trim( (string) $reg['name'] );
+                        }
+                    }
+                }
+            }
+        }
+
+        $t_context = is_array( $t_data ) ? $t_data : $selected_tournament;
+
+        foreach ( $t_profiles as $p_slug => $prof ) {
+            $is_active      = $season_promo_on && ! empty( $prof['promo_enabled'] );
+            $ineligible_map = array();
+
+            if ( $is_active && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+                foreach ( $candidate_names as $norm_name => $orig_name ) {
+                    $check = sywat_check_archer_promo_eligibility(
+                        $orig_name,
+                        $t_context,
+                        $p_slug,
+                        $all_regs
+                    );
+                    if ( empty( $check['eligible'] ) ) {
+                        $ineligible_map[ $norm_name ] = isset( $check['reason'] ) ? $check['reason'] : 'ineligible';
+                    }
+                }
+            }
+
+            $payload[ $p_slug ] = array(
+                'active'     => $is_active,
+                'label'      => ! empty( $prof['promo_label'] ) ? $prof['promo_label'] : 'Promo (Free)',
+                'ineligible' => $ineligible_map,
+            );
+        }
+
+        return $payload;
+    }
+}
+
+/**
  * Fetches and prepares all Check-In Desk portal state datasets.
  *
- * @return array Aggregated state array containing tournaments, lines, archers, and TFAA bundles.
+ * @return array Aggregated state array containing tournaments, lines, archers, pricing profiles, and TFAA bundles.
  */
 if ( ! function_exists( 'sywat_desk_get_data' ) ) {
     function sywat_desk_get_data() {
@@ -277,8 +366,24 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
                 : $scoped_raw[ $t_name ];
         }
 
+        $selected_t_data = ( ! empty( $selected_tournament ) && isset( $scoped_raw[ $selected_tournament ] ) )
+            ? $scoped_raw[ $selected_tournament ]
+            : ( isset( $all_tournaments[ $selected_tournament ] ) ? $all_tournaments[ $selected_tournament ] : array() );
+
         $lines         = isset( $tournaments[ $selected_tournament ] ) ? $tournaments[ $selected_tournament ] : array();
         $active_t_slug = sanitize_title( $selected_tournament );
+
+        // Resolve active Pricing & Round Profiles for the selected tournament
+        $t_profiles       = ( ! empty( $selected_tournament ) && function_exists( 'sywat_get_tournament_pricing_profiles' ) )
+            ? sywat_get_tournament_pricing_profiles( ! empty( $selected_t_data ) ? $selected_t_data : $selected_tournament )
+            : array();
+        $default_prof     = ! empty( $t_profiles )
+            ? reset( $t_profiles )
+            : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() );
+        $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
+        $init_adult_rate  = is_array( $default_prof ) && isset( $default_prof['adult_rate'] ) ? floatval( $default_prof['adult_rate'] ) : 30.00;
+        $init_youth_rate  = is_array( $default_prof ) && isset( $default_prof['youth_rate'] ) ? floatval( $default_prof['youth_rate'] ) : 25.00;
+        $is_multi_round   = count( $t_profiles ) > 1;
 
         $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
 
@@ -444,6 +549,10 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
                     $rate_tier = ( isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Youth' ) ? 'Youth' : 'Adult';
                     $distance  = ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd';
 
+                    $div_fee = function_exists( 'sywat_get_archer_individual_fee' )
+                        ? sywat_get_archer_individual_fee( ! empty( $selected_t_data ) ? $selected_t_data : $selected_tournament, $label, $distance, '', $default_prof_key, '' )
+                        : ( ( $rate_tier === 'Youth' ) ? $init_youth_rate : $init_adult_rate );
+
                     $divs[] = $label;
                     if ( $status === 'active' ) {
                         $active_divs[] = $label;
@@ -455,6 +564,7 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
                         'label'     => $label,
                         'distance'  => $distance,
                         'rate_tier' => $rate_tier,
+                        'fee'       => $div_fee,
                         'status'    => $status,
                         'aliases'   => ! empty( $rec['aliases'] ) && is_array( $rec['aliases'] ) ? array_values( $rec['aliases'] ) : array(),
                     );
@@ -562,17 +672,31 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             }
         }
 
+        $promo_rules = sywat_desk_build_promo_rules_payload(
+            $selected_tournament,
+            $selected_t_data,
+            $t_profiles,
+            $seasons,
+            $registrations
+        );
+
         return array(
             'is_admin'                  => $is_admin,
             'user_shop_id'              => $user_shop_id,
             'tournaments'               => $tournaments,
+            'tournaments_full'          => $scoped_raw,
             'selected_tournament'       => $selected_tournament,
+            'selected_tournament_data'  => $selected_t_data,
             'selected_line_idx'         => $selected_line_idx,
             'search_query'              => $search_query,
             'lines'                     => $lines,
             'active_t_slug'             => $active_t_slug,
             'closed_lines'              => $closed_lines,
             'closed_lines_key'          => $closed_lines_key,
+            'pricing_profiles'          => $t_profiles,
+            'default_pricing_profile'   => $default_prof_key,
+            'is_multi_round'            => $is_multi_round,
+            'promo_rules'               => $promo_rules,
             'registrations'             => $registrations,
             'tourn_registrations'       => $tourn_registrations,
             'history_profiles'          => $history_profiles,
