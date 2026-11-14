@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Action Handlers (Manual Promotion, Top-Bar Open-Line Moves & Removal)
  * Path: includes/waitlist/waitlist-actions.php
- * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, database-driven division/style/distance normalization, capacity guards, and per-line $75.00 Family Cap reconciliation.
+ * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, database-driven division/style/distance normalization, capacity guards, First-Time/Lapsed Shooter promo checks, and dynamic Household Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -422,6 +422,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         }
 
         $promoted_names    = array();
+        $promo_names       = array();
         $affected_families = array();
 
         foreach ( $candidates as $cand ) {
@@ -431,18 +432,30 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
+            $style_val     = isset( $cand['style'] ) ? $cand['style'] : '';
+            $round_slug    = isset( $cand['pricing_profile'] ) ? $cand['pricing_profile'] : '';
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
+
+            $is_promo_free = ! empty( $cand['is_promo_free'] );
+            if ( ! $is_promo_free && strcasecmp( trim( (string) $existing_paid ), 'Field Governor' ) !== 0 && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+                $promo_res     = sywat_check_archer_promo_eligibility( $cand['name'], $tourn_name, $round_slug, $registrations, $cand['id'] );
+                $is_promo_free = ! empty( $promo_res['eligible'] );
+            }
 
             $cand['status']         = 'Pre-Reg';
             $cand['line_index']     = $target_line_idx;
             $cand['line_name']      = $line_label;
             $cand['distance']       = $dist_val;
-            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid );
-            $cand['balance_due']    = ( $cand['paid'] === 'Field Governor' ) ? 0.00 : sywat_waitlist_get_individual_rate( $div_val, $dist_val );
+            $cand['is_promo_free']  = $is_promo_free;
+            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid, $is_promo_free );
+            $cand['balance_due']    = sywat_waitlist_get_individual_rate( $div_val, $dist_val, $tourn_name, $round_slug, $style_val, $cand['paid'] );
             $cand['_just_promoted'] = true;
 
             if ( sywat_waitlist_persist_record( $cand, $registrations ) ) {
                 $promoted_names[] = $cand['name'];
+                if ( $is_promo_free ) {
+                    $promo_names[] = $cand['name'];
+                }
                 if ( ! empty( $cand['family_id'] ) ) {
                     $affected_families[ trim( (string) $cand['family_id'] ) ] = true;
                 }
@@ -459,17 +472,28 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         unset( $r );
 
         $cap_applied = false;
+        $cap_amount  = 75.00;
         foreach ( array_keys( $affected_families ) as $fam_key ) {
             $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_idx, $fam_key, $registrations, $t_lines );
             if ( ! empty( $rec_res['is_family_capped'] ) ) {
                 $cap_applied = true;
+                if ( isset( $rec_res['cap_amount'] ) && floatval( $rec_res['cap_amount'] ) > 0 ) {
+                    $cap_amount = floatval( $rec_res['cap_amount'] );
+                }
             }
         }
 
         $count_promoted = count( $promoted_names );
-        $cap_note       = $cap_applied ? ' ($75.00 Family Cap applied for this line).' : '.';
+        $notes_parts    = array();
+        if ( ! empty( $promo_names ) ) {
+            $notes_parts[] = 'First-Time/Lapsed Promo ($0.00) applied to ' . implode( ', ', $promo_names );
+        }
+        if ( $cap_applied ) {
+            $notes_parts[] = '$' . number_format( $cap_amount, 2 ) . ' Family Cap applied';
+        }
+        $extra_note = ! empty( $notes_parts ) ? ' (' . implode( '; ', $notes_parts ) . ').' : '.';
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Promoted <strong>' . intval( $count_promoted ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $promoted_names ) ) . '</strong>) to Pre-Reg on <strong>' . esc_html( $line_label ) . '</strong>' . esc_html( $cap_note ) . '</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Promoted <strong>' . intval( $count_promoted ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $promoted_names ) ) . '</strong>) to Pre-Reg on <strong>' . esc_html( $line_label ) . '</strong>' . esc_html( $extra_note ) . '</div>';
     }
 }
 
@@ -477,7 +501,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
  * Action Handler: Move Checkbox-Selected Waitlisted Archers (or Single/Group)
  * from their current waitlisted line(s) to a selected open shooting line as 'Pre-Reg'.
  * Keeps moved members of the same household grouped together on the destination line
- * and reconciles per-line $75.00 Family Cap fees on both origin and destination lines.
+ * and reconciles dynamic Household Family Cap fees on both origin and destination lines.
  *
  * @param array $tournaments   Tournaments master list.
  * @param array $registrations Reference to registrations array.
@@ -613,6 +637,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         }
 
         $moved_names          = array();
+        $promo_names          = array();
         $dest_family_ids      = array();
         $origin_family_scopes = array();
 
@@ -627,14 +652,23 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
+            $style_val     = isset( $cand['style'] ) ? $cand['style'] : '';
+            $round_slug    = isset( $cand['pricing_profile'] ) ? $cand['pricing_profile'] : '';
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
+
+            $is_promo_free = ! empty( $cand['is_promo_free'] );
+            if ( ! $is_promo_free && strcasecmp( trim( (string) $existing_paid ), 'Field Governor' ) !== 0 && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+                $promo_res     = sywat_check_archer_promo_eligibility( $cand['name'], $tourn_name, $round_slug, $registrations, $cand['id'] );
+                $is_promo_free = ! empty( $promo_res['eligible'] );
+            }
 
             $cand['line_index']     = (string) $target_line_raw;
             $cand['line_name']      = $dest_label;
             $cand['distance']       = $dist_val;
             $cand['status']         = 'Pre-Reg';
-            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid );
-            $cand['balance_due']    = ( $cand['paid'] === 'Field Governor' ) ? 0.00 : sywat_waitlist_get_individual_rate( $div_val, $dist_val );
+            $cand['is_promo_free']  = $is_promo_free;
+            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid, $is_promo_free );
+            $cand['balance_due']    = sywat_waitlist_get_individual_rate( $div_val, $dist_val, $tourn_name, $round_slug, $style_val, $cand['paid'] );
             $cand['_just_promoted'] = true;
 
             if ( $old_fam_id !== '' ) {
@@ -656,6 +690,9 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
 
             if ( sywat_waitlist_persist_record( $cand, $registrations ) ) {
                 $moved_names[] = $cand['name'];
+                if ( $is_promo_free ) {
+                    $promo_names[] = $cand['name'];
+                }
             }
         }
 
@@ -669,10 +706,14 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         unset( $r );
 
         $cap_applied = false;
+        $cap_amount  = 75.00;
         foreach ( array_keys( $dest_family_ids ) as $df_id ) {
             $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_raw, $df_id, $registrations, $t_lines );
             if ( ! empty( $rec_res['is_family_capped'] ) ) {
                 $cap_applied = true;
+                if ( isset( $rec_res['cap_amount'] ) && floatval( $rec_res['cap_amount'] ) > 0 ) {
+                    $cap_amount = floatval( $rec_res['cap_amount'] );
+                }
             }
         }
 
@@ -682,15 +723,22 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         }
 
         $count_moved = count( $moved_names );
-        $cap_note    = $cap_applied ? ' ($75.00 Family Cap applied on destination line).' : '.';
+        $notes_parts = array();
+        if ( ! empty( $promo_names ) ) {
+            $notes_parts[] = 'First-Time/Lapsed Promo ($0.00) applied to ' . implode( ', ', $promo_names );
+        }
+        if ( $cap_applied ) {
+            $notes_parts[] = '$' . number_format( $cap_amount, 2 ) . ' Family Cap applied on destination line';
+        }
+        $extra_note = ! empty( $notes_parts ) ? ' (' . implode( '; ', $notes_parts ) . ').' : '.';
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Moved <strong>' . intval( $count_moved ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $moved_names ) ) . '</strong>) to <strong>' . esc_html( $dest_label ) . '</strong> as Pre-Reg' . esc_html( $cap_note ) . '</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Moved <strong>' . intval( $count_moved ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $moved_names ) ) . '</strong>) to <strong>' . esc_html( $dest_label ) . '</strong> as Pre-Reg' . esc_html( $extra_note ) . '</div>';
     }
 }
 
 /**
  * Action Handler: Remove a Single Waitlisted Archer Entry across all host portals
- * (Register, Manage Tournaments, Roster, Check-In) and reconcile line family fees.
+ * (Register, Manage Tournaments, Roster, Check-In) and reconcile household family fees.
  *
  * @param array $tournaments   Tournaments master list.
  * @param array $registrations Reference to registrations array.
