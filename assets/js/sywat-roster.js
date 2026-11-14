@@ -1,8 +1,9 @@
 /**
  * SYWAT Archery - Archer Roster Management & Edit Modal Engine
  * Path: assets/js/sywat-roster.js
- * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, and database-driven shooting style & age division rule enforcement.
- * Version: 7.0.0
+ * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing option synchronization, Promotional Free Entry status display, and database-driven shooting style & age division rule enforcement.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden).
+ * Version: 7.1.0
  */
 
 (function() {
@@ -31,6 +32,38 @@
             return window.sywatRosterData.divisions;
         }
         return [];
+    }
+
+    /**
+     * Retrieve Active Tournament Pricing & Round Profiles
+     */
+    function getProfiles() {
+        if (window.sywatRosterData && typeof window.sywatRosterData.profiles === 'object' && window.sywatRosterData.profiles !== null) {
+            return window.sywatRosterData.profiles;
+        }
+        if (window.SYWAT && window.SYWAT.pricing && typeof window.SYWAT.pricing.getProfiles === 'function') {
+            return window.SYWAT.pricing.getProfiles();
+        }
+        return {};
+    }
+
+    function getDefaultProfileKey() {
+        if (window.sywatRosterData && window.sywatRosterData.defaultProfile) {
+            return String(window.sywatRosterData.defaultProfile);
+        }
+        const profiles = getProfiles();
+        const keys = Object.keys(profiles);
+        return keys.length > 0 ? keys[0] : 'indoor';
+    }
+
+    function getProfile(profileSlug) {
+        const profiles = getProfiles();
+        const slug = String(profileSlug || '').trim();
+        if (slug && profiles[slug]) {
+            return profiles[slug];
+        }
+        const defSlug = getDefaultProfileKey();
+        return profiles[defSlug] || null;
     }
 
     /**
@@ -95,6 +128,44 @@
 
         const youthDivs = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
         return youthDivs.includes(divisionEl.value) ? 'Youth' : 'Adult';
+    }
+
+    /**
+     * Update Paid Option dropdown labels (Individual & Family Cap) when the archer's
+     * Round Format selector changes on multi-round tournaments (e.g. Field vs Field 50).
+     */
+    function updatePayOptionLabelsForRound(type) {
+        const roundEl   = document.getElementById(type + '_pricing_profile');
+        const payOption = document.getElementById(type + '_pay_option');
+        if (!roundEl || !payOption) return;
+
+        const prof = getProfile(roundEl.value);
+        if (!prof) return;
+
+        const youthRate  = parseFloat(prof.youth_rate);
+        const adultRate  = parseFloat(prof.adult_rate);
+        const capEnabled = Boolean(prof.family_cap_enabled);
+        const capAmount  = parseFloat(prof.family_cap_amount) || 75;
+        const capMin     = parseInt(prof.family_min_archers, 10) || 3;
+
+        const yDisp = !Number.isNaN(youthRate) ? Math.round(youthRate) : 25;
+        const aDisp = !Number.isNaN(adultRate) ? Math.round(adultRate) : 30;
+
+        const indLabel = (yDisp === aDisp)
+            ? 'Individual Rate ($' + aDisp + ')'
+            : 'Individual Rate ($' + yDisp + ' / $' + aDisp + ')';
+
+        const famLabel = capEnabled
+            ? 'Family Group ($' + Math.round(capAmount) + ' Cap for ' + capMin + '+ Archers)'
+            : 'Family Group';
+
+        Array.from(payOption.options).forEach(function(opt) {
+            if (opt.value === 'Individual') {
+                opt.textContent = indLabel;
+            } else if (opt.value === 'Family') {
+                opt.textContent = famLabel;
+            }
+        });
     }
 
     /**
@@ -179,7 +250,9 @@
             if (familyBox) {
                 familyBox.classList.add('sywat-hidden');
             }
-            if (payOption.value === 'Field Governor') {
+            if (payOption.value === 'Promo (Free)') {
+                calculatedStatus = 'Promo (Free)';
+            } else if (payOption.value === 'Field Governor') {
                 calculatedStatus = 'Field Governor';
             } else {
                 calculatedStatus = getDivisionRateTier(division);
@@ -300,6 +373,7 @@
     // Namespaced Module API (Section IV.1)
     window.SYWAT.roster = {
         updateEditFamilyOptions: updateRosterEditFamilyOptions,
+        updatePayOptionLabelsForRound: updatePayOptionLabelsForRound,
         closeRosterModal: closeRosterModal,
         closeEditArcherModal: closeEditArcherModal,
         updatePaidStatusDisplay: updatePaidStatusDisplay,
@@ -352,6 +426,9 @@
             if (actionEl.form) {
                 actionEl.form.submit();
             }
+        } else if (action === 'roster-edit-round-change') {
+            updatePayOptionLabelsForRound('edit');
+            updatePaidStatusDisplay('edit');
         } else if (action === 'roster-edit-line-change') {
             updateRosterEditFamilyOptions(actionEl.value);
         } else if (action === 'roster-edit-division-change') {
@@ -378,6 +455,10 @@
      * DOM Initialization & Live Search Input Wiring
      */
     function initRosterModule() {
+        if (document.getElementById('edit_pricing_profile')) {
+            updatePayOptionLabelsForRound('edit');
+        }
+
         if (document.getElementById('edit_division')) {
             handleDivisionChange('edit');
         }
