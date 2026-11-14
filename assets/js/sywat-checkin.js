@@ -1,8 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, TFAA multi-style profile pills, and database-driven shooting style & age division rule enforcement.
- * Version: 7.0.0
+ * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live First-Time/Lapsed Shooter promo eligibility badges, TFAA multi-style profile pills, and database-driven shooting style & age division rule enforcement.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
+ * Version: 7.1.0
  */
 
 (function() {
@@ -32,6 +33,66 @@
             return window.sywatDeskDivisions;
         }
         return [];
+    }
+
+    /**
+     * Retrieve Localized Active Tournament Pricing & Promoter Rules
+     */
+    function getDeskPricing() {
+        if (window.sywatDeskPricing && typeof window.sywatDeskPricing === 'object') {
+            return window.sywatDeskPricing;
+        }
+        return {};
+    }
+
+    /**
+     * Resolve Currently Selected Walk-In Round / Pricing Profile Slug
+     */
+    function getActiveWalkinRoundSlug() {
+        const roundEl = document.getElementById('walkin_pricing_profile');
+        if (roundEl && roundEl.value) {
+            return String(roundEl.value).trim();
+        }
+        const pricing = getDeskPricing();
+        if (pricing.defaultProfile) {
+            return String(pricing.defaultProfile).trim();
+        }
+        const profiles = pricing.profiles || {};
+        const keys = Object.keys(profiles);
+        return keys.length > 0 ? keys[0] : 'indoor';
+    }
+
+    /**
+     * Evaluate First-Time / Lapsed Shooter Promo Eligibility for Walk-In Intake
+     */
+    function isWalkinPromoEligible(typedName, roundSlug) {
+        const cleanName = cleanDeskName(typedName);
+        if (!cleanName || cleanName.length < 2) {
+            return null;
+        }
+
+        const courtesyCb = document.querySelector('#sywat_walkin_form input[name="walkin_is_courtesy"]');
+        if (courtesyCb && courtesyCb.checked) {
+            return null;
+        }
+
+        const pricing = getDeskPricing();
+        const rules   = pricing.promoRules || {};
+        const slug    = String(roundSlug || getActiveWalkinRoundSlug()).trim();
+        const rule    = rules[slug];
+
+        if (!rule || !rule.active) {
+            return null;
+        }
+
+        if (rule.ineligible && Object.prototype.hasOwnProperty.call(rule.ineligible, cleanName)) {
+            return null;
+        }
+
+        return {
+            eligible: true,
+            label: rule.label || 'Promo (Free)'
+        };
     }
 
     /**
@@ -493,11 +554,18 @@
         const cleanTyped  = cleanDeskName(typedName);
         const tfaaMatches = findTfaaMatch(typedName);
 
+        const promoInfo = (prefix === 'walkin' && cleanTyped.length >= 2)
+            ? isWalkinPromoEligible(typedName, getActiveWalkinRoundSlug())
+            : null;
+        const promoBannerHtml = promoInfo
+            ? '<div class="sywat-badge-verified sywat-modal-row-spacing">🎟️ <strong>First-Time / Lapsed Promo Eligible ($0.00)</strong> — ' + escapeHtmlDesk(promoInfo.label) + '</div>'
+            : '';
+
         pillsEl.innerHTML = '';
 
         if (!tfaaMatches || !Array.isArray(tfaaMatches) || tfaaMatches.length === 0) {
             badgeEl.className = 'sywat-badge-none';
-            badgeEl.innerHTML = '⚪ No History Found (18-Mo Window)';
+            badgeEl.innerHTML = '⚪ No History Found (18-Mo Window)' + promoBannerHtml;
             return;
         }
 
@@ -614,7 +682,7 @@
             badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
         }
 
-        badgeEl.innerHTML = badgeText;
+        badgeEl.innerHTML = badgeText + promoBannerHtml;
     }
 
     function autoFillOnNameChange(prefix, preserveExisting) {
@@ -678,6 +746,9 @@
 
         const nameInput = document.getElementById('walkin_name_input');
         if (nameInput) nameInput.value = '';
+
+        const roundSel = document.getElementById('walkin_pricing_profile');
+        if (roundSel && roundSel.tagName === 'SELECT') roundSel.selectedIndex = 0;
 
         const divEl = document.getElementById('walkin_division');
         if (divEl) divEl.value = '';
@@ -871,6 +942,7 @@
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         evaluateTfaaStatus: evaluateTfaaStatus,
+        isWalkinPromoEligible: isWalkinPromoEligible,
         openWalkinModal: openWalkinModal,
         closeWalkinModal: closeWalkinModal,
         continueFamilyLoop: continueFamilyLoop,
@@ -911,6 +983,20 @@
         if (walkinInput) {
             walkinInput.addEventListener('input', function() {
                 autoFillOnNameChange('walkin', false);
+            });
+        }
+
+        const walkinCourtesyCb = document.querySelector('#sywat_walkin_form input[name="walkin_is_courtesy"]');
+        if (walkinCourtesyCb) {
+            walkinCourtesyCb.addEventListener('change', function() {
+                evaluateTfaaStatus('walkin');
+            });
+        }
+
+        const walkinRoundSel = document.getElementById('walkin_pricing_profile');
+        if (walkinRoundSel && walkinRoundSel.tagName === 'SELECT') {
+            walkinRoundSel.addEventListener('change', function() {
+                evaluateTfaaStatus('walkin');
             });
         }
 
