@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
- * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with database-driven shooting styles & age divisions, retired-record preservation, and household-wide unpaid family balance enforcement.
+ * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with multi-round format selection, First-Time/Lapsed Shooter Promotional Free Entry support, database-driven shooting styles, age divisions & pricing profiles, retired-record preservation, and household-wide unpaid family balance enforcement.
+ * Compliance: Pure view layer — zero DB writes, zero inline style/script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -40,6 +41,32 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
         $existing_families_by_line = isset( $data['existing_families_by_line'] ) ? $data['existing_families_by_line'] : array();
         $all_tourn_regs            = isset( $data['registrations'] ) ? $data['registrations'] : array();
 
+        // Active Tournament Pricing & Round Profiles
+        $t_profiles       = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
+        $is_multi_round   = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
+        $default_prof_key = ! empty( $data['default_pricing_profile'] )
+            ? (string) $data['default_pricing_profile']
+            : ( ! empty( $t_profiles ) ? (string) key( $t_profiles ) : 'indoor' );
+        $default_prof     = isset( $t_profiles[ $default_prof_key ] )
+            ? $t_profiles[ $default_prof_key ]
+            : ( ! empty( $t_profiles ) ? reset( $t_profiles ) : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() ) );
+        $t_context        = ! empty( $data['selected_tournament_data'] ) ? $data['selected_tournament_data'] : $selected_tournament;
+
+        $active_cap_amount = 75.00;
+        if ( ! empty( $t_profiles ) ) {
+            $max_cap = 0.00;
+            foreach ( $t_profiles as $tp ) {
+                if ( ! empty( $tp['family_cap_enabled'] ) && isset( $tp['family_cap_amount'] ) ) {
+                    $max_cap = max( $max_cap, floatval( $tp['family_cap_amount'] ) );
+                }
+            }
+            if ( $max_cap > 0 ) {
+                $active_cap_amount = $max_cap;
+            }
+        } elseif ( is_array( $default_prof ) && isset( $default_prof['family_cap_amount'] ) ) {
+            $active_cap_amount = floatval( $default_prof['family_cap_amount'] );
+        }
+
         // Fast-Loop Context Persistence with 3-tier fail-safe checking
         $walkin_context = array();
         if ( ! empty( $data['walkin_loop_context'] ) ) {
@@ -51,6 +78,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                 'primary_contact' => isset( $_POST['walkin_group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_group_name'] ) ) : '',
                 'phone'           => isset( $_POST['walkin_group_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_group_phone'] ) ) : '',
                 'line_idx'        => isset( $_POST['walkin_line_index'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_line_index'] ) ) : $selected_line_idx,
+                'pricing_profile' => isset( $_POST['walkin_pricing_profile'] ) ? sanitize_title( wp_unslash( $_POST['walkin_pricing_profile'] ) ) : $default_prof_key,
                 'family_id'       => isset( $_POST['walkin_family_group_id'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_family_group_id'] ) ) : '',
                 'last_added_name' => isset( $_POST['walkin_name'] ) ? sanitize_text_field( wp_unslash( $_POST['walkin_name'] ) ) : '',
             );
@@ -60,17 +88,29 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
         $saved_contact    = isset( $walkin_context['primary_contact'] ) ? $walkin_context['primary_contact'] : '';
         $saved_phone      = isset( $walkin_context['phone'] ) ? $walkin_context['phone'] : '';
         $saved_line_idx   = isset( $walkin_context['line_idx'] ) ? $walkin_context['line_idx'] : $selected_line_idx;
+        $saved_round_slug = ! empty( $walkin_context['pricing_profile'] ) ? sanitize_title( (string) $walkin_context['pricing_profile'] ) : $default_prof_key;
+        if ( ! empty( $t_profiles ) && ! isset( $t_profiles[ $saved_round_slug ] ) ) {
+            $saved_round_slug = $default_prof_key;
+        }
         $saved_fam_id     = isset( $walkin_context['family_id'] ) ? $walkin_context['family_id'] : '';
         $last_added_name  = isset( $walkin_context['last_added_name'] ) ? $walkin_context['last_added_name'] : '';
         $session_archers  = isset( $walkin_context['session_archers'] ) ? $walkin_context['session_archers'] : array();
         $session_total    = isset( $walkin_context['session_total'] ) ? floatval( $walkin_context['session_total'] ) : 0.00;
         $is_capped        = ! empty( $walkin_context['is_capped'] );
+        $session_cap_amt  = isset( $walkin_context['cap_amount'] ) && floatval( $walkin_context['cap_amount'] ) > 0
+            ? floatval( $walkin_context['cap_amount'] )
+            : $active_cap_amount;
         ?>
         <!-- CHECK-IN MODAL (PRE-REG) -->
         <?php if ( $modal_archer ) : ?>
         <?php
             $modal_due      = isset( $modal_archer['balance_due'] ) ? floatval( $modal_archer['balance_due'] ) : 0;
-            $is_family      = isset( $modal_archer['paid'] ) && strcasecmp( $modal_archer['paid'], 'Family' ) === 0;
+            $curr_paid_raw  = isset( $modal_archer['paid'] ) ? trim( (string) $modal_archer['paid'] ) : '';
+            $is_family      = strcasecmp( $curr_paid_raw, 'Family' ) === 0;
+            $is_promo_check = ! empty( $modal_archer['is_promo_free'] )
+                || strcasecmp( $curr_paid_raw, 'Promo (Free)' ) === 0
+                || stripos( $curr_paid_raw, 'Promo' ) === 0;
+
             $curr_div_check = isset( $modal_archer['division'] ) ? trim( (string) $modal_archer['division'] ) : '';
             if ( isset( $legacy_div_map[ $curr_div_check ] ) ) {
                 $curr_div_check = $legacy_div_map[ $curr_div_check ];
@@ -79,10 +119,42 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                 $curr_div_check = sywat_shooting_styles_normalize_division( $curr_div_check );
             }
 
+            $raw_sty_check = isset( $modal_archer['style'] ) ? trim( (string) $modal_archer['style'] ) : '';
+            if ( $raw_sty_check === '—' ) {
+                $raw_sty_check = '';
+            }
+            if ( $raw_sty_check !== '' && strcasecmp( $raw_sty_check, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
+                $raw_sty_check = sywat_shooting_styles_normalize_style( $raw_sty_check );
+            }
+
+            $checkin_round = ! empty( $modal_archer['pricing_profile'] )
+                ? sanitize_title( (string) $modal_archer['pricing_profile'] )
+                : $default_prof_key;
+            $checkin_round_options = $t_profiles;
+            if ( $checkin_round !== '' && ! isset( $checkin_round_options[ $checkin_round ] ) ) {
+                $legacy_rp = function_exists( 'sywat_find_pricing_profile' ) ? sywat_find_pricing_profile( $checkin_round ) : null;
+                if ( is_array( $legacy_rp ) ) {
+                    $checkin_round_options[ $checkin_round ] = $legacy_rp;
+                } else {
+                    $checkin_round = $default_prof_key;
+                }
+            }
+
             if ( $curr_div_check !== '' && function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
                 $is_youth_check = ( sywat_shooting_styles_get_division_rate_tier( $curr_div_check ) === 'Youth' );
             } else {
                 $is_youth_check = ( stripos( $curr_div_check, 'Cub' ) !== false || stripos( $curr_div_check, 'Youth' ) !== false || stripos( $curr_div_check, 'Young Adult' ) !== false );
+            }
+
+            $calc_dist_check = function_exists( 'sywat_shooting_styles_get_division_distance' )
+                ? sywat_shooting_styles_get_division_distance( $curr_div_check )
+                : ( ( stripos( $curr_div_check, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
+
+            $fallback_ind_fee = 0.00;
+            if ( ! $is_promo_check && strcasecmp( $curr_paid_raw, 'Field Governor' ) !== 0 ) {
+                $fallback_ind_fee = function_exists( 'sywat_get_archer_individual_fee' )
+                    ? sywat_get_archer_individual_fee( $t_context, $curr_div_check, $calc_dist_check, $raw_sty_check, $checkin_round, '' )
+                    : ( $is_youth_check ? 25.00 : 30.00 );
             }
 
             $household_info = function_exists( 'sywat_get_household_balance_info' )
@@ -108,10 +180,20 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
             }
 
             $is_family_balance = $is_family || ( $household_info && ! empty( $household_info['has_family'] ) );
-            $display_due       = $is_family_balance ? $effective_due : ( $modal_due > 0 ? $modal_due : ( $is_youth_check ? 25.00 : 30.00 ) );
+            $display_due       = $is_family_balance ? $effective_due : ( $modal_due > 0 ? $modal_due : $fallback_ind_fee );
 
             $checkin_line_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $modal_archer, $lines ) : ( isset( $modal_archer['line_index'] ) ? $modal_archer['line_index'] : '0' );
             $checkin_families = isset( $existing_families_by_line[ $checkin_line_idx ] ) ? $existing_families_by_line[ $checkin_line_idx ] : $existing_families;
+
+            if ( $is_promo_check ) {
+                $curr_pay_opt = 'Promo (Free)';
+            } elseif ( $is_family ) {
+                $curr_pay_opt = 'Family';
+            } elseif ( strcasecmp( $curr_paid_raw, 'Field Governor' ) === 0 ) {
+                $curr_pay_opt = 'Field Governor';
+            } else {
+                $curr_pay_opt = 'Individual';
+            }
         ?>
         <div class="sywat-modal-backdrop active">
             <div class="sywat-modal-content sywat-modal-sm">
@@ -131,12 +213,35 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
                         <input type="hidden" name="reg_id" value="<?php echo esc_attr( $modal_archer['id'] ); ?>">
 
+                        <?php if ( ! $is_multi_round && count( $checkin_round_options ) <= 1 ) : ?>
+                            <input type="hidden" name="checkin_pricing_profile" value="<?php echo esc_attr( $checkin_round ); ?>">
+                        <?php endif; ?>
+
                         <div class="sywat-field-group sywat-field-relative">
                             <label>Name:</label>
                             <input type="text" name="checkin_name" id="checkin_archer_name" value="<?php echo esc_attr( $modal_archer['name'] ); ?>" autocomplete="off" class="sywat-input-bold">
                             <div id="checkin_tfaa_badge"></div>
                             <div id="checkin_tfaa_pills" class="sywat-pill-box"></div>
                         </div>
+
+                        <?php if ( $is_multi_round || count( $checkin_round_options ) > 1 ) : ?>
+                            <div class="sywat-field-group">
+                                <label for="checkin_pricing_profile">Round Format:</label>
+                                <select name="checkin_pricing_profile" id="checkin_pricing_profile" required>
+                                    <?php foreach ( $checkin_round_options as $r_slug => $r_rec ) : ?>
+                                        <?php
+                                            $r_label = $r_rec['label'];
+                                            if ( ! empty( $r_rec['round_subtitle'] ) ) {
+                                                $r_label .= ' (' . $r_rec['round_subtitle'] . ')';
+                                            }
+                                        ?>
+                                        <option value="<?php echo esc_attr( $r_slug ); ?>" <?php selected( $checkin_round, $r_slug ); ?>>
+                                            <?php echo esc_html( $r_label ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
 
                         <?php if ( $effective_due > 0 ) : ?>
                             <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger sywat-alert-center">
@@ -211,14 +316,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                             <label>Style:</label>
                             <select name="checkin_style" id="checkin_style" required onchange="if(window.handleStyleChange) handleStyleChange('checkin'); evaluateTfaaStatus('checkin');">
                                 <?php
-                                $raw_sty = isset( $modal_archer['style'] ) ? trim( (string) $modal_archer['style'] ) : '';
-                                if ( $raw_sty === '—' ) {
-                                    $raw_sty = '';
-                                }
-                                if ( $raw_sty !== '' && strcasecmp( $raw_sty, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
-                                    $raw_sty = sywat_shooting_styles_normalize_style( $raw_sty );
-                                }
-                                $curr_sty = $raw_sty;
+                                $curr_sty = $raw_sty_check;
 
                                 $checkin_style_options = array();
                                 foreach ( $active_styles as $s ) {
@@ -245,13 +343,10 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <div class="sywat-field-group">
                             <label>Paid Option:</label>
                             <select name="checkin_pay_option" id="checkin_pay_option" required onchange="toggleFamilyBox('checkin')">
-                                <?php
-                                $curr_paid    = isset( $modal_archer['paid'] ) ? $modal_archer['paid'] : '';
-                                $curr_pay_opt = ( $curr_paid === 'Family' ) ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
-                                ?>
                                 <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual</option>
                                 <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family</option>
                                 <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor</option>
+                                <option value="Promo (Free)" <?php selected( $curr_pay_opt, 'Promo (Free)' ); ?>>Promotional Free Entry ($0.00)</option>
                             </select>
                         </div>
 
@@ -283,6 +378,34 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
         <?php
             $edit_line_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $modal_edit_archer, $lines ) : ( isset( $modal_edit_archer['line_index'] ) ? $modal_edit_archer['line_index'] : '0' );
             $edit_families = isset( $existing_families_by_line[ $edit_line_idx ] ) ? $existing_families_by_line[ $edit_line_idx ] : $existing_families;
+
+            $edit_round = ! empty( $modal_edit_archer['pricing_profile'] )
+                ? sanitize_title( (string) $modal_edit_archer['pricing_profile'] )
+                : $default_prof_key;
+            $edit_round_options = $t_profiles;
+            if ( $edit_round !== '' && ! isset( $edit_round_options[ $edit_round ] ) ) {
+                $legacy_edit_rp = function_exists( 'sywat_find_pricing_profile' ) ? sywat_find_pricing_profile( $edit_round ) : null;
+                if ( is_array( $legacy_edit_rp ) ) {
+                    $edit_round_options[ $edit_round ] = $legacy_edit_rp;
+                } else {
+                    $edit_round = $default_prof_key;
+                }
+            }
+
+            $curr_edit_paid_raw = isset( $modal_edit_archer['paid'] ) ? trim( (string) $modal_edit_archer['paid'] ) : '';
+            $is_edit_promo      = ! empty( $modal_edit_archer['is_promo_free'] )
+                || strcasecmp( $curr_edit_paid_raw, 'Promo (Free)' ) === 0
+                || stripos( $curr_edit_paid_raw, 'Promo' ) === 0;
+
+            if ( $is_edit_promo ) {
+                $curr_edit_pay_opt = 'Promo (Free)';
+            } elseif ( strcasecmp( $curr_edit_paid_raw, 'Family' ) === 0 ) {
+                $curr_edit_pay_opt = 'Family';
+            } elseif ( strcasecmp( $curr_edit_paid_raw, 'Field Governor' ) === 0 ) {
+                $curr_edit_pay_opt = 'Field Governor';
+            } else {
+                $curr_edit_pay_opt = 'Individual';
+            }
         ?>
         <div class="sywat-modal-backdrop active">
             <div class="sywat-modal-content sywat-modal-sm">
@@ -302,10 +425,33 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
                         <input type="hidden" name="reg_id" value="<?php echo esc_attr( $modal_edit_archer['id'] ); ?>">
 
+                        <?php if ( ! $is_multi_round && count( $edit_round_options ) <= 1 ) : ?>
+                            <input type="hidden" name="edit_pricing_profile" value="<?php echo esc_attr( $edit_round ); ?>">
+                        <?php endif; ?>
+
                         <div class="sywat-field-group sywat-field-relative">
                             <label>Full Name:</label>
                             <input type="text" name="edit_name" id="edit_archer_name" value="<?php echo esc_attr( $modal_edit_archer['name'] ); ?>" autocomplete="off" required>
                         </div>
+
+                        <?php if ( $is_multi_round || count( $edit_round_options ) > 1 ) : ?>
+                            <div class="sywat-field-group">
+                                <label for="edit_pricing_profile">Round Format:</label>
+                                <select name="edit_pricing_profile" id="edit_pricing_profile" required>
+                                    <?php foreach ( $edit_round_options as $r_slug => $r_rec ) : ?>
+                                        <?php
+                                            $r_label = $r_rec['label'];
+                                            if ( ! empty( $r_rec['round_subtitle'] ) ) {
+                                                $r_label .= ' (' . $r_rec['round_subtitle'] . ')';
+                                            }
+                                        ?>
+                                        <option value="<?php echo esc_attr( $r_slug ); ?>" <?php selected( $edit_round, $r_slug ); ?>>
+                                            <?php echo esc_html( $r_label ); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="sywat-field-group">
                             <label>Shooting Line:</label>
@@ -411,17 +557,14 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <div class="sywat-field-group">
                             <label>Paid Option:</label>
                             <select name="edit_pay_option" id="edit_pay_option" required onchange="toggleFamilyBox('edit')">
-                                <?php
-                                $curr_paid    = isset( $modal_edit_archer['paid'] ) ? $modal_edit_archer['paid'] : '';
-                                $curr_pay_opt = ( $curr_paid === 'Family' ) ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
-                                ?>
-                                <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual</option>
-                                <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family</option>
-                                <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor</option>
+                                <option value="Individual" <?php selected( $curr_edit_pay_opt, 'Individual' ); ?>>Individual</option>
+                                <option value="Family" <?php selected( $curr_edit_pay_opt, 'Family' ); ?>>Family</option>
+                                <option value="Field Governor" <?php selected( $curr_edit_pay_opt, 'Field Governor' ); ?>>Field Governor</option>
+                                <option value="Promo (Free)" <?php selected( $curr_edit_pay_opt, 'Promo (Free)' ); ?>>Promotional Free Entry ($0.00)</option>
                             </select>
                         </div>
 
-                        <div class="sywat-field-group <?php echo ( $curr_pay_opt === 'Family' ) ? '' : 'sywat-hidden'; ?>" id="edit_family_box">
+                        <div class="sywat-field-group <?php echo ( $curr_edit_pay_opt === 'Family' ) ? '' : 'sywat-hidden'; ?>" id="edit_family_box">
                             <label>Line Family Group:</label>
                             <select name="edit_family_group_id" id="edit_family_group_id">
                                 <option value="">[ + Start New Family Group for This Line ]</option>
@@ -453,7 +596,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
         </div>
         <?php endif; ?>
 
-        <!-- ADD WALK-IN MODAL (AUTOMATED FEE & FAMILY CAP ENGINE) -->
+        <!-- ADD WALK-IN MODAL (AUTOMATED FEE, PROMO & FAMILY CAP ENGINE) -->
         <div id="walkinModal" class="sywat-modal-backdrop <?php echo $is_walkin_active ? 'active' : ''; ?>">
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header no-print">
@@ -476,6 +619,10 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $selected_line_idx ); ?>">
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
                         <input type="hidden" name="walkin_session_archers_json" value="<?php echo esc_attr( wp_json_encode( $session_archers ) ); ?>">
+
+                        <?php if ( ! $is_multi_round ) : ?>
+                            <input type="hidden" name="walkin_pricing_profile" id="walkin_pricing_profile" value="<?php echo esc_attr( $default_prof_key ); ?>">
+                        <?php endif; ?>
 
                         <!-- Persistent Group Intake Header -->
                         <div class="sywat-intake-group-wrapper">
@@ -538,12 +685,33 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                             <h2>🏹 Archer Details</h2>
                         </div>
 
-                        <div class="sywat-field-group sywat-field-relative">
-                            <label for="walkin_name_input">Archer Full Name *</label>
-                            <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this);">
-                            <div id="walkin_tfaa_badge"></div>
-                            <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
-                            <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
+                        <div class="<?php echo $is_multi_round ? 'sywat-form-grid-2' : 'sywat-field-group'; ?>">
+                            <div class="sywat-field-group sywat-field-relative">
+                                <label for="walkin_name_input">Archer Full Name *</label>
+                                <input type="text" name="walkin_name" id="walkin_name_input" required placeholder="Type archer name..." autocomplete="off" class="sywat-input-bold" oninput="if(window.handleTfaaAutocomplete) window.handleTfaaAutocomplete(this);">
+                                <div id="walkin_tfaa_badge"></div>
+                                <div id="walkin_tfaa_pills" class="sywat-pill-box"></div>
+                                <div class="sywat-tfaa-autocomplete-dropdown sywat-hidden"></div>
+                            </div>
+
+                            <?php if ( $is_multi_round ) : ?>
+                                <div class="sywat-field-group">
+                                    <label for="walkin_pricing_profile">Round Format *</label>
+                                    <select name="walkin_pricing_profile" id="walkin_pricing_profile" required onchange="if(window.evaluateTfaaStatus) evaluateTfaaStatus('walkin');">
+                                        <?php foreach ( $t_profiles as $p_slug => $p_rec ) : ?>
+                                            <?php
+                                                $opt_label = $p_rec['label'];
+                                                if ( ! empty( $p_rec['round_subtitle'] ) ) {
+                                                    $opt_label .= ' (' . $p_rec['round_subtitle'] . ')';
+                                                }
+                                            ?>
+                                            <option value="<?php echo esc_attr( $p_slug ); ?>" <?php selected( $saved_round_slug, $p_slug ); ?>>
+                                                <?php echo esc_html( $opt_label ); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                         <div class="sywat-form-grid-3 sywat-modal-row-spacing">
@@ -591,7 +759,8 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                                         $roster_items = array();
                                         foreach ( $session_archers as $idx => $sa ) {
                                             $num            = $idx + 1;
-                                            $roster_items[] = '<strong>' . $num . '. ' . esc_html( $sa['name'] ) . '</strong> ($' . number_format( floatval( $sa['fee'] ), 2 ) . ')';
+                                            $promo_tag      = ! empty( $sa['is_promo'] ) ? ' <em>(Promo)</em>' : '';
+                                            $roster_items[] = '<strong>' . $num . '. ' . esc_html( $sa['name'] ) . '</strong> ($' . number_format( floatval( $sa['fee'] ), 2 ) . ')' . $promo_tag;
                                         }
                                         echo implode( ' &bull; ', $roster_items );
                                         ?>
@@ -600,7 +769,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                                 <div class="sywat-intake-summary">
                                     <div class="sywat-calculated-status-value">Total Due: $<?php echo number_format( $session_total, 2 ); ?></div>
                                     <?php if ( $is_capped ) : ?>
-                                        <span class="sywat-family-badge">🟢 Family Cap Applied ($75.00 Max)</span>
+                                        <span class="sywat-family-badge">🟢 Family Cap Applied ($<?php echo esc_html( number_format( $session_cap_amt, 2 ) ); ?> Max)</span>
                                     <?php endif; ?>
                                 </div>
                             </div>
