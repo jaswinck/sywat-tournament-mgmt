@@ -3,10 +3,12 @@
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
  * Author: SYWAT Archery
- * Version: 7.5.1
+ * Version: 7.5.2
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Central Permission Checker for Season/Shop Administration
@@ -86,6 +88,107 @@ if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
 }
 
 /**
+ * Chronological comparator for tournament shooting lines.
+ * Orders by day of week (Mon-Thu -> Friday -> Saturday -> Sunday) and 24-hour start time.
+ *
+ * @param array $a First line slot array.
+ * @param array $b Second line slot array.
+ * @return int Comparison result (-1, 0, 1).
+ */
+if ( ! function_exists( 'sywat_compare_tournament_lines' ) ) {
+    function sywat_compare_tournament_lines( $a, $b ) {
+        if ( ! is_array( $a ) || ! is_array( $b ) ) {
+            return 0;
+        }
+
+        $day_weights = array(
+            'mon'       => 1,
+            'monday'    => 1,
+            'tue'       => 2,
+            'tues'      => 2,
+            'tuesday'   => 2,
+            'wed'       => 3,
+            'wednesday' => 3,
+            'thu'       => 4,
+            'thur'      => 4,
+            'thurs'     => 4,
+            'thursday'  => 4,
+            'fri'       => 5,
+            'friday'    => 5,
+            'sat'       => 6,
+            'saturday'  => 6,
+            'sun'       => 7,
+            'sunday'    => 7,
+        );
+
+        $extract_sort_key = function( $line ) use ( $day_weights ) {
+            $name_raw = isset( $line['name'] ) ? trim( (string) $line['name'] ) : '';
+            $day_raw  = isset( $line['day'] ) ? trim( (string) $line['day'] ) : '';
+            $time_raw = isset( $line['time'] ) ? trim( (string) $line['time'] ) : '';
+
+            if ( ( $day_raw === '' || $time_raw === '' ) && $name_raw !== '' ) {
+                $parts = preg_split( '/\s+/', $name_raw, 2 );
+                if ( $day_raw === '' && isset( $parts[0] ) ) {
+                    $day_raw = $parts[0];
+                }
+                if ( $time_raw === '' && isset( $parts[1] ) ) {
+                    $time_raw = $parts[1];
+                }
+            }
+
+            $day_norm   = strtolower( preg_replace( '/[^a-z]/i', '', $day_raw ) );
+            $day_weight = isset( $day_weights[ $day_norm ] ) ? $day_weights[ $day_norm ] : 99;
+
+            $minutes = 9999;
+            if ( $time_raw !== '' && preg_match( '/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i', $time_raw, $m ) ) {
+                $hour     = intval( $m[1] );
+                $mins     = ( isset( $m[2] ) && $m[2] !== '' ) ? intval( $m[2] ) : 0;
+                $meridiem = isset( $m[3] ) ? strtoupper( $m[3] ) : '';
+
+                if ( $meridiem === '' ) {
+                    if ( $hour === 6 || $hour === 12 || ( $hour >= 1 && $hour <= 5 ) ) {
+                        $meridiem = 'PM';
+                    } else {
+                        $meridiem = 'AM';
+                    }
+                }
+
+                // Archery rule: 6 o'clock lines are always PM
+                if ( $hour === 6 ) {
+                    $meridiem = 'PM';
+                }
+
+                if ( $meridiem === 'PM' && $hour < 12 ) {
+                    $hour += 12;
+                } elseif ( $meridiem === 'AM' && $hour === 12 ) {
+                    $hour = 0;
+                }
+
+                $minutes = ( $hour * 60 ) + $mins;
+            } elseif ( $time_raw !== '' ) {
+                $parsed = strtotime( '1970-01-01 ' . $time_raw );
+                if ( $parsed !== false ) {
+                    $minutes = ( intval( date( 'G', $parsed ) ) * 60 ) + intval( date( 'i', $parsed ) );
+                }
+            }
+
+            return array( $day_weight, $minutes, $name_raw );
+        };
+
+        list( $day_a, $min_a, $name_a ) = $extract_sort_key( $a );
+        list( $day_b, $min_b, $name_b ) = $extract_sort_key( $b );
+
+        if ( $day_a !== $day_b ) {
+            return ( $day_a < $day_b ) ? -1 : 1;
+        }
+        if ( $min_a !== $min_b ) {
+            return ( $min_a < $min_b ) ? -1 : 1;
+        }
+        return strnatcasecmp( $name_a, $name_b );
+    }
+}
+
+/**
  * Universal Token & Qualifier Matcher for TFAA Tournament Names
  * Resolves local short names (e.g., "Fort Grard - 1", "Archery HQ - 1") to official TFAA index strings.
  */
@@ -145,7 +248,7 @@ if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
 
 /**
  * Parses raw human line string into structured line slot arrays.
- * Enforces standardized day labels and named slot titles.
+ * Enforces standardized day labels, named slot titles, and chronological Fri->Sat->Sun order.
  *
  * @param string $line_str      Raw schedule string from import file or input.
  * @param int    $default_20yd  Default 20-yard line capacity.
@@ -205,6 +308,10 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
             foreach ( $times as $t ) {
                 $lines[] = array( 'day' => 'Sunday', 'time' => $t, 'name' => 'Sunday ' . $t, 'cap_20yd' => $default_20yd, 'cap_cub' => $default_cub );
             }
+        }
+
+        if ( count( $lines ) > 1 ) {
+            usort( $lines, 'sywat_compare_tournament_lines' );
         }
 
         return $lines;
@@ -475,13 +582,23 @@ if ( ! function_exists( 'sywat_format_tournament_dates' ) ) {
     }
 }
 
+/**
+ * Retrieves tournament shooting lines sorted chronologically (Friday -> Saturday -> Sunday, then by time)
+ * while preserving each line's original array index key (uasort) so stored registration line_index mappings remain intact.
+ *
+ * @param array $t_data Tournament configuration array or raw lines array.
+ * @return array Key-preserved, chronologically sorted line slots.
+ */
 if ( ! function_exists( 'sywat_get_tournament_lines' ) ) {
     function sywat_get_tournament_lines( $t_data ) {
-        if ( ! is_array( $t_data ) ) return array();
-        if ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) {
-            return $t_data['lines'];
+        if ( ! is_array( $t_data ) ) {
+            return array();
         }
-        return $t_data;
+        $lines = ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) ? $t_data['lines'] : $t_data;
+        if ( count( $lines ) > 1 ) {
+            uasort( $lines, 'sywat_compare_tournament_lines' );
+        }
+        return $lines;
     }
 }
 
