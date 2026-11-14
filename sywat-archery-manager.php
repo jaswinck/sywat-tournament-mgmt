@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     6.9.0
+ * Version:     7.0.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '6.9.0' );
+define( 'SYWAT_PLUGIN_VERSION', '7.0.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -36,6 +36,9 @@ require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-frontend.php';
 
 // Load Shared Core Engines & Utilities
 require_once SYWAT_PLUGIN_DIR . 'includes/shooting-styles/class-sywat-shooting-styles.php'; // Shooting Styles & Divisions Configuration Engine ([sywat_shooting_styles])
+if ( file_exists( SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php' ) ) {
+    require_once SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php';               // Dynamic Pricing, Round Formats & Promoter Engine ([sywat_pricing])
+}
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
 
 // Load TFAA Authentication Engine Sub-Modules
