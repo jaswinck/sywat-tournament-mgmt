@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
- * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, database-driven division/style controls, and line-scoped family group assignment.
+ * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, multi-round format selection, database-driven division/style/pricing controls, Promotional Free Entry support, and line-scoped family group assignment.
+ * Compliance: Pure view layer — zero DB writes, zero inline style/script attributes, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -47,6 +48,16 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
             $edit_action_args,
             $manage_base_url
         );
+
+        // Resolve active Pricing & Round Profiles for this tournament
+        $t_profiles       = ( ! empty( $selected_tournament ) && function_exists( 'sywat_get_tournament_pricing_profiles' ) )
+            ? sywat_get_tournament_pricing_profiles( $selected_tournament )
+            : array();
+        $is_multi_round   = count( $t_profiles ) > 1;
+        $default_prof     = ! empty( $t_profiles )
+            ? reset( $t_profiles )
+            : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() );
+        $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
 
         // Load active database-configured age divisions (with safe NFAA fallback)
         $division_options = array();
@@ -130,7 +141,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                 <div class="sywat-modal-header">
                     <div>
                         <h3>✏️ Edit Archer Registration</h3>
-                        <div class="sywat-subtitle">Update registration status, division, shooting line, or payment category details.</div>
+                        <div class="sywat-subtitle">Update registration status, round format, division, shooting line, or payment category details.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Edit Archer Modal" data-sywat-action="close-edit-archer-modal">&times;</button>
                 </div>
@@ -144,9 +155,51 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                             ? 'Waitlist'
                             : ( ( strcasecmp( $raw_status, 'Cancelled' ) === 0 ) ? 'Cancelled' : 'Pre-Reg' );
 
-                        $curr_paid           = isset( $target_archer['paid'] ) ? $target_archer['paid'] : '';
-                        $is_family_member    = ( $curr_paid === 'Family' ) || ( $curr_status === 'Waitlist' && $curr_fam_id !== '' );
-                        $curr_pay_opt        = $is_family_member ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
+                        // Resolve archer's assigned Round / Pricing Profile
+                        $curr_round = ! empty( $target_archer['pricing_profile'] )
+                            ? sanitize_title( (string) $target_archer['pricing_profile'] )
+                            : $default_prof_key;
+
+                        $round_options = $t_profiles;
+                        if ( $curr_round !== '' && ! isset( $round_options[ $curr_round ] ) ) {
+                            $legacy_prof = function_exists( 'sywat_find_pricing_profile' ) ? sywat_find_pricing_profile( $curr_round ) : null;
+                            if ( is_array( $legacy_prof ) ) {
+                                $round_options[ $curr_round ] = $legacy_prof;
+                            } else {
+                                $curr_round = $default_prof_key;
+                            }
+                        }
+
+                        $active_prof = isset( $round_options[ $curr_round ] ) ? $round_options[ $curr_round ] : $default_prof;
+                        $youth_rate  = is_array( $active_prof ) && isset( $active_prof['youth_rate'] ) ? floatval( $active_prof['youth_rate'] ) : 25.00;
+                        $adult_rate  = is_array( $active_prof ) && isset( $active_prof['adult_rate'] ) ? floatval( $active_prof['adult_rate'] ) : 30.00;
+                        $cap_enabled = is_array( $active_prof ) && ! empty( $active_prof['family_cap_enabled'] );
+                        $cap_amount  = is_array( $active_prof ) && isset( $active_prof['family_cap_amount'] ) ? floatval( $active_prof['family_cap_amount'] ) : 75.00;
+                        $cap_min     = is_array( $active_prof ) && isset( $active_prof['family_min_archers'] ) ? max( 2, intval( $active_prof['family_min_archers'] ) ) : 3;
+
+                        $ind_rate_label = ( abs( $youth_rate - $adult_rate ) < 0.01 )
+                            ? sprintf( 'Individual Rate ($%s)', number_format( $adult_rate, 0 ) )
+                            : sprintf( 'Individual Rate ($%s / $%s)', number_format( $youth_rate, 0 ), number_format( $adult_rate, 0 ) );
+
+                        $fam_rate_label = $cap_enabled
+                            ? sprintf( 'Family Group ($%s Cap for %d+ Archers)', number_format( $cap_amount, 0 ), $cap_min )
+                            : 'Family Group';
+
+                        $curr_paid        = isset( $target_archer['paid'] ) ? trim( (string) $target_archer['paid'] ) : '';
+                        $is_promo_free    = ! empty( $target_archer['is_promo_free'] )
+                            || strcasecmp( $curr_paid, 'Promo (Free)' ) === 0
+                            || stripos( $curr_paid, 'Promo' ) === 0;
+                        $is_family_member = ( strcasecmp( $curr_paid, 'Family' ) === 0 ) || ( $curr_status === 'Waitlist' && $curr_fam_id !== '' );
+
+                        if ( $is_promo_free ) {
+                            $curr_pay_opt = 'Promo (Free)';
+                        } elseif ( $is_family_member ) {
+                            $curr_pay_opt = 'Family';
+                        } elseif ( strcasecmp( $curr_paid, 'Field Governor' ) === 0 ) {
+                            $curr_pay_opt = 'Field Governor';
+                        } else {
+                            $curr_pay_opt = 'Individual';
+                        }
 
                         $raw_curr_div = isset( $target_archer['division'] ) ? trim( (string) $target_archer['division'] ) : '';
                         if ( $raw_curr_div !== '' && $raw_curr_div !== '—' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
@@ -208,11 +261,34 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
                             <?php endif; ?>
 
+                            <?php if ( ! $is_multi_round && count( $round_options ) <= 1 ) : ?>
+                                <input type="hidden" name="edit_pricing_profile" value="<?php echo esc_attr( $curr_round ); ?>">
+                            <?php endif; ?>
+
                             <div class="sywat-form-grid-2">
-                                <div class="sywat-field-group sywat-full-width">
+                                <div class="sywat-field-group <?php echo ( $is_multi_round || count( $round_options ) > 1 ) ? '' : 'sywat-full-width'; ?>">
                                     <label for="edit_name">Full Name</label>
                                     <input type="text" id="edit_name" name="edit_name" value="<?php echo esc_attr( $target_archer['name'] ); ?>" required>
                                 </div>
+
+                                <?php if ( $is_multi_round || count( $round_options ) > 1 ) : ?>
+                                    <div class="sywat-field-group">
+                                        <label for="edit_pricing_profile">Round Format</label>
+                                        <select name="edit_pricing_profile" id="edit_pricing_profile" required data-sywat-action="roster-edit-round-change">
+                                            <?php foreach ( $round_options as $r_slug => $r_rec ) : ?>
+                                                <?php
+                                                    $r_label = $r_rec['label'];
+                                                    if ( ! empty( $r_rec['round_subtitle'] ) ) {
+                                                        $r_label .= ' (' . $r_rec['round_subtitle'] . ')';
+                                                    }
+                                                ?>
+                                                <option value="<?php echo esc_attr( $r_slug ); ?>" <?php selected( $curr_round, $r_slug ); ?>>
+                                                    <?php echo esc_html( $r_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                <?php endif; ?>
 
                                 <div class="sywat-field-group">
                                     <label for="edit_line_index">Shooting Line</label>
@@ -285,9 +361,10 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <div class="sywat-field-group">
                                     <label for="edit_pay_option">Paid Option</label>
                                     <select name="edit_pay_option" id="edit_pay_option" required data-sywat-action="roster-edit-pay-change">
-                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual Rate ($25 / $30)</option>
-                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family Group ($75 Cap for 3+ Archers)</option>
+                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>><?php echo esc_html( $ind_rate_label ); ?></option>
+                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>><?php echo esc_html( $fam_rate_label ); ?></option>
                                         <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor (Free)</option>
+                                        <option value="Promo (Free)" <?php selected( $curr_pay_opt, 'Promo (Free)' ); ?>>Promotional Free Entry ($0.00)</option>
                                     </select>
                                 </div>
 
