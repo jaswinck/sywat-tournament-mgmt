@@ -5,7 +5,7 @@
  * Description: Renders the [sywat_pricing] administration interface for managing round pricing profiles (Indoor, Field, Field 50, Known 3D, 900, and custom formats), per-division rate overrides, household family cap rules, and configurable first-time/lapsed shooter promotional rules.
  * Compliance: Pure view layer — zero direct SQL queries, zero inline style attributes, zero inline event handlers, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.2
+ * Version: 1.1.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -463,16 +463,13 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         <!-- SECTION 3: HOUSEHOLD FAMILY CAP RULES -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>Household Family Cap Limits</h2>
-                        </div>
-
-                        <div class="sywat-field-group">
                             <label class="sywat-checkbox-label" for="sywat_pf_family_cap_enabled">
                                 <input type="checkbox" name="family_cap_enabled" id="sywat_pf_family_cap_enabled" value="1" data-sywat-action="toggle-family-cap-fields" checked>
                                 Enable Household Family Cap for this format
                             </label>
                         </div>
 
-                        <div class="sywat-form-grid-3 sywat-mt-2" id="sywat_family_cap_fields">
+                        <div class="sywat-form-grid-3" id="sywat_family_cap_fields">
                             <div class="sywat-field-group">
                                 <label for="sywat_pf_family_cap_amount">Max Household Cap ($)</label>
                                 <input type="number" name="family_cap_amount" id="sywat_pf_family_cap_amount" value="75.00" min="0" step="0.01">
@@ -495,16 +492,13 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         <!-- SECTION 4: PROMOTIONAL FREE ENTRY RULES -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>First-Time / Lapsed Shooter Promotional Rules</h2>
-                        </div>
-
-                        <div class="sywat-field-group">
                             <label class="sywat-checkbox-label" for="sywat_pf_promo_enabled">
                                 <input type="checkbox" name="promo_enabled" id="sywat_pf_promo_enabled" value="1" data-sywat-action="toggle-promo-fields">
                                 Allow $0.00 Promotional Free Entries on this format (when enabled on the active Season)
                             </label>
                         </div>
 
-                        <div id="sywat_promo_fields" class="sywat-mt-2 sywat-hidden">
+                        <div id="sywat_promo_fields" class="sywat-hidden">
                             <div class="sywat-form-grid-3">
                                 <div class="sywat-field-group">
                                     <label for="sywat_pf_promo_label">Promo Display Label</label>
@@ -561,12 +555,12 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                 </div>
                             <?php endif; ?>
                         </div>
-
-                        <div class="sywat-modal-form-actions">
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="close-pricing-modal">Cancel</button>
-                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Pricing Format</button>
-                        </div>
                     </form>
+                </div>
+
+                <div class="sywat-modal-footer no-print">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="close-pricing-modal">Cancel</button>
+                    <button type="submit" form="sywat_pricing_profile_form" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Pricing Format</button>
                 </div>
             </div>
         </div>
