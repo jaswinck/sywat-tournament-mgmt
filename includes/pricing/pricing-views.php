@@ -5,7 +5,7 @@
  * Description: Renders the [sywat_pricing] administration interface for managing round pricing profiles (Indoor, Field, Field 50, Known 3D, 900, and custom formats), per-division rate overrides, household family cap rules, and configurable first-time/lapsed shooter promotional rules.
  * Compliance: Pure view layer — zero direct SQL queries, zero inline style attributes, zero inline event handlers, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.1
+ * Version: 1.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -340,10 +340,16 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
 
         <!-- ADD / EDIT PRICING & PROMOTER PROFILE MODAL -->
         <div class="sywat-modal-backdrop" id="sywat_pricing_profile_modal">
-            <div class="sywat-modal-content sywat-modal-lg">
+            <div class="sywat-modal-content sywat-modal-xl">
                 <div class="sywat-modal-header no-print">
                     <div>
-                        <h3 id="sywat_pricing_modal_title">Configure Pricing &amp; Round Format</h3>
+                        <h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                            <span id="sywat_pricing_modal_title">Configure Pricing &amp; Round Format</span>
+                        </h3>
                         <div class="sywat-subtitle">Define tier rates, optional per-division overrides, household cap rules, and first-time shooter promotional limits.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" data-sywat-action="close-pricing-modal" aria-label="Close pricing format modal">&times;</button>
@@ -373,7 +379,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </div>
                         </div>
 
-                        <div class="sywat-form-grid-3 sywat-mt-3">
+                        <div class="sywat-form-grid-3 sywat-mt-2">
                             <div class="sywat-field-group">
                                 <label for="sywat_pf_sort_order">Display Order</label>
                                 <input type="number" name="profile_sort_order" id="sywat_pf_sort_order" value="<?php echo intval( $total_profiles + 1 ); ?>" min="1" required>
@@ -393,7 +399,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </div>
                         </div>
 
-                        <div class="sywat-field-group sywat-mt-3">
+                        <div class="sywat-field-group sywat-mt-2">
                             <label class="sywat-checkbox-label" for="sywat_pf_is_default">
                                 <input type="checkbox" name="profile_is_default" id="sywat_pf_is_default" value="1">
                                 Set as Global Default Pricing Format (fallback when a tournament has no season or format selected)
@@ -417,7 +423,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </div>
                         </div>
 
-                        <div class="sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-form-grid-2 sywat-mt-2">
                             <div class="sywat-field-group">
                                 <label for="sywat_pf_pro_rate">Pro Category Rate ($) <span class="sywat-label-subtext">(Leave blank to use Adult+ rate)</span></label>
                                 <input type="number" name="pro_rate" id="sywat_pf_pro_rate" value="" min="0" step="0.01" placeholder="Optional Pro entry rate">
@@ -430,9 +436,9 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                         </div>
 
                         <?php if ( ! empty( $divisions ) ) : ?>
-                            <details class="sywat-mt-3" id="sywat_pf_overrides_disclosure">
+                            <details class="sywat-mt-2" id="sywat_pf_overrides_disclosure">
                                 <summary><strong>Optional Per-Division Price Overrides</strong> (Leave blank to use standard Youth / Adult+ tier rates above)</summary>
-                                <div class="sywat-form-grid-3 sywat-mt-3">
+                                <div class="sywat-form-grid-3 sywat-mt-2">
                                     <?php foreach ( $divisions as $div_slug => $div_rec ) : ?>
                                         <div class="sywat-field-group">
                                             <label for="sywat_pf_ov_<?php echo esc_attr( $div_slug ); ?>">
@@ -466,7 +472,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </label>
                         </div>
 
-                        <div class="sywat-form-grid-3 sywat-mt-3" id="sywat_family_cap_fields">
+                        <div class="sywat-form-grid-3 sywat-mt-2" id="sywat_family_cap_fields">
                             <div class="sywat-field-group">
                                 <label for="sywat_pf_family_cap_amount">Max Household Cap ($)</label>
                                 <input type="number" name="family_cap_amount" id="sywat_pf_family_cap_amount" value="75.00" min="0" step="0.01">
@@ -498,7 +504,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </label>
                         </div>
 
-                        <div id="sywat_promo_fields" class="sywat-mt-3 sywat-hidden">
+                        <div id="sywat_promo_fields" class="sywat-mt-2 sywat-hidden">
                             <div class="sywat-form-grid-3">
                                 <div class="sywat-field-group">
                                     <label for="sywat_pf_promo_label">Promo Display Label</label>
@@ -519,7 +525,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                                 </div>
                             </div>
 
-                            <div class="sywat-form-grid-2 sywat-mt-3">
+                            <div class="sywat-form-grid-2 sywat-mt-2">
                                 <div class="sywat-field-group">
                                     <label for="sywat_pf_promo_max_uses">Max Free Promotional Shoots <span class="sywat-label-subtext">(0 = Unlimited while eligible)</span></label>
                                     <input type="number" name="promo_max_uses" id="sywat_pf_promo_max_uses" value="1" min="0" max="50">
@@ -536,7 +542,7 @@ if ( ! function_exists( 'render_sywat_pricing_portal' ) ) {
                             </div>
 
                             <?php if ( ! empty( $all_profiles ) ) : ?>
-                                <div class="sywat-field-group sywat-mt-3">
+                                <div class="sywat-field-group sywat-mt-2">
                                     <label>Qualifying Prior-Experience Formats <span class="sywat-label-subtext">(Archers who shot any checked format within the lookback window pay standard rates)</span></label>
                                     <div class="sywat-role-grid sywat-form-grid-3">
                                         <?php foreach ( $all_profiles as $hp_slug => $hp_rec ) : ?>
