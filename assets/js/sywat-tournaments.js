@@ -2,7 +2,7 @@
  * SYWAT Archery - Master Tournament Management Client Engine
  * Path: assets/js/sywat-tournaments.js
  * Author: SYWAT Archery
- * Version: 6.8.2
+ * Version: 7.0.0
  */
 
 let sywatTournamentNameIsCustomized = false;
@@ -131,6 +131,39 @@ function sywatSyncShopCapacities() {
     });
 }
 
+/**
+ * Synchronizes Offered Round / Pricing Format checkboxes with the selected
+ * Competition Season when creating a new tournament.
+ */
+function sywatSyncTournamentPricingProfiles() {
+    const wrap        = document.getElementById('sywat_modal_pricing_profiles_wrap');
+    const seasonField = document.getElementById('sywat_modal_season_slug');
+
+    if (!wrap || !seasonField || seasonField.tagName.toLowerCase() !== 'select') {
+        return;
+    }
+
+    const rawMap = wrap.getAttribute('data-season-profiles') || '{}';
+    let seasonMap = {};
+    try {
+        seasonMap = JSON.parse(rawMap);
+    } catch (e) {
+        seasonMap = {};
+    }
+
+    const selectedSeason = String(seasonField.value || '').trim();
+    const targetSlugs    = Array.isArray(seasonMap[selectedSeason]) ? seasonMap[selectedSeason] : [];
+    const checkboxes     = wrap.querySelectorAll('.sywat-tourn-pricing-profile-cb');
+
+    if (!checkboxes.length || targetSlugs.length === 0) {
+        return;
+    }
+
+    checkboxes.forEach(cb => {
+        cb.checked = targetSlugs.indexOf(cb.value) !== -1;
+    });
+}
+
 function sywatAutoGenerateTournamentName(force) {
     if (sywatTournamentNameIsCustomized && !force) return;
 
@@ -204,8 +237,9 @@ function openAddTournamentModal() {
         sywatTournamentNameIsCustomized = false;
     }
 
-    // Immediately synchronize capacity inputs with the pre-selected host shop's defaults
+    // Synchronize capacity inputs and season-inherited pricing formats
     sywatSyncShopCapacities();
+    sywatSyncTournamentPricingProfiles();
 }
 
 function closeAddTournamentModal() {
@@ -341,6 +375,15 @@ function removeTournamentLineRow(btn) {
 }
 
 function validateTournamentLines() {
+    const pricingWrap = document.getElementById('sywat_modal_pricing_profiles_wrap');
+    if (pricingWrap) {
+        const checkedFormats = pricingWrap.querySelectorAll('.sywat-tourn-pricing-profile-cb:checked');
+        if (checkedFormats.length === 0) {
+            alert('Please select at least one Offered Round / Pricing Format for this tournament.');
+            return false;
+        }
+    }
+
     const table = document.querySelector('#sywat_tourn_lines_table');
     if (!table) return true;
 
@@ -594,6 +637,14 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // Bind Season -> Pricing Format inheritance in Create Tournament mode
+    const modalSeasonSelect = document.getElementById('sywat_modal_season_slug');
+    if (modalSeasonSelect && modalSeasonSelect.tagName.toLowerCase() === 'select') {
+        modalSeasonSelect.addEventListener('change', function() {
+            sywatSyncTournamentPricingProfiles();
+        });
+    }
+
     // Restore search persistence from sessionStorage
     const searchInput = document.getElementById('sywat_tournament_search_input');
     if (searchInput) {
@@ -604,9 +655,12 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // Automatically synchronize capacity inputs if modal is active on page paint
+    // Automatically synchronize capacity inputs (and formats in Create mode) if modal is active on page paint
     const activeTournModal = document.getElementById('sywat_add_tourn_modal');
     if (activeTournModal && activeTournModal.classList.contains('active')) {
         sywatSyncShopCapacities();
+        if (modalSeasonSelect && modalSeasonSelect.tagName.toLowerCase() === 'select') {
+            sywatSyncTournamentPricingProfiles();
+        }
     }
 });
