@@ -106,7 +106,7 @@ if ( ! function_exists( 'sywat_page_defaults' ) ) {
             'results'             => array( '/results/', 'Results & Standings page' ),
             'member_directory'    => array( '/member-directory/', 'Member Directory page' ),
             'shooting_styles'     => array( '/shooting-styles/', 'Shooting Styles & Rules page' ),
-            'pricing'             => array( '/pricing-formats/', 'Pricing & Round Formats page' ),
+            'pricing'             => array( '/pricing/', 'Pricing & Round Formats page' ),
             'after_login_manager' => array( '/tournaments', 'After login: tournament managers go to' ),
             'after_login_shop'    => array( '/desk', 'After login: shop operators go to' ),
         );
