@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
- * Description: Handles multi-archer phone intake, round/pricing profile resolution, First-Time/Lapsed Shooter promoter free-entry evaluation, database-driven division/fee-tier resolution, dynamic Household Family Cap evaluation (line or tournament scope), waitlist triage ('all' vs. 'remainder'), and atomic multi-store persistence.
+ * Description: Handles multi-archer phone intake, Member Directory DOB & history profile resolution via sywat_resolve_archer_intake_profile(), round/pricing profile resolution, First-Time/Lapsed Shooter promoter free-entry evaluation, database-driven division/fee-tier resolution, dynamic Household Family Cap evaluation (line or tournament scope), waitlist triage ('all' vs. 'remainder'), and atomic multi-store persistence.
+ * Compliance: Pure action layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -63,9 +64,9 @@ if ( ! function_exists( 'sywat_registration_resolve_line_idx' ) ) {
 }
 
 /**
- * Handles multi-archer phone intake, round/pricing profile fee calculation,
- * First-Time/Lapsed Shooter promoter evaluation, active-only household family capping,
- * waitlists, and persistence.
+ * Handles multi-archer phone intake, Member Directory & history profile lookup,
+ * round/pricing profile fee calculation, First-Time/Lapsed Shooter promoter evaluation,
+ * active-only household family capping, waitlists, and persistence.
  *
  * @param array $tournaments   Master tournament configuration array.
  * @param array $registrations Master registration state array reference.
@@ -82,8 +83,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $waitlist_mode    = sanitize_text_field( wp_unslash( $_POST['waitlist_mode'] ?? '' ) );
         $t_slug           = sanitize_title( $tourn_name );
 
-        $t_data  = isset( $tournaments[ $tourn_name ] ) ? $tournaments[ $tourn_name ] : array();
-        $t_lines = function_exists( 'sywat_get_tournament_lines' )
+        $t_data     = isset( $tournaments[ $tourn_name ] ) ? $tournaments[ $tourn_name ] : array();
+        $tourn_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? (string) $t_data['start_date'] : '';
+        $t_lines    = function_exists( 'sywat_get_tournament_lines' )
             ? sywat_get_tournament_lines( $t_data )
             : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
 
@@ -156,12 +158,24 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 : sanitize_text_field( $a['distance'] ?? '20yd' );
             $division = trim( sanitize_text_field( $a['division'] ?? '' ) );
 
+            // Resolve Member Directory (DOB age division, gender, contact) & cached shop/TFAA history
+            $resolved_profile = function_exists( 'sywat_resolve_archer_intake_profile' )
+                ? sywat_resolve_archer_intake_profile( $name, $tourn_date, array( 'phone' => $group_phone ) )
+                : array();
+
             if ( $division !== '' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
                 $division = sywat_shooting_styles_normalize_division( $division );
             }
 
             if ( empty( $division ) ) {
-                $division = ( $distance === 'Cub' ) ? $default_cub_div : $default_20yd_div;
+                if ( ! empty( $resolved_profile['division'] ) ) {
+                    $division = $resolved_profile['division'];
+                    if ( isset( $resolved_profile['distance'] ) && $resolved_profile['distance'] === 'Cub' ) {
+                        $distance = 'Cub';
+                    }
+                } else {
+                    $division = ( $distance === 'Cub' ) ? $default_cub_div : $default_20yd_div;
+                }
             } elseif ( function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
                 $div_dist = sywat_shooting_styles_get_division_distance( $division );
                 if ( $div_dist === 'Cub' ) {
@@ -194,6 +208,10 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'distance'        => $distance,
                 'pricing_profile' => $raw_round,
                 'line_idx'        => $resolved_idx,
+                'gender'          => isset( $resolved_profile['gender'] ) ? $resolved_profile['gender'] : '',
+                'style'           => isset( $resolved_profile['style'] ) ? $resolved_profile['style'] : '',
+                'phone'           => ! empty( $group_phone ) ? $group_phone : ( isset( $resolved_profile['phone'] ) ? $resolved_profile['phone'] : '' ),
+                'email'           => isset( $resolved_profile['email'] ) ? $resolved_profile['email'] : '',
             );
         }
 
@@ -332,11 +350,11 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
 
         // Pass 1: Duplicate/capacity triage, Promo eligibility check, and active-only group stats
-        $triaged_archers         = array();
-        $active_group_stats      = array();
-        $skipped_duplicates      = array();
-        $skipped_full            = array();
-        $claimed_promo_names     = array();
+        $triaged_archers     = array();
+        $active_group_stats  = array();
+        $skipped_duplicates  = array();
+        $skipped_full        = array();
+        $claimed_promo_names = array();
 
         foreach ( $valid_archers as $archer ) {
             $l_idx      = $archer['line_idx'];
@@ -526,13 +544,14 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'line_index'      => $l_idx,
                 'line_name'       => $line_name,
                 'name'            => $name,
-                'phone'           => $group_phone,
+                'phone'           => $archer['phone'],
+                'email'           => $archer['email'],
                 'distance'        => $dist,
                 'division'        => $archer['division'],
                 'pricing_profile' => $round_slug,
                 'is_promo_free'   => $is_promo_free,
-                'gender'          => '',
-                'style'           => '',
+                'gender'          => $archer['gender'],
+                'style'           => $archer['style'],
                 'paid'            => $paid_status,
                 'family_id'       => $fam_id_val,
                 'family_name'     => $family_base_name,
