@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with sticky tournament carryover, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -179,51 +180,17 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                     <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
                 </div>
             </div>
-            <?php if ( ! empty( $lines ) ) : ?>
+            <?php if ( ! empty( $lines ) && is_array( $lines ) ) : ?>
                 <?php
-                    $ordered_lines = array();
-                    foreach ( $lines as $idx => $line ) {
-                        $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ( $idx + 1 );
-                        $weight     = 50;
-
-                        if ( stripos( $line_title, 'Sat' ) !== false ) {
-                            if ( stripos( $line_title, '10' ) !== false ) {
-                                $weight = 10;
-                            } elseif ( stripos( $line_title, '2' ) !== false ) {
-                                $weight = 20;
-                            } else {
-                                $weight = 25;
-                            }
-                        } elseif ( stripos( $line_title, 'Sun' ) !== false ) {
-                            if ( stripos( $line_title, '10' ) !== false ) {
-                                $weight = 30;
-                            } elseif ( stripos( $line_title, '2' ) !== false ) {
-                                $weight = 40;
-                            } else {
-                                $weight = 45;
-                            }
-                        }
-
-                        $ordered_lines[] = array(
-                            'idx'    => (string) $idx,
-                            'line'   => $line,
-                            'weight' => $weight,
-                        );
+                    if ( function_exists( 'sywat_compare_tournament_lines' ) ) {
+                        uasort( $lines, 'sywat_compare_tournament_lines' );
                     }
-
-                    usort( $ordered_lines, function( $a, $b ) {
-                        if ( $a['weight'] !== $b['weight'] ) {
-                            return $a['weight'] <=> $b['weight'];
-                        }
-                        return $a['idx'] <=> $b['idx'];
-                    } );
                 ?>
 
                 <div class="sywat-tracker-grid">
-                    <?php foreach ( $ordered_lines as $item ) : ?>
+                    <?php foreach ( $lines as $raw_idx => $line ) : ?>
                         <?php
-                            $idx       = $item['idx'];
-                            $line      = $item['line'];
+                            $idx       = (string) $raw_idx;
                             $line_name = isset( $line['name'] ) ? trim( $line['name'] ) : '';
 
                             $booked_20yd     = 0;
