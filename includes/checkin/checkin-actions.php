@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, First-Time/Lapsed Shooter promoter evaluation, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in balance verification, and archer edits/deletions with Family Cap reconciliation.
+ * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, First-Time/Lapsed Shooter promoter evaluation, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance, and archer edits/deletions with Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -55,6 +55,14 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         $default_prof     = isset( $t_profiles[ $default_prof_key ] )
             ? $t_profiles[ $default_prof_key ]
             : ( ! empty( $t_profiles ) ? reset( $t_profiles ) : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() ) );
+
+        $use_tourn_wide_cap = false;
+        foreach ( $t_profiles as $tp ) {
+            if ( ! empty( $tp['family_cap_enabled'] ) && isset( $tp['family_cap_scope'] ) && $tp['family_cap_scope'] === 'tournament' ) {
+                $use_tourn_wide_cap = true;
+                break;
+            }
+        }
 
         // Delegate Waitlist Modal actions (promote_waitlist, move_waitlist_line, modal delete_shooter) to central Waitlist engine
         if ( function_exists( 'sywat_waitlist_is_supported_action' ) && sywat_waitlist_is_supported_action( $action ) && function_exists( 'sywat_waitlist_dispatch_post_action' ) ) {
@@ -177,6 +185,58 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 'style'    => $clean_style,
                 'division' => $clean_div,
             );
+        };
+
+        /**
+         * Clear unpaid balance_due across all active members sharing the same family_id or booking_id
+         * when a household/group payment is collected at check-in or marked Paid in edit.
+         */
+        $clear_linked_group_balances = function( $source_reg ) use ( &$registrations, $selected_tournament, $active_t_slug, $lines, $use_tourn_wide_cap ) {
+            if ( ! is_array( $source_reg ) ) {
+                return;
+            }
+            $fam_id      = ! empty( $source_reg['family_id'] ) ? trim( (string) $source_reg['family_id'] ) : '';
+            $book_id     = ! empty( $source_reg['booking_id'] ) ? trim( (string) $source_reg['booking_id'] ) : '';
+            $source_id   = isset( $source_reg['id'] ) ? (string) $source_reg['id'] : '';
+            $target_line = function_exists( 'sywat_desk_resolve_line_idx' )
+                ? sywat_desk_resolve_line_idx( $source_reg, $lines )
+                : ( isset( $source_reg['line_index'] ) ? (string) $source_reg['line_index'] : '0' );
+
+            if ( $fam_id === '' && $book_id === '' ) {
+                return;
+            }
+
+            foreach ( $registrations as &$r ) {
+                if ( ! is_array( $r ) || ( isset( $r['id'] ) && (string) $r['id'] === $source_id ) ) {
+                    continue;
+                }
+                if ( ! isset( $r['tournament'] ) || strcasecmp( trim( (string) $r['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                    continue;
+                }
+                $r_status = isset( $r['status'] ) ? trim( (string) $r['status'] ) : '';
+                if ( strcasecmp( $r_status, 'Waitlist' ) === 0 || strcasecmp( $r_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $r_fam   = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
+                $r_book  = ! empty( $r['booking_id'] ) ? trim( (string) $r['booking_id'] ) : '';
+                $r_line  = function_exists( 'sywat_desk_resolve_line_idx' )
+                    ? sywat_desk_resolve_line_idx( $r, $lines )
+                    : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
+
+                $is_book_match = ( $book_id !== '' && $r_book === $book_id );
+                $is_fam_match  = ( $fam_id !== '' && $r_fam === $fam_id ) && ( $use_tourn_wide_cap || $r_line === $target_line );
+
+                if ( $is_book_match || $is_fam_match ) {
+                    $r['balance_due'] = 0;
+                    if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
+                        sywat_waitlist_persist_record( $r, $registrations );
+                    } else {
+                        update_option( 'sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false );
+                    }
+                }
+            }
+            unset( $r );
         };
 
         // Close Line (Preserves Waitlist & Cancelled records; marks un-checked-in active archers as No Show)
@@ -522,7 +582,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html( $name_val ) . '</strong> registered and checked in successfully.' . $promo_note . ' Total Due: $' . number_format( $session_total, 2 ) . '</div>';
         }
 
-        // Check-In (Enforces household-wide unpaid family balance block)
+        // Check-In (Enforces household-wide unpaid family balance block and clears linked balances when verified)
         if ( $action === 'save_checkin' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -552,7 +612,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                                 continue;
                             }
                             $o_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $other_r, $lines ) : ( isset( $other_r['line_index'] ) ? (string) $other_r['line_index'] : '0' );
-                            if ( $o_line !== $reg_line ) {
+                            if ( ! $use_tourn_wide_cap && $o_line !== $reg_line ) {
                                 continue;
                             }
                             $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
@@ -636,44 +696,23 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                             $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title( $line_idx ) . '_' . sanitize_title( $reg['name'] ) . '_' . substr( md5( uniqid( '', true ) ), 0, 4 );
                             $reg['family_name'] = $reg['name'] . ' (Family Cap)';
                         }
-                    } else {
-                        unset( $reg['family_id'], $reg['family_name'] );
                     }
 
                     if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
                         sywat_waitlist_persist_record( $reg, $registrations );
                     } else {
                         update_option( $opt_key, $reg, false );
-                    }
-
-                    $fam_id      = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
-                    $book_id     = ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '';
-                    $target_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-
-                    foreach ( $registrations as &$r ) {
-                        if ( isset( $r['id'] ) && $r['id'] === $target_id ) {
-                            $r = $reg;
-                        }
-                        if ( ! empty( $fam_id ) || ! empty( $book_id ) ) {
-                            $r_line = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $r, $lines ) : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
-                            if ( isset( $r['tournament'] )
-                                && strcasecmp( $r['tournament'], $selected_tournament ) === 0
-                                && $r_line === $target_line ) {
-
-                                $is_fam_match = ( ! empty( $fam_id ) && isset( $r['family_id'] ) && trim( (string) $r['family_id'] ) === $fam_id ) ||
-                                                ( ! empty( $book_id ) && isset( $r['booking_id'] ) && trim( (string) $r['booking_id'] ) === $book_id );
-                                if ( $is_fam_match ) {
-                                    $r['balance_due'] = 0;
-                                    if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
-                                        sywat_waitlist_persist_record( $r, $registrations );
-                                    } else {
-                                        update_option( 'sywat_t_' . $active_t_slug . '_' . $r['id'], $r, false );
-                                    }
-                                }
+                        foreach ( $registrations as &$r ) {
+                            if ( isset( $r['id'] ) && $r['id'] === $target_id ) {
+                                $r = $reg;
+                                break;
                             }
                         }
+                        unset( $r );
                     }
-                    unset( $r );
+
+                    // Clear unpaid balances across all linked household / booking members
+                    $clear_linked_group_balances( $reg );
                 }
             }
         }
@@ -699,7 +738,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             }
         }
 
-        // Save Edit (With database-driven rule enforcement, round/promo persistence & Family Cap reconciliation)
+        // Save Edit (With automatic fee recalculation on division change, group balance clearance & Family Cap reconciliation)
         if ( $action === 'save_edit' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -710,6 +749,9 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $line_idx    = sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) );
                 $orig_name   = isset( $reg['name'] ) ? trim( $reg['name'] ) : '';
                 $orig_line   = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
+                $orig_div    = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+                $orig_round  = isset( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+                $orig_due    = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.00;
                 $orig_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
 
                 if ( strcasecmp( $orig_name, $edit_name ) !== 0 || (string) $orig_line !== (string) $line_idx ) {
@@ -740,7 +782,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $pay_opt      = sanitize_text_field( wp_unslash( $_POST['edit_pay_option'] ) );
                 $round_slug   = isset( $_POST['edit_pricing_profile'] )
                     ? sanitize_title( wp_unslash( $_POST['edit_pricing_profile'] ) )
-                    : ( ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key );
+                    : ( $orig_round !== '' ? $orig_round : $default_prof_key );
 
                 if ( $round_slug === '' || ( ! empty( $t_profiles ) && ! isset( $t_profiles[ $round_slug ] ) ) ) {
                     $legacy_rp = ( $round_slug !== '' && function_exists( 'sywat_find_pricing_profile' ) ) ? sywat_find_pricing_profile( $round_slug ) : null;
@@ -754,6 +796,9 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $division    = $resolved_sd['division'];
                 $style       = $resolved_sd['style'];
                 $distance    = $resolve_division_distance( $division );
+
+                $submitted_due = isset( $_POST['edit_balance_due'] ) ? max( 0.00, floatval( wp_unslash( $_POST['edit_balance_due'] ) ) ) : 0.00;
+                $div_changed   = ( strcasecmp( $orig_div, $division ) !== 0 || $orig_round !== $round_slug );
 
                 $reg['name']            = $edit_name;
                 $reg['line_index']      = $line_idx;
@@ -771,7 +816,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 } elseif ( $pay_opt === 'Family' ) {
                     $reg['paid']          = 'Family';
                     $reg['is_promo_free'] = false;
-                    $reg['balance_due']   = isset( $_POST['edit_balance_due'] ) ? floatval( wp_unslash( $_POST['edit_balance_due'] ) ) : 0;
+                    $reg['balance_due']   = $submitted_due;
                 } elseif ( $pay_opt === 'Field Governor' ) {
                     $reg['paid']          = 'Field Governor';
                     $reg['is_promo_free'] = false;
@@ -779,7 +824,13 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 } else {
                     $reg['paid']          = $resolve_paid_tier( $division );
                     $reg['is_promo_free'] = false;
-                    $reg['balance_due']   = isset( $_POST['edit_balance_due'] ) ? floatval( wp_unslash( $_POST['edit_balance_due'] ) ) : 0;
+
+                    // Automatically recalculate unpaid fee if division or round changed and balance wasn't manually adjusted
+                    if ( $orig_due > 0 && abs( $submitted_due - $orig_due ) < 0.01 && $div_changed ) {
+                        $reg['balance_due'] = round( $calculate_individual_fee( $division, $style, $round_slug ), 2 );
+                    } else {
+                        $reg['balance_due'] = $submitted_due;
+                    }
                 }
 
                 if ( $reg['paid'] === 'Family' ) {
@@ -793,8 +844,12 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                         $reg['family_id']   = 'fam_' . $active_t_slug . '_l' . sanitize_title( $line_idx ) . '_' . sanitize_title( $edit_name ) . '_' . substr( md5( uniqid( '', true ) ), 0, 4 );
                         $reg['family_name'] = $edit_name . ' (Family Cap)';
                     }
-                } else {
-                    unset( $reg['family_id'], $reg['family_name'] );
+                }
+
+                $balance_was_cleared = ( $reg['balance_due'] <= 0.00 ) && ( $orig_due > 0 || $submitted_due <= 0.00 );
+                if ( $balance_was_cleared && $orig_due > 0 ) {
+                    $prior_paid         = isset( $reg['amount_paid'] ) ? floatval( $reg['amount_paid'] ) : 0.00;
+                    $reg['amount_paid'] = round( $prior_paid + $orig_due, 2 );
                 }
 
                 if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
@@ -809,14 +864,19 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     unset( $r );
                 }
 
-                // Reconcile dynamic Household Family Cap fees if family membership or line changed
-                $new_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
-                if ( function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
-                    if ( $orig_fam_id !== '' ) {
-                        sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $orig_line, $orig_fam_id, $registrations, $lines );
-                    }
-                    if ( $new_fam_id !== '' && ( $new_fam_id !== $orig_fam_id || $line_idx !== $orig_line ) ) {
-                        sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $line_idx, $new_fam_id, $registrations, $lines );
+                // If balance was cleared to $0.00, propagate Paid clearance across all linked household/booking members
+                if ( $balance_was_cleared && $orig_due > 0 ) {
+                    $clear_linked_group_balances( $reg );
+                } else {
+                    // Reconcile dynamic Household Family Cap fees if family membership or line changed
+                    $new_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+                    if ( function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
+                        if ( $orig_fam_id !== '' ) {
+                            sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $orig_line, $orig_fam_id, $registrations, $lines );
+                        }
+                        if ( $new_fam_id !== '' && ( $new_fam_id !== $orig_fam_id || $line_idx !== $orig_line ) ) {
+                            sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $line_idx, $new_fam_id, $registrations, $lines );
+                        }
                     }
                 }
             }
