@@ -1,0 +1,150 @@
+<?php
+/**
+ * Sub-Module: Public Season Schedule Formatting Helpers
+ * Path: includes/schedule/schedule-helpers.php
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data, formats line times without capacity metrics, normalizes external registration links, and calculates chronological event statuses.
+ * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
+ * Author: SYWAT Archery
+ * Version: 1.0.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Formats the raw schedule data payload into a presentation-ready array for the View layer.
+ *
+ * @param array $raw_data The data bundle returned by sywat_schedule_get_raw_data().
+ * @return array Formatted view payload.
+ */
+if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
+    function sywat_schedule_format_view_payload( $raw_data ) {
+        $formatted_tournaments = array();
+        $all_shops             = isset( $raw_data['all_shops'] ) ? $raw_data['all_shops'] : array();
+        $tournaments           = isset( $raw_data['tournaments'] ) ? $raw_data['tournaments'] : array();
+
+        $today = current_time( 'Y-m-d' );
+
+        // Build a quick name-to-shop map for fallback resolution
+        $shop_lookup_map = array();
+        foreach ( $all_shops as $s_id => $s_data ) {
+            if ( is_array( $s_data ) ) {
+                $s_name = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : '' );
+                if ( ! empty( $s_name ) ) {
+                    $shop_lookup_map[ strtolower( trim( $s_name ) ) ] = $s_id;
+                }
+            }
+        }
+
+        foreach ( $tournaments as $t_name => $t_data ) {
+            // 1. Dates & Status Resolution
+            $start_date = isset( $t_data['start_date'] ) ? $t_data['start_date'] : '';
+            $end_date   = ! empty( $t_data['end_date'] ) ? $t_data['end_date'] : $start_date;
+            $disp_dates = function_exists( 'sywat_format_tournament_dates' ) ? sywat_format_tournament_dates( $start_date, $end_date ) : $start_date;
+            
+            $status_code  = 'upcoming';
+            $status_label = 'Upcoming';
+            
+            if ( ! empty( $start_date ) && ! empty( $end_date ) ) {
+                if ( $today > $end_date ) {
+                    $status_code  = 'completed';
+                    $status_label = 'Completed';
+                } elseif ( $today >= $start_date && $today <= $end_date ) {
+                    $status_code  = 'active';
+                    $status_label = 'In Progress';
+                } else {
+                    // Check if it's coming up this weekend (within the next 5 days)
+                    $days_until = ( strtotime( $start_date ) - strtotime( $today ) ) / 86400;
+                    if ( $days_until > 0 && $days_until <= 5 ) {
+                        $status_code  = 'this_weekend';
+                        $status_label = 'This Weekend';
+                    }
+                }
+            }
+
+            // 2. Shop Data Resolution
+            $t_shop_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : ( isset( $t_data['shop_id'] ) ? $t_data['shop_id'] : '' );
+            $shop_name = function_exists( 'sywat_get_tournament_shop_name' ) ? sywat_get_tournament_shop_name( $t_data, $t_name, $all_shops ) : ( ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : '' );
+            
+            if ( empty( $t_shop_id ) ) {
+                $norm_shop = strtolower( trim( $shop_name ) );
+                if ( isset( $shop_lookup_map[ $norm_shop ] ) ) {
+                    $t_shop_id = $shop_lookup_map[ $norm_shop ];
+                }
+            }
+
+            $district = '';
+            $address  = '';
+            if ( ! empty( $t_shop_id ) && isset( $all_shops[ $t_shop_id ] ) ) {
+                $s_info = $all_shops[ $t_shop_id ];
+                $district = isset( $s_info['district'] ) ? $s_info['district'] : '';
+                
+                $addr_parts = array();
+                if ( ! empty( $s_info['address_1'] ) ) $addr_parts[] = $s_info['address_1'];
+                if ( ! empty( $s_info['address_2'] ) ) $addr_parts[] = $s_info['address_2'];
+                
+                $city_state_zip = trim( 
+                    ( ! empty( $s_info['city'] ) ? $s_info['city'] : '' ) . 
+                    ( ! empty( $s_info['city'] ) && ! empty( $s_info['state'] ) ? ', ' : ' ' ) . 
+                    ( ! empty( $s_info['state'] ) ? $s_info['state'] : '' ) . ' ' . 
+                    ( ! empty( $s_info['zip'] ) ? $s_info['zip'] : '' )
+                );
+                
+                if ( ! empty( $city_state_zip ) ) {
+                    $addr_parts[] = $city_state_zip;
+                }
+                $address = implode( ', ', $addr_parts );
+            }
+
+            // 3. Shooting Lines Extraction (Time only, no capacities)
+            $raw_lines = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
+            $lines = array();
+            foreach ( $raw_lines as $l ) {
+                $day  = isset( $l['day'] ) ? $l['day'] : '';
+                $time = isset( $l['time'] ) ? $l['time'] : ( isset( $l['start_time'] ) ? $l['start_time'] : '' );
+                if ( ! empty( $day ) && ! empty( $time ) ) {
+                    $lines[] = array(
+                        'day'  => $day,
+                        'time' => $time,
+                        'name' => trim( $day . ' ' . $time )
+                    );
+                } elseif ( ! empty( $l['name'] ) ) {
+                    $lines[] = array(
+                        'day'  => '',
+                        'time' => '',
+                        'name' => $l['name']
+                    );
+                }
+            }
+
+            // 4. Registration Links Normalization
+            $reg_links = function_exists( 'sywat_get_shop_registration_links' ) ? sywat_get_shop_registration_links( $t_data ) : ( isset( $t_data['registration_links'] ) ? $t_data['registration_links'] : array() );
+
+            // 5. Build Event Card Data
+            $formatted_tournaments[] = array(
+                'name'             => $t_name,
+                'event_type'       => isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT',
+                'start_date'       => $start_date,
+                'end_date'         => $end_date,
+                'display_dates'    => $disp_dates,
+                'status_code'      => $status_code,
+                'status_label'     => $status_label,
+                'shop_name'        => $shop_name,
+                'district'         => $district,
+                'address'          => $address,
+                'lines'            => $lines,
+                'reg_links'        => $reg_links,
+                'scores_published' => ! empty( $t_data['scores_published'] ),
+                'has_tfaa_url'     => ! empty( $t_data['tfaa_results_url'] ),
+            );
+        }
+
+        return array(
+            'target_season_slug' => $raw_data['target_season_slug'],
+            'seasons'            => $raw_data['seasons'],
+            'referenced_shops'   => $raw_data['referenced_shops'],
+            'events'             => $formatted_tournaments,
+        );
+    }
+}
