@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the Add/Edit Tournament modal (with Season-inherited Pricing & Round Format selection and repeatable External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection and progressive-disclosure External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.12.0
+ * Version: 7.13.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -71,6 +71,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 $selected_t_profiles = array( $def_p['slug'] );
             }
         }
+
+        $active_season_slugs = ( ! empty( $edit_t_season ) && isset( $season_profiles_map[ $edit_t_season ] ) )
+            ? $season_profiles_map[ $edit_t_season ]
+            : array();
 
         // Resolve target shop key for fallback initialization
         $target_shop_key = $edit_t_shop;
@@ -298,32 +302,35 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <!-- ROW 3: OPTIONAL TFAA EVENT ID / DIRECT RESULTS URL OVERRIDE -->
                         <div class="sywat-form-grid-1 sywat-modal-row-spacing">
                             <div class="sywat-field-group">
-                                <label for="sywat_modal_tfaa_event_id">TFAA Results Event ID / Direct URL <span class="sywat-label-subtext">(Optional Override)</span></label>
+                                <label for="sywat_modal_tfaa_event_id">TFAA Results Event ID / Direct URL <span class="sywat-label-subtext">(Optional Override — leave blank for automatic season/date matching)</span></label>
                                 <input type="text"
                                        name="tfaa_event_id"
                                        id="sywat_modal_tfaa_event_id"
                                        value="<?php echo esc_attr( $edit_tfaa_val ); ?>"
                                        placeholder="e.g. 76 or https://texasfieldarchery.org/results/76">
-                                <span class="sywat-meta-subtext">Optional direct link or numeric ID from the TFAA results site. If left blank, score sync automatically matches by season, dates, and title.</span>
                             </div>
                         </div>
 
-                        <!-- ROW 4: OFFERED ROUND / PRICING FORMAT(S) -->
+                        <!-- ROW 4: OFFERED ROUND / PRICING FORMAT(S) (SEASON-FILTERED) -->
                         <?php if ( ! empty( $all_pricing_profiles ) ) : ?>
                             <div class="sywat-form-grid-1 sywat-modal-row-spacing"
                                  id="sywat_modal_pricing_profiles_wrap"
                                  data-season-profiles="<?php echo esc_attr( wp_json_encode( $season_profiles_map ) ); ?>">
                                 <div class="sywat-field-group">
-                                    <label>Offered Round / Pricing Format(s) * <span class="sywat-label-subtext">(Select 1 format for single-round shoots, or multiple formats such as Field + Field 50 sharing the same course &amp; start times)</span></label>
+                                    <label>Offered Round / Pricing Format(s) * <span class="sywat-label-subtext">(Select all formats offered at this event)</span></label>
                                     <div class="sywat-form-grid-2">
                                         <?php foreach ( $all_pricing_profiles as $p_slug => $p_rec ) : ?>
                                             <?php
-                                                $is_checked   = in_array( $p_slug, $selected_t_profiles, true );
-                                                $rate_summary = function_exists( 'sywat_format_pricing_profile_summary' )
+                                                $is_checked      = in_array( $p_slug, $selected_t_profiles, true );
+                                                $is_visible_prof = empty( $active_season_slugs )
+                                                    || in_array( $p_slug, $active_season_slugs, true )
+                                                    || $is_checked;
+                                                $rate_summary    = function_exists( 'sywat_format_pricing_profile_summary' )
                                                     ? sywat_format_pricing_profile_summary( $p_rec )
                                                     : '';
                                             ?>
-                                            <label>
+                                            <label class="sywat-tourn-pricing-option<?php echo $is_visible_prof ? '' : ' sywat-hidden'; ?>"
+                                                   data-profile-slug="<?php echo esc_attr( $p_slug ); ?>">
                                                 <input type="checkbox"
                                                        name="tournament_pricing_profiles[]"
                                                        class="sywat-tourn-pricing-profile-cb"
@@ -343,16 +350,15 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         <?php endif; ?>
 
-                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS REPEATER -->
+                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS (PROGRESSIVE DISCLOSURE) -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
-                            <div>
-                                <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional)</span></h2>
-                                <div class="sywat-meta-subtext">Auto-filled from the host shop's default links. Add, edit, or remove links for this event (e.g., FareHarbor 10-yard Cubs vs. 20-yard Youth/Adult links), or leave empty for SYWAT / onsite registration.</div>
-                            </div>
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-tourn-reg-link">+ Add Registration Link</button>
+                            <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional — auto-filled from host shop)</span></h2>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-tourn-reg-link">Add Registration Link</button>
                         </div>
 
-                        <div id="sywat_tourn_reg_links_container" class="sywat-mb-4" data-is-edit="<?php echo $is_edit_mode ? '1' : '0'; ?>">
+                        <div id="sywat_tourn_reg_links_container"
+                             class="sywat-mb-4<?php echo empty( $edit_t_reg_links ) ? ' sywat-hidden' : ''; ?>"
+                             data-is-edit="<?php echo $is_edit_mode ? '1' : '0'; ?>">
                             <?php foreach ( $edit_t_reg_links as $rl ) : ?>
                                 <div class="sywat-reg-link-row sywat-form-grid-2 sywat-mt-3">
                                     <div class="sywat-field-group">
@@ -369,12 +375,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <p id="sywat_tourn_no_reg_links_msg" class="sywat-empty-state-notice <?php echo empty( $edit_t_reg_links ) ? '' : 'sywat-hidden'; ?>">No external registration links configured for this event. Click "+ Add Registration Link" above if archers register through an external shop link.</p>
 
                         <!-- STANDARDIZED SUB-HEADER -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>📋 Shooting Lines & Capacity Templates</h2>
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">+ Add New Line</button>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
                         </div>
 
                         <!-- COMPACT REPEATER TABLE -->
