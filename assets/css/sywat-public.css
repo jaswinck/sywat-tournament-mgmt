@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Public Results, Standings & Dynamic Schedules
    Path: assets/css/sywat-public.css
-   Version: 1.1.0
+   Version: 1.2.0
    ========================================================================== */
 
 .sywat-public-card {
@@ -11,6 +11,66 @@
     padding: 20px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     margin-bottom: 20px;
+}
+
+/* Header Controls & Segmented List/Calendar View Toggle */
+.sywat-schedule-header-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.sywat-header-inline-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.sywat-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: var(--sywat-surface-muted);
+    border: 1px solid var(--sywat-border);
+    border-radius: 6px;
+    padding: 3px;
+    gap: 3px;
+}
+
+.sywat-public-card .sywat-view-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--sywat-text-muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sywat-public-card .sywat-view-toggle-btn:hover {
+    color: var(--sywat-navy);
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.sywat-public-card .sywat-view-toggle-btn.is-active {
+    background: var(--sywat-primary);
+    border-color: var(--sywat-primary-dark);
+    color: #ffffff;
 }
 
 .sywat-filter-bar {
@@ -136,6 +196,327 @@
     max-width: 220px;
 }
 
+/* ==========================================================================
+   Monthly Season Schedule Calendar View
+   ========================================================================== */
+.sywat-cal-panel {
+    margin-top: 8px;
+}
+
+.sywat-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--sywat-surface-alt);
+    border: 1px solid var(--sywat-border);
+    border-radius: 8px;
+}
+
+.sywat-cal-title-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.sywat-public-card .sywat-cal-month-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--sywat-heading);
+    line-height: 1.2;
+}
+
+.sywat-public-card .sywat-cal-today-btn {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.sywat-public-card .sywat-cal-nav-prev:disabled,
+.sywat-public-card .sywat-cal-nav-next:disabled,
+.sywat-public-card .sywat-cal-today-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sywat-cal-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sywat-text-muted);
+}
+
+.sywat-cal-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sywat-cal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.sywat-cal-dot.is-current {
+    background: #d1fae5;
+    border: 1px solid #059669;
+}
+
+.sywat-cal-dot.is-upcoming {
+    background: var(--sywat-primary-tint);
+    border: 1px solid var(--sywat-primary);
+}
+
+.sywat-cal-dot.is-completed {
+    background: var(--sywat-surface-muted);
+    border: 1px solid var(--sywat-border-strong);
+}
+
+.sywat-cal-scroll-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--sywat-border);
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.sywat-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(128px, 1fr));
+    width: 100%;
+    background: var(--sywat-border);
+    gap: 1px;
+}
+
+.sywat-cal-dow {
+    background: var(--sywat-navy-soft);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    padding: 9px 6px;
+    letter-spacing: 0.3px;
+}
+
+.sywat-cal-day {
+    background: #ffffff;
+    min-height: 122px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.sywat-cal-day.is-outside {
+    background: var(--sywat-surface-alt);
+}
+
+.sywat-cal-day.is-today {
+    background: #fffbeb;
+}
+
+.sywat-cal-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 2px;
+}
+
+.sywat-cal-day-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sywat-text-muted);
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 999px;
+}
+
+.sywat-cal-day.is-outside .sywat-cal-day-num {
+    color: var(--sywat-border-strong);
+    font-weight: 600;
+}
+
+.sywat-cal-day.is-today .sywat-cal-day-num {
+    background: #dc2626;
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.sywat-cal-day-events {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sywat-public-card .sywat-cal-event-chip {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    box-sizing: border-box;
+    box-shadow: none;
+    transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.sywat-public-card .sywat-cal-event-chip:hover {
+    filter: brightness(0.95);
+}
+
+.sywat-public-card .sywat-cal-event-chip.is-current {
+    background: #d1fae5;
+    border-color: #6ee7b7;
+    color: #065f46;
+}
+
+.sywat-public-card .sywat-cal-event-chip.is-upcoming {
+    background: var(--sywat-primary-tint);
+    border-color: #bae6fd;
+    color: var(--sywat-primary-dark);
+}
+
+.sywat-public-card .sywat-cal-event-chip.is-completed {
+    background: var(--sywat-surface-muted);
+    border-color: var(--sywat-border);
+    color: var(--sywat-text-muted);
+}
+
+.sywat-public-card .sywat-cal-more-btn {
+    display: block;
+    width: 100%;
+    margin-top: auto;
+    padding: 3px 6px;
+    border: 1px solid var(--sywat-border);
+    border-radius: 4px;
+    background: var(--sywat-surface-alt);
+    color: var(--sywat-primary-dark);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    box-sizing: border-box;
+    box-shadow: none;
+}
+
+.sywat-public-card .sywat-cal-more-btn:hover {
+    background: var(--sywat-primary-tint);
+    border-color: var(--sywat-primary);
+}
+
+/* Event / Day Details Modal Cards */
+.sywat-cal-modal-card {
+    background: #ffffff;
+    border: 1px solid var(--sywat-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.sywat-cal-modal-card:last-child {
+    margin-bottom: 0;
+}
+
+.sywat-cal-modal-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.sywat-cal-modal-date {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sywat-text-subtle);
+    margin-bottom: 2px;
+}
+
+.sywat-cal-modal-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--sywat-navy);
+    line-height: 1.3;
+}
+
+.sywat-cal-modal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.sywat-cal-modal-lines {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--sywat-border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sywat-cal-modal-line-row {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.sywat-cal-modal-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--sywat-border-light);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 @media (max-width: 768px) {
+    .sywat-schedule-header-controls {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
+    }
+
+    .sywat-cal-header {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .sywat-cal-legend {
+        justify-content: flex-start;
+    }
+
     .sywat-filter-bar .sywat-field-group { flex: 1 1 100% !important; width: 100% !important; }
 }
