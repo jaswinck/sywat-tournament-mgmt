@@ -1,10 +1,10 @@
 /**
  * Sub-Module: Public Season Schedule Client Engine (List View & Monthly Calendar View)
  * Path: assets/js/sywat-schedule.js
- * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal with per-line Cubs Only / 20 YD Only pills and stacked tap-to-call shop phone links, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
+ * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal with live SYWAT online registration links & upcoming opening date pills, per-line Cubs Only / 20 YD Only pills and stacked tap-to-call shop phone links, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
  * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden / .active / .is-active class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.3.1
+ * Version: 1.4.0
  */
 
 (function() {
@@ -557,8 +557,9 @@
                 badgeClass = 'sywat-badge-open';
             }
 
-            const iconPin     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
-            const iconExtLink = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
+            const iconPin      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+            const iconExtLink  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
+            const iconRegCheck = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14l2 2 4-4"></path></svg>';
 
             let html = '<div class="sywat-cal-modal-card">';
             html += '<div class="sywat-cal-modal-card-top">';
@@ -652,18 +653,36 @@
                     html += '<span class="sywat-badge sywat-badge-pending">⏳ Results Pending</span>';
                 }
             } else {
+                const pubRegStatus   = evt.public_reg_status || 'closed';
+                const safeSywatUrl   = self.sanitizeUrl( evt.sywat_reg_url );
+                const opensLabel     = evt.public_reg_opens_label || evt.public_reg_opens_date || 'Soon';
+                let renderedAction   = false;
+
+                if ( pubRegStatus === 'open' && safeSywatUrl ) {
+                    html += '<a href="' + self.escapeHtml( safeSywatUrl ) + '" class="sywat-btn sywat-btn-success">' + iconRegCheck + ' Register Online</a>';
+                    renderedAction = true;
+                } else if ( pubRegStatus === 'opens_soon' ) {
+                    html += '<span class="sywat-badge sywat-badge-warning">Opens ' + self.escapeHtml( opensLabel ) + '</span>';
+                    renderedAction = true;
+                }
+
                 const regLinks = Array.isArray( evt.reg_links ) ? evt.reg_links : [];
+                const extBtnClass = ( pubRegStatus === 'open' && safeSywatUrl )
+                    ? 'sywat-btn sywat-btn-secondary'
+                    : 'sywat-btn sywat-btn-success';
                 let renderedLink = false;
+
                 regLinks.forEach(function( link ) {
                     const safeHref = self.sanitizeUrl( link && link.url );
                     if ( safeHref ) {
                         const btnLabel = (link && link.label) ? link.label : 'Register Online';
-                        html += '<a href="' + self.escapeHtml( safeHref ) + '" target="_blank" rel="noopener noreferrer" class="sywat-btn sywat-btn-success">' + iconExtLink + ' ' + self.escapeHtml( btnLabel ) + '</a>';
-                        renderedLink = true;
+                        html += '<a href="' + self.escapeHtml( safeHref ) + '" target="_blank" rel="noopener noreferrer" class="' + extBtnClass + '">' + iconExtLink + ' ' + self.escapeHtml( btnLabel ) + '</a>';
+                        renderedLink   = true;
+                        renderedAction = true;
                     }
                 });
 
-                if ( ! renderedLink ) {
+                if ( ! renderedLink && pubRegStatus !== 'open' ) {
                     if ( evt.shop_phone ) {
                         const telHref = String( evt.shop_phone ).replace(/[^0-9+]/g, '');
                         html += '<div class="sywat-label-subtext">';
@@ -676,7 +695,7 @@
                         }
                         html += '</div>';
                         html += '</div>';
-                    } else {
+                    } else if ( ! renderedAction ) {
                         html += '<span class="sywat-label-subtext">📞 <strong>Contact Host to Register</strong></span>';
                     }
                 }
