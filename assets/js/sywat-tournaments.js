@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Master Tournament & Season Management Client Engine
  * Path: assets/js/sywat-tournaments.js
- * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & default line templates, progressive-disclosure per-tournament registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
+ * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & default line templates, progressive-disclosure per-tournament registration link rows, season-filtered pricing formats, standardized 30-minute AM/PM shooting line dropdown repeaters & duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
  * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.tournaments with legacy attribute compatibility aliases, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden).
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 (function () {
@@ -23,6 +23,90 @@
     function setElementVisible(el, visible) {
         if (!el) return;
         el.classList.toggle('sywat-hidden', !visible);
+    }
+
+    /**
+     * Normalizes a line time string into a canonical token (e.g. "10:00 AM" -> "10AM", "6:30 PM" -> "6:30PM").
+     * Enforces the TFAA rule that 6 o'clock lines are always PM.
+     */
+    function normalizeLineTimeToken(rawToken) {
+        const token = String(rawToken || '').trim();
+        if (!token) return '';
+
+        const match = token.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+        if (match) {
+            const hour = parseInt(match[1], 10);
+            let mins = match[2] || '';
+            let meridiem = (match[3] || '').toUpperCase();
+
+            if (mins === '00') {
+                mins = '';
+            }
+            const minStr = mins ? ':' + mins : '';
+
+            if (!meridiem) {
+                if (hour === 6 || hour === 12 || (hour >= 1 && hour <= 5)) {
+                    meridiem = 'PM';
+                } else {
+                    meridiem = 'AM';
+                }
+            }
+
+            if (hour === 6) {
+                meridiem = 'PM';
+            }
+
+            return hour + minStr + meridiem;
+        }
+
+        return token.toUpperCase();
+    }
+
+    /**
+     * Builds standardized 30-minute AM/PM <option> HTML (7:00 AM through 9:30 PM)
+     * matching sywat_get_standard_line_time_options() in tournament-helpers.php.
+     */
+    function buildStandardLineTimeOptionsHtml(defaultTime) {
+        const rawDefault        = String(defaultTime || '10AM').trim();
+        const normalizedDefault = normalizeLineTimeToken(rawDefault);
+        const options           = [];
+        let matchedStandard     = false;
+
+        for (let mins = 7 * 60; mins <= (21 * 60) + 30; mins += 30) {
+            const hour24   = Math.floor(mins / 60);
+            const minute   = mins % 60;
+            const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+            let hour12     = hour24 % 12;
+            if (hour12 === 0) {
+                hour12 = 12;
+            }
+
+            const minPadded    = String(minute).padStart(2, '0');
+            const token        = hour12 + (minute === 0 ? '' : ':' + minPadded) + meridiem;
+            const label        = hour12 + ':' + minPadded + ' ' + meridiem;
+            const isSelected   = (normalizedDefault === token);
+            if (isSelected) {
+                matchedStandard = true;
+            }
+
+            options.push('<option value="' + token + '"' + (isSelected ? ' selected' : '') + '>' + label + '</option>');
+        }
+
+        if (normalizedDefault && !matchedStandard) {
+            const safeVal   = normalizedDefault.replace(/"/g, '&quot;');
+            const safeLabel = rawDefault.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            options.unshift('<option value="' + safeVal + '" selected>' + safeLabel + '</option>');
+        }
+
+        return options.join('');
+    }
+
+    function getTimeFieldDisplayLabel(fieldEl) {
+        if (!fieldEl) return '';
+        if (fieldEl.tagName && fieldEl.tagName.toLowerCase() === 'select' && fieldEl.selectedIndex >= 0) {
+            return fieldEl.options[fieldEl.selectedIndex].text;
+        }
+        return fieldEl.value || '';
     }
 
     function sywatMarkNameAsCustomized() {
@@ -151,12 +235,13 @@
     }
 
     /**
-     * Builds a repeater table row <tr> for #sywat_tourn_lines_table using safe DOM assignment.
+     * Builds a repeater table row <tr> for #sywat_tourn_lines_table using standardized 30-minute AM/PM time dropdowns.
      */
     function buildTournamentLineRow(dayVal, timeVal, cap20Val, capCubVal) {
         const { cap20, capCub } = sywatGetSelectedShopCapacities();
         const resolvedCap20  = (cap20Val !== undefined && cap20Val !== null && cap20Val !== '') ? cap20Val : cap20;
         const resolvedCapCub = (capCubVal !== undefined && capCubVal !== null && capCubVal !== '') ? capCubVal : capCub;
+        const resolvedTime   = (timeVal !== undefined && timeVal !== null && timeVal !== '') ? timeVal : '10AM';
 
         const tr = document.createElement('tr');
         tr.innerHTML =
@@ -169,7 +254,9 @@
                 '</select>' +
             '</td>' +
             '<td>' +
-                '<input type="text" name="line_times[]" placeholder="10:00 AM" required onchange="checkTournamentLineDuplicate(this);">' +
+                '<select name="line_times[]" required onchange="checkTournamentLineDuplicate(this);">' +
+                    buildStandardLineTimeOptionsHtml(resolvedTime) +
+                '</select>' +
             '</td>' +
             '<td class="sywat-col-center">' +
                 '<input type="number" name="cap_20yd[]" min="0" class="sywat-col-num-input" required>' +
@@ -181,16 +268,12 @@
                 '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-sm" onclick="removeTournamentLineRow(this)">Remove</button>' +
             '</td>';
 
-        const daySelect  = tr.querySelector('select[name="line_days[]"]');
-        const timeInput  = tr.querySelector('input[name="line_times[]"]');
-        const cap20Input = tr.querySelector('input[name="cap_20yd[]"]');
+        const daySelect   = tr.querySelector('select[name="line_days[]"]');
+        const cap20Input  = tr.querySelector('input[name="cap_20yd[]"]');
         const capCubInput = tr.querySelector('input[name="cap_cub[]"]');
 
         if (daySelect) {
             daySelect.value = dayVal || '';
-        }
-        if (timeInput) {
-            timeInput.value = (timeVal !== undefined && timeVal !== null && timeVal !== '') ? timeVal : '10:00 AM';
         }
         if (cap20Input) {
             cap20Input.value = resolvedCap20;
@@ -247,7 +330,7 @@
                 tableBody.appendChild(
                     buildTournamentLineRow(
                         line.day || '',
-                        line.time || '10:00 AM',
+                        line.time || '10AM',
                         line.cap_20yd,
                         line.cap_cub
                     )
@@ -474,10 +557,10 @@
         if (!tr || !table) return true;
 
         const daySelect = tr.querySelector('select[name="line_days[]"]');
-        const timeInput = tr.querySelector('input[name="line_times[]"]');
+        const timeField = tr.querySelector('select[name="line_times[]"], input[name="line_times[]"]');
 
         const dayVal = (daySelect ? daySelect.value : '').trim();
-        const timeVal = (timeInput ? timeInput.value : '').trim().toLowerCase();
+        const timeVal = normalizeLineTimeToken(timeField ? timeField.value : '').toLowerCase();
 
         if (!dayVal || !timeVal) return true;
 
@@ -489,13 +572,13 @@
             if (row === tr) continue;
 
             const otherDaySelect = row.querySelector('select[name="line_days[]"]');
-            const otherTimeInput = row.querySelector('input[name="line_times[]"]');
+            const otherTimeField = row.querySelector('select[name="line_times[]"], input[name="line_times[]"]');
 
             const otherDay = (otherDaySelect ? otherDaySelect.value : '').trim().toLowerCase();
-            const otherTime = (otherTimeInput ? otherTimeInput.value : '').trim().toLowerCase();
+            const otherTime = normalizeLineTimeToken(otherTimeField ? otherTimeField.value : '').toLowerCase();
 
             if (otherDay && otherTime && (otherDay + ' @ ' + otherTime) === currentCombo) {
-                window.alert(`Duplicate tournament line schedule detected: "${dayVal} ${timeInput.value}". This day and start time is already assigned to another line.`);
+                window.alert(`Duplicate tournament line schedule detected: "${dayVal} ${getTimeFieldDisplayLabel(timeField)}". This day and start time is already assigned to another line.`);
                 if (daySelect) {
                     daySelect.value = '';
                     daySelect.focus();
@@ -511,7 +594,7 @@
         if (!tableBody) return;
 
         const { cap20, capCub } = sywatGetSelectedShopCapacities();
-        tableBody.appendChild(buildTournamentLineRow('', '10:00 AM', cap20, capCub));
+        tableBody.appendChild(buildTournamentLineRow('', '10AM', cap20, capCub));
     }
 
     function removeTournamentLineRow(btn) {
@@ -548,12 +631,12 @@
         if (!table) return true;
 
         const daySelects = table.querySelectorAll('select[name="line_days[]"]');
-        const timeInputs = table.querySelectorAll('input[name="line_times[]"]');
+        const timeFields = table.querySelectorAll('select[name="line_times[]"], input[name="line_times[]"]');
 
         const seen = new Map();
         for (let i = 0; i < daySelects.length; i++) {
             const dayVal = (daySelects[i] ? daySelects[i].value : '').trim();
-            const timeVal = (timeInputs[i] ? timeInputs[i].value : '').trim().toLowerCase();
+            const timeVal = normalizeLineTimeToken(timeFields[i] ? timeFields[i].value : '').toLowerCase();
 
             if (!dayVal) {
                 window.alert(`Please select a Shooting Day for row ${i + 1}.`);
@@ -564,7 +647,7 @@
             if (dayVal && timeVal) {
                 const combo = dayVal + ' @ ' + timeVal;
                 if (seen.has(combo)) {
-                    window.alert(`Duplicate tournament line schedule detected: "${dayVal} ${timeInputs[i].value}". Please choose a different day or start time.`);
+                    window.alert(`Duplicate tournament line schedule detected: "${dayVal} ${getTimeFieldDisplayLabel(timeFields[i])}". Please choose a different day or start time.`);
                     daySelects[i].value = '';
                     daySelects[i].focus();
                     return false;
