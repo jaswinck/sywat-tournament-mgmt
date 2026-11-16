@@ -4,7 +4,7 @@
  * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
  * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden / .active / .is-active class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.2.1
  */
 
 (function() {
@@ -18,7 +18,6 @@
     window.SYWAT._scheduleInitialized = true;
 
     const STATUS_PRIORITY = [ 'active', 'this_weekend', 'upcoming' ];
-    const MAX_CHIPS_PER_DAY = 3;
 
     const scheduleEngine = {
         viewMode: 'list',
@@ -159,7 +158,7 @@
                 });
             }
 
-            // 7. Calendar Day Cell Click Delegation (Event Chips & "+N more" Overflow Buttons)
+            // 7. Calendar Event Chip Click Delegation
             const calPanel = document.getElementById('sywat_schedule_calendar_panel');
             if ( calPanel ) {
                 calPanel.addEventListener('click', function( e ) {
@@ -167,13 +166,6 @@
                     if ( chipBtn ) {
                         const evtId = chipBtn.getAttribute('data-event-id');
                         self.openSingleEventModal( evtId, chipBtn );
-                        return;
-                    }
-
-                    const moreBtn = e.target.closest('.sywat-cal-more-btn');
-                    if ( moreBtn ) {
-                        const dateStr = moreBtn.getAttribute('data-date') || '';
-                        self.openDayEventsModal( dateStr, moreBtn );
                     }
                 });
             }
@@ -501,43 +493,21 @@
                 }
             });
 
-            // 2. Synchronize Calendar View Day Cells & "+N more" Overflow Counters
-            const dayCells = document.querySelectorAll('.sywat-cal-day');
-            dayCells.forEach(function( cell ) {
-                const chips   = cell.querySelectorAll('.sywat-cal-event-chip');
-                const moreBtn = cell.querySelector('.sywat-cal-more-btn');
-                let matchingInDay = 0;
+            // 2. Synchronize Calendar View Event Chips (All Matching Events Visible)
+            const calChips = document.querySelectorAll('.sywat-cal-event-chip');
+            calChips.forEach(function( chip ) {
+                const chipDist   = (chip.getAttribute('data-district') || '').toLowerCase().trim();
+                const chipShop   = (chip.getAttribute('data-shop') || '').toLowerCase().trim();
+                const chipSearch = (chip.getAttribute('data-name') || '').toLowerCase().trim();
 
-                chips.forEach(function( chip ) {
-                    const chipDist   = (chip.getAttribute('data-district') || '').toLowerCase().trim();
-                    const chipShop   = (chip.getAttribute('data-shop') || '').toLowerCase().trim();
-                    const chipSearch = (chip.getAttribute('data-name') || '').toLowerCase().trim();
+                const matchDist   = (distVal === 'all' || chipDist === distVal);
+                const matchShop   = (shopVal === 'all' || chipShop === shopVal);
+                const matchSearch = (searchVal === '' || chipSearch.includes(searchVal));
 
-                    const matchDist   = (distVal === 'all' || chipDist === distVal);
-                    const matchShop   = (shopVal === 'all' || chipShop === shopVal);
-                    const matchSearch = (searchVal === '' || chipSearch.includes(searchVal));
-
-                    if ( matchDist && matchShop && matchSearch ) {
-                        if ( matchingInDay < MAX_CHIPS_PER_DAY ) {
-                            chip.classList.remove('sywat-hidden');
-                        } else {
-                            chip.classList.add('sywat-hidden');
-                        }
-                        matchingInDay++;
-                    } else {
-                        chip.classList.add('sywat-hidden');
-                    }
-                });
-
-                if ( moreBtn ) {
-                    const overflow = matchingInDay - MAX_CHIPS_PER_DAY;
-                    if ( overflow > 0 ) {
-                        moreBtn.textContent = '+' + overflow + ' more';
-                        moreBtn.classList.remove('sywat-hidden');
-                    } else {
-                        moreBtn.textContent = '';
-                        moreBtn.classList.add('sywat-hidden');
-                    }
+                if ( matchDist && matchShop && matchSearch ) {
+                    chip.classList.remove('sywat-hidden');
+                } else {
+                    chip.classList.add('sywat-hidden');
                 }
             });
 
@@ -576,28 +546,6 @@
                 return url;
             }
             return '';
-        },
-
-        formatHumanDate: function( dateStr ) {
-            const parts = String( dateStr || '' ).split('-');
-            if ( parts.length !== 3 ) {
-                return dateStr;
-            }
-            const dt = new Date(
-                parseInt( parts[ 0 ], 10 ),
-                parseInt( parts[ 1 ], 10 ) - 1,
-                parseInt( parts[ 2 ], 10 ),
-                12, 0, 0
-            );
-            if ( isNaN( dt.getTime() ) ) {
-                return dateStr;
-            }
-            return dt.toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-            });
         },
 
         renderEventCardHtml: function( evt ) {
@@ -712,62 +660,6 @@
             this.openEventModal(
                 evt.name || 'Tournament Details',
                 this.renderEventCardHtml( evt ),
-                triggerEl
-            );
-        },
-
-        openDayEventsModal: function( dateStr, triggerEl ) {
-            const calPanel = document.getElementById('sywat_schedule_calendar_panel');
-            if ( ! calPanel ) {
-                return;
-            }
-
-            const districtEl = document.getElementById('sywat_schedule_filter_district');
-            const shopEl     = document.getElementById('sywat_schedule_filter_shop');
-            const searchEl   = document.getElementById('sywat_schedule_search');
-
-            const distVal   = districtEl ? districtEl.value.toLowerCase().trim() : 'all';
-            const shopVal   = shopEl ? shopEl.value.toLowerCase().trim() : 'all';
-            const searchVal = searchEl ? searchEl.value.toLowerCase().trim() : '';
-
-            const dayCell = calPanel.querySelector('.sywat-cal-day[data-date="' + dateStr + '"]');
-            if ( ! dayCell ) {
-                return;
-            }
-
-            const chips = dayCell.querySelectorAll('.sywat-cal-event-chip');
-            const matchingEvents = [];
-            const self = this;
-
-            chips.forEach(function( chip ) {
-                const chipDist   = (chip.getAttribute('data-district') || '').toLowerCase().trim();
-                const chipShop   = (chip.getAttribute('data-shop') || '').toLowerCase().trim();
-                const chipSearch = (chip.getAttribute('data-name') || '').toLowerCase().trim();
-
-                const matchDist   = (distVal === 'all' || chipDist === distVal);
-                const matchShop   = (shopVal === 'all' || chipShop === shopVal);
-                const matchSearch = (searchVal === '' || chipSearch.includes(searchVal));
-
-                if ( matchDist && matchShop && matchSearch ) {
-                    const eid = chip.getAttribute('data-event-id');
-                    if ( self.eventsMap[ String( eid ) ] ) {
-                        matchingEvents.push( self.eventsMap[ String( eid ) ] );
-                    }
-                }
-            });
-
-            if ( ! matchingEvents.length ) {
-                return;
-            }
-
-            let bodyHtml = '';
-            matchingEvents.forEach(function( evt ) {
-                bodyHtml += self.renderEventCardHtml( evt );
-            });
-
-            this.openEventModal(
-                this.formatHumanDate( dateStr ),
-                bodyHtml,
                 triggerEl
             );
         },
