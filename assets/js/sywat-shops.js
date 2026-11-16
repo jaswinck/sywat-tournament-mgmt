@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Shops & Clubs Module Client Engine
  * Path: assets/js/sywat-shops.js
- * Description: Manages Edit Location tabs, facility visibility toggles, repeatable contacts, repeatable external registration links, shooting line duplicate checks, directory search/district filters, and single-prompt confirmations.
+ * Description: Manages Edit Location tabs, facility visibility toggles, repeatable contacts, shooting line duplicate checks, directory search/district filters, and single-prompt confirmations.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden / .active).
  * Author: SYWAT Archery / TFAA
- * Version: 6.9.0
+ * Version: 6.10.0
  */
 
 (function() {
@@ -103,71 +103,6 @@
     function closeImportShopsModal() {
         const modal = document.getElementById('importShopsModal');
         if (modal) modal.classList.remove('active');
-    }
-
-    /**
-     * Append a repeatable Online Registration Link row (Label + URL)
-     *
-     * @param {string} containerId Target container ID
-     * @param {string} emptyMsgId  Empty-state message element ID
-     */
-    function addShopRegLinkRow(containerId, emptyMsgId) {
-        const container = document.getElementById(containerId || 'sywat_shop_reg_links_container');
-        if (!container) return;
-
-        const noMsg = document.getElementById(emptyMsgId || 'sywat_no_reg_links_msg');
-        setElementVisible(noMsg, false);
-
-        const row = document.createElement('div');
-        row.className = 'sywat-reg-link-row sywat-form-grid-2 sywat-mt-3';
-        row.innerHTML =
-            '<div class="sywat-field-group">' +
-                '<label>Link Label <span class="sywat-label-subtext">(Optional for single link)</span></label>' +
-                '<input type="text" name="reg_link_labels[]" placeholder="e.g. 10-yard lines (Cubs)">' +
-            '</div>' +
-            '<div class="sywat-field-group">' +
-                '<label>Registration URL *</label>' +
-                '<div class="sywat-search-input-group">' +
-                    '<input type="text" name="reg_link_urls[]" placeholder="https://fareharbor.com/embeds/book/...">' +
-                    '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" data-sywat-action="remove-shop-reg-link">Remove</button>' +
-                '</div>' +
-            '</div>';
-        container.appendChild(row);
-
-        const labelInput = row.querySelector('input[name="reg_link_labels[]"]');
-        if (labelInput) {
-            labelInput.focus();
-        }
-
-        if (container.closest('#sywat_edit_shop_form')) {
-            markFormDirty();
-        }
-    }
-
-    /**
-     * Remove a repeatable Online Registration Link row and restore empty notice if none remain
-     *
-     * @param {HTMLElement} btn Remove button element inside .sywat-reg-link-row
-     */
-    function removeShopRegLinkRow(btn) {
-        const row = btn.closest('.sywat-reg-link-row');
-        if (!row) return;
-
-        const container = row.parentElement;
-        const isEditForm = Boolean(row.closest('#sywat_edit_shop_form'));
-        row.remove();
-
-        if (container && container.querySelectorAll('.sywat-reg-link-row').length === 0) {
-            const emptyMsgId = (container.id === 'sywat_create_shop_reg_links_container')
-                ? 'sywat_create_no_reg_links_msg'
-                : 'sywat_no_reg_links_msg';
-            const noMsg = document.getElementById(emptyMsgId);
-            setElementVisible(noMsg, true);
-        }
-
-        if (isEditForm) {
-            markFormDirty();
-        }
     }
 
     function addShopContactRow() {
@@ -495,16 +430,7 @@
         }
 
         const action = target.getAttribute('data-sywat-action');
-        if (action === 'add-shop-reg-link') {
-            e.preventDefault();
-            addShopRegLinkRow('sywat_shop_reg_links_container', 'sywat_no_reg_links_msg');
-        } else if (action === 'add-create-shop-reg-link') {
-            e.preventDefault();
-            addShopRegLinkRow('sywat_create_shop_reg_links_container', 'sywat_create_no_reg_links_msg');
-        } else if (action === 'remove-shop-reg-link') {
-            e.preventDefault();
-            removeShopRegLinkRow(target);
-        } else if (action === 'add-shop-contact') {
+        if (action === 'add-shop-contact') {
             e.preventDefault();
             addShopContactRow();
         } else if (action === 'remove-shop-contact') {
@@ -621,8 +547,6 @@
         closeAddShopModal: closeAddShopModal,
         openImportShopsModal: openImportShopsModal,
         closeImportShopsModal: closeImportShopsModal,
-        addShopRegLinkRow: addShopRegLinkRow,
-        removeShopRegLinkRow: removeShopRegLinkRow,
         addShopContactRow: addShopContactRow,
         removeShopContactRow: removeShopContactRow,
         checkShopLineDuplicate: checkShopLineDuplicate,
@@ -641,8 +565,6 @@
     window.closeAddShopModal = closeAddShopModal;
     window.openImportShopsModal = openImportShopsModal;
     window.closeImportShopsModal = closeImportShopsModal;
-    window.addShopRegLinkRow = addShopRegLinkRow;
-    window.removeShopRegLinkRow = removeShopRegLinkRow;
     window.addShopContactRow = addShopContactRow;
     window.removeShopContactRow = removeShopContactRow;
     window.checkShopLineDuplicate = checkShopLineDuplicate;
