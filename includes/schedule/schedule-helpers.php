@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Schedule Formatting Helpers
  * Path: includes/schedule/schedule-helpers.php
- * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, normalizes external registration links, and calculates chronological event statuses.
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, sorts times chronologically, normalizes external registration links, and calculates chronological event statuses.
  * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.2.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -128,12 +128,28 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 }
                 
                 if ( ! empty( $time ) ) {
+                    // Strip the trailing :00 so "6:00PM" exactly matches the config view "6PM"
+                    $time = str_replace( ':00', '', $time );
+                    
                     if ( ! isset( $grouped_lines[ $day ] ) ) {
                         $grouped_lines[ $day ] = array();
                     }
                     $grouped_lines[ $day ][] = $time;
                 }
             }
+
+            // 3b. Sort times chronologically for each day
+            foreach ( $grouped_lines as $day => &$times ) {
+                usort( $times, function( $a, $b ) {
+                    $time_a = strtotime( $a );
+                    $time_b = strtotime( $b );
+                    // Fallback to 0 if parsing fails (e.g. "TBD")
+                    if ( $time_a === false ) $time_a = 0;
+                    if ( $time_b === false ) $time_b = 0;
+                    return $time_a - $time_b;
+                });
+            }
+            unset( $times ); // break reference
 
             // 4. Registration Links Normalization
             $reg_links = function_exists( 'sywat_get_shop_registration_links' ) ? sywat_get_shop_registration_links( $t_data ) : ( isset( $t_data['registration_links'] ) ? $t_data['registration_links'] : array() );
