@@ -2,8 +2,9 @@
 /**
  * Sub-Module: Shop Helpers & WP User Profile Integration
  * Path: includes/shops/shops-helpers.php
+ * Description: Provides formatting, normalization, registration link sanitization helpers, and WP user profile shop assignment hooks.
  * Author: SYWAT Archery / TFAA
- * Version: 2.8.0
+ * Version: 2.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -63,6 +64,93 @@ if ( ! function_exists( 'sywat_normalize_state_code' ) ) {
         }
 
         return isset( $state_map[$clean] ) ? $state_map[$clean] : 'TX - Texas';
+    }
+}
+
+/**
+ * Sanitize and normalize repeatable external online registration links.
+ * Accepts either parallel ($labels, $urls) POST arrays or an array of associative ['label' => ..., 'url' => ...] items.
+ * Pure array formatter with zero database queries.
+ *
+ * @param array      $labels_or_items Parallel labels array when $urls is passed, or array of link items.
+ * @param array|null $urls            Optional parallel URLs array from form submission.
+ * @return array<int, array{label: string, url: string}> Normalized list of valid registration links.
+ */
+if ( ! function_exists( 'sywat_sanitize_registration_links' ) ) {
+    function sywat_sanitize_registration_links( $labels_or_items, $urls = null ) {
+        $sanitized = array();
+        $seen_urls = array();
+
+        if ( is_array( $urls ) ) {
+            $labels = is_array( $labels_or_items ) ? $labels_or_items : array();
+            foreach ( $urls as $idx => $raw_url ) {
+                $clean_url = esc_url_raw( trim( (string) $raw_url ), array( 'http', 'https' ) );
+                if ( $clean_url === '' ) {
+                    continue;
+                }
+
+                $dedup_key = strtolower( $clean_url );
+                if ( isset( $seen_urls[ $dedup_key ] ) ) {
+                    continue;
+                }
+                $seen_urls[ $dedup_key ] = true;
+
+                $raw_label   = isset( $labels[ $idx ] ) ? (string) $labels[ $idx ] : '';
+                $clean_label = trim( sanitize_text_field( $raw_label ) );
+
+                $sanitized[] = array(
+                    'label' => $clean_label,
+                    'url'   => $clean_url,
+                );
+            }
+            return $sanitized;
+        }
+
+        if ( is_array( $labels_or_items ) ) {
+            foreach ( $labels_or_items as $item ) {
+                if ( ! is_array( $item ) ) {
+                    continue;
+                }
+
+                $raw_url   = isset( $item['url'] ) ? (string) $item['url'] : '';
+                $clean_url = esc_url_raw( trim( $raw_url ), array( 'http', 'https' ) );
+                if ( $clean_url === '' ) {
+                    continue;
+                }
+
+                $dedup_key = strtolower( $clean_url );
+                if ( isset( $seen_urls[ $dedup_key ] ) ) {
+                    continue;
+                }
+                $seen_urls[ $dedup_key ] = true;
+
+                $raw_label   = isset( $item['label'] ) ? (string) $item['label'] : '';
+                $clean_label = trim( sanitize_text_field( $raw_label ) );
+
+                $sanitized[] = array(
+                    'label' => $clean_label,
+                    'url'   => $clean_url,
+                );
+            }
+        }
+
+        return $sanitized;
+    }
+}
+
+/**
+ * Extract normalized default online registration links from a shop or tournament record array.
+ * Pure array accessor with zero database queries.
+ *
+ * @param array $record Shop or tournament configuration array.
+ * @return array<int, array{label: string, url: string}> Normalized list of registration links.
+ */
+if ( ! function_exists( 'sywat_get_shop_registration_links' ) ) {
+    function sywat_get_shop_registration_links( $record ) {
+        if ( ! is_array( $record ) || empty( $record['registration_links'] ) || ! is_array( $record['registration_links'] ) ) {
+            return array();
+        }
+        return sywat_sanitize_registration_links( $record['registration_links'] );
     }
 }
 
