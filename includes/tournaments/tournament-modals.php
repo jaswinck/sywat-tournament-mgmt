@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament External Online Registration Links, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament External Online Registration Links, standardized 30-minute AM/PM shooting line dropdowns, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.16.0
+ * Version: 7.17.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -156,10 +156,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 $raw = sywat_get_default_tournament_lines( $shop_item );
             } else {
                 $raw = array(
-                    array( 'day' => 'Saturday', 'time' => '10:00 AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
-                    array( 'day' => 'Saturday', 'time' => '2:00 PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
-                    array( 'day' => 'Sunday',   'time' => '10:00 AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
-                    array( 'day' => 'Sunday',   'time' => '2:00 PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Saturday', 'time' => '10AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Saturday', 'time' => '2PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Sunday',   'time' => '10AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Sunday',   'time' => '2PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
                 );
             }
 
@@ -185,7 +185,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                     }
                     $out[] = array(
                         'day'      => $d,
-                        'time'     => $t !== '' ? $t : '10:00 AM',
+                        'time'     => $t !== '' ? $t : '10AM',
                         'cap_20yd' => isset( $line['cap_20yd'] ) ? intval( $line['cap_20yd'] ) : intval( $fallback_20 ),
                         'cap_cub'  => isset( $line['cap_cub'] ) ? intval( $line['cap_cub'] ) : intval( $fallback_cub ),
                     );
@@ -524,7 +524,15 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                 </select>
                                             </td>
                                             <td>
-                                                <input type="text" name="line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="10:00 AM" required onchange="checkTournamentLineDuplicate(this);">
+                                                <select name="line_times[]" required onchange="checkTournamentLineDuplicate(this);">
+                                                    <?php
+                                                        if ( function_exists( 'sywat_render_line_time_options' ) ) {
+                                                            echo sywat_render_line_time_options( $time_val );
+                                                        } else {
+                                                            echo '<option value="' . esc_attr( $time_val ) . '" selected>' . esc_html( $time_val ) . '</option>';
+                                                        }
+                                                    ?>
+                                                </select>
                                             </td>
                                             <td class="sywat-col-center">
                                                 <input type="number" name="cap_20yd[]" value="<?php echo esc_attr( $cap_20yd ); ?>" min="0" class="sywat-col-num-input" required>
