@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
- * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with multi-round format selection, First-Time/Lapsed Shooter Promotional Free Entry support, database-driven shooting styles, age divisions & pricing profiles, retired-record preservation, and household-wide unpaid family balance enforcement.
+ * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with live unpaid balance targets, multi-round format selection, First-Time/Lapsed Shooter Promotional Free Entry support, database-driven shooting styles, age divisions & pricing profiles, retired-record preservation, and household-wide unpaid family balance enforcement.
  * Compliance: Pure view layer — zero DB writes, zero inline style/script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -214,7 +214,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <input type="hidden" name="reg_id" value="<?php echo esc_attr( $modal_archer['id'] ); ?>">
 
                         <?php if ( ! $is_multi_round && count( $checkin_round_options ) <= 1 ) : ?>
-                            <input type="hidden" name="checkin_pricing_profile" value="<?php echo esc_attr( $checkin_round ); ?>">
+                            <input type="hidden" name="checkin_pricing_profile" id="checkin_pricing_profile" value="<?php echo esc_attr( $checkin_round ); ?>">
                         <?php endif; ?>
 
                         <div class="sywat-field-group sywat-field-relative">
@@ -244,9 +244,12 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <?php endif; ?>
 
                         <?php if ( $effective_due > 0 ) : ?>
-                            <div id="sywat_unpaid_warning_banner" class="sywat-alert sywat-alert-danger sywat-alert-center">
+                            <div id="sywat_unpaid_warning_banner"
+                                 class="sywat-alert sywat-alert-danger sywat-alert-center"
+                                 data-orig-due="<?php echo esc_attr( number_format( $display_due, 2, '.', '' ) ); ?>"
+                                 data-is-family-balance="<?php echo $is_family_balance ? '1' : '0'; ?>">
                                 <div class="sywat-alert-title">
-                                    ⚠️ <?php echo $is_family_balance ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<?php echo number_format( $display_due, 2 ); ?>
+                                    ⚠️ <?php echo $is_family_balance ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE'; ?>: $<span id="checkin_unpaid_amount_disp"><?php echo number_format( $display_due, 2 ); ?></span>
                                 </div>
                                 <div class="sywat-alert-subtext">
                                     <?php if ( $is_family_balance ) : ?>
@@ -406,6 +409,8 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
             } else {
                 $curr_edit_pay_opt = 'Individual';
             }
+
+            $edit_orig_due = isset( $modal_edit_archer['balance_due'] ) ? floatval( $modal_edit_archer['balance_due'] ) : 0.00;
         ?>
         <div class="sywat-modal-backdrop active">
             <div class="sywat-modal-content sywat-modal-sm">
@@ -426,7 +431,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         <input type="hidden" name="reg_id" value="<?php echo esc_attr( $modal_edit_archer['id'] ); ?>">
 
                         <?php if ( ! $is_multi_round && count( $edit_round_options ) <= 1 ) : ?>
-                            <input type="hidden" name="edit_pricing_profile" value="<?php echo esc_attr( $edit_round ); ?>">
+                            <input type="hidden" name="edit_pricing_profile" id="edit_pricing_profile" value="<?php echo esc_attr( $edit_round ); ?>">
                         <?php endif; ?>
 
                         <div class="sywat-field-group sywat-field-relative">
@@ -578,8 +583,8 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label>Balance Due ($):</label>
-                            <input type="number" step="0.01" min="0" name="edit_balance_due" value="<?php echo esc_attr( isset( $modal_edit_archer['balance_due'] ) ? $modal_edit_archer['balance_due'] : 0 ); ?>">
+                            <label for="edit_balance_due">Balance Due ($):</label>
+                            <input type="number" step="0.01" min="0" id="edit_balance_due" name="edit_balance_due" data-orig-due="<?php echo esc_attr( number_format( $edit_orig_due, 2, '.', '' ) ); ?>" value="<?php echo esc_attr( $edit_orig_due ); ?>">
                         </div>
 
                         <div class="sywat-modal-form-actions-split">
