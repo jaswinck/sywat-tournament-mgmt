@@ -2,14 +2,90 @@
 /**
  * Sub-Module: Public Season Schedule Formatting Helpers
  * Path: includes/schedule/schedule-helpers.php
- * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, sorts times chronologically, normalizes external registration links, calculates chronological event statuses, and builds Sunday-Saturday calendar month grids.
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, detects per-line and event-level distance restrictions (Cubs Only / 20 YD Only) from line capacities, sorts times chronologically, normalizes external registration links, calculates chronological event statuses, and builds Sunday-Saturday calendar month grids.
  * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
+}
+
+/**
+ * Detects whether an individual shooting line is restricted to Cubs Only or 20 YD Only
+ * based on its configured 20yd/Cub slot capacities or explicit text labels.
+ *
+ * @param array  $line      Raw shooting line configuration array.
+ * @param string $raw_label Optional raw line label/time text to inspect for explicit tags.
+ * @return array{code: string, label: string}
+ */
+if ( ! function_exists( 'sywat_schedule_detect_line_restriction' ) ) {
+    function sywat_schedule_detect_line_restriction( $line, $raw_label = '' ) {
+        $text = is_string( $raw_label ) ? trim( $raw_label ) : '';
+        if ( $text === '' && is_array( $line ) && ! empty( $line['name'] ) ) {
+            $text = trim( (string) $line['name'] );
+        }
+
+        // 1. Explicit text tag check (takes precedence if an admin typed it in the line name)
+        if ( $text !== '' ) {
+            if ( preg_match( '/\bcubs?\s*only\b/i', $text ) ) {
+                return array(
+                    'code'  => 'cubs_only',
+                    'label' => 'Cubs Only',
+                );
+            }
+            if ( preg_match( '/\b(20\s*y(ar)?ds?|adult)\s*only\b/i', $text ) ) {
+                return array(
+                    'code'  => '20yd_only',
+                    'label' => '20 YD Only',
+                );
+            }
+        }
+
+        // 2. Capacity-based detection (20yd = 0 & Cub > 0 => Cubs Only; Cub = 0 & 20yd > 0 => 20 YD Only)
+        if ( is_array( $line ) ) {
+            $has_20yd = false;
+            $val_20yd = 0;
+            foreach ( array( 'cap_20yd', 'capacity_20yd', 'max_20yd', '20yd' ) as $key_20 ) {
+                if ( isset( $line[ $key_20 ] ) && $line[ $key_20 ] !== '' && is_numeric( $line[ $key_20 ] ) ) {
+                    $has_20yd = true;
+                    $val_20yd = (int) $line[ $key_20 ];
+                    break;
+                }
+            }
+
+            $has_cub = false;
+            $val_cub = 0;
+            foreach ( array( 'cap_cub', 'capacity_cub', 'max_cub', 'cub', 'cap_10yd', 'capacity_10yd' ) as $key_cub ) {
+                if ( isset( $line[ $key_cub ] ) && $line[ $key_cub ] !== '' && is_numeric( $line[ $key_cub ] ) ) {
+                    $has_cub = true;
+                    $val_cub = (int) $line[ $key_cub ];
+                    break;
+                }
+            }
+
+            if ( $has_20yd && $has_cub ) {
+                if ( $val_20yd <= 0 && $val_cub > 0 ) {
+                    return array(
+                        'code'  => 'cubs_only',
+                        'label' => 'Cubs Only',
+                    );
+                }
+                if ( $val_cub <= 0 && $val_20yd > 0 ) {
+                    return array(
+                        'code'  => '20yd_only',
+                        'label' => '20 YD Only',
+                    );
+                }
+            }
+        }
+
+        return array(
+            'code'  => '',
+            'label' => '',
+        );
+    }
 }
 
 /**
@@ -108,12 +184,15 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 $address = implode( ', ', $addr_parts );
             }
 
-            // 3. Group Shooting Lines by Day (Using 'name' as Single Source of Truth)
+            // 3. Group Shooting Lines by Day & Detect Per-Line Distance Restrictions
             $raw_lines     = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
             $grouped_lines = array();
-            
-            $valid_days = array( 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' );
-            
+            $valid_days    = array( 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' );
+
+            $total_slot_count = 0;
+            $cubs_only_count  = 0;
+            $yd20_only_count  = 0;
+
             foreach ( $raw_lines as $l ) {
                 $day  = '';
                 $time = '';
@@ -133,27 +212,59 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 }
                 
                 if ( ! empty( $time ) ) {
-                    // Strip the trailing :00 so "6:00PM" exactly matches the config view "6PM"
-                    $time = str_replace( ':00', '', $time );
-                    
+                    $restriction = sywat_schedule_detect_line_restriction( $l, $time );
+
+                    // Strip trailing :00 and redundant parenthetical restriction text from the time label
+                    $clean_time = str_replace( ':00', '', $time );
+                    if ( $restriction['code'] !== '' ) {
+                        $clean_time = trim( preg_replace( '/\s*\((?:cubs?|20\s*y(?:ar)?ds?|adult)\s*only\)\s*/i', ' ', $clean_time ) );
+                    }
+
+                    $total_slot_count++;
+                    if ( $restriction['code'] === 'cubs_only' ) {
+                        $cubs_only_count++;
+                    } elseif ( $restriction['code'] === '20yd_only' ) {
+                        $yd20_only_count++;
+                    }
+
                     if ( ! isset( $grouped_lines[ $day ] ) ) {
                         $grouped_lines[ $day ] = array();
                     }
-                    $grouped_lines[ $day ][] = $time;
+                    $grouped_lines[ $day ][] = array(
+                        'time'              => $clean_time,
+                        'restriction_code'  => $restriction['code'],
+                        'restriction_label' => $restriction['label'],
+                    );
                 }
             }
 
-            // 3b. Sort times chronologically for each day
-            foreach ( $grouped_lines as $day => &$times ) {
-                usort( $times, function( $a, $b ) {
-                    $time_a = strtotime( $a );
-                    $time_b = strtotime( $b );
+            // 3b. Sort line slots chronologically for each day
+            foreach ( $grouped_lines as $day => &$slots ) {
+                usort( $slots, function( $a, $b ) {
+                    $time_a = strtotime( $a['time'] );
+                    $time_b = strtotime( $b['time'] );
                     if ( $time_a === false ) $time_a = 0;
                     if ( $time_b === false ) $time_b = 0;
                     return $time_a - $time_b;
                 } );
             }
-            unset( $times );
+            unset( $slots );
+
+            // 3c. Summarize event-level distance restriction scope
+            $line_restriction_scope = '';
+            $line_restriction_label = '';
+            if ( $total_slot_count > 0 ) {
+                if ( $cubs_only_count === $total_slot_count ) {
+                    $line_restriction_scope = 'all_cubs';
+                    $line_restriction_label = 'Cubs Only';
+                } elseif ( $yd20_only_count === $total_slot_count ) {
+                    $line_restriction_scope = 'all_20yd';
+                    $line_restriction_label = '20 YD Only';
+                } elseif ( $cubs_only_count > 0 || $yd20_only_count > 0 ) {
+                    $line_restriction_scope = 'mixed';
+                    $line_restriction_label = 'Line Restrictions';
+                }
+            }
 
             // 4. Registration Links & Action URLs Normalization
             $reg_links = function_exists( 'sywat_get_shop_registration_links' ) ? sywat_get_shop_registration_links( $t_data ) : ( isset( $t_data['registration_links'] ) ? $t_data['registration_links'] : array() );
@@ -166,24 +277,26 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
 
             // 5. Build Event Card Data
             $formatted_tournaments[] = array(
-                'id'               => $event_idx,
-                'name'             => $t_name,
-                'event_type'       => isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT',
-                'start_date'       => $start_date,
-                'end_date'         => $end_date,
-                'display_dates'    => $disp_dates,
-                'status_code'      => $status_code,
-                'status_label'     => $status_label,
-                'shop_name'        => $shop_name,
-                'shop_phone'       => $shop_phone,
-                'district'         => $district,
-                'address'          => $address,
-                'maps_url'         => $maps_url,
-                'grouped_lines'    => $grouped_lines,
-                'reg_links'        => $reg_links,
-                'scores_published' => ! empty( $t_data['scores_published'] ),
-                'has_tfaa_url'     => ! empty( $t_data['tfaa_results_url'] ),
-                'results_url'      => $results_url,
+                'id'                     => $event_idx,
+                'name'                   => $t_name,
+                'event_type'             => isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT',
+                'start_date'             => $start_date,
+                'end_date'               => $end_date,
+                'display_dates'          => $disp_dates,
+                'status_code'            => $status_code,
+                'status_label'           => $status_label,
+                'shop_name'              => $shop_name,
+                'shop_phone'             => $shop_phone,
+                'district'               => $district,
+                'address'                => $address,
+                'maps_url'               => $maps_url,
+                'grouped_lines'          => $grouped_lines,
+                'line_restriction_scope' => $line_restriction_scope,
+                'line_restriction_label' => $line_restriction_label,
+                'reg_links'              => $reg_links,
+                'scores_published'       => ! empty( $t_data['scores_published'] ),
+                'has_tfaa_url'           => ! empty( $t_data['tfaa_results_url'] ),
+                'results_url'            => $results_url,
             );
             $event_idx++;
         }
