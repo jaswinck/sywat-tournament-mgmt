@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule (List View & Monthly Calendar View)
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, Sunday-Saturday monthly calendar grid, and event details modal.
+ * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 1.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -54,7 +54,7 @@ foreach ( $events as $evt_check ) {
     }
 }
 
-// Build compact event lookup map for Calendar Day / Event Modal rendering
+// Build compact event lookup map for Calendar Event Modal rendering
 $events_lookup = array();
 foreach ( $events as $evt_item ) {
     $eid                   = isset( $evt_item['id'] ) ? (int) $evt_item['id'] : count( $events_lookup );
@@ -348,8 +348,7 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                     if ( ! empty( $cell['is_today'] ) ) {
                                         $cell_classes .= ' is-today';
                                     }
-                                    $day_events    = isset( $cell['events'] ) && is_array( $cell['events'] ) ? $cell['events'] : array();
-                                    $visible_index = 0;
+                                    $day_events = isset( $cell['events'] ) && is_array( $cell['events'] ) ? $cell['events'] : array();
                                 ?>
                                 <div class="<?php echo esc_attr( $cell_classes ); ?>" role="gridcell" data-date="<?php echo esc_attr( $cell['date'] ); ?>">
                                     <div class="sywat-cal-day-header">
@@ -366,14 +365,14 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                 } elseif ( $chip_status === 'active' || $chip_status === 'this_weekend' ) {
                                                     $chip_class = 'sywat-cal-event-chip is-current';
                                                 }
-                                                if ( $visible_index >= 3 ) {
-                                                    $chip_class .= ' sywat-hidden';
-                                                }
-                                                $visible_index++;
-                                                $d_search = strtolower( $d_evt['name'] . ' ' . $d_evt['shop_name'] . ' ' . $d_evt['address'] );
+                                                $d_search   = strtolower( $d_evt['name'] . ' ' . $d_evt['shop_name'] . ' ' . $d_evt['address'] );
+                                                $chip_title = ! empty( $d_evt['shop_name'] ) && $d_evt['shop_name'] !== $d_evt['name']
+                                                    ? $d_evt['name'] . ' — ' . $d_evt['shop_name']
+                                                    : $d_evt['name'];
                                             ?>
                                             <button type="button"
                                                     class="<?php echo esc_attr( $chip_class ); ?>"
+                                                    title="<?php echo esc_attr( $chip_title ); ?>"
                                                     data-event-id="<?php echo esc_attr( (string) $d_evt['id'] ); ?>"
                                                     data-name="<?php echo esc_attr( $d_search ); ?>"
                                                     data-shop="<?php echo esc_attr( strtolower( $d_evt['shop_name'] ) ); ?>"
@@ -382,13 +381,6 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                 <?php echo esc_html( $d_evt['name'] ); ?>
                                             </button>
                                         <?php endforeach; ?>
-
-                                        <?php $overflow_count = count( $day_events ) - 3; ?>
-                                        <button type="button"
-                                                class="sywat-cal-more-btn<?php echo ( $overflow_count > 0 ) ? '' : ' sywat-hidden'; ?>"
-                                                data-date="<?php echo esc_attr( $cell['date'] ); ?>">
-                                            <?php echo $overflow_count > 0 ? esc_html( '+' . $overflow_count . ' more' ) : ''; ?>
-                                        </button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -400,7 +392,7 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
     <?php endif; ?>
 </div>
 
-<!-- EVENT / DAY DETAILS MODAL (OUTSIDE ALL FORMS PER CONTRACT) -->
+<!-- EVENT DETAILS MODAL (OUTSIDE ALL FORMS PER CONTRACT) -->
 <div class="sywat-modal-backdrop" id="sywat_schedule_event_modal" role="dialog" aria-modal="true" aria-labelledby="sywat_schedule_event_modal_title">
     <div class="sywat-modal-content sywat-modal-md">
         <div class="sywat-modal-header">
