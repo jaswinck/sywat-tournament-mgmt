@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Schedule Formatting Helpers
  * Path: includes/schedule/schedule-helpers.php
- * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data, formats line times without capacity metrics, normalizes external registration links, and calculates chronological event statuses.
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day without capacity metrics, normalizes external registration links, and calculates chronological event statuses.
  * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -63,7 +63,7 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 }
             }
 
-            // 2. Shop Data Resolution
+            // 2. Shop Data & Phone Resolution
             $t_shop_id = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : ( isset( $t_data['shop_id'] ) ? $t_data['shop_id'] : '' );
             $shop_name = function_exists( 'sywat_get_tournament_shop_name' ) ? sywat_get_tournament_shop_name( $t_data, $t_name, $all_shops ) : ( ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : '' );
             
@@ -74,11 +74,17 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 }
             }
 
-            $district = '';
-            $address  = '';
+            $district   = '';
+            $address    = '';
+            $shop_phone = '';
+            
             if ( ! empty( $t_shop_id ) && isset( $all_shops[ $t_shop_id ] ) ) {
                 $s_info = $all_shops[ $t_shop_id ];
                 $district = isset( $s_info['district'] ) ? $s_info['district'] : '';
+                
+                if ( ! empty( $s_info['phone'] ) ) {
+                    $shop_phone = $s_info['phone'];
+                }
                 
                 $addr_parts = array();
                 if ( ! empty( $s_info['address_1'] ) ) $addr_parts[] = $s_info['address_1'];
@@ -97,24 +103,24 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 $address = implode( ', ', $addr_parts );
             }
 
-            // 3. Shooting Lines Extraction (Time only, no capacities)
+            // 3. Group Shooting Lines by Day (Time only, no capacities)
             $raw_lines = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
-            $lines = array();
+            $grouped_lines = array();
+            
             foreach ( $raw_lines as $l ) {
-                $day  = isset( $l['day'] ) ? $l['day'] : '';
-                $time = isset( $l['time'] ) ? $l['time'] : ( isset( $l['start_time'] ) ? $l['start_time'] : '' );
+                $day  = isset( $l['day'] ) ? trim( $l['day'] ) : '';
+                $time = isset( $l['time'] ) ? trim( $l['time'] ) : ( isset( $l['start_time'] ) ? trim( $l['start_time'] ) : '' );
+                
                 if ( ! empty( $day ) && ! empty( $time ) ) {
-                    $lines[] = array(
-                        'day'  => $day,
-                        'time' => $time,
-                        'name' => trim( $day . ' ' . $time )
-                    );
+                    if ( ! isset( $grouped_lines[ $day ] ) ) {
+                        $grouped_lines[ $day ] = array();
+                    }
+                    $grouped_lines[ $day ][] = $time;
                 } elseif ( ! empty( $l['name'] ) ) {
-                    $lines[] = array(
-                        'day'  => '',
-                        'time' => '',
-                        'name' => $l['name']
-                    );
+                    if ( ! isset( $grouped_lines['Other'] ) ) {
+                        $grouped_lines['Other'] = array();
+                    }
+                    $grouped_lines['Other'][] = trim( $l['name'] );
                 }
             }
 
@@ -131,9 +137,10 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 'status_code'      => $status_code,
                 'status_label'     => $status_label,
                 'shop_name'        => $shop_name,
+                'shop_phone'       => $shop_phone,
                 'district'         => $district,
                 'address'          => $address,
-                'lines'            => $lines,
+                'grouped_lines'    => $grouped_lines,
                 'reg_links'        => $reg_links,
                 'scores_published' => ! empty( $t_data['scores_published'] ),
                 'has_tfaa_url'     => ! empty( $t_data['tfaa_results_url'] ),
