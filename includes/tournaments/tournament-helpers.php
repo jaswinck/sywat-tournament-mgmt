@@ -2,8 +2,10 @@
 /**
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
+ * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological line comparators, TFAA name matchers, and spreadsheet parsers.
+ * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.2
+ * Version: 7.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -84,6 +86,76 @@ if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
         }
 
         return strtoupper( $token );
+    }
+}
+
+/**
+ * Returns the standardized 30-minute AM/PM start time options map.
+ * Keys are canonical storage tokens (e.g. "10AM", "6PM", "6:30PM");
+ * values are human-readable 12-hour AM/PM labels (e.g. "10:00 AM", "6:00 PM", "6:30 PM").
+ *
+ * @return array<string, string> Canonical token => display label map.
+ */
+if ( ! function_exists( 'sywat_get_standard_line_time_options' ) ) {
+    function sywat_get_standard_line_time_options() {
+        static $options = null;
+        if ( $options !== null ) {
+            return $options;
+        }
+
+        $options = array();
+        // 7:00 AM (420 mins) through 9:30 PM (1290 mins) in 30-minute steps
+        for ( $mins = 7 * 60; $mins <= ( 21 * 60 ) + 30; $mins += 30 ) {
+            $hour_24  = intdiv( $mins, 60 );
+            $minute   = $mins % 60;
+            $meridiem = ( $hour_24 >= 12 ) ? 'PM' : 'AM';
+            $hour_12  = $hour_24 % 12;
+            if ( $hour_12 === 0 ) {
+                $hour_12 = 12;
+            }
+
+            $min_padded = str_pad( (string) $minute, 2, '0', STR_PAD_LEFT );
+            $token      = $hour_12 . ( $minute === 0 ? '' : ':' . $min_padded ) . $meridiem;
+            $label      = $hour_12 . ':' . $min_padded . ' ' . $meridiem;
+
+            $options[ $token ] = $label;
+        }
+
+        return $options;
+    }
+}
+
+/**
+ * Renders HTML <option> tags for the standardized 30-minute AM/PM line start time dropdown.
+ * Normalizes legacy stored values ("6:00 PM", "6PM", "10:00 AM") so existing rows pre-select accurately,
+ * and preserves non-30-minute legacy tokens as a selected fallback option so existing data is never lost.
+ *
+ * @param string $selected_val        Currently saved time value.
+ * @param bool   $include_placeholder Whether to prepend a disabled placeholder option.
+ * @return string Escaped <option> HTML markup.
+ */
+if ( ! function_exists( 'sywat_render_line_time_options' ) ) {
+    function sywat_render_line_time_options( $selected_val = '', $include_placeholder = false ) {
+        $options    = sywat_get_standard_line_time_options();
+        $normalized = ( trim( (string) $selected_val ) !== '' )
+            ? sywat_format_line_time_token( (string) $selected_val )
+            : '';
+
+        $html = '';
+        if ( $include_placeholder ) {
+            $html .= '<option value="" disabled' . selected( $normalized, '', false ) . '>-- Select Time --</option>';
+        }
+
+        // Preserve any legacy off-interval time (e.g. 6:15PM) so opening Edit never silently alters saved data
+        if ( $normalized !== '' && ! isset( $options[ $normalized ] ) ) {
+            $html .= '<option value="' . esc_attr( $normalized ) . '" selected>' . esc_html( trim( (string) $selected_val ) ) . '</option>';
+        }
+
+        foreach ( $options as $token => $label ) {
+            $html .= '<option value="' . esc_attr( $token ) . '"' . selected( $normalized, $token, false ) . '>' . esc_html( $label ) . '</option>';
+        }
+
+        return $html;
     }
 }
 
@@ -332,7 +404,7 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
 
         // 1. Excel (.xlsx) Parser via includes/lib/SimpleXLSX.php
         if ( $ext === 'xlsx' ) {
-            $lib_path = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
+            $lib_path  = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
             if ( file_exists( $lib_path ) && ! class_exists( 'SimpleXLSX' ) ) {
                 require_once $lib_path;
             }
@@ -464,7 +536,7 @@ if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
 }
 
 /**
- * Builds the default 4-line template using host shop capacity limits.
+ * Builds the default 4-line template using host shop capacity limits and canonical time tokens.
  *
  * @param array|string $shop_data_or_id Optional shop dataset array, shop ID, or shop name string.
  * @return array Default lines template.
@@ -473,10 +545,10 @@ if ( ! function_exists( 'sywat_get_default_tournament_lines' ) ) {
     function sywat_get_default_tournament_lines( $shop_data_or_id = array() ) {
         $caps = sywat_get_shop_capacity_defaults( $shop_data_or_id );
         return array(
-            array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
         );
     }
 }
