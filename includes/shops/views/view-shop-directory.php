@@ -2,8 +2,9 @@
 /**
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
+ * Description: Renders the administrative Shop & Club directory table, 2-step CSV/XLSX import modal, and Create New Location modal with repeatable Default Online Registration Links.
  * Author: SYWAT Archery / TFAA
- * Version: 6.8.3
+ * Version: 6.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -421,6 +422,20 @@ uasort( $filtered_shops, function( $a, $b ) {
                         <input type="text" id="sywat_new_shop_zip" name="shop_zip" placeholder="e.g. 76262">
                     </div>
                 </div>
+
+                <!-- Default External Online Registration Links Repeater -->
+                <hr class="sywat-mt-4 sywat-mb-4">
+                <div class="sywat-table-header-bar">
+                    <div>
+                        <div class="sywat-subtitle">🔗 DEFAULT ONLINE REGISTRATION LINKS (OPTIONAL)</div>
+                        <div class="sywat-meta-subtext">Configure external registration links (such as FareHarbor) that auto-fill when creating tournaments for this location.</div>
+                    </div>
+                    <div class="sywat-table-header-actions">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-create-shop-reg-link">Add Registration Link</button>
+                    </div>
+                </div>
+                <div id="sywat_create_shop_reg_links_container" class="sywat-mb-4"></div>
+                <p id="sywat_create_no_reg_links_msg" class="sywat-empty-state-notice">No external registration links configured. Click "Add Registration Link" above if needed.</p>
 
                 <div class="sywat-modal-footer">
                     <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" id="sywat_cancel_add_shop_btn">Cancel</button>
