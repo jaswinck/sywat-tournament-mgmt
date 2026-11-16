@@ -5,7 +5,7 @@
  * Description: Renders the public season schedule table, filter bar, and external registration links.
  * Compliance: Zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -117,7 +117,7 @@ $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                         <th class="sywat-col-w-20">Date &amp; Status</th>
                         <th class="sywat-col-w-32">Event &amp; Location</th>
                         <th class="sywat-col-w-24">Shooting Lines</th>
-                        <th class="sywat-col-w-24 sywat-text-left">Registration / Results</th>
+                        <th class="sywat-col-w-24 sywat-col-left">Registration / Results</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -192,7 +192,7 @@ $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                                     <div class="sywat-schedule-lines-stack">
                                         <?php foreach ( $evt['grouped_lines'] as $day => $times ) : ?>
                                             <div class="sywat-mb-2">
-                                                <strong class="sywat-text-subtle sywat-d-block"><?php echo esc_html( $day ); ?>:</strong>
+                                                <div><strong class="sywat-text-subtle"><?php echo esc_html( $day ); ?>:</strong></div>
                                                 <div class="sywat-mt-1">
                                                     <?php foreach ( $times as $time ) : ?>
                                                         <span class="sywat-badge sywat-badge-muted"><?php echo esc_html( $time ); ?></span>
