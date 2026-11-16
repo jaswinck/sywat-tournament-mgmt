@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Master Tournament & Season Management Client Engine
  * Path: assets/js/sywat-tournaments.js
- * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & external registration link inheritance, progressive-disclosure registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
+ * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity inheritance, progressive-disclosure per-tournament registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
  * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.tournaments with legacy attribute compatibility aliases, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden).
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 (function () {
@@ -142,30 +142,6 @@
     }
 
     /**
-     * Retrieves default external registration links (Array<{label, url}>) for the currently selected host shop.
-     */
-    function sywatGetSelectedShopRegLinks() {
-        const shopSelect = document.getElementById('sywat_modal_shop_id');
-        if (!shopSelect) return [];
-
-        const sourceEl = shopSelect.tagName.toLowerCase() === 'select'
-            ? shopSelect.options[shopSelect.selectedIndex]
-            : shopSelect;
-
-        if (!sourceEl) return [];
-
-        try {
-            const parsed = JSON.parse(sourceEl.getAttribute('data-reglinks') || '[]');
-            if (!Array.isArray(parsed)) return [];
-            return parsed.filter(function (item) {
-                return item && typeof item === 'object' && typeof item.url === 'string' && item.url.trim() !== '';
-            });
-        } catch (e) {
-            return [];
-        }
-    }
-
-    /**
      * Appends a repeatable External Online Registration Link row (Label + URL) in #sywat_tourn_reg_links_container.
      */
     function addTournamentRegLinkRow(prefillLabel, prefillUrl, shouldFocus) {
@@ -217,29 +193,6 @@
     }
 
     /**
-     * Populates #sywat_tourn_reg_links_container from the selected host shop's default links in Create mode.
-     */
-    function sywatSyncShopRegistrationLinks() {
-        const container = document.getElementById('sywat_tourn_reg_links_container');
-        if (!container || container.getAttribute('data-is-edit') === '1') {
-            return;
-        }
-
-        const links = sywatGetSelectedShopRegLinks();
-        container.innerHTML = '';
-
-        if (links.length === 0) {
-            setElementVisible(container, false);
-            return;
-        }
-
-        setElementVisible(container, true);
-        links.forEach(function (item) {
-            addTournamentRegLinkRow(item.label || '', item.url || '', false);
-        });
-    }
-
-    /**
      * Synchronizes Offered Round / Pricing Format visibility and checkboxes with the selected
      * Competition Season when creating a new tournament.
      */
@@ -282,7 +235,6 @@
 
     function sywatAutoGenerateTournamentName(force) {
         sywatSyncShopCapacities();
-        sywatSyncShopRegistrationLinks();
 
         if (sywatTournamentNameIsCustomized && !force) return;
 
@@ -351,7 +303,6 @@
         }
 
         sywatSyncShopCapacities();
-        sywatSyncShopRegistrationLinks();
         sywatSyncTournamentPricingProfiles();
     }
 
@@ -780,11 +731,10 @@
             }
         }
 
-        // Synchronize capacity inputs, registration links, and formats in Create mode if modal is active on page paint
+        // Synchronize capacity inputs and formats in Create mode if modal is active on page paint
         const activeTournModal = document.getElementById('sywat_add_tourn_modal');
         if (activeTournModal && activeTournModal.classList.contains('active')) {
             sywatSyncShopCapacities();
-            sywatSyncShopRegistrationLinks();
             if (modalSeasonSelect && modalSeasonSelect.tagName.toLowerCase() === 'select') {
                 sywatSyncTournamentPricingProfiles();
             }
@@ -804,8 +754,6 @@
         autoPopulateEndDate: sywatAutoPopulateEndDate,
         getSelectedShopCapacities: sywatGetSelectedShopCapacities,
         syncShopCapacities: sywatSyncShopCapacities,
-        getSelectedShopRegLinks: sywatGetSelectedShopRegLinks,
-        syncShopRegistrationLinks: sywatSyncShopRegistrationLinks,
         addRegLinkRow: addTournamentRegLinkRow,
         removeRegLinkRow: removeTournamentRegLinkRow,
         syncPricingProfiles: sywatSyncTournamentPricingProfiles,
