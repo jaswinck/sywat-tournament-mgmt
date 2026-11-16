@@ -4,7 +4,7 @@
  * Path: includes/tournaments/tournament-actions.php
  * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, external registration links, and promoter flags, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
  * Author: SYWAT Archery
- * Version: 7.15.0
+ * Version: 7.16.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -285,16 +285,6 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $norm_off = strtolower( trim( $official ) );
                 $assoc_id = isset( $shop_name_to_id[ $norm_off ] ) ? $shop_name_to_id[ $norm_off ] : '';
 
-                // Auto-inherit default online registration links from host shop
-                $inherited_reg_links = array();
-                if ( ! empty( $assoc_id ) && isset( $all_shops[ $assoc_id ] ) ) {
-                    if ( function_exists( 'sywat_get_shop_registration_links' ) ) {
-                        $inherited_reg_links = sywat_get_shop_registration_links( $all_shops[ $assoc_id ] );
-                    } elseif ( isset( $all_shops[ $assoc_id ]['registration_links'] ) && is_array( $all_shops[ $assoc_id ]['registration_links'] ) ) {
-                        $inherited_reg_links = $all_shops[ $assoc_id ]['registration_links'];
-                    }
-                }
-
                 $tournaments[ $t_name ] = array(
                     'name'                 => $t_name,
                     'season'               => $target_season,
@@ -307,7 +297,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     'end_date'             => $t['end_date_formatted'],
                     'event_type'           => $t['event_type'],
                     'pricing_profiles'     => $imported_t_profiles,
-                    'registration_links'   => $inherited_reg_links,
+                    'registration_links'   => array(),
                     'notes'                => sanitize_textarea_field( $t['notes'] ),
                     'lines'                => $t['line_slots'],
                     'registration_enabled' => $t['registration_enabled'],
