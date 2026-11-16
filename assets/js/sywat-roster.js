@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-roster.js
  * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, single-prompt confirmations, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden).
- * Version: 7.2.1
+ * Version: 7.2.2
  */
 
 (function() {
@@ -567,28 +567,22 @@
 
     // Delegated Submit Confirmation Listener (Single-Prompt & Double-Submit Guarded — Section IV.1)
     document.addEventListener('submit', function(event) {
-        const form = event.target.closest('form[data-sywat-confirm]');
-        if (!form || event.defaultPrevented) return;
+        const form = event.target && event.target.closest ? event.target.closest('form[data-sywat-confirm]') : null;
+        if (!form || event.defaultPrevented || event._sywatConfirmHandled) return;
 
         if (form.dataset.sywatSubmitting === '1') {
             event.preventDefault();
             return;
         }
 
-        if (!event._sywatConfirmHandled) {
-            event._sywatConfirmHandled = true;
-            const message = form.getAttribute('data-sywat-confirm');
-            if (message && !window.confirm(message)) {
-                event.preventDefault();
-                return;
-            }
+        event._sywatConfirmHandled = true;
+        const message = form.getAttribute('data-sywat-confirm');
+        if (message && !window.confirm(message)) {
+            event.preventDefault();
+            return;
         }
 
         form.dataset.sywatSubmitting = '1';
-        const submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-        }
     });
 
     /**
