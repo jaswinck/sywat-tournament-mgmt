@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.5.1
+   Version: 7.5.2
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -176,7 +176,7 @@
     justify-content: center !important;
     gap: 5px !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     margin: 0 auto !important;
 }
 
@@ -195,7 +195,7 @@
     align-items: center !important;
     margin: 0 auto !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     box-sizing: border-box !important;
 }
 
@@ -206,7 +206,7 @@
     align-items: center !important;
     margin: 0 auto !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     height: 28px !important;
     box-sizing: border-box !important;
     border-radius: 4px !important;
