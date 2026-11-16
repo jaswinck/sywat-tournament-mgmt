@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Archer Roster Management & Edit Modal Engine
  * Path: assets/js/sywat-roster.js
- * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing option synchronization, Promotional Free Entry status display, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden).
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 (function() {
@@ -131,6 +131,106 @@
     }
 
     /**
+     * Calculate exact individual entry fee for the Edit Archer Modal based on
+     * active Round Format, Division, Distance, Style, and Paid Option.
+     */
+    function calculateRosterEditFee(type) {
+        const divisionEl = document.getElementById(type + '_division');
+        const styleEl    = document.getElementById(type + '_style');
+        const roundEl    = document.getElementById(type + '_pricing_profile');
+        const payOption  = document.getElementById(type + '_pay_option');
+        const statusEl   = document.getElementById(type + '_status');
+
+        if (!divisionEl) return 0;
+
+        const statusVal = statusEl ? String(statusEl.value || '').trim() : 'Pre-Reg';
+        if (statusVal === 'Waitlist' || statusVal === 'Cancelled') {
+            return 0;
+        }
+
+        const payVal = payOption ? String(payOption.value || 'Individual').trim() : 'Individual';
+        if (payVal === 'Promo (Free)') {
+            return 0;
+        }
+
+        const divVal    = String(divisionEl.value || '').trim();
+        const distVal   = getDivisionDistance(divisionEl);
+        const styleVal  = styleEl ? String(styleEl.value || '').trim() : '';
+        const roundSlug = roundEl ? String(roundEl.value || '').trim() : getDefaultProfileKey();
+        const tournName = (window.sywatRosterData && window.sywatRosterData.tournamentName) ? String(window.sywatRosterData.tournamentName) : '';
+
+        if (window.SYWAT && window.SYWAT.pricing && typeof window.SYWAT.pricing.calculateIndividualFee === 'function') {
+            return window.SYWAT.pricing.calculateIndividualFee({
+                tournamentName: tournName,
+                division: divVal,
+                distance: distVal,
+                style: styleVal,
+                roundSlug: roundSlug,
+                paidStatus: (payVal === 'Field Governor') ? 'Field Governor' : ''
+            });
+        }
+
+        const prof = getProfile(roundSlug);
+        if (payVal === 'Field Governor') {
+            return prof && typeof prof.field_governor_rate !== 'undefined' ? (parseFloat(prof.field_governor_rate) || 0) : 0;
+        }
+
+        const divCfg = findDivisionConfig(divVal);
+        if (prof) {
+            if (divCfg && divCfg.slug && prof.division_overrides && typeof prof.division_overrides[divCfg.slug] !== 'undefined' && prof.division_overrides[divCfg.slug] !== '') {
+                const ovFee = parseFloat(prof.division_overrides[divCfg.slug]);
+                if (!Number.isNaN(ovFee)) return ovFee;
+            }
+            if (styleVal && prof.pro_rate !== '' && prof.pro_rate !== null && typeof prof.pro_rate !== 'undefined') {
+                if (styleVal.toLowerCase().indexOf('pro') !== -1 || divVal.toLowerCase().indexOf('pro') !== -1) {
+                    const proFee = parseFloat(prof.pro_rate);
+                    if (!Number.isNaN(proFee)) return proFee;
+                }
+            }
+            const tier = getDivisionRateTier(divisionEl);
+            const tierFee = (tier === 'Youth') ? parseFloat(prof.youth_rate) : parseFloat(prof.adult_rate);
+            if (!Number.isNaN(tierFee)) return tierFee;
+        }
+
+        return (getDivisionRateTier(divisionEl) === 'Youth') ? 25 : 30;
+    }
+
+    /**
+     * Synchronize #edit_balance_due live when Division, Style, Round, Status, or Pay Option changes
+     * (only when the record originally had an unpaid balance and was not manually overridden).
+     */
+    function syncEditBalanceDue(type) {
+        const balanceEl = document.getElementById(type + '_balance_due');
+        if (!balanceEl) return;
+
+        const statusEl = document.getElementById(type + '_status');
+        const payEl    = document.getElementById(type + '_pay_option');
+        const status   = statusEl ? String(statusEl.value || '') : 'Pre-Reg';
+        const payVal   = payEl ? String(payEl.value || '') : 'Individual';
+
+        if (status === 'Waitlist' || status === 'Cancelled' || payVal === 'Promo (Free)' || payVal === 'Field Governor') {
+            balanceEl.value = '0.00';
+            return;
+        }
+
+        if (balanceEl.dataset.manualOverride === '1') {
+            return;
+        }
+
+        const origDue = parseFloat(balanceEl.dataset.origDue || '0');
+        if (Number.isNaN(origDue) || origDue <= 0) {
+            return;
+        }
+
+        if (payVal === 'Family') {
+            return;
+        }
+
+        const newFee = calculateRosterEditFee(type);
+        balanceEl.value = newFee.toFixed(2);
+    }
+
+    /**
      * Update Paid Option dropdown labels (Individual & Family Cap) when the archer's
      * Round Format selector changes on multi-round tournaments (e.g. Field vs Field 50).
      */
@@ -232,7 +332,7 @@
     /**
      * Recalculate Paid Status & Toggle Family Group Assignment Box via CSS Class
      */
-    function updatePaidStatusDisplay(type) {
+    function updatePaidStatusDisplay(type, shouldSyncBalance) {
         const payOption = document.getElementById(type + '_pay_option');
         const division  = document.getElementById(type + '_division');
         const displayEl = document.getElementById(type + '_paid_status_display');
@@ -259,6 +359,10 @@
             }
         }
         displayEl.textContent = calculatedStatus;
+
+        if (shouldSyncBalance !== false) {
+            syncEditBalanceDue(type);
+        }
     }
 
     /**
@@ -334,7 +438,7 @@
             if (distDispEl) {
                 distDispEl.value = getDivisionDistance(divisionEl);
             }
-            updatePaidStatusDisplay(type);
+            updatePaidStatusDisplay(type, true);
             handleStyleRestrictions(type);
         }
     }
@@ -342,7 +446,7 @@
     /**
      * Division Change Event Handler
      */
-    function handleDivisionChange(type) {
+    function handleDivisionChange(type, shouldSyncBalance) {
         const divisionEl = document.getElementById(type + '_division');
         const distDispEl = document.getElementById(type + '_distance_display');
         if (!divisionEl) return;
@@ -351,7 +455,7 @@
             distDispEl.value = getDivisionDistance(divisionEl);
         }
 
-        updatePaidStatusDisplay(type);
+        updatePaidStatusDisplay(type, shouldSyncBalance);
         handleStyleRestrictions(type);
     }
 
@@ -377,6 +481,7 @@
         closeRosterModal: closeRosterModal,
         closeEditArcherModal: closeEditArcherModal,
         updatePaidStatusDisplay: updatePaidStatusDisplay,
+        syncEditBalanceDue: syncEditBalanceDue,
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         handleDivisionChange: handleDivisionChange,
@@ -417,7 +522,15 @@
 
     // Delegated Change Listener (Optimizer-Safe — Section IV.1)
     document.addEventListener('change', function(event) {
-        const actionEl = event.target.closest('[data-sywat-action]');
+        const target = event.target;
+        if (!target) return;
+
+        if (target.id === 'edit_status') {
+            syncEditBalanceDue('edit');
+            return;
+        }
+
+        const actionEl = target.closest('[data-sywat-action]');
         if (!actionEl) return;
 
         const action = actionEl.getAttribute('data-sywat-action');
@@ -428,15 +541,22 @@
             }
         } else if (action === 'roster-edit-round-change') {
             updatePayOptionLabelsForRound('edit');
-            updatePaidStatusDisplay('edit');
+            updatePaidStatusDisplay('edit', true);
         } else if (action === 'roster-edit-line-change') {
             updateRosterEditFamilyOptions(actionEl.value);
         } else if (action === 'roster-edit-division-change') {
-            handleDivisionChange('edit');
+            handleDivisionChange('edit', true);
         } else if (action === 'roster-edit-style-change') {
             handleStyleChange('edit');
         } else if (action === 'roster-edit-pay-change') {
-            updatePaidStatusDisplay('edit');
+            updatePaidStatusDisplay('edit', true);
+        }
+    });
+
+    // Delegated Input Listener: Mark manual balance override when user edits #edit_balance_due directly
+    document.addEventListener('input', function(event) {
+        if (event.target && event.target.id === 'edit_balance_due') {
+            event.target.dataset.manualOverride = '1';
         }
     });
 
@@ -455,12 +575,17 @@
      * DOM Initialization & Live Search Input Wiring
      */
     function initRosterModule() {
+        const editBalanceEl = document.getElementById('edit_balance_due');
+        if (editBalanceEl && typeof editBalanceEl.dataset.origDue === 'undefined') {
+            editBalanceEl.dataset.origDue = editBalanceEl.value || '0';
+        }
+
         if (document.getElementById('edit_pricing_profile')) {
             updatePayOptionLabelsForRound('edit');
         }
 
         if (document.getElementById('edit_division')) {
-            handleDivisionChange('edit');
+            handleDivisionChange('edit', false);
         }
 
         const manageSearchInput = document.getElementById('search_shooter');
