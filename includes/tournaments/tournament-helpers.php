@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
- * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological line comparators, TFAA name matchers, and spreadsheet parsers.
- * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, omitted closing PHP tag.
+ * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, TFAA name matchers, and spreadsheet parsers.
+ * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, O(N) hoisted sort key pre-computation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.6.0
+ * Version: 7.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -156,6 +156,124 @@ if ( ! function_exists( 'sywat_render_line_time_options' ) ) {
         }
 
         return $html;
+    }
+}
+
+/**
+ * Sorts an associative array of tournaments ($tournaments[ $t_name => $t_data ]) in place using
+ * a hoisted O(N) pre-computed 4-tier sort key map (zero regexes or lookups inside the comparator):
+ *   1. Start Date (YYYY-MM-DD ascending; undated events sort last)
+ *   2. Event Tier (TFAA State -> National -> SYWAT) & End Date (YYYY-MM-DD ascending)
+ *   3. Host Shop Name (A -> Z natural case-insensitive)
+ *   4. Event Title (A -> Z natural case-insensitive)
+ *
+ * @param array $tournaments Associative array of tournaments passed by reference.
+ * @param array $all_shops   Optional pre-fetched master shops map for O(1) shop name resolution.
+ * @return void
+ */
+if ( ! function_exists( 'sywat_sort_tournaments_chronologically' ) ) {
+    function sywat_sort_tournaments_chronologically( &$tournaments, $all_shops = array() ) {
+        if ( ! is_array( $tournaments ) || count( $tournaments ) <= 1 ) {
+            return;
+        }
+
+        if ( empty( $all_shops ) ) {
+            if ( function_exists( 'sywat_get_shops' ) ) {
+                $all_shops = sywat_get_shops();
+            } elseif ( function_exists( 'sywat_get_all_shops' ) ) {
+                $all_shops = sywat_get_all_shops();
+            }
+        }
+        if ( ! is_array( $all_shops ) ) {
+            $all_shops = array();
+        }
+
+        // Build O(1) shop lookup maps once outside the tournament loop
+        $shop_id_to_name   = array();
+        $norm_name_to_name = array();
+        foreach ( $all_shops as $s_id => $s_info ) {
+            if ( is_array( $s_info ) ) {
+                $title = ! empty( $s_info['name'] )
+                    ? trim( (string) $s_info['name'] )
+                    : ( ! empty( $s_info['shop_name'] )
+                        ? trim( (string) $s_info['shop_name'] )
+                        : ( ! empty( $s_info['title'] ) ? trim( (string) $s_info['title'] ) : '' ) );
+                if ( $title !== '' ) {
+                    $shop_id_to_name[ (string) $s_id ]      = $title;
+                    $norm_name_to_name[ strtolower( $title ) ] = $title;
+                }
+            }
+        }
+
+        // Single O(N) pass: pre-compute scalar sort keys for every tournament
+        $sort_keys = array();
+        foreach ( $tournaments as $t_key => $t_data ) {
+            $t_name = ( is_array( $t_data ) && ! empty( $t_data['name'] ) ) ? trim( (string) $t_data['name'] ) : trim( (string) $t_key );
+
+            $start_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? trim( (string) $t_data['start_date'] ) : '9999-12-31';
+            $end_date   = ( is_array( $t_data ) && ! empty( $t_data['end_date'] ) ) ? trim( (string) $t_data['end_date'] ) : $start_date;
+
+            $ev_type = ( is_array( $t_data ) && ! empty( $t_data['event_type'] ) ) ? trim( (string) $t_data['event_type'] ) : 'SYWAT';
+            if ( strcasecmp( $ev_type, 'TFAA State' ) === 0 ) {
+                $tier_weight = 1;
+            } elseif ( strcasecmp( $ev_type, 'National' ) === 0 ) {
+                $tier_weight = 2;
+            } else {
+                $tier_weight = 3;
+            }
+
+            // O(1) host shop name resolution
+            $shop_name = '';
+            $s_id      = ( is_array( $t_data ) && ! empty( $t_data['shop_id'] ) ) ? (string) $t_data['shop_id'] : '';
+            if ( $s_id !== '' && isset( $shop_id_to_name[ $s_id ] ) ) {
+                $shop_name = $shop_id_to_name[ $s_id ];
+            } elseif ( is_array( $t_data ) ) {
+                if ( ! empty( $t_data['official_shop_name'] ) ) {
+                    $shop_name = trim( (string) $t_data['official_shop_name'] );
+                } elseif ( ! empty( $t_data['shop_name'] ) ) {
+                    $shop_name = trim( (string) $t_data['shop_name'] );
+                } elseif ( ! empty( $t_data['location_display'] ) ) {
+                    $shop_name = trim( (string) $t_data['location_display'] );
+                }
+            }
+
+            if ( $shop_name === '' && $t_name !== '' ) {
+                $base_title = preg_replace( '/\s*[\-\#]\s*\d+$/i', '', $t_name );
+                $norm_base  = strtolower( trim( $base_title ) );
+                $shop_name  = isset( $norm_name_to_name[ $norm_base ] ) ? $norm_name_to_name[ $norm_base ] : ( $base_title !== '' ? $base_title : $t_name );
+            }
+
+            $sort_keys[ $t_key ] = array(
+                'start' => $start_date,
+                'tier'  => $tier_weight,
+                'end'   => $end_date,
+                'shop'  => $shop_name,
+                'name'  => $t_name,
+            );
+        }
+
+        // Pure scalar comparison inside uksort (zero regexes or lookups)
+        uksort( $tournaments, function( $key_a, $key_b ) use ( $sort_keys ) {
+            $ka = $sort_keys[ $key_a ];
+            $kb = $sort_keys[ $key_b ];
+
+            if ( $ka['start'] !== $kb['start'] ) {
+                return ( $ka['start'] < $kb['start'] ) ? -1 : 1;
+            }
+            if ( $ka['tier'] !== $kb['tier'] ) {
+                return ( $ka['tier'] < $kb['tier'] ) ? -1 : 1;
+            }
+            if ( $ka['end'] !== $kb['end'] ) {
+                return ( $ka['end'] < $kb['end'] ) ? -1 : 1;
+            }
+
+            $shop_cmp = strnatcasecmp( $ka['shop'], $kb['shop'] );
+            if ( $shop_cmp !== 0 ) {
+                return $shop_cmp;
+            }
+
+            return strnatcasecmp( $ka['name'], $kb['name'] );
+        } );
     }
 }
 
@@ -436,13 +554,13 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
             while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
                 if ( count( $data ) >= 3 ) {
                     $raw_rows[] = array(
-                        'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
-                        'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
-                        'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
-                        'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
-                        'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
-                        'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
-                        'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
+                        'start_date'           => isset( $data[0] ) ? trim( (string) $data[0] ) : '',
+                        'end_date'             => isset( $data[1] ) ? trim( (string) $data[1] ) : '',
+                        'host_shop_city'       => isset( $data[2] ) ? trim( (string) $data[2] ) : '',
+                        'line_times'           => isset( $data[3] ) ? trim( (string) $data[3] ) : '',
+                        'event_type'           => isset( $data[4] ) ? trim( (string) $data[4] ) : '',
+                        'national_event_title' => isset( $data[5] ) ? trim( (string) $data[5] ) : '',
+                        'notes'                => isset( $data[6] ) ? trim( (string) $data[6] ) : '',
                     );
                 }
             }
