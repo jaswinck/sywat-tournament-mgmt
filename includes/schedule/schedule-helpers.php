@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Schedule Formatting Helpers
  * Path: includes/schedule/schedule-helpers.php
- * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day without capacity metrics, normalizes external registration links, and calculates chronological event statuses.
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, normalizes external registration links, and calculates chronological event statuses.
  * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -103,24 +103,35 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 $address = implode( ', ', $addr_parts );
             }
 
-            // 3. Group Shooting Lines by Day (Time only, no capacities)
+            // 3. Group Shooting Lines by Day (Using 'name' as Single Source of Truth)
             $raw_lines = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
             $grouped_lines = array();
             
+            $valid_days = array( 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' );
+            
             foreach ( $raw_lines as $l ) {
-                $day  = isset( $l['day'] ) ? trim( $l['day'] ) : '';
-                $time = isset( $l['time'] ) ? trim( $l['time'] ) : ( isset( $l['start_time'] ) ? trim( $l['start_time'] ) : '' );
+                $day  = '';
+                $time = '';
+
+                if ( ! empty( $l['name'] ) ) {
+                    $name_parts = explode( ' ', trim( $l['name'] ), 2 );
+                    if ( count( $name_parts ) === 2 && in_array( strtolower( $name_parts[0] ), $valid_days, true ) ) {
+                        $day  = ucfirst( strtolower( $name_parts[0] ) );
+                        $time = trim( $name_parts[1] );
+                    } else {
+                        $day  = 'Other';
+                        $time = trim( $l['name'] );
+                    }
+                } else {
+                    $day  = isset( $l['day'] ) && ! empty( $l['day'] ) ? trim( $l['day'] ) : 'Other';
+                    $time = isset( $l['time'] ) ? trim( $l['time'] ) : ( isset( $l['start_time'] ) ? trim( $l['start_time'] ) : '' );
+                }
                 
-                if ( ! empty( $day ) && ! empty( $time ) ) {
+                if ( ! empty( $time ) ) {
                     if ( ! isset( $grouped_lines[ $day ] ) ) {
                         $grouped_lines[ $day ] = array();
                     }
                     $grouped_lines[ $day ][] = $time;
-                } elseif ( ! empty( $l['name'] ) ) {
-                    if ( ! isset( $grouped_lines['Other'] ) ) {
-                        $grouped_lines['Other'] = array();
-                    }
-                    $grouped_lines['Other'][] = trim( $l['name'] );
                 }
             }
 
