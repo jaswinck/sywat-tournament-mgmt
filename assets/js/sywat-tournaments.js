@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Master Tournament & Season Management Client Engine
  * Path: assets/js/sywat-tournaments.js
- * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity inheritance, progressive-disclosure per-tournament registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
+ * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & default line templates, progressive-disclosure per-tournament registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
  * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.tournaments with legacy attribute compatibility aliases, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden).
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
 (function () {
@@ -99,29 +99,107 @@
     }
 
     /**
+     * Resolves the active shop element (<option> in Create select or hidden <input> in Edit/Shop Manager mode).
+     */
+    function getSelectedShopSourceElement() {
+        const shopSelect = document.getElementById('sywat_modal_shop_id');
+        if (!shopSelect) return null;
+
+        if (shopSelect.tagName.toLowerCase() === 'select') {
+            return shopSelect.selectedIndex >= 0 ? shopSelect.options[shopSelect.selectedIndex] : null;
+        }
+        return shopSelect;
+    }
+
+    /**
      * Retrieves default line capacity limits (20yd and Cub) for the currently selected shop in the modal.
      */
     function sywatGetSelectedShopCapacities() {
-        const shopSelect = document.getElementById('sywat_modal_shop_id');
-        let cap20 = 20;
+        let cap20  = 20;
         let capCub = 5;
 
-        if (!shopSelect) {
-            return { cap20, capCub };
-        }
-
-        const sourceEl = shopSelect.tagName.toLowerCase() === 'select'
-            ? shopSelect.options[shopSelect.selectedIndex]
-            : shopSelect;
-
+        const sourceEl = getSelectedShopSourceElement();
         if (sourceEl) {
             const raw20  = sourceEl.getAttribute('data-cap20');
             const rawCub = sourceEl.getAttribute('data-capcub');
-            if (raw20)  cap20  = parseInt(raw20, 10) || 20;
-            if (rawCub) capCub = parseInt(rawCub, 10) || 5;
+            if (raw20 !== null && raw20 !== '') {
+                const parsed20 = parseInt(raw20, 10);
+                if (!isNaN(parsed20)) cap20 = parsed20;
+            }
+            if (rawCub !== null && rawCub !== '') {
+                const parsedCub = parseInt(rawCub, 10);
+                if (!isNaN(parsedCub)) capCub = parsedCub;
+            }
         }
 
         return { cap20, capCub };
+    }
+
+    /**
+     * Retrieves the host shop's normalized default shooting lines array from data-default-lines.
+     */
+    function sywatGetSelectedShopDefaultLines() {
+        const sourceEl = getSelectedShopSourceElement();
+        if (!sourceEl) return [];
+
+        try {
+            const parsed = JSON.parse(sourceEl.getAttribute('data-default-lines') || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    /**
+     * Builds a repeater table row <tr> for #sywat_tourn_lines_table using safe DOM assignment.
+     */
+    function buildTournamentLineRow(dayVal, timeVal, cap20Val, capCubVal) {
+        const { cap20, capCub } = sywatGetSelectedShopCapacities();
+        const resolvedCap20  = (cap20Val !== undefined && cap20Val !== null && cap20Val !== '') ? cap20Val : cap20;
+        const resolvedCapCub = (capCubVal !== undefined && capCubVal !== null && capCubVal !== '') ? capCubVal : capCub;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td>' +
+                '<select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">' +
+                    '<option value="" disabled>-- Select --</option>' +
+                    '<option value="Friday">Friday</option>' +
+                    '<option value="Saturday">Saturday</option>' +
+                    '<option value="Sunday">Sunday</option>' +
+                '</select>' +
+            '</td>' +
+            '<td>' +
+                '<input type="text" name="line_times[]" placeholder="10:00 AM" required onchange="checkTournamentLineDuplicate(this);">' +
+            '</td>' +
+            '<td class="sywat-col-center">' +
+                '<input type="number" name="cap_20yd[]" min="0" class="sywat-col-num-input" required>' +
+            '</td>' +
+            '<td class="sywat-col-center">' +
+                '<input type="number" name="cap_cub[]" min="0" class="sywat-col-num-input" required>' +
+            '</td>' +
+            '<td class="sywat-col-center">' +
+                '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-sm" onclick="removeTournamentLineRow(this)">Remove</button>' +
+            '</td>';
+
+        const daySelect  = tr.querySelector('select[name="line_days[]"]');
+        const timeInput  = tr.querySelector('input[name="line_times[]"]');
+        const cap20Input = tr.querySelector('input[name="cap_20yd[]"]');
+        const capCubInput = tr.querySelector('input[name="cap_cub[]"]');
+
+        if (daySelect) {
+            daySelect.value = dayVal || '';
+        }
+        if (timeInput) {
+            timeInput.value = (timeVal !== undefined && timeVal !== null && timeVal !== '') ? timeVal : '10:00 AM';
+        }
+        if (cap20Input) {
+            cap20Input.value = resolvedCap20;
+        }
+        if (capCubInput) {
+            capCubInput.value = resolvedCapCub;
+        }
+
+        return tr;
     }
 
     /**
@@ -139,6 +217,45 @@
         tableBody.querySelectorAll('input[name="cap_cub[]"]').forEach(function (input) {
             input.value = capCub;
         });
+    }
+
+    /**
+     * Resets #sywat_tourn_lines_table rows and capacities to the active host shop's configured defaults.
+     */
+    function resetTournamentLinesToShopDefaults() {
+        const shopSelect = document.getElementById('sywat_modal_shop_id');
+        if (shopSelect && shopSelect.tagName.toLowerCase() === 'select' && !shopSelect.value) {
+            window.alert('Please select a Host Archery Shop first.');
+            shopSelect.focus();
+            return;
+        }
+
+        const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
+        if (!tableBody) return;
+
+        const confirmed = window.confirm(
+            'Reset shooting lines and capacities to this shop\'s configured defaults?\n\n' +
+            'If archers are already registered on this tournament, please verify their line assignments after saving. ' +
+            'Changes take effect when you click "Save Tournament Configuration".'
+        );
+        if (!confirmed) return;
+
+        const defaultLines = sywatGetSelectedShopDefaultLines();
+        if (defaultLines.length > 0) {
+            tableBody.innerHTML = '';
+            defaultLines.forEach(function (line) {
+                tableBody.appendChild(
+                    buildTournamentLineRow(
+                        line.day || '',
+                        line.time || '10:00 AM',
+                        line.cap_20yd,
+                        line.cap_cub
+                    )
+                );
+            });
+        } else {
+            sywatSyncShopCapacities();
+        }
     }
 
     /**
@@ -394,34 +511,7 @@
         if (!tableBody) return;
 
         const { cap20, capCub } = sywatGetSelectedShopCapacities();
-
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td>' +
-                '<div class="sywat-field-group">' +
-                    '<select name="line_days[]" onchange="checkTournamentLineDuplicate(this);">' +
-                        '<option value="" disabled selected>-- Select Day --</option>' +
-                        '<option value="Friday">Friday</option>' +
-                        '<option value="Saturday">Saturday</option>' +
-                        '<option value="Sunday">Sunday</option>' +
-                    '</select>' +
-                '</div>' +
-            '</td>' +
-            '<td>' +
-                '<div class="sywat-field-group">' +
-                    '<input type="text" name="line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required onchange="checkTournamentLineDuplicate(this);">' +
-                '</div>' +
-            '</td>' +
-            '<td class="sywat-col-center">' +
-                '<input type="number" name="cap_20yd[]" value="' + cap20 + '" min="0" class="sywat-col-num-input" required>' +
-            '</td>' +
-            '<td class="sywat-col-center">' +
-                '<input type="number" name="cap_cub[]" value="' + capCub + '" min="0" class="sywat-col-num-input" required>' +
-            '</td>' +
-            '<td class="sywat-col-center">' +
-                '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-sm" onclick="removeTournamentLineRow(this)">Remove</button>' +
-            '</td>';
-        tableBody.appendChild(tr);
+        tableBody.appendChild(buildTournamentLineRow('', '10:00 AM', cap20, capCub));
     }
 
     function removeTournamentLineRow(btn) {
@@ -688,6 +778,9 @@
         } else if (action === 'remove-tourn-reg-link') {
             e.preventDefault();
             removeTournamentRegLinkRow(trigger);
+        } else if (action === 'reset-tourn-lines') {
+            e.preventDefault();
+            resetTournamentLinesToShopDefaults();
         }
     });
 
@@ -731,9 +824,12 @@
             }
         }
 
-        // Synchronize capacity inputs and formats in Create mode if modal is active on page paint
+        // Synchronize capacity inputs and formats in Create mode ONLY if modal is active on page paint
         const activeTournModal = document.getElementById('sywat_add_tourn_modal');
-        if (activeTournModal && activeTournModal.classList.contains('active')) {
+        const linesTable       = document.getElementById('sywat_tourn_lines_table');
+        const isEditMode       = linesTable && linesTable.getAttribute('data-is-edit') === '1';
+
+        if (activeTournModal && activeTournModal.classList.contains('active') && !isEditMode) {
             sywatSyncShopCapacities();
             if (modalSeasonSelect && modalSeasonSelect.tagName.toLowerCase() === 'select') {
                 sywatSyncTournamentPricingProfiles();
@@ -753,7 +849,9 @@
         toggleNameLock: sywatToggleTournamentNameLock,
         autoPopulateEndDate: sywatAutoPopulateEndDate,
         getSelectedShopCapacities: sywatGetSelectedShopCapacities,
+        getSelectedShopDefaultLines: sywatGetSelectedShopDefaultLines,
         syncShopCapacities: sywatSyncShopCapacities,
+        resetLinesToShopDefaults: resetTournamentLinesToShopDefaults,
         addRegLinkRow: addTournamentRegLinkRow,
         removeRegLinkRow: removeTournamentRegLinkRow,
         syncPricingProfiles: sywatSyncTournamentPricingProfiles,
