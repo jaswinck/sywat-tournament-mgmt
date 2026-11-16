@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection and progressive-disclosure External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection and per-tournament External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.13.0
+ * Version: 7.14.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -76,7 +76,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             ? $season_profiles_map[ $edit_t_season ]
             : array();
 
-        // Resolve target shop key for fallback initialization
+        // Resolve target shop key for default line capacity initialization
         $target_shop_key = $edit_t_shop;
         if ( empty( $target_shop_key ) && ! empty( $user_shop_id ) ) {
             $target_shop_key = $user_shop_id;
@@ -87,22 +87,13 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         }
 
         $init_shop_data = ( ! empty( $target_shop_key ) && isset( $all_shops[ $target_shop_key ] ) ) ? $all_shops[ $target_shop_key ] : array();
-        $init_reg_links = function_exists( 'sywat_get_shop_registration_links' )
-            ? sywat_get_shop_registration_links( $init_shop_data )
-            : ( is_array( $init_shop_data ) && isset( $init_shop_data['registration_links'] ) && is_array( $init_shop_data['registration_links'] ) ? $init_shop_data['registration_links'] : array() );
 
-        // Resolve external registration links for the modal (Edit mode preserves saved links; Create mode inherits shop defaults when shop is preselected)
+        // Resolve saved external registration links for this specific tournament
         $edit_t_reg_links = array();
-        if ( $is_edit_mode && is_array( $edit_t_data ) ) {
-            if ( array_key_exists( 'registration_links', $edit_t_data ) && is_array( $edit_t_data['registration_links'] ) ) {
-                $edit_t_reg_links = function_exists( 'sywat_get_shop_registration_links' )
-                    ? sywat_get_shop_registration_links( $edit_t_data )
-                    : $edit_t_data['registration_links'];
-            } else {
-                $edit_t_reg_links = $init_reg_links;
-            }
-        } elseif ( ! empty( $edit_t_shop ) ) {
-            $edit_t_reg_links = $init_reg_links;
+        if ( $is_edit_mode && is_array( $edit_t_data ) && ! empty( $edit_t_data['registration_links'] ) && is_array( $edit_t_data['registration_links'] ) ) {
+            $edit_t_reg_links = function_exists( 'sywat_get_shop_registration_links' )
+                ? sywat_get_shop_registration_links( $edit_t_data )
+                : $edit_t_data['registration_links'];
         }
 
         if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
@@ -218,11 +209,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     $s_cap20  = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? $s_name['cap_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? $s_name['capacity_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? $s_name['cap_20'] : 20 ) );
                                                     $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? $s_name['cap_cub'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? $s_name['capacity_cub'] : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? $s_name['cub_cap'] : 5 ) );
                                                 }
-
-                                                $s_reglinks = function_exists( 'sywat_get_shop_registration_links' )
-                                                    ? sywat_get_shop_registration_links( $s_name )
-                                                    : ( is_array( $s_name ) && isset( $s_name['registration_links'] ) && is_array( $s_name['registration_links'] ) ? $s_name['registration_links'] : array() );
-                                                $reglinks_json = esc_attr( wp_json_encode( $s_reglinks ) );
                                             ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>"
                                                     data-name="<?php echo esc_attr( $s_title ); ?>"
@@ -230,7 +216,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     data-events="<?php echo $events_json; ?>"
                                                     data-cap20="<?php echo esc_attr( $s_cap20 ); ?>"
                                                     data-capcub="<?php echo esc_attr( $s_capcub ); ?>"
-                                                    data-reglinks="<?php echo $reglinks_json; ?>"
                                                     <?php selected( $edit_t_shop, $s_id ); ?>>
                                                 <?php echo esc_html( $s_title ); ?>
                                             </option>
@@ -242,8 +227,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                            id="sywat_modal_shop_id"
                                            value="<?php echo esc_attr( $user_shop_id ); ?>"
                                            data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
-                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
-                                           data-reglinks="<?php echo esc_attr( wp_json_encode( $init_reg_links ) ); ?>">
+                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>">
                                     <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $user_shop_id ]['name'] ) ? $all_shops[ $user_shop_id ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
                             </div>
@@ -350,15 +334,14 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         <?php endif; ?>
 
-                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS (PROGRESSIVE DISCLOSURE) -->
+                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS (PER-TOURNAMENT, PROGRESSIVE DISCLOSURE) -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
-                            <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional — auto-filled from host shop)</span></h2>
+                            <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional)</span></h2>
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-tourn-reg-link">Add Registration Link</button>
                         </div>
 
                         <div id="sywat_tourn_reg_links_container"
-                             class="sywat-mb-4<?php echo empty( $edit_t_reg_links ) ? ' sywat-hidden' : ''; ?>"
-                             data-is-edit="<?php echo $is_edit_mode ? '1' : '0'; ?>">
+                             class="sywat-mb-4<?php echo empty( $edit_t_reg_links ) ? ' sywat-hidden' : ''; ?>">
                             <?php foreach ( $edit_t_reg_links as $rl ) : ?>
                                 <div class="sywat-reg-link-row sywat-form-grid-2 sywat-mt-3">
                                     <div class="sywat-field-group">
