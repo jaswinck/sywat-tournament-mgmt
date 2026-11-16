@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
- * Description: Renders the Manage Tournaments & Seasons portal with clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Description: Renders the Manage Tournaments & Seasons portal with live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
  * Author: SYWAT Archery
- * Version: 7.19.0
+ * Version: 7.20.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -316,6 +316,16 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 $tfaa_link = is_numeric( $eid ) ? 'https://texasfieldarchery.org/results/' . $eid : $eid;
                                             }
 
+                                            // Evaluate live Public Online Registration gatekeeper status
+                                            $public_reg_status = function_exists( 'sywat_get_public_registration_status' )
+                                                ? sywat_get_public_registration_status( $t_data )
+                                                : array(
+                                                    'status'      => 'closed',
+                                                    'reason'      => 'disabled',
+                                                    'opens_date'  => '',
+                                                    'opens_label' => '',
+                                                );
+
                                             $tourn_waitlist_url = ( $total_tourn_waitlist > 0 && function_exists( 'sywat_waitlist_get_modal_url' ) )
                                                 ? sywat_waitlist_get_modal_url( $t_name, 'all', $manage_base_url )
                                                 : '';
@@ -332,6 +342,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <div class="sywat-tourn-tfaa-link">🔗 <a href="<?php echo esc_url( $tfaa_link ); ?>" target="_blank" rel="noopener">TFAA Direct Link ↗</a></div>
                                                 <?php else : ?>
                                                     <div class="sywat-tourn-tfaa-link sywat-label-subtext">🔗 TFAA Link: Pending</div>
+                                                <?php endif; ?>
+
+                                                <?php if ( $public_reg_status['status'] === 'open' ) : ?>
+                                                    <div class="sywat-tourn-tfaa-link"><span class="sywat-badge sywat-badge-success">Public Reg: Open</span></div>
+                                                <?php elseif ( $public_reg_status['status'] === 'opens_soon' ) : ?>
+                                                    <?php $opens_lbl = ! empty( $public_reg_status['opens_label'] ) ? $public_reg_status['opens_label'] : $public_reg_status['opens_date']; ?>
+                                                    <div class="sywat-tourn-tfaa-link"><span class="sywat-badge sywat-badge-warning">Public Reg: Opens <?php echo esc_html( $opens_lbl ); ?></span></div>
+                                                <?php elseif ( isset( $public_reg_status['reason'] ) && $public_reg_status['reason'] === 'past' ) : ?>
+                                                    <div class="sywat-tourn-tfaa-link sywat-label-subtext">Public Reg: Closed (Event Ended)</div>
+                                                <?php else : ?>
+                                                    <div class="sywat-tourn-tfaa-link sywat-label-subtext">Public Reg: Off</div>
                                                 <?php endif; ?>
 
                                                 <!-- Volunteer Hub Toggle Chip (Available to All Host Shops, Hidden by Default) -->
