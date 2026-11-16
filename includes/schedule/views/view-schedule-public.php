@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule (List View & Monthly Calendar View)
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, stacked shop phone links, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
+ * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, live SYWAT online registration links & upcoming opening date pills, stacked shop phone links, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.5.1
+ * Version: 1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -62,10 +62,11 @@ foreach ( $events as $evt_item ) {
 }
 
 // Utility Icons
-$icon_pin      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
-$icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
-$icon_calendar = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
-$icon_list     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>';
+$icon_pin       = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+$icon_ext_link  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
+$icon_reg_check = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14l2 2 4-4"></path></svg>';
+$icon_calendar  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
+$icon_list      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>';
 
 $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
 ?>
@@ -182,6 +183,9 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                 $restr_label    = isset( $evt['line_restriction_label'] ) ? $evt['line_restriction_label'] : '';
                                 $maps_url       = ! empty( $evt['maps_url'] ) ? $evt['maps_url'] : '';
                                 $results_url    = ! empty( $evt['results_url'] ) ? $evt['results_url'] : '';
+                                $pub_reg_status = isset( $evt['public_reg_status'] ) ? $evt['public_reg_status'] : 'closed';
+                                $sywat_reg_url  = ! empty( $evt['sywat_reg_url'] ) ? $evt['sywat_reg_url'] : '';
+                                $opens_label    = ! empty( $evt['public_reg_opens_label'] ) ? $evt['public_reg_opens_label'] : ( ! empty( $evt['public_reg_opens_date'] ) ? $evt['public_reg_opens_date'] : 'Soon' );
                                 $search_payload = strtolower( trim( $evt['name'] . ' ' . $evt['shop_name'] . ' ' . $evt['address'] . ' ' . $restr_label ) );
                             ?>
                             <tr class="sywat-schedule-row" 
@@ -289,14 +293,29 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                             
                                         <?php else : ?>
 
+                                            <?php if ( $pub_reg_status === 'open' && ! empty( $sywat_reg_url ) ) : ?>
+                                                <a href="<?php echo esc_url( $sywat_reg_url ); ?>" class="sywat-btn sywat-btn-success sywat-btn-full sywat-btn-sm">
+                                                    <?php echo $icon_reg_check; ?> Register Online
+                                                </a>
+                                            <?php elseif ( $pub_reg_status === 'opens_soon' ) : ?>
+                                                <span class="sywat-badge sywat-badge-warning sywat-badge-full">
+                                                    Opens <?php echo esc_html( $opens_label ); ?>
+                                                </span>
+                                            <?php endif; ?>
+
                                             <?php if ( ! empty( $evt['reg_links'] ) ) : ?>
+                                                <?php
+                                                    $ext_btn_class = ( $pub_reg_status === 'open' && ! empty( $sywat_reg_url ) )
+                                                        ? 'sywat-btn sywat-btn-secondary sywat-btn-full sywat-btn-sm'
+                                                        : 'sywat-btn sywat-btn-success sywat-btn-full sywat-btn-sm';
+                                                ?>
                                                 <?php foreach ( $evt['reg_links'] as $link ) : ?>
                                                     <?php $btn_label = ! empty( $link['label'] ) ? $link['label'] : 'Register Online'; ?>
-                                                    <a href="<?php echo esc_url( $link['url'] ); ?>" target="_blank" rel="noopener noreferrer" class="sywat-btn sywat-btn-success sywat-btn-full sywat-btn-sm">
+                                                    <a href="<?php echo esc_url( $link['url'] ); ?>" target="_blank" rel="noopener noreferrer" class="<?php echo esc_attr( $ext_btn_class ); ?>">
                                                         <?php echo $icon_ext_link; ?> <?php echo esc_html( $btn_label ); ?>
                                                     </a>
                                                 <?php endforeach; ?>
-                                            <?php elseif ( ! empty( $evt['shop_phone'] ) ) : ?>
+                                            <?php elseif ( $pub_reg_status !== 'open' && ! empty( $evt['shop_phone'] ) ) : ?>
                                                 <?php $tel_href = preg_replace( '/[^0-9+]/', '', (string) $evt['shop_phone'] ); ?>
                                                 <div class="sywat-label-subtext sywat-mt-1">
                                                     <div>📞 <strong>Contact Shop:</strong></div>
@@ -310,7 +329,7 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                         <?php endif; ?>
                                                     </div>
                                                 </div>
-                                            <?php else : ?>
+                                            <?php elseif ( $pub_reg_status !== 'open' && $pub_reg_status !== 'opens_soon' ) : ?>
                                                 <div class="sywat-label-subtext sywat-mt-1">
                                                     📞 <strong>Contact Host to Register</strong>
                                                 </div>
