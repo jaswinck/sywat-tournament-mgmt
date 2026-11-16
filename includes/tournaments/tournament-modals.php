@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection and per-tournament External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament External Online Registration Links, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.14.0
+ * Version: 7.15.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -76,7 +76,53 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
             ? $season_profiles_map[ $edit_t_season ]
             : array();
 
-        // Resolve target shop key for default line capacity initialization
+        // Helper: Normalize a shop's configured default lines (day, time, cap_20yd, cap_cub)
+        $build_normalized_shop_lines = function( $shop_item, $fallback_20, $fallback_cub ) {
+            if ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
+                $raw = sywat_get_default_tournament_lines( $shop_item );
+            } elseif ( is_array( $shop_item ) && ! empty( $shop_item['default_lines'] ) && is_array( $shop_item['default_lines'] ) ) {
+                $raw = $shop_item['default_lines'];
+            } else {
+                $raw = array(
+                    array( 'day' => 'Saturday', 'time' => '10:00 AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Saturday', 'time' => '2:00 PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Sunday',   'time' => '10:00 AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                    array( 'day' => 'Sunday',   'time' => '2:00 PM',  'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
+                );
+            }
+
+            $out = array();
+            if ( is_array( $raw ) ) {
+                foreach ( $raw as $line ) {
+                    if ( ! is_array( $line ) ) {
+                        continue;
+                    }
+                    $d = isset( $line['day'] ) ? trim( (string) $line['day'] ) : '';
+                    $t = isset( $line['time'] ) ? trim( (string) $line['time'] ) : ( isset( $line['start_time'] ) ? trim( (string) $line['start_time'] ) : '' );
+                    if ( ( $d === '' || $t === '' ) && ! empty( $line['name'] ) ) {
+                        $parts = explode( ' ', trim( (string) $line['name'] ), 2 );
+                        if ( $d === '' ) {
+                            $d = $parts[0];
+                        }
+                        if ( $t === '' && isset( $parts[1] ) ) {
+                            $t = $parts[1];
+                        }
+                    }
+                    if ( function_exists( 'sywat_format_line_time_token' ) && $t !== '' ) {
+                        $t = sywat_format_line_time_token( $t );
+                    }
+                    $out[] = array(
+                        'day'      => $d,
+                        'time'     => $t !== '' ? $t : '10:00 AM',
+                        'cap_20yd' => isset( $line['cap_20yd'] ) ? intval( $line['cap_20yd'] ) : intval( $fallback_20 ),
+                        'cap_cub'  => isset( $line['cap_cub'] ) ? intval( $line['cap_cub'] ) : intval( $fallback_cub ),
+                    );
+                }
+            }
+            return $out;
+        };
+
+        // Resolve target shop key for default line capacity & template initialization
         $target_shop_key = $edit_t_shop;
         if ( empty( $target_shop_key ) && ! empty( $user_shop_id ) ) {
             $target_shop_key = $user_shop_id;
@@ -98,22 +144,17 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
         if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
             $shop_caps       = sywat_get_shop_capacity_defaults( $init_shop_data );
-            $default_cap_20  = $shop_caps['cap_20yd'];
-            $default_cap_cub = $shop_caps['cap_cub'];
+            $default_cap_20  = intval( $shop_caps['cap_20yd'] );
+            $default_cap_cub = intval( $shop_caps['cap_cub'] );
         } else {
-            $default_cap_20  = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20yd'] ) ) ? $init_shop_data['cap_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_20yd'] ) ) ? $init_shop_data['capacity_20yd'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20'] ) ) ? $init_shop_data['cap_20'] : 20 ) );
-            $default_cap_cub = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_cub'] ) ) ? $init_shop_data['cap_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_cub'] ) ) ? $init_shop_data['capacity_cub'] : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cub_cap'] ) ) ? $init_shop_data['cub_cap'] : 5 ) );
+            $default_cap_20  = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20yd'] ) ) ? intval( $init_shop_data['cap_20yd'] ) : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_20yd'] ) ) ? intval( $init_shop_data['capacity_20yd'] ) : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_20'] ) ) ? intval( $init_shop_data['cap_20'] ) : 20 ) );
+            $default_cap_cub = ( is_array( $init_shop_data ) && isset( $init_shop_data['cap_cub'] ) ) ? intval( $init_shop_data['cap_cub'] ) : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['capacity_cub'] ) ) ? intval( $init_shop_data['capacity_cub'] ) : ( ( is_array( $init_shop_data ) && isset( $init_shop_data['cub_cap'] ) ) ? intval( $init_shop_data['cub_cap'] ) : 5 ) );
         }
 
-        if ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
-            $default_lines = sywat_get_default_tournament_lines( $init_shop_data );
-        } else {
-            $default_lines = array(
-                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $default_cap_20, 'cap_cub' => $default_cap_cub ),
-            );
+        $default_lines = $build_normalized_shop_lines( $init_shop_data, $default_cap_20, $default_cap_cub );
+        if ( ! empty( $default_lines ) ) {
+            $default_cap_20  = intval( $default_lines[0]['cap_20yd'] );
+            $default_cap_cub = intval( $default_lines[0]['cap_cub'] );
         }
 
         $edit_t_lines = $edit_t_data ? sywat_get_tournament_lines( $edit_t_data ) : $default_lines;
@@ -190,7 +231,13 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             <div class="sywat-field-group">
                                 <label>Host Archery Shop *</label>
                                 <?php if ( $is_edit_mode ) : ?>
-                                    <input type="hidden" name="shop_id" value="<?php echo esc_attr( $edit_t_shop ); ?>">
+                                    <input type="hidden"
+                                           name="shop_id"
+                                           id="sywat_modal_shop_id"
+                                           value="<?php echo esc_attr( $edit_t_shop ); ?>"
+                                           data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
+                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
+                                           data-default-lines="<?php echo esc_attr( wp_json_encode( $default_lines ) ); ?>">
                                     <input type="text" value="<?php echo esc_attr( $shop_display_name ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php elseif ( $can_manage_seasons ) : ?>
                                     <select name="shop_id" id="sywat_modal_shop_id" onchange="sywatAutoGenerateTournamentName()" required>
@@ -203,11 +250,17 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
                                                 if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
                                                     $s_caps   = sywat_get_shop_capacity_defaults( $s_name );
-                                                    $s_cap20  = $s_caps['cap_20yd'];
-                                                    $s_capcub = $s_caps['cap_cub'];
+                                                    $s_cap20  = intval( $s_caps['cap_20yd'] );
+                                                    $s_capcub = intval( $s_caps['cap_cub'] );
                                                 } else {
-                                                    $s_cap20  = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? $s_name['cap_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? $s_name['capacity_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? $s_name['cap_20'] : 20 ) );
-                                                    $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? $s_name['cap_cub'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? $s_name['capacity_cub'] : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? $s_name['cub_cap'] : 5 ) );
+                                                    $s_cap20  = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? intval( $s_name['cap_20yd'] ) : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? intval( $s_name['capacity_20yd'] ) : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? intval( $s_name['cap_20'] ) : 20 ) );
+                                                    $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? intval( $s_name['cap_cub'] ) : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? intval( $s_name['capacity_cub'] ) : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? intval( $s_name['cub_cap'] ) : 5 ) );
+                                                }
+
+                                                $s_def_lines = $build_normalized_shop_lines( $s_name, $s_cap20, $s_capcub );
+                                                if ( ! empty( $s_def_lines ) ) {
+                                                    $s_cap20  = intval( $s_def_lines[0]['cap_20yd'] );
+                                                    $s_capcub = intval( $s_def_lines[0]['cap_cub'] );
                                                 }
                                             ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>"
@@ -216,6 +269,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     data-events="<?php echo $events_json; ?>"
                                                     data-cap20="<?php echo esc_attr( $s_cap20 ); ?>"
                                                     data-capcub="<?php echo esc_attr( $s_capcub ); ?>"
+                                                    data-default-lines="<?php echo esc_attr( wp_json_encode( $s_def_lines ) ); ?>"
                                                     <?php selected( $edit_t_shop, $s_id ); ?>>
                                                 <?php echo esc_html( $s_title ); ?>
                                             </option>
@@ -227,7 +281,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                            id="sywat_modal_shop_id"
                                            value="<?php echo esc_attr( $user_shop_id ); ?>"
                                            data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
-                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>">
+                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
+                                           data-default-lines="<?php echo esc_attr( wp_json_encode( $default_lines ) ); ?>">
                                     <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $user_shop_id ]['name'] ) ? $all_shops[ $user_shop_id ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
                             </div>
@@ -362,12 +417,17 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                         <!-- STANDARDIZED SUB-HEADER -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>📋 Shooting Lines & Capacity Templates</h2>
-                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
+                            <div class="sywat-table-header-actions">
+                                <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="reset-tourn-lines">Reset to Shop Defaults</button>
+                                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addTournamentLineRow()">Add New Line</button>
+                            </div>
                         </div>
 
                         <!-- COMPACT REPEATER TABLE -->
                         <div class="sywat-table-responsive">
-                            <table class="sywat-table sywat-modal-repeater-table" id="sywat_tourn_lines_table">
+                            <table class="sywat-table sywat-modal-repeater-table"
+                                   id="sywat_tourn_lines_table"
+                                   data-is-edit="<?php echo $is_edit_mode ? '1' : '0'; ?>">
                                 <thead>
                                     <tr>
                                         <th class="sywat-col-day">Shooting Day</th>
