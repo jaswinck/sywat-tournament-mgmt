@@ -1,15 +1,20 @@
 /**
  * SYWAT Archery - Archer Roster Management & Edit Modal Engine
  * Path: assets/js/sywat-roster.js
- * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, single-prompt confirmations, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden).
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 (function() {
     'use strict';
 
     window.SYWAT = window.SYWAT || {};
+
+    if (window.SYWAT._rosterInitialized) {
+        return;
+    }
+    window.SYWAT._rosterInitialized = true;
 
     /**
      * Retrieve Line-Scoped Family Group Data
@@ -560,14 +565,29 @@
         }
     });
 
-    // Delegated Submit Confirmation Listener (Section IV.1)
+    // Delegated Submit Confirmation Listener (Single-Prompt & Double-Submit Guarded — Section IV.1)
     document.addEventListener('submit', function(event) {
         const form = event.target.closest('form[data-sywat-confirm]');
-        if (!form) return;
+        if (!form || event.defaultPrevented) return;
 
-        const message = form.getAttribute('data-sywat-confirm');
-        if (message && !window.confirm(message)) {
+        if (form.dataset.sywatSubmitting === '1') {
             event.preventDefault();
+            return;
+        }
+
+        if (!event._sywatConfirmHandled) {
+            event._sywatConfirmHandled = true;
+            const message = form.getAttribute('data-sywat-confirm');
+            if (message && !window.confirm(message)) {
+                event.preventDefault();
+                return;
+            }
+        }
+
+        form.dataset.sywatSubmitting = '1';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
         }
     });
 
