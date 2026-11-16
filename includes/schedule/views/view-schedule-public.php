@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule (List View & Monthly Calendar View)
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
+ * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, stacked shop phone links, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.5.0
+ * Version: 1.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -297,8 +297,18 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                     </a>
                                                 <?php endforeach; ?>
                                             <?php elseif ( ! empty( $evt['shop_phone'] ) ) : ?>
+                                                <?php $tel_href = preg_replace( '/[^0-9+]/', '', (string) $evt['shop_phone'] ); ?>
                                                 <div class="sywat-label-subtext sywat-mt-1">
-                                                    📞 <strong>Contact Shop:</strong> <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                                    <div>📞 <strong>Contact Shop:</strong></div>
+                                                    <div>
+                                                        <?php if ( ! empty( $tel_href ) ) : ?>
+                                                            <a href="<?php echo esc_attr( 'tel:' . $tel_href ); ?>" class="sywat-table-link">
+                                                                <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                                            </a>
+                                                        <?php else : ?>
+                                                            <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
                                             <?php else : ?>
                                                 <div class="sywat-label-subtext sywat-mt-1">
