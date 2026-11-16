@@ -1,10 +1,10 @@
 /**
  * Sub-Module: Public Season Schedule Client Engine (List View & Monthly Calendar View)
  * Path: assets/js/sywat-schedule.js
- * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
+ * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal with per-line Cubs Only / 20 YD Only pills, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
  * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden / .active / .is-active class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.2.1
+ * Version: 1.3.0
  */
 
 (function() {
@@ -569,15 +569,24 @@
             html += '<span class="sywat-badge ' + badgeClass + '">' + self.escapeHtml( evt.status_label || '' ) + '</span>';
             html += '</div>';
 
-            // Type & District Pills
+            // Type, District & Whole-Event Restriction Pills
             const hasSpecialType = evt.event_type && evt.event_type !== 'SYWAT';
-            if ( hasSpecialType || evt.district ) {
+            const rScope         = evt.line_restriction_scope || '';
+            const rLabel         = evt.line_restriction_label || '';
+            const hasEventRestr  = (rScope === 'all_cubs' || rScope === 'all_20yd') && rLabel !== '';
+
+            if ( hasSpecialType || evt.district || hasEventRestr ) {
                 html += '<div class="sywat-cal-modal-badges">';
                 if ( hasSpecialType ) {
                     html += '<span class="sywat-badge sywat-badge-open">' + self.escapeHtml( evt.event_type ) + '</span>';
                 }
                 if ( evt.district ) {
                     html += '<span class="sywat-badge sywat-badge-prereg">' + self.escapeHtml( evt.district ) + '</span>';
+                }
+                if ( rScope === 'all_cubs' && rLabel ) {
+                    html += '<span class="sywat-badge sywat-badge-cubs">' + self.escapeHtml( rLabel ) + '</span>';
+                } else if ( rScope === 'all_20yd' && rLabel ) {
+                    html += '<span class="sywat-badge sywat-badge-20yd">' + self.escapeHtml( rLabel ) + '</span>';
                 }
                 html += '</div>';
             }
@@ -597,18 +606,34 @@
                 html += '</div>';
             }
 
-            // Grouped Shooting Lines
+            // Grouped Shooting Lines with Per-Line Restriction Pills
             if ( evt.grouped_lines && typeof evt.grouped_lines === 'object' ) {
                 const days = Object.keys( evt.grouped_lines );
                 if ( days.length > 0 ) {
                     html += '<div class="sywat-cal-modal-lines">';
                     days.forEach(function( day ) {
-                        const times = Array.isArray( evt.grouped_lines[ day ] ) ? evt.grouped_lines[ day ] : [];
-                        if ( times.length > 0 ) {
+                        const slots = Array.isArray( evt.grouped_lines[ day ] ) ? evt.grouped_lines[ day ] : [];
+                        if ( slots.length > 0 ) {
                             html += '<div class="sywat-cal-modal-line-row">';
                             html += '<strong class="sywat-text-subtle">' + self.escapeHtml( day ) + ':</strong> ';
-                            times.forEach(function( time ) {
-                                html += '<span class="sywat-badge sywat-badge-muted">' + self.escapeHtml( time ) + '</span> ';
+                            slots.forEach(function( slot ) {
+                                const isObj     = slot && typeof slot === 'object';
+                                const slotTime  = isObj ? (slot.time || '') : String( slot || '' );
+                                const slotCode  = isObj ? (slot.restriction_code || '') : '';
+                                const slotLabel = isObj ? (slot.restriction_label || '') : '';
+
+                                let pillClass = 'sywat-badge-muted';
+                                let pillText  = slotTime;
+
+                                if ( slotCode === 'cubs_only' && slotLabel ) {
+                                    pillClass = 'sywat-badge-cubs';
+                                    pillText  = slotTime + ' · ' + slotLabel;
+                                } else if ( slotCode === '20yd_only' && slotLabel ) {
+                                    pillClass = 'sywat-badge-20yd';
+                                    pillText  = slotTime + ' · ' + slotLabel;
+                                }
+
+                                html += '<span class="sywat-badge ' + pillClass + '">' + self.escapeHtml( pillText ) + '</span> ';
                             });
                             html += '</div>';
                         }
