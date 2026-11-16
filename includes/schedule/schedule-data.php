@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Schedule Data Access Layer
  * Path: includes/schedule/schedule-data.php
- * Description: Pure data retrieval engine for the public season schedule. Fetches active seasons, filters tournaments, and maps host shop data in O(N) time without formatting or HTML generation.
+ * Description: Pure data retrieval engine for the public season schedule. Fetches active seasons, filters tournaments, maps host shop data in O(N) time, and sorts events deterministically by start date, event tier/end date, and host shop name without formatting or HTML generation.
  * Compliance: Zero HTML output, zero inline styles, pure scalar data shaping, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -66,16 +66,27 @@ if ( ! function_exists( 'sywat_schedule_get_raw_data' ) ) {
             }
         }
 
-        // 5. Sort season tournaments chronologically by start date
+        // 5. Sort season tournaments deterministically (Start Date -> Event Tier/End Date -> Host Shop A-Z -> Title A-Z)
         if ( count( $season_tournaments ) > 1 ) {
-            uasort( $season_tournaments, function( $a, $b ) {
-                $a_date = isset( $a['start_date'] ) ? $a['start_date'] : '';
-                $b_date = isset( $b['start_date'] ) ? $b['start_date'] : '';
-                if ( $a_date === $b_date ) {
-                    return 0;
-                }
-                return ( $a_date < $b_date ) ? -1 : 1;
-            });
+            if ( function_exists( 'sywat_sort_tournaments_chronologically' ) ) {
+                sywat_sort_tournaments_chronologically( $season_tournaments, $all_shops );
+            } else {
+                uasort( $season_tournaments, function( $a, $b ) {
+                    $a_start = ! empty( $a['start_date'] ) ? $a['start_date'] : '9999-12-31';
+                    $b_start = ! empty( $b['start_date'] ) ? $b['start_date'] : '9999-12-31';
+                    if ( $a_start !== $b_start ) {
+                        return ( $a_start < $b_start ) ? -1 : 1;
+                    }
+                    $a_end = ! empty( $a['end_date'] ) ? $a['end_date'] : $a_start;
+                    $b_end = ! empty( $b['end_date'] ) ? $b['end_date'] : $b_start;
+                    if ( $a_end !== $b_end ) {
+                        return ( $a_end < $b_end ) ? -1 : 1;
+                    }
+                    $a_shop = ! empty( $a['shop_name'] ) ? $a['shop_name'] : ( ! empty( $a['name'] ) ? $a['name'] : '' );
+                    $b_shop = ! empty( $b['shop_name'] ) ? $b['shop_name'] : ( ! empty( $b['name'] ) ? $b['name'] : '' );
+                    return strnatcasecmp( $a_shop, $b_shop );
+                } );
+            }
         }
 
         return array(
