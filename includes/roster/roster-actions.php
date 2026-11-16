@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Action Handlers (Edit, Remove & Line Purge)
  * Path: includes/roster/roster-actions.php
- * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, round/pricing profile persistence, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
+ * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -152,8 +152,9 @@ if ( ! function_exists( 'sywat_roster_delete_record_storage' ) ) {
 /**
  * Action Handler: Save Edited Archer Registration from the Roster Modal.
  * Synchronizes Pre-Reg / Waitlist status, round/pricing profile selection, Promotional Free Entry status,
- * enforces database-driven style & division rules, enforces $0.00 balance due on Waitlist,
- * validates duplicate names on target lines, and reconciles dynamic Household Family Cap fees.
+ * recalculates unpaid fees on division/round changes, enforces database-driven style & division rules,
+ * enforces $0.00 balance due on Waitlist, validates duplicate names on target lines, and reconciles
+ * dynamic Household Family Cap fees.
  *
  * @param array $tournaments   Master tournaments array.
  * @param array $registrations Reference to registrations array.
@@ -207,6 +208,9 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         $orig_name     = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
         $orig_line_idx = sywat_roster_resolve_line_idx( $reg, $t_lines );
         $orig_fam_id   = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+        $orig_div      = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+        $orig_round    = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+        $orig_due      = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.00;
 
         $edit_name     = isset( $_POST['edit_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) : $orig_name;
         $new_line_idx  = isset( $_POST['edit_line_index'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) ) ) : $orig_line_idx;
@@ -306,6 +310,8 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $line_name = ! empty( $reg['line_name'] ) ? $reg['line_name'] : ( 'Line ' . ( (int) $new_line_idx + 1 ) );
         }
 
+        $div_changed = ( strcasecmp( $orig_div, $division ) !== 0 || $orig_round !== $raw_round );
+
         $reg['tournament']      = $tourn_name;
         $reg['name']            = $edit_name;
         $reg['line_index']      = $new_line_idx;
@@ -370,7 +376,16 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 } else {
                     $reg['paid'] = in_array( $division, array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' ), true ) ? 'Youth' : 'Adult';
                 }
-                $reg['balance_due'] = $posted_due;
+
+                // Recalculate unpaid balance if division or round changed and balance was not manually overridden
+                if ( $orig_due > 0 && abs( $posted_due - $orig_due ) < 0.01 && $div_changed ) {
+                    $recalc_fee = function_exists( 'sywat_get_archer_individual_fee' )
+                        ? sywat_get_archer_individual_fee( $t_entry, $division, $distance, $style, $raw_round, '' )
+                        : ( $reg['paid'] === 'Youth' ? 25.00 : 30.00 );
+                    $reg['balance_due'] = round( floatval( $recalc_fee ), 2 );
+                } else {
+                    $reg['balance_due'] = $posted_due;
+                }
             }
         }
 
