@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live First-Time/Lapsed Shooter promo eligibility badges, TFAA multi-style profile pills, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, TFAA multi-style profile pills, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 (function() {
@@ -129,6 +129,143 @@
             return window.SYWAT.shootingStyles.findStyle(styleValue);
         }
         return null;
+    }
+
+    /**
+     * Calculate exact individual entry fee for Check-In or Edit modals based on
+     * active Round Format, Division, Distance, Style, and Paid Option.
+     */
+    function calculateDeskModalFee(prefix) {
+        const divisionEl = document.getElementById(prefix + '_division');
+        const styleEl    = document.getElementById(prefix + '_style');
+        const roundEl    = document.getElementById(prefix + '_pricing_profile');
+        const payEl      = document.getElementById(prefix + '_pay_option');
+        const tournEl    = document.getElementById('sywat_selected_tournament');
+
+        if (!divisionEl) return 0;
+
+        const payVal = payEl ? String(payEl.value || 'Individual').trim() : 'Individual';
+        if (payVal === 'Promo (Free)') {
+            return 0;
+        }
+
+        const divVal = String(divisionEl.value || '').trim();
+        if (!divVal || divVal === 'No Show') {
+            return 0;
+        }
+
+        const divCfg  = findDeskDivisionConfig(divVal);
+        const distVal = (divCfg && (divCfg.distance === 'Cub' || divCfg.distance === '20yd'))
+            ? divCfg.distance
+            : (divVal.toLowerCase().indexOf('cub') !== -1 ? 'Cub' : '20yd');
+
+        const styleVal  = styleEl ? String(styleEl.value || '').trim() : '';
+        const pricing   = getDeskPricing();
+        const roundSlug = (roundEl && roundEl.value)
+            ? String(roundEl.value).trim()
+            : (pricing.defaultProfile ? String(pricing.defaultProfile).trim() : 'indoor');
+        const tournName = tournEl ? String(tournEl.value || '').trim() : '';
+
+        if (window.SYWAT && window.SYWAT.pricing && typeof window.SYWAT.pricing.calculateIndividualFee === 'function') {
+            return window.SYWAT.pricing.calculateIndividualFee({
+                tournamentName: tournName,
+                division: divVal,
+                distance: distVal,
+                style: styleVal,
+                roundSlug: roundSlug,
+                paidStatus: (payVal === 'Field Governor') ? 'Field Governor' : ''
+            });
+        }
+
+        const profiles = pricing.profiles || {};
+        const prof     = profiles[roundSlug] || profiles[pricing.defaultProfile || 'indoor'] || null;
+
+        if (payVal === 'Field Governor') {
+            return prof && typeof prof.field_governor_rate !== 'undefined' ? (parseFloat(prof.field_governor_rate) || 0) : 0;
+        }
+
+        const isYouth = (distVal === 'Cub')
+            || (divCfg && divCfg.rate_tier === 'Youth')
+            || /cub|youth|young adult/i.test(divVal);
+
+        if (prof) {
+            if (divCfg && divCfg.slug && prof.division_overrides && typeof prof.division_overrides[divCfg.slug] !== 'undefined' && prof.division_overrides[divCfg.slug] !== '') {
+                const ovFee = parseFloat(prof.division_overrides[divCfg.slug]);
+                if (!Number.isNaN(ovFee)) return ovFee;
+            }
+            if (styleVal && prof.pro_rate !== '' && prof.pro_rate !== null && typeof prof.pro_rate !== 'undefined') {
+                if (styleVal.toLowerCase().indexOf('pro') !== -1 || divVal.toLowerCase().indexOf('pro') !== -1) {
+                    const proFee = parseFloat(prof.pro_rate);
+                    if (!Number.isNaN(proFee)) return proFee;
+                }
+            }
+            const tierFee = isYouth ? parseFloat(prof.youth_rate) : parseFloat(prof.adult_rate);
+            if (!Number.isNaN(tierFee)) return tierFee;
+        }
+
+        return isYouth ? 25 : 30;
+    }
+
+    /**
+     * Synchronize #edit_balance_due or #checkin_unpaid_amount_disp live when Division,
+     * Style, Round Format, or Paid Option changes on the Check-In Desk modals.
+     */
+    function syncDeskBalanceDisplay(prefix) {
+        if (prefix === 'edit') {
+            const balanceEl = document.getElementById('edit_balance_due');
+            if (!balanceEl) return;
+
+            const payEl  = document.getElementById('edit_pay_option');
+            const payVal = payEl ? String(payEl.value || 'Individual').trim() : 'Individual';
+
+            if (payVal === 'Promo (Free)' || payVal === 'Field Governor') {
+                balanceEl.value = '0.00';
+                return;
+            }
+
+            if (balanceEl.dataset.manualOverride === '1') {
+                return;
+            }
+
+            const origDue = parseFloat(balanceEl.dataset.origDue || '0');
+            if (Number.isNaN(origDue) || origDue <= 0) {
+                return;
+            }
+
+            if (payVal === 'Family') {
+                return;
+            }
+
+            const newFee = calculateDeskModalFee('edit');
+            balanceEl.value = newFee.toFixed(2);
+            return;
+        }
+
+        if (prefix === 'checkin') {
+            const banner   = document.getElementById('sywat_unpaid_warning_banner');
+            const amountEl = document.getElementById('checkin_unpaid_amount_disp');
+            if (!banner || !amountEl) return;
+
+            const payEl           = document.getElementById('checkin_pay_option');
+            const payVal          = payEl ? String(payEl.value || 'Individual').trim() : 'Individual';
+            const isFamilyBalance = banner.getAttribute('data-is-family-balance') === '1';
+
+            if (payVal === 'Promo (Free)' || payVal === 'Field Governor') {
+                amountEl.textContent = '0.00';
+                return;
+            }
+
+            if (isFamilyBalance || payVal === 'Family') {
+                const origFamilyDue = parseFloat(banner.getAttribute('data-orig-due') || '0');
+                if (!Number.isNaN(origFamilyDue)) {
+                    amountEl.textContent = origFamilyDue.toFixed(2);
+                }
+                return;
+            }
+
+            const newCheckinFee = calculateDeskModalFee('checkin');
+            amountEl.textContent = newCheckinFee.toFixed(2);
+        }
     }
 
     function formatDeskPhoneNumber(input) {
@@ -790,12 +927,15 @@
     function toggleFamilyBox(type) {
         const paySelect = document.getElementById(type + '_pay_option');
         const box       = document.getElementById(type + '_family_box');
-        if (!box) return;
-
-        if (!paySelect || paySelect.value === 'Family') {
-            box.classList.remove('sywat-hidden');
-        } else {
-            box.classList.add('sywat-hidden');
+        if (box) {
+            if (!paySelect || paySelect.value === 'Family') {
+                box.classList.remove('sywat-hidden');
+            } else {
+                box.classList.add('sywat-hidden');
+            }
+        }
+        if (type === 'edit' || type === 'checkin') {
+            syncDeskBalanceDisplay(type);
         }
     }
 
@@ -828,6 +968,9 @@
             for (let i = 0; i < styleEl.options.length; i++) {
                 styleEl.options[i].disabled = false;
             }
+            if (type === 'edit' || type === 'checkin') {
+                syncDeskBalanceDisplay(type);
+            }
             return;
         }
 
@@ -837,6 +980,9 @@
                 if (styleEl.options[i].value === 'No Show') {
                     styleEl.options[i].disabled = false;
                 }
+            }
+            if (type === 'edit' || type === 'checkin') {
+                syncDeskBalanceDisplay(type);
             }
             return;
         }
@@ -862,6 +1008,10 @@
 
             opt.disabled = isDisabled;
             if (isDisabled && styleEl.value === val) styleEl.value = 'FS – Freestyle';
+        }
+
+        if (type === 'edit' || type === 'checkin') {
+            syncDeskBalanceDisplay(type);
         }
     }
 
@@ -890,6 +1040,8 @@
 
         if (divisionEl.value !== prevDiv) {
             handleStyleRestrictions(type);
+        } else if (type === 'edit' || type === 'checkin') {
+            syncDeskBalanceDisplay(type);
         }
     }
 
@@ -939,6 +1091,7 @@
         updateWalkinFamilyOptions: updateWalkinFamilyOptions,
         updateEditFamilyOptions: updateEditFamilyOptions,
         toggleUnpaidBanner: toggleUnpaidBanner,
+        syncDeskBalanceDisplay: syncDeskBalanceDisplay,
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         evaluateTfaaStatus: evaluateTfaaStatus,
@@ -971,6 +1124,11 @@
      * Initializes Check-In Desk event listeners and pre-fills active forms.
      */
     function initSywatCheckin() {
+        const editBalanceEl = document.getElementById('edit_balance_due');
+        if (editBalanceEl && typeof editBalanceEl.dataset.origDue === 'undefined') {
+            editBalanceEl.dataset.origDue = editBalanceEl.value || '0';
+        }
+
         const walkinGroupName = document.getElementById('walkin_group_name');
         if (walkinGroupName) {
             walkinGroupName.setAttribute('data-prev-val', walkinGroupName.value || '');
@@ -1058,8 +1216,22 @@
         initSywatCheckin();
     }
 
+    document.addEventListener('change', function(e) {
+        if (!e.target) return;
+        if (e.target.id === 'edit_pricing_profile') {
+            syncDeskBalanceDisplay('edit');
+        } else if (e.target.id === 'checkin_pricing_profile') {
+            syncDeskBalanceDisplay('checkin');
+        }
+    });
+
     document.addEventListener('input', function(e) {
-        if (e.target && (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name' || e.target.id === 'walkin_group_name' || e.target.name === 'walkin_group_name')) {
+        if (!e.target) return;
+        if (e.target.id === 'edit_balance_due') {
+            e.target.dataset.manualOverride = '1';
+            return;
+        }
+        if (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name' || e.target.id === 'walkin_group_name' || e.target.name === 'walkin_group_name') {
             handleDeskTfaaAutocomplete(e.target);
         }
     });
