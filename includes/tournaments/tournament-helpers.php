@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
- * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, TFAA name matchers, and spreadsheet parsers.
+ * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, public online registration window gatekeepers, TFAA name matchers, and spreadsheet parsers.
  * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, O(N) hoisted sort key pre-computation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -920,5 +920,154 @@ if ( ! function_exists( 'sywat_is_archer_on_line' ) ) {
             }
         }
         return false;
+    }
+}
+
+/**
+ * Resolves a host shop's default Public Online Registration policy (On/Off + Days Before Event).
+ * Supports O(1) lookup when a pre-fetched $all_shops array is supplied during batch imports.
+ *
+ * @param array|string $shop_data_or_id Shop record array, shop ID, or shop name.
+ * @param array        $all_shops       Optional pre-fetched shops directory map.
+ * @return array{public_reg_default: string, public_reg_days_before: int}
+ */
+if ( ! function_exists( 'sywat_get_shop_public_reg_defaults' ) ) {
+    function sywat_get_shop_public_reg_defaults( $shop_data_or_id, $all_shops = array() ) {
+        $enabled     = '0';
+        $days_before = 15;
+        $shop_data   = array();
+
+        if ( is_array( $shop_data_or_id ) ) {
+            $shop_data = $shop_data_or_id;
+        } elseif ( is_string( $shop_data_or_id ) && trim( $shop_data_or_id ) !== '' ) {
+            if ( empty( $all_shops ) ) {
+                if ( function_exists( 'sywat_get_shops' ) ) {
+                    $all_shops = sywat_get_shops();
+                } elseif ( function_exists( 'sywat_get_all_shops' ) ) {
+                    $all_shops = sywat_get_all_shops();
+                }
+            }
+            if ( is_array( $all_shops ) ) {
+                $lookup_key = trim( $shop_data_or_id );
+                if ( isset( $all_shops[ $lookup_key ] ) && is_array( $all_shops[ $lookup_key ] ) ) {
+                    $shop_data = $all_shops[ $lookup_key ];
+                } else {
+                    $search_lower = strtolower( $lookup_key );
+                    foreach ( $all_shops as $s_id => $s_info ) {
+                        if ( is_array( $s_info ) ) {
+                            $s_name  = isset( $s_info['name'] ) ? strtolower( trim( (string) $s_info['name'] ) ) : '';
+                            $s_title = isset( $s_info['title'] ) ? strtolower( trim( (string) $s_info['title'] ) ) : '';
+                            $s_key   = strtolower( trim( (string) $s_id ) );
+                            if ( $s_key === $search_lower || $s_name === $search_lower || $s_title === $search_lower ) {
+                                $shop_data = $s_info;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if ( is_array( $shop_data ) && ! empty( $shop_data ) ) {
+            $enabled = ! empty( $shop_data['public_reg_default'] ) ? '1' : '0';
+            if ( isset( $shop_data['public_reg_days_before'] ) && $shop_data['public_reg_days_before'] !== '' ) {
+                $days_before = max( 0, min( 365, intval( $shop_data['public_reg_days_before'] ) ) );
+            }
+        }
+
+        return array(
+            'public_reg_default'     => $enabled,
+            'public_reg_days_before' => $days_before,
+        );
+    }
+}
+
+/**
+ * Evaluates a tournament's Public Online Registration gatekeeper status dynamically on read.
+ * Compares today's date (site timezone) against (start_date - days_before) and end_date.
+ *
+ * @param array  $t_data    Tournament configuration array.
+ * @param string $today_ymd Optional 'YYYY-MM-DD' override for deterministic evaluation.
+ * @return array{
+ *     status: string,
+ *     is_open: bool,
+ *     enabled: bool,
+ *     days_before: int,
+ *     opens_date: string,
+ *     opens_label: string,
+ *     reason: string
+ * }
+ */
+if ( ! function_exists( 'sywat_get_public_registration_status' ) ) {
+    function sywat_get_public_registration_status( $t_data, $today_ymd = '' ) {
+        $enabled     = is_array( $t_data ) && ! empty( $t_data['public_reg_enabled'] );
+        $days_before = ( is_array( $t_data ) && isset( $t_data['public_reg_days_before'] ) && $t_data['public_reg_days_before'] !== '' )
+            ? max( 0, min( 365, intval( $t_data['public_reg_days_before'] ) ) )
+            : 15;
+
+        if ( ! $enabled ) {
+            return array(
+                'status'      => 'closed',
+                'is_open'     => false,
+                'enabled'     => false,
+                'days_before' => $days_before,
+                'opens_date'  => '',
+                'opens_label' => '',
+                'reason'      => 'disabled',
+            );
+        }
+
+        $today = ( $today_ymd !== '' )
+            ? trim( (string) $today_ymd )
+            : ( function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : date( 'Y-m-d' ) );
+
+        $start_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? trim( (string) $t_data['start_date'] ) : '';
+        $end_date   = ( is_array( $t_data ) && ! empty( $t_data['end_date'] ) ) ? trim( (string) $t_data['end_date'] ) : $start_date;
+
+        if ( $end_date !== '' && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) && $today > $end_date ) {
+            return array(
+                'status'      => 'closed',
+                'is_open'     => false,
+                'enabled'     => true,
+                'days_before' => $days_before,
+                'opens_date'  => '',
+                'opens_label' => '',
+                'reason'      => 'past',
+            );
+        }
+
+        $opens_date  = '';
+        $opens_label = '';
+
+        if ( $start_date !== '' && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) ) {
+            $start_ts = strtotime( $start_date . ' 00:00:00' );
+            if ( $start_ts !== false ) {
+                $opens_ts    = ( $days_before > 0 ) ? strtotime( '-' . $days_before . ' days', $start_ts ) : $start_ts;
+                $opens_date  = ( $opens_ts !== false ) ? date( 'Y-m-d', $opens_ts ) : $start_date;
+                $opens_label = ( $opens_ts !== false ) ? date( 'M j', $opens_ts ) : '';
+
+                if ( $days_before > 0 && $today < $opens_date ) {
+                    return array(
+                        'status'      => 'opens_soon',
+                        'is_open'     => false,
+                        'enabled'     => true,
+                        'days_before' => $days_before,
+                        'opens_date'  => $opens_date,
+                        'opens_label' => $opens_label,
+                        'reason'      => 'opens_soon',
+                    );
+                }
+            }
+        }
+
+        return array(
+            'status'      => 'open',
+            'is_open'     => true,
+            'enabled'     => true,
+            'days_before' => $days_before,
+            'opens_date'  => $opens_date,
+            'opens_label' => $opens_label,
+            'reason'      => 'open',
+        );
     }
 }
