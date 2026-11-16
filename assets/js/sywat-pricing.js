@@ -4,7 +4,7 @@
  * Description: Provides shared client-side pricing & household family cap helpers under window.SYWAT.pricing plus delegated UI event handlers and single-prompt confirmation guards for the [sywat_pricing] administration portal.
  * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.pricing, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden) with zero element.style.* mutations.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 
 (function () {
@@ -507,27 +507,21 @@
 
     document.addEventListener('submit', function (e) {
         var form = e.target && e.target.closest ? e.target.closest('form[data-sywat-confirm]') : null;
-        if (!form || e.defaultPrevented) return;
+        if (!form || e.defaultPrevented || e._sywatConfirmHandled) return;
 
         if (form.dataset.sywatSubmitting === '1') {
             e.preventDefault();
             return;
         }
 
-        if (!e._sywatConfirmHandled) {
-            e._sywatConfirmHandled = true;
-            var confirmMsg = form.getAttribute('data-sywat-confirm');
-            if (confirmMsg && !window.confirm(confirmMsg)) {
-                e.preventDefault();
-                return;
-            }
+        e._sywatConfirmHandled = true;
+        var confirmMsg = form.getAttribute('data-sywat-confirm');
+        if (confirmMsg && !window.confirm(confirmMsg)) {
+            e.preventDefault();
+            return;
         }
 
         form.dataset.sywatSubmitting = '1';
-        var submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-        }
     });
 
     // Public Namespace API
