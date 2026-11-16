@@ -1,10 +1,10 @@
 /**
  * SYWAT Archery - Master Tournament & Season Management Client Engine
  * Path: assets/js/sywat-tournaments.js
- * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & external registration link inheritance, repeatable registration link rows, season pricing format inheritance, shooting line duplicate validation, filters, and asynchronous TFAA scorecard batch sync.
- * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.tournaments with legacy compatibility aliases, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden).
+ * Description: Manages Add/Edit Tournament modal auto-naming, shop capacity & external registration link inheritance, progressive-disclosure registration link rows, season-filtered pricing formats, shooting line duplicate validation, table filters, and asynchronous TFAA scorecard batch sync.
+ * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.tournaments with legacy attribute compatibility aliases, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden).
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 (function () {
@@ -22,11 +22,7 @@
 
     function setElementVisible(el, visible) {
         if (!el) return;
-        if (visible) {
-            el.classList.remove('sywat-hidden');
-        } else {
-            el.classList.add('sywat-hidden');
-        }
+        el.classList.toggle('sywat-hidden', !visible);
     }
 
     function sywatMarkNameAsCustomized() {
@@ -114,17 +110,13 @@
             return { cap20, capCub };
         }
 
-        if (shopSelect.tagName.toLowerCase() === 'select') {
-            const selectedOption = shopSelect.options[shopSelect.selectedIndex];
-            if (selectedOption) {
-                const raw20  = selectedOption.getAttribute('data-cap20');
-                const rawCub = selectedOption.getAttribute('data-capcub');
-                if (raw20)  cap20  = parseInt(raw20, 10) || 20;
-                if (rawCub) capCub = parseInt(rawCub, 10) || 5;
-            }
-        } else if (shopSelect.tagName.toLowerCase() === 'input') {
-            const raw20  = shopSelect.getAttribute('data-cap20');
-            const rawCub = shopSelect.getAttribute('data-capcub');
+        const sourceEl = shopSelect.tagName.toLowerCase() === 'select'
+            ? shopSelect.options[shopSelect.selectedIndex]
+            : shopSelect;
+
+        if (sourceEl) {
+            const raw20  = sourceEl.getAttribute('data-cap20');
+            const rawCub = sourceEl.getAttribute('data-capcub');
             if (raw20)  cap20  = parseInt(raw20, 10) || 20;
             if (rawCub) capCub = parseInt(rawCub, 10) || 5;
         }
@@ -140,14 +132,11 @@
         const tableBody = document.querySelector('#sywat_tourn_lines_table tbody');
         if (!tableBody) return;
 
-        const cap20Inputs  = tableBody.querySelectorAll('input[name="cap_20yd[]"]');
-        const capCubInputs = tableBody.querySelectorAll('input[name="cap_cub[]"]');
-
-        cap20Inputs.forEach(function (input) {
+        tableBody.querySelectorAll('input[name="cap_20yd[]"]').forEach(function (input) {
             input.value = cap20;
         });
 
-        capCubInputs.forEach(function (input) {
+        tableBody.querySelectorAll('input[name="cap_cub[]"]').forEach(function (input) {
             input.value = capCub;
         });
     }
@@ -157,25 +146,17 @@
      */
     function sywatGetSelectedShopRegLinks() {
         const shopSelect = document.getElementById('sywat_modal_shop_id');
-        if (!shopSelect) {
-            return [];
-        }
+        if (!shopSelect) return [];
 
-        let rawJson = '[]';
-        if (shopSelect.tagName.toLowerCase() === 'select') {
-            const selectedOption = shopSelect.options[shopSelect.selectedIndex];
-            if (selectedOption) {
-                rawJson = selectedOption.getAttribute('data-reglinks') || '[]';
-            }
-        } else if (shopSelect.tagName.toLowerCase() === 'input') {
-            rawJson = shopSelect.getAttribute('data-reglinks') || '[]';
-        }
+        const sourceEl = shopSelect.tagName.toLowerCase() === 'select'
+            ? shopSelect.options[shopSelect.selectedIndex]
+            : shopSelect;
+
+        if (!sourceEl) return [];
 
         try {
-            const parsed = JSON.parse(rawJson);
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
+            const parsed = JSON.parse(sourceEl.getAttribute('data-reglinks') || '[]');
+            if (!Array.isArray(parsed)) return [];
             return parsed.filter(function (item) {
                 return item && typeof item === 'object' && typeof item.url === 'string' && item.url.trim() !== '';
             });
@@ -191,58 +172,37 @@
         const container = document.getElementById('sywat_tourn_reg_links_container');
         if (!container) return;
 
-        const emptyMsg = document.getElementById('sywat_tourn_no_reg_links_msg');
-        setElementVisible(emptyMsg, false);
+        setElementVisible(container, true);
 
         const row = document.createElement('div');
         row.className = 'sywat-reg-link-row sywat-form-grid-2 sywat-mt-3';
+        row.innerHTML =
+            '<div class="sywat-field-group">' +
+                '<label>Link Label <span class="sywat-label-subtext">(Optional for single link)</span></label>' +
+                '<input type="text" name="tourn_reg_link_labels[]" placeholder="e.g. 10-yard lines (Cubs)">' +
+            '</div>' +
+            '<div class="sywat-field-group">' +
+                '<label>Registration URL *</label>' +
+                '<div class="sywat-search-input-group">' +
+                    '<input type="text" name="tourn_reg_link_urls[]" placeholder="https://fareharbor.com/embeds/book/...">' +
+                    '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" data-sywat-action="remove-tourn-reg-link">Remove</button>' +
+                '</div>' +
+            '</div>';
 
-        const labelGroup = document.createElement('div');
-        labelGroup.className = 'sywat-field-group';
-        const labelEl = document.createElement('label');
-        labelEl.innerHTML = 'Link Label <span class="sywat-label-subtext">(Optional for single link)</span>';
-        const labelInput = document.createElement('input');
-        labelInput.type = 'text';
-        labelInput.name = 'tourn_reg_link_labels[]';
-        labelInput.placeholder = 'e.g. 10-yard lines (Cubs)';
-        labelInput.value = typeof prefillLabel === 'string' ? prefillLabel : '';
-        labelGroup.appendChild(labelEl);
-        labelGroup.appendChild(labelInput);
+        const labelInput = row.querySelector('input[name="tourn_reg_link_labels[]"]');
+        const urlInput   = row.querySelector('input[name="tourn_reg_link_urls[]"]');
+        if (labelInput && typeof prefillLabel === 'string') labelInput.value = prefillLabel;
+        if (urlInput && typeof prefillUrl === 'string') urlInput.value = prefillUrl;
 
-        const urlGroup = document.createElement('div');
-        urlGroup.className = 'sywat-field-group';
-        const urlLabelEl = document.createElement('label');
-        urlLabelEl.textContent = 'Registration URL *';
-        const inputWrap = document.createElement('div');
-        inputWrap.className = 'sywat-search-input-group';
-        const urlInput = document.createElement('input');
-        urlInput.type = 'text';
-        urlInput.name = 'tourn_reg_link_urls[]';
-        urlInput.placeholder = 'https://fareharbor.com/embeds/book/...';
-        urlInput.value = typeof prefillUrl === 'string' ? prefillUrl : '';
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'sywat-btn sywat-btn-danger sywat-btn-icon-delete';
-        removeBtn.setAttribute('data-sywat-action', 'remove-tourn-reg-link');
-        removeBtn.textContent = 'Remove';
-
-        inputWrap.appendChild(urlInput);
-        inputWrap.appendChild(removeBtn);
-        urlGroup.appendChild(urlLabelEl);
-        urlGroup.appendChild(inputWrap);
-
-        row.appendChild(labelGroup);
-        row.appendChild(urlGroup);
         container.appendChild(row);
 
-        if (shouldFocus) {
+        if (shouldFocus && labelInput) {
             labelInput.focus();
         }
     }
 
     /**
-     * Removes a repeatable External Online Registration Link row and toggles the empty-state notice.
+     * Removes a repeatable External Online Registration Link row and collapses the container when empty.
      */
     function removeTournamentRegLinkRow(btn) {
         const row = btn.closest('.sywat-reg-link-row');
@@ -252,8 +212,7 @@
         row.remove();
 
         if (container && container.querySelectorAll('.sywat-reg-link-row').length === 0) {
-            const emptyMsg = document.getElementById('sywat_tourn_no_reg_links_msg');
-            setElementVisible(emptyMsg, true);
+            setElementVisible(container, false);
         }
     }
 
@@ -262,30 +221,26 @@
      */
     function sywatSyncShopRegistrationLinks() {
         const container = document.getElementById('sywat_tourn_reg_links_container');
-        if (!container) return;
-
-        // Preserve saved tournament registration links when editing an existing tournament
-        if (container.getAttribute('data-is-edit') === '1') {
+        if (!container || container.getAttribute('data-is-edit') === '1') {
             return;
         }
 
         const links = sywatGetSelectedShopRegLinks();
         container.innerHTML = '';
 
-        const emptyMsg = document.getElementById('sywat_tourn_no_reg_links_msg');
         if (links.length === 0) {
-            setElementVisible(emptyMsg, true);
+            setElementVisible(container, false);
             return;
         }
 
-        setElementVisible(emptyMsg, false);
+        setElementVisible(container, true);
         links.forEach(function (item) {
             addTournamentRegLinkRow(item.label || '', item.url || '', false);
         });
     }
 
     /**
-     * Synchronizes Offered Round / Pricing Format checkboxes with the selected
+     * Synchronizes Offered Round / Pricing Format visibility and checkboxes with the selected
      * Competition Season when creating a new tournament.
      */
     function sywatSyncTournamentPricingProfiles() {
@@ -296,35 +251,41 @@
             return;
         }
 
-        const rawMap = wrap.getAttribute('data-season-profiles') || '{}';
         let seasonMap = {};
         try {
-            seasonMap = JSON.parse(rawMap);
+            seasonMap = JSON.parse(wrap.getAttribute('data-season-profiles') || '{}');
         } catch (e) {
             seasonMap = {};
         }
 
         const selectedSeason = String(seasonField.value || '').trim();
         const targetSlugs    = Array.isArray(seasonMap[selectedSeason]) ? seasonMap[selectedSeason] : [];
+        const optionLabels   = wrap.querySelectorAll('.sywat-tourn-pricing-option');
         const checkboxes     = wrap.querySelectorAll('.sywat-tourn-pricing-profile-cb');
 
         if (!checkboxes.length || targetSlugs.length === 0) {
+            optionLabels.forEach(function (lbl) {
+                setElementVisible(lbl, true);
+            });
             return;
         }
 
         checkboxes.forEach(function (cb) {
             cb.checked = targetSlugs.indexOf(cb.value) !== -1;
         });
+
+        optionLabels.forEach(function (lbl) {
+            const slug = lbl.getAttribute('data-profile-slug') || '';
+            setElementVisible(lbl, targetSlugs.indexOf(slug) !== -1);
+        });
     }
 
     function sywatAutoGenerateTournamentName(force) {
-        // Always sync shop capacities & default registration links when shop selection changes
         sywatSyncShopCapacities();
         sywatSyncShopRegistrationLinks();
 
         if (sywatTournamentNameIsCustomized && !force) return;
 
-        // Auto-populate End Date to the first Sunday following Start Date
         sywatAutoPopulateEndDate();
 
         const shopSelect     = document.getElementById('sywat_modal_shop_id');
@@ -365,12 +326,10 @@
             if (shopSelect.tagName.toLowerCase() === 'select' && shopSelect.selectedIndex >= 0) {
                 currentCount = parseInt(shopSelect.options[shopSelect.selectedIndex].getAttribute('data-count') || '0', 10);
             }
-            const nextNum = currentCount + 1;
-            nameInput.value = `${shopName.trim()} - ${nextNum}`;
+            nameInput.value = `${shopName.trim()} - ${currentCount + 1}`;
             return;
         }
 
-        // Determine chronological sequence position based on start date
         let seqNum = 1;
         for (let i = 0; i < events.length; i++) {
             const evt = events[i];
@@ -386,13 +345,11 @@
         const modal = document.getElementById('sywat_add_tourn_modal');
         if (modal) modal.classList.add('active');
 
-        // Reset flag if starting fresh
         const nameInput = document.getElementById('sywat_modal_tournament_name');
         if (nameInput && !nameInput.value) {
             sywatTournamentNameIsCustomized = false;
         }
 
-        // Synchronize capacity inputs, registration links, and season-inherited pricing formats
         sywatSyncShopCapacities();
         sywatSyncShopRegistrationLinks();
         sywatSyncTournamentPricingProfiles();
@@ -536,7 +493,6 @@
             }
         }
 
-        // Validate external registration link URLs if entered
         const regUrlInputs = document.querySelectorAll('#sywat_tourn_reg_links_container input[name="tourn_reg_link_urls[]"]');
         for (let i = 0; i < regUrlInputs.length; i++) {
             const rawUrl = (regUrlInputs[i].value || '').trim();
@@ -637,7 +593,6 @@
 
         modal.classList.add('active');
 
-        // Collect tournament names from active table rows
         const tournamentRows = document.querySelectorAll('.sywat-tournament-row');
         const tournamentList = [];
 
@@ -653,7 +608,6 @@
             return;
         }
 
-        // Capture the primary desk action nonce directly from the page
         const nonceElem = document.querySelector('input[name="sywat_nonce"]');
         const nonce = nonceElem ? nonceElem.value : '';
 
@@ -670,9 +624,7 @@
         const logConsole   = document.getElementById('sywat_tfaa_sync_log_console');
         const progressFill = document.getElementById('sywat_tfaa_sync_progress_fill');
         const statusText   = document.getElementById('sywat_tfaa_sync_status_text');
-
-        // DIRECT PAGE BYPASS: Route traffic to the current page URL to hit our JSON interceptor hook
-        const requestUrl = window.location.href;
+        const requestUrl   = window.location.href;
 
         let successCount = 0;
         let failureCount = 0;
@@ -803,15 +755,14 @@
         if (seasonSearchInput) {
             seasonSearchInput.addEventListener('input', function () {
                 const filter = this.value.toLowerCase().trim();
-                const rows = document.querySelectorAll('.sywat-season-row');
-                rows.forEach(function (row) {
+                document.querySelectorAll('.sywat-season-row').forEach(function (row) {
                     const searchStr = (row.getAttribute('data-search') || '').toLowerCase();
                     setElementVisible(row, searchStr.includes(filter));
                 });
             });
         }
 
-        // Bind Season -> Pricing Format inheritance in Create Tournament mode
+        // Bind Season -> Pricing Format filtering & inheritance in Create Tournament mode
         const modalSeasonSelect = document.getElementById('sywat_modal_season_slug');
         if (modalSeasonSelect && modalSeasonSelect.tagName.toLowerCase() === 'select') {
             modalSeasonSelect.addEventListener('change', function () {
@@ -829,7 +780,7 @@
             }
         }
 
-        // Automatically synchronize capacity inputs, registration links, and formats in Create mode if modal is active on page paint
+        // Synchronize capacity inputs, registration links, and formats in Create mode if modal is active on page paint
         const activeTournModal = document.getElementById('sywat_add_tourn_modal');
         if (activeTournModal && activeTournModal.classList.contains('active')) {
             sywatSyncShopCapacities();
@@ -877,30 +828,25 @@
         closeTfaaSyncModal: sywatCloseTfaaSyncModal
     };
 
-    // Legacy Global Compatibility Aliases for Existing Modal Markup
-    window.sywatMarkNameAsCustomized          = sywatMarkNameAsCustomized;
-    window.sywatToggleTournamentNameLock      = sywatToggleTournamentNameLock;
-    window.sywatAutoPopulateEndDate           = sywatAutoPopulateEndDate;
-    window.sywatGetSelectedShopCapacities     = sywatGetSelectedShopCapacities;
-    window.sywatSyncShopCapacities            = sywatSyncShopCapacities;
-    window.sywatGetSelectedShopRegLinks       = sywatGetSelectedShopRegLinks;
-    window.sywatSyncShopRegistrationLinks     = sywatSyncShopRegistrationLinks;
-    window.sywatSyncTournamentPricingProfiles = sywatSyncTournamentPricingProfiles;
-    window.sywatAutoGenerateTournamentName    = sywatAutoGenerateTournamentName;
-    window.openAddTournamentModal             = openAddTournamentModal;
-    window.closeAddTournamentModal            = closeAddTournamentModal;
-    window.openAddSeasonModal                 = openAddSeasonModal;
-    window.closeAddSeasonModal                = closeAddSeasonModal;
-    window.openImportScheduleModal            = openImportScheduleModal;
-    window.closeImportScheduleModal           = closeImportScheduleModal;
-    window.closeSywatModal                    = closeSywatModal;
-    window.checkTournamentLineDuplicate       = checkTournamentLineDuplicate;
-    window.addTournamentLineRow               = addTournamentLineRow;
-    window.removeTournamentLineRow            = removeTournamentLineRow;
-    window.validateTournamentLines            = validateTournamentLines;
-    window.sywatApplyTournamentFilters        = sywatApplyTournamentFilters;
-    window.sywatResetTournamentFilters        = sywatResetTournamentFilters;
-    window.sywatOpenTfaaSyncModal             = sywatOpenTfaaSyncModal;
-    window.sywatRunTfaaBatchSync              = sywatRunTfaaBatchSync;
-    window.sywatCloseTfaaSyncModal            = sywatCloseTfaaSyncModal;
+    // Legacy Global Compatibility Aliases (Strictly for Existing HTML Attribute Handlers)
+    window.sywatMarkNameAsCustomized       = sywatMarkNameAsCustomized;
+    window.sywatToggleTournamentNameLock   = sywatToggleTournamentNameLock;
+    window.sywatAutoPopulateEndDate        = sywatAutoPopulateEndDate;
+    window.sywatAutoGenerateTournamentName = sywatAutoGenerateTournamentName;
+    window.openAddTournamentModal          = openAddTournamentModal;
+    window.closeAddTournamentModal         = closeAddTournamentModal;
+    window.openAddSeasonModal              = openAddSeasonModal;
+    window.closeAddSeasonModal             = closeAddSeasonModal;
+    window.openImportScheduleModal         = openImportScheduleModal;
+    window.closeImportScheduleModal        = closeImportScheduleModal;
+    window.closeSywatModal                 = closeSywatModal;
+    window.checkTournamentLineDuplicate    = checkTournamentLineDuplicate;
+    window.addTournamentLineRow            = addTournamentLineRow;
+    window.removeTournamentLineRow         = removeTournamentLineRow;
+    window.validateTournamentLines         = validateTournamentLines;
+    window.sywatApplyTournamentFilters     = sywatApplyTournamentFilters;
+    window.sywatResetTournamentFilters     = sywatResetTournamentFilters;
+    window.sywatOpenTfaaSyncModal          = sywatOpenTfaaSyncModal;
+    window.sywatRunTfaaBatchSync           = sywatRunTfaaBatchSync;
+    window.sywatCloseTfaaSyncModal         = sywatCloseTfaaSyncModal;
 })();
