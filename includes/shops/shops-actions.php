@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
- * Description: Processes Shop & Club CRUD actions, CSV/XLSX dry-run imports, and staff linking with scoped Shop Manager self-service permissions.
+ * Description: Processes Shop & Club CRUD actions, CSV/XLSX dry-run imports, and staff linking with scoped Shop Manager self-service permissions. Normalizes and chronologically sorts shop shooting line templates on save.
+ * Compliance: Zero HTML output at include time, pure POST action handlers, omitted closing PHP tag.
  * Author: SYWAT Archery / TFAA
- * Version: 5.2.0
+ * Version: 5.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -87,48 +88,66 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 }
                 $shops[$shop_id]['additional_contacts'] = $add_contacts;
 
-                // Process SYWAT Indoor Lines
+                // Process SYWAT Indoor Lines (Canonical Time Token Normalization + Deduplication + Chronological Sort)
                 if ( ! empty( $_POST['indoor_line_days'] ) && is_array( $_POST['indoor_line_days'] ) ) {
                     $raw_in_days  = wp_unslash( $_POST['indoor_line_days'] );
                     $raw_in_times = isset( $_POST['indoor_line_times'] ) && is_array( $_POST['indoor_line_times'] ) ? wp_unslash( $_POST['indoor_line_times'] ) : array();
                     $raw_cap_20   = isset( $_POST['cap_20yd'] ) && is_array( $_POST['cap_20yd'] ) ? wp_unslash( $_POST['cap_20yd'] ) : array();
                     $raw_cap_cub  = isset( $_POST['cap_cub'] ) && is_array( $_POST['cap_cub'] ) ? wp_unslash( $_POST['cap_cub'] ) : array();
 
-                    $indoor_lines = array();
+                    $indoor_lines  = array();
+                    $seen_in_lines = array();
                     foreach ( $raw_in_days as $index => $day ) {
                         $clean_day  = trim( sanitize_text_field( $day ) );
                         $clean_time = isset( $raw_in_times[$index] ) ? trim( sanitize_text_field( $raw_in_times[$index] ) ) : '';
                         if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
-                            $indoor_lines[] = array(
-                                'day'      => $clean_day,
-                                'time'     => $clean_time,
-                                'name'     => trim( $clean_day . ' ' . $clean_time ),
-                                'cap_20yd' => isset( $raw_cap_20[$index] ) ? intval( $raw_cap_20[$index] ) : 20,
-                                'cap_cub'  => isset( $raw_cap_cub[$index] ) ? intval( $raw_cap_cub[$index] ) : 5,
-                            );
+                            $formatted_time = function_exists( 'sywat_format_line_time_token' ) ? sywat_format_line_time_token( $clean_time ) : $clean_time;
+                            $combo_key      = strtolower( $clean_day . '_' . $formatted_time );
+                            if ( ! isset( $seen_in_lines[ $combo_key ] ) ) {
+                                $seen_in_lines[ $combo_key ] = true;
+                                $indoor_lines[]              = array(
+                                    'day'      => $clean_day,
+                                    'time'     => $formatted_time,
+                                    'name'     => trim( $clean_day . ' ' . $formatted_time ),
+                                    'cap_20yd' => isset( $raw_cap_20[$index] ) ? intval( $raw_cap_20[$index] ) : 20,
+                                    'cap_cub'  => isset( $raw_cap_cub[$index] ) ? intval( $raw_cap_cub[$index] ) : 5,
+                                );
+                            }
                         }
                     }
                     if ( ! empty( $indoor_lines ) ) {
+                        if ( count( $indoor_lines ) > 1 && function_exists( 'sywat_compare_tournament_lines' ) ) {
+                            usort( $indoor_lines, 'sywat_compare_tournament_lines' );
+                        }
                         $shops[$shop_id]['default_lines'] = $indoor_lines;
                     }
                 }
 
-                // Process SYWAT Outdoor Lines
+                // Process SYWAT Outdoor Lines (Canonical Time Token Normalization + Deduplication + Chronological Sort)
                 if ( ! empty( $_POST['outdoor_line_days'] ) && is_array( $_POST['outdoor_line_days'] ) ) {
                     $raw_out_days  = wp_unslash( $_POST['outdoor_line_days'] );
                     $raw_out_times = isset( $_POST['outdoor_line_times'] ) && is_array( $_POST['outdoor_line_times'] ) ? wp_unslash( $_POST['outdoor_line_times'] ) : array();
 
-                    $outdoor_lines = array();
+                    $outdoor_lines  = array();
+                    $seen_out_lines = array();
                     foreach ( $raw_out_days as $index => $day ) {
                         $clean_day  = trim( sanitize_text_field( $day ) );
                         $clean_time = isset( $raw_out_times[$index] ) ? trim( sanitize_text_field( $raw_out_times[$index] ) ) : '';
                         if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
-                            $outdoor_lines[] = array(
-                                'day'  => $clean_day,
-                                'time' => $clean_time,
-                                'name' => trim( $clean_day . ' ' . $clean_time ),
-                            );
+                            $formatted_time = function_exists( 'sywat_format_line_time_token' ) ? sywat_format_line_time_token( $clean_time ) : $clean_time;
+                            $combo_key      = strtolower( $clean_day . '_' . $formatted_time );
+                            if ( ! isset( $seen_out_lines[ $combo_key ] ) ) {
+                                $seen_out_lines[ $combo_key ] = true;
+                                $outdoor_lines[]              = array(
+                                    'day'  => $clean_day,
+                                    'time' => $formatted_time,
+                                    'name' => trim( $clean_day . ' ' . $formatted_time ),
+                                );
+                            }
                         }
+                    }
+                    if ( count( $outdoor_lines ) > 1 && function_exists( 'sywat_compare_tournament_lines' ) ) {
+                        usort( $outdoor_lines, 'sywat_compare_tournament_lines' );
                     }
                     $shops[$shop_id]['outdoor_lines'] = $outdoor_lines;
                 }
@@ -155,15 +174,15 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
 
             $default_indoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
             );
 
             $default_outdoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '9:00 AM', 'name' => 'Saturday 9:00 AM' ),
-                array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
+                array( 'day' => 'Saturday', 'time' => '9AM', 'name' => 'Saturday 9AM' ),
+                array( 'day' => 'Sunday',   'time' => '9AM', 'name' => 'Sunday 9AM' ),
             );
 
             $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] )
@@ -431,15 +450,15 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             $skipped_count = 0;
 
             $default_indoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
-                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => 20, 'cap_cub' => 5 ),
+                array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => 20, 'cap_cub' => 5 ),
             );
 
             $default_outdoor_lines = array(
-                array( 'day' => 'Saturday', 'time' => '9:00 AM', 'name' => 'Saturday 9:00 AM' ),
-                array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
+                array( 'day' => 'Saturday', 'time' => '9AM', 'name' => 'Saturday 9AM' ),
+                array( 'day' => 'Sunday',   'time' => '9AM', 'name' => 'Sunday 9AM' ),
             );
 
             foreach ( $items as $item ) {
