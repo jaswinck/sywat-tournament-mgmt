@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
- * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, external registration links, and promoter flags, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, public online registration On/Off & lead-time overrides (inheriting host shop defaults), external registration links, and promoter flags, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
  * Author: SYWAT Archery
- * Version: 7.16.0
+ * Version: 7.17.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -266,7 +266,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $imported_t_profiles = array_keys( $resolved_imp_profs );
             }
 
-            // Extract shop lookup map for assigning shop_id and default registration_links on import
+            // Extract shop lookup map for assigning shop_id and default public registration settings on import
             $all_shops       = function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : get_option( 'sywat_shops_list', array() );
             $shop_name_to_id = array();
             foreach ( $all_shops as $s_id => $s_data ) {
@@ -280,29 +280,43 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
             $affected_shops = array();
             foreach ( $processed['valid_tournaments'] as $t ) {
-                $t_name   = $t['tournament_name'];
-                $official = $t['official_shop_name'];
-                $norm_off = strtolower( trim( $official ) );
-                $assoc_id = isset( $shop_name_to_id[ $norm_off ] ) ? $shop_name_to_id[ $norm_off ] : '';
+                $t_name      = $t['tournament_name'];
+                $official    = $t['official_shop_name'];
+                $norm_off    = strtolower( trim( $official ) );
+                $assoc_id    = isset( $shop_name_to_id[ $norm_off ] ) ? $shop_name_to_id[ $norm_off ] : '';
+                $shop_record = ( ! empty( $assoc_id ) && isset( $all_shops[ $assoc_id ] ) && is_array( $all_shops[ $assoc_id ] ) )
+                    ? $all_shops[ $assoc_id ]
+                    : array();
+
+                $shop_reg_defaults = function_exists( 'sywat_get_shop_public_reg_defaults' )
+                    ? sywat_get_shop_public_reg_defaults( $shop_record, $all_shops )
+                    : array(
+                        'public_reg_default'     => ! empty( $shop_record['public_reg_default'] ) ? '1' : '0',
+                        'public_reg_days_before' => ( isset( $shop_record['public_reg_days_before'] ) && $shop_record['public_reg_days_before'] !== '' )
+                            ? max( 0, min( 365, intval( $shop_record['public_reg_days_before'] ) ) )
+                            : 15,
+                    );
 
                 $tournaments[ $t_name ] = array(
-                    'name'                 => $t_name,
-                    'season'               => $target_season,
-                    'season_slug'          => $target_season,
-                    'shop_id'              => $assoc_id,
-                    'shop_name'            => $official,
-                    'official_shop_name'   => $official,
-                    'location_display'     => $t['location_display'],
-                    'start_date'           => $t['start_date_formatted'],
-                    'end_date'             => $t['end_date_formatted'],
-                    'event_type'           => $t['event_type'],
-                    'pricing_profiles'     => $imported_t_profiles,
-                    'registration_links'   => array(),
-                    'notes'                => sanitize_textarea_field( $t['notes'] ),
-                    'lines'                => $t['line_slots'],
-                    'registration_enabled' => $t['registration_enabled'],
-                    'scores_published'     => false,
-                    'created_at'           => current_time( 'mysql' ),
+                    'name'                   => $t_name,
+                    'season'                 => $target_season,
+                    'season_slug'            => $target_season,
+                    'shop_id'                => $assoc_id,
+                    'shop_name'              => $official,
+                    'official_shop_name'     => $official,
+                    'location_display'       => $t['location_display'],
+                    'start_date'             => $t['start_date_formatted'],
+                    'end_date'               => $t['end_date_formatted'],
+                    'event_type'             => $t['event_type'],
+                    'pricing_profiles'       => $imported_t_profiles,
+                    'public_reg_enabled'     => ( $shop_reg_defaults['public_reg_default'] === '1' ),
+                    'public_reg_days_before' => intval( $shop_reg_defaults['public_reg_days_before'] ),
+                    'registration_links'     => array(),
+                    'notes'                  => sanitize_textarea_field( $t['notes'] ),
+                    'lines'                  => $t['line_slots'],
+                    'registration_enabled'   => $t['registration_enabled'],
+                    'scores_published'       => false,
+                    'created_at'             => current_time( 'mysql' ),
                 );
 
                 if ( ! empty( $assoc_id ) && ! in_array( $assoc_id, $affected_shops, true ) ) {
@@ -554,6 +568,30 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $resolved_shop_name = sywat_get_tournament_shop_name( array( 'shop_id' => $assigned_shop_id ), $t_name, $all_shops );
             }
 
+            // Resolve Public Online Registration On/Off & lead-time days (explicit POST override -> existing record -> host shop default)
+            $shop_reg_defaults = function_exists( 'sywat_get_shop_public_reg_defaults' )
+                ? sywat_get_shop_public_reg_defaults( $assigned_shop_id, $all_shops )
+                : array(
+                    'public_reg_default'     => '0',
+                    'public_reg_days_before' => 15,
+                );
+
+            if ( isset( $_POST['public_reg_enabled'] ) ) {
+                $public_reg_enabled = ( sanitize_text_field( wp_unslash( $_POST['public_reg_enabled'] ) ) === '1' );
+            } elseif ( isset( $existing_record['public_reg_enabled'] ) ) {
+                $public_reg_enabled = ! empty( $existing_record['public_reg_enabled'] );
+            } else {
+                $public_reg_enabled = ( $shop_reg_defaults['public_reg_default'] === '1' );
+            }
+
+            if ( isset( $_POST['public_reg_days_before'] ) && $_POST['public_reg_days_before'] !== '' ) {
+                $public_reg_days = max( 0, min( 365, intval( wp_unslash( $_POST['public_reg_days_before'] ) ) ) );
+            } elseif ( isset( $existing_record['public_reg_days_before'] ) && $existing_record['public_reg_days_before'] !== '' ) {
+                $public_reg_days = max( 0, min( 365, intval( $existing_record['public_reg_days_before'] ) ) );
+            } else {
+                $public_reg_days = intval( $shop_reg_defaults['public_reg_days_before'] );
+            }
+
             // -------------------------------------------------------------
             // MANUAL SAVE OVERLAP GUARD: Prohibit overlapping shop event dates
             // -------------------------------------------------------------
@@ -803,24 +841,26 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $tournaments[ $storage_key ] = array(
-                'name'                 => $t_name,
-                'shop_id'              => $assigned_shop_id,
-                'shop_name'            => $resolved_shop_name,
-                'official_shop_name'   => $resolved_shop_name,
-                'location_display'     => $resolved_shop_name,
-                'season_slug'          => $season_slug,
-                'season'               => $season_slug,
-                'start_date'           => $start_date,
-                'end_date'             => $end_date,
-                'event_type'           => $existing_ev_type,
-                'pricing_profiles'     => $t_pricing_profiles,
-                'registration_links'   => $t_reg_links,
-                'notes'                => $existing_notes,
-                'registration_enabled' => $existing_reg_en,
-                'tfaa_event_id'        => $tfaa_event_id,
-                'lines'                => $new_lines,
-                'scores_published'     => $is_scores_pub,
-                'created_at'           => $existing_created,
+                'name'                   => $t_name,
+                'shop_id'                => $assigned_shop_id,
+                'shop_name'              => $resolved_shop_name,
+                'official_shop_name'     => $resolved_shop_name,
+                'location_display'       => $resolved_shop_name,
+                'season_slug'            => $season_slug,
+                'season'                 => $season_slug,
+                'start_date'             => $start_date,
+                'end_date'               => $end_date,
+                'event_type'             => $existing_ev_type,
+                'pricing_profiles'       => $t_pricing_profiles,
+                'public_reg_enabled'     => $public_reg_enabled,
+                'public_reg_days_before' => $public_reg_days,
+                'registration_links'     => $t_reg_links,
+                'notes'                  => $existing_notes,
+                'registration_enabled'   => $existing_reg_en,
+                'tfaa_event_id'          => $tfaa_event_id,
+                'lines'                  => $new_lines,
+                'scores_published'       => $is_scores_pub,
+                'created_at'             => $existing_created,
             );
 
             if ( ! empty( $published_at ) ) {
