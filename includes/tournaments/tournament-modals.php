@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament External Online Registration Links, standardized 30-minute AM/PM shooting line dropdowns, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament Public Online Registration On/Off & lead-time overrides inherited from host shop defaults, External Online Registration Links, standardized 30-minute AM/PM shooting line dropdowns, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.17.0
+ * Version: 7.18.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -206,6 +206,26 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
         $init_shop_data = ( ! empty( $target_shop_key ) && isset( $all_shops[ $target_shop_key ] ) ) ? $all_shops[ $target_shop_key ] : array();
 
+        // Resolve Public Online Registration defaults (from shop on create, or tournament record on edit)
+        $init_reg_defaults = function_exists( 'sywat_get_shop_public_reg_defaults' )
+            ? sywat_get_shop_public_reg_defaults( $init_shop_data, $all_shops )
+            : array(
+                'public_reg_default'     => ( is_array( $init_shop_data ) && ! empty( $init_shop_data['public_reg_default'] ) ) ? '1' : '0',
+                'public_reg_days_before' => ( is_array( $init_shop_data ) && isset( $init_shop_data['public_reg_days_before'] ) && $init_shop_data['public_reg_days_before'] !== '' )
+                    ? max( 0, min( 365, intval( $init_shop_data['public_reg_days_before'] ) ) )
+                    : 15,
+            );
+
+        if ( $is_edit_mode && is_array( $edit_t_data ) ) {
+            $edit_public_reg_enabled = ! empty( $edit_t_data['public_reg_enabled'] ) ? '1' : '0';
+            $edit_public_reg_days    = ( isset( $edit_t_data['public_reg_days_before'] ) && $edit_t_data['public_reg_days_before'] !== '' )
+                ? max( 0, min( 365, intval( $edit_t_data['public_reg_days_before'] ) ) )
+                : intval( $init_reg_defaults['public_reg_days_before'] );
+        } else {
+            $edit_public_reg_enabled = ( ! empty( $edit_t_shop ) || ! $can_manage_seasons ) ? $init_reg_defaults['public_reg_default'] : '0';
+            $edit_public_reg_days    = ( ! empty( $edit_t_shop ) || ! $can_manage_seasons ) ? intval( $init_reg_defaults['public_reg_days_before'] ) : 15;
+        }
+
         // Resolve saved external registration links for this specific tournament
         $edit_t_reg_links = array();
         if ( $is_edit_mode && is_array( $edit_t_data ) && ! empty( $edit_t_data['registration_links'] ) && is_array( $edit_t_data['registration_links'] ) ) {
@@ -269,7 +289,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 <div class="sywat-modal-header no-print">
                     <div>
                         <h3>🎯 <?php echo $is_edit_mode ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
-                        <div class="sywat-subtitle">Set up tournament details, dates, round pricing formats, registration links, and shooting line capacity limits.</div>
+                        <div class="sywat-subtitle">Set up tournament details, dates, round pricing formats, public online registration, registration links, and shooting line capacity limits.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()" aria-label="Close Tournament Configuration Modal">&times;</button>
                 </div>
@@ -291,6 +311,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                            value="<?php echo esc_attr( $edit_t_shop ); ?>"
                                            data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
                                            data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
+                                           data-public-reg-default="<?php echo esc_attr( $init_reg_defaults['public_reg_default'] ); ?>"
+                                           data-public-reg-days="<?php echo esc_attr( $init_reg_defaults['public_reg_days_before'] ); ?>"
                                            data-default-lines="<?php echo esc_attr( wp_json_encode( $default_lines ) ); ?>">
                                     <input type="text" value="<?php echo esc_attr( $shop_display_name ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php elseif ( $can_manage_seasons ) : ?>
@@ -311,6 +333,15 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? intval( $s_name['cap_cub'] ) : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? intval( $s_name['capacity_cub'] ) : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? intval( $s_name['cub_cap'] ) : 5 ) );
                                                 }
 
+                                                $s_reg_defaults = function_exists( 'sywat_get_shop_public_reg_defaults' )
+                                                    ? sywat_get_shop_public_reg_defaults( $s_name, $all_shops )
+                                                    : array(
+                                                        'public_reg_default'     => ( is_array( $s_name ) && ! empty( $s_name['public_reg_default'] ) ) ? '1' : '0',
+                                                        'public_reg_days_before' => ( is_array( $s_name ) && isset( $s_name['public_reg_days_before'] ) && $s_name['public_reg_days_before'] !== '' )
+                                                            ? max( 0, min( 365, intval( $s_name['public_reg_days_before'] ) ) )
+                                                            : 15,
+                                                    );
+
                                                 $s_def_lines = $build_normalized_shop_lines( $s_name, $s_cap20, $s_capcub );
                                                 if ( ! empty( $s_def_lines ) ) {
                                                     $s_cap20  = intval( $s_def_lines[0]['cap_20yd'] );
@@ -323,6 +354,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     data-events="<?php echo $events_json; ?>"
                                                     data-cap20="<?php echo esc_attr( $s_cap20 ); ?>"
                                                     data-capcub="<?php echo esc_attr( $s_capcub ); ?>"
+                                                    data-public-reg-default="<?php echo esc_attr( $s_reg_defaults['public_reg_default'] ); ?>"
+                                                    data-public-reg-days="<?php echo esc_attr( $s_reg_defaults['public_reg_days_before'] ); ?>"
                                                     data-default-lines="<?php echo esc_attr( wp_json_encode( $s_def_lines ) ); ?>"
                                                     <?php selected( $edit_t_shop, $s_id ); ?>>
                                                 <?php echo esc_html( $s_title ); ?>
@@ -336,6 +369,8 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                            value="<?php echo esc_attr( $target_shop_key ); ?>"
                                            data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
                                            data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
+                                           data-public-reg-default="<?php echo esc_attr( $init_reg_defaults['public_reg_default'] ); ?>"
+                                           data-public-reg-days="<?php echo esc_attr( $init_reg_defaults['public_reg_days_before'] ); ?>"
                                            data-default-lines="<?php echo esc_attr( wp_json_encode( $default_lines ) ); ?>">
                                     <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $target_shop_key ]['name'] ) ? $all_shops[ $target_shop_key ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
@@ -443,7 +478,28 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         <?php endif; ?>
 
-                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS (PER-TOURNAMENT, PROGRESSIVE DISCLOSURE) -->
+                        <!-- ROW 5: PUBLIC ONLINE REGISTRATION (SYWAT MEMBER PORTAL) -->
+                        <div class="sywat-form-grid-2 sywat-modal-row-spacing">
+                            <div class="sywat-field-group">
+                                <label for="sywat_modal_public_reg_enabled">Public Online Registration (SYWAT Portal)</label>
+                                <select name="public_reg_enabled" id="sywat_modal_public_reg_enabled">
+                                    <option value="0" <?php selected( $edit_public_reg_enabled, '0' ); ?>>Off (External Link or Phone Intake Only)</option>
+                                    <option value="1" <?php selected( $edit_public_reg_enabled, '1' ); ?>>On (Members Can Register Online via SYWAT)</option>
+                                </select>
+                            </div>
+                            <div class="sywat-field-group">
+                                <label for="sywat_modal_public_reg_days_before">Open Online Registration (Days Before Event) <span class="sywat-label-subtext">(0 = immediate)</span></label>
+                                <input type="number"
+                                       name="public_reg_days_before"
+                                       id="sywat_modal_public_reg_days_before"
+                                       value="<?php echo esc_attr( $edit_public_reg_days ); ?>"
+                                       min="0"
+                                       max="365"
+                                       required>
+                            </div>
+                        </div>
+
+                        <!-- ROW 6: EXTERNAL ONLINE REGISTRATION LINKS (PER-TOURNAMENT, PROGRESSIVE DISCLOSURE) -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional)</span></h2>
                             <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-tourn-reg-link">Add Registration Link</button>
