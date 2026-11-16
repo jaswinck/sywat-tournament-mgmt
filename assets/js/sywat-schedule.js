@@ -1,10 +1,10 @@
 /**
  * Sub-Module: Public Season Schedule Client Engine
  * Path: assets/js/sywat-schedule.js
- * Description: Vanilla JS engine for live filtering and UI interactions on the public season schedule.
- * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden class toggling only).
+ * Description: Vanilla JS engine for live filtering, automatic initial positioning on the current weekend, jump-to-weekend navigation, and UI interactions on the public season schedule.
+ * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 (function() {
@@ -17,16 +17,24 @@
     }
     window.SYWAT._scheduleInitialized = true;
 
+    const STATUS_PRIORITY = [ 'active', 'this_weekend', 'upcoming' ];
+
     const scheduleEngine = {
         init: function() {
             this.bindEvents();
+            this.updateJumpButtonVisibility();
+
+            const self = this;
+            window.requestAnimationFrame(function() {
+                self.scrollToCurrentWeekend( true );
+            });
         },
 
         bindEvents: function() {
-            // 1. Season Selector Form Submission (Replaces inline onchange)
+            // 1. Season Selector Form Submission
             const seasonSelect = document.getElementById('sywat_schedule_season_select');
             if ( seasonSelect ) {
-                seasonSelect.addEventListener('change', function(e) {
+                seasonSelect.addEventListener('change', function() {
                     const form = document.getElementById('sywat_schedule_season_form');
                     if ( form ) {
                         form.submit();
@@ -39,14 +47,23 @@
             const shopFilter     = document.getElementById('sywat_schedule_filter_shop');
             const searchInput    = document.getElementById('sywat_schedule_search');
             const clearBtn       = document.getElementById('sywat_schedule_search_clear');
+            const jumpBtn        = document.getElementById('sywat_schedule_jump_weekend');
 
             const applyFilters = this.applyFilters.bind(this);
+            const self         = this;
 
             if ( districtFilter ) districtFilter.addEventListener('change', applyFilters);
             if ( shopFilter )     shopFilter.addEventListener('change', applyFilters);
             if ( searchInput )    searchInput.addEventListener('input', applyFilters);
 
-            // 3. Clear/Reset Button Handler
+            // 3. Jump to Current Weekend Button Handler
+            if ( jumpBtn ) {
+                jumpBtn.addEventListener('click', function() {
+                    self.scrollToCurrentWeekend( false );
+                });
+            }
+
+            // 4. Clear/Reset Button Handler
             if ( clearBtn ) {
                 clearBtn.addEventListener('click', function() {
                     if ( districtFilter ) districtFilter.value = 'all';
@@ -54,6 +71,129 @@
                     if ( searchInput )    searchInput.value = '';
                     applyFilters();
                 });
+            }
+        },
+
+        /**
+         * Returns the first visible schedule row matching priority:
+         * active ("In Progress") -> this_weekend ("This Weekend") -> upcoming ("Upcoming").
+         */
+        findCurrentWeekendRow: function() {
+            const rows = Array.prototype.slice.call(
+                document.querySelectorAll('.sywat-schedule-row:not(.sywat-hidden)')
+            );
+            if ( ! rows.length ) {
+                return null;
+            }
+
+            for ( let p = 0; p < STATUS_PRIORITY.length; p++ ) {
+                const targetStatus = STATUS_PRIORITY[ p ];
+                for ( let i = 0; i < rows.length; i++ ) {
+                    const rowStatus = (rows[ i ].getAttribute('data-status') || '').toLowerCase().trim();
+                    if ( rowStatus === targetStatus ) {
+                        return rows[ i ];
+                    }
+                }
+            }
+
+            return null;
+        },
+
+        /**
+         * Checks whether any visible completed rows appear ahead of the target row.
+         */
+        hasCompletedRowsBefore: function( targetRow ) {
+            if ( ! targetRow ) {
+                return false;
+            }
+
+            const rows = document.querySelectorAll('.sywat-schedule-row:not(.sywat-hidden)');
+            for ( let i = 0; i < rows.length; i++ ) {
+                if ( rows[ i ] === targetRow ) {
+                    return false;
+                }
+                const rowStatus = (rows[ i ].getAttribute('data-status') || '').toLowerCase().trim();
+                if ( rowStatus === 'completed' ) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+
+        /**
+         * Shows or hides the "This Weekend" jump button based on whether a visible target row exists.
+         */
+        updateJumpButtonVisibility: function() {
+            const jumpBtn = document.getElementById('sywat_schedule_jump_weekend');
+            if ( ! jumpBtn ) {
+                return;
+            }
+
+            const hasTarget = Boolean( this.findCurrentWeekendRow() );
+            jumpBtn.classList.toggle('sywat-hidden', ! hasTarget);
+        },
+
+        /**
+         * Scrolls the schedule container or window to the current weekend row.
+         * On initial load, scrolls only when completed rows precede the target row and no URL hash is set.
+         */
+        scrollToCurrentWeekend: function( isInitialLoad ) {
+            if ( isInitialLoad && window.location.hash ) {
+                return;
+            }
+
+            const targetRow = this.findCurrentWeekendRow();
+            if ( ! targetRow ) {
+                return;
+            }
+
+            if ( isInitialLoad && ! this.hasCompletedRowsBefore( targetRow ) ) {
+                return;
+            }
+
+            const behavior     = isInitialLoad ? 'auto' : 'smooth';
+            const tableWrapper = targetRow.closest('.sywat-table-responsive');
+
+            // If the table wrapper itself scrolls vertically, position inside the wrapper
+            if ( tableWrapper ) {
+                const wrapperStyle = window.getComputedStyle( tableWrapper );
+                const canScrollY   = ( wrapperStyle.overflowY === 'auto' || wrapperStyle.overflowY === 'scroll' )
+                    && ( tableWrapper.scrollHeight > tableWrapper.clientHeight + 4 );
+
+                if ( canScrollY ) {
+                    const thead        = tableWrapper.querySelector('thead');
+                    const headerHeight = thead ? thead.offsetHeight : 0;
+                    const wrapperRect  = tableWrapper.getBoundingClientRect();
+                    const rowRect      = targetRow.getBoundingClientRect();
+                    const nextTop      = tableWrapper.scrollTop + ( rowRect.top - wrapperRect.top ) - headerHeight;
+
+                    tableWrapper.scrollTo({
+                        top: Math.max( 0, nextTop ),
+                        behavior: behavior
+                    });
+
+                    if ( ! isInitialLoad ) {
+                        targetRow.setAttribute('tabindex', '-1');
+                        targetRow.focus({ preventScroll: true });
+                    }
+                    return;
+                }
+            }
+
+            // Standard document scroll with theme-neutral top clearance for sticky headers / WP admin bar
+            const adminBarOffset = document.body ? ( document.body.offsetTop || 0 ) : 0;
+            const topClearance   = adminBarOffset + 110;
+            const targetY        = targetRow.getBoundingClientRect().top + window.pageYOffset - topClearance;
+
+            window.scrollTo({
+                top: Math.max( 0, targetY ),
+                behavior: behavior
+            });
+
+            if ( ! isInitialLoad ) {
+                targetRow.setAttribute('tabindex', '-1');
+                targetRow.focus({ preventScroll: true });
             }
         },
 
@@ -102,6 +242,8 @@
                     counterEl.innerHTML = iconTarget + ' Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Scheduled Events';
                 }
             }
+
+            this.updateJumpButtonVisibility();
         }
     };
 
