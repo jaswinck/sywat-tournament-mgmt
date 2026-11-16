@@ -1,6 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Public Results, Standings & Dynamic Schedules
    Path: assets/css/sywat-public.css
+   Version: 1.1.0
    ========================================================================== */
 
 .sywat-public-card {
@@ -109,6 +110,31 @@
 .sywat-shop-location { font-size: 12px; color: var(--sywat-primary); font-weight: 600; margin-top: 2px; }
 .sywat-empty-notice { color: #646970; font-style: italic; padding: 20px 0; }
 .sywat-badge-pending { background: var(--sywat-surface-muted); color: var(--sywat-text-subtle); border: 1px solid var(--sywat-border); padding: 6px 12px; font-size: 12px; }
+
+/* Public Season Schedule Multi-Line Action Buttons (Isolated to Schedule Rows) */
+.sywat-public-card .sywat-schedule-row .sywat-table-actions-vertical {
+    max-width: 220px;
+}
+
+.sywat-public-card .sywat-schedule-row .sywat-table-actions-vertical .sywat-btn {
+    max-width: 220px;
+    height: auto;
+    min-height: 30px;
+    padding: 6px 10px;
+    gap: 6px;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.25;
+    text-align: center;
+}
+
+.sywat-public-card .sywat-schedule-row .sywat-table-actions-vertical .sywat-btn .sywat-icon {
+    flex-shrink: 0;
+}
+
+.sywat-public-card .sywat-schedule-row .sywat-table-actions-vertical .sywat-badge {
+    max-width: 220px;
+}
 
 @media (max-width: 768px) {
     .sywat-filter-bar .sywat-field-group { flex: 1 1 100% !important; width: 100% !important; }
