@@ -2,8 +2,9 @@
 /**
  * View Template: Admin Edit Location (Tabbed Layout)
  * Path: includes/shops/views/view-shop-edit.php
+ * Description: Renders the tabbed Edit Location view with Profile & Address, repeatable Default Online Registration Links, Contacts, SYWAT Indoor Lines, and SYWAT Outdoor Lines.
  * Author: SYWAT Archery / TFAA
- * Version: 6.8.3
+ * Version: 6.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -15,6 +16,9 @@ $curr_fac       = isset( $editing_shop['facilities'] ) && is_array( $editing_sho
 $curr_dist      = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
 $curr_type      = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
 $add_contacts   = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
+$reg_links      = function_exists( 'sywat_get_shop_registration_links' )
+    ? sywat_get_shop_registration_links( $editing_shop )
+    : ( isset( $editing_shop['registration_links'] ) && is_array( $editing_shop['registration_links'] ) ? $editing_shop['registration_links'] : array() );
 
 $raw_state = isset( $editing_shop['state'] ) ? trim( (string) $editing_shop['state'] ) : '';
 $curr_st   = ( $raw_state !== '' && function_exists( 'sywat_normalize_state_code' ) ) ? sywat_normalize_state_code( $raw_state ) : $raw_state;
@@ -133,6 +137,36 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                     </div>
                 </div>
             </div>
+
+            <!-- Default External Online Registration Links Repeater -->
+            <hr class="sywat-mt-4 sywat-mb-4">
+            <div class="sywat-table-header-bar">
+                <div>
+                    <h2>🔗 Default Online Registration Links <span class="sywat-label-subtext">(Optional)</span></h2>
+                    <div class="sywat-meta-subtext">Configure external registration links (such as FareHarbor) that auto-fill when creating tournaments for this location. Leave blank if archers register via SYWAT or onsite at check-in.</div>
+                </div>
+                <div class="sywat-table-header-actions">
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-shop-reg-link">Add Registration Link</button>
+                </div>
+            </div>
+            <div id="sywat_shop_reg_links_container" class="sywat-mb-4">
+                <?php foreach ( $reg_links as $rl ): ?>
+                    <div class="sywat-reg-link-row sywat-form-grid-2 sywat-mt-3">
+                        <div class="sywat-field-group">
+                            <label>Link Label <span class="sywat-label-subtext">(Optional for single link)</span></label>
+                            <input type="text" name="reg_link_labels[]" value="<?php echo esc_attr( isset( $rl['label'] ) ? $rl['label'] : '' ); ?>" placeholder="e.g. 10-yard lines (Cubs)">
+                        </div>
+                        <div class="sywat-field-group">
+                            <label>Registration URL *</label>
+                            <div class="sywat-search-input-group">
+                                <input type="text" name="reg_link_urls[]" value="<?php echo esc_attr( isset( $rl['url'] ) ? $rl['url'] : '' ); ?>" placeholder="https://fareharbor.com/embeds/book/...">
+                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" data-sywat-action="remove-shop-reg-link">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <p id="sywat_no_reg_links_msg" class="sywat-empty-state-notice <?php echo empty( $reg_links ) ? '' : 'sywat-hidden'; ?>">No external registration links configured. Click "Add Registration Link" above to add a FareHarbor or shop booking link.</p>
         </div>
 
         <!-- TAB 2: CONTACTS -->
