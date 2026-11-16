@@ -5,7 +5,7 @@
  * Description: Centralized helpers for Season/Tournament pricing inheritance, individual entry rate calculation, O(1)-indexed First-Time/Lapsed Shooter Promoter eligibility checks, mixed-round Household Family Cap reconciliation, and client JS localization payloads.
  * Compliance: Pure helper layer — zero direct database queries, zero get_option() calls, zero HTML echo at include time, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -733,9 +733,12 @@ if ( ! function_exists( 'sywat_recalculate_household_fees' ) ) {
 
         if ( $had_explicit_paid_tracking ) {
             $amount_already_paid = $prior_paid_sum;
+        } elseif ( $was_previously_capped ) {
+            $amount_already_paid = max( 0.00, round( $prior_cap_amount - $prior_due_sum, 2 ) );
+        } elseif ( $prior_due_sum > 0.00 ) {
+            $amount_already_paid = 0.00;
         } else {
-            $prior_billed_total  = $was_previously_capped ? $prior_cap_amount : $prior_active_individual_sum;
-            $amount_already_paid = max( 0.00, round( $prior_billed_total - $prior_due_sum, 2 ) );
+            $amount_already_paid = $prior_active_individual_sum;
         }
 
         $remaining_line_due = max( 0.00, round( $target_line_total - $amount_already_paid, 2 ) );
