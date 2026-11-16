@@ -5,7 +5,7 @@
  * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament External Online Registration Links, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.15.0
+ * Version: 7.16.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,7 +31,79 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
         $edit_t_data = ( $is_edit_mode && isset( $tournaments[ $edit_t_target ] ) ) ? $tournaments[ $edit_t_target ] : null;
 
-        $edit_t_shop   = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( ! empty( $user_shop_id ) ? $user_shop_id : '' );
+        // Build shop lookup mapping (canonical IDs, unprefixed slugs, and shop names) before resolving shop records
+        $shop_lookup_map = array();
+        if ( is_array( $all_shops ) ) {
+            foreach ( $all_shops as $s_id => $s_data ) {
+                $s_id_str   = (string) $s_id;
+                $s_id_lower = strtolower( trim( $s_id_str ) );
+                if ( $s_id_lower !== '' ) {
+                    $shop_lookup_map[ $s_id_lower ] = $s_id_str;
+                    if ( strpos( $s_id_lower, 'shop_' ) === 0 ) {
+                        $unprefixed = substr( $s_id_lower, 5 );
+                        if ( $unprefixed !== '' ) {
+                            $shop_lookup_map[ $unprefixed ] = $s_id_str;
+                        }
+                    }
+                }
+
+                if ( is_array( $s_data ) ) {
+                    $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
+                    if ( ! empty( $title ) ) {
+                        $norm_title = strtolower( trim( $title ) );
+                        $slug_title = sanitize_title( $title );
+                        $shop_lookup_map[ $norm_title ] = $s_id_str;
+                        if ( $slug_title !== '' ) {
+                            $shop_lookup_map[ $slug_title ]           = $s_id_str;
+                            $shop_lookup_map[ 'shop_' . $slug_title ] = $s_id_str;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Helper: Resolve any stored shop ID, unprefixed slug, or shop name to its canonical key in $all_shops
+        $resolve_canonical_shop_id = function( $raw_shop_id, $t_record = null ) use ( $all_shops, $shop_lookup_map ) {
+            $candidates = array();
+            if ( ! empty( $raw_shop_id ) ) {
+                $candidates[] = (string) $raw_shop_id;
+            }
+            if ( is_array( $t_record ) ) {
+                foreach ( array( 'shop_id', 'shop_name', 'official_shop_name', 'location_display', 'location' ) as $field_key ) {
+                    if ( ! empty( $t_record[ $field_key ] ) && is_string( $t_record[ $field_key ] ) ) {
+                        $candidates[] = $t_record[ $field_key ];
+                    }
+                }
+            }
+
+            foreach ( $candidates as $cand ) {
+                $trimmed = trim( $cand );
+                if ( $trimmed === '' ) {
+                    continue;
+                }
+                if ( isset( $all_shops[ $trimmed ] ) ) {
+                    return $trimmed;
+                }
+                $lower = strtolower( $trimmed );
+                if ( isset( $shop_lookup_map[ $lower ] ) ) {
+                    return $shop_lookup_map[ $lower ];
+                }
+                $slug = sanitize_title( $trimmed );
+                if ( $slug !== '' ) {
+                    if ( isset( $shop_lookup_map[ $slug ] ) ) {
+                        return $shop_lookup_map[ $slug ];
+                    }
+                    if ( isset( $shop_lookup_map[ 'shop_' . $slug ] ) ) {
+                        return $shop_lookup_map[ 'shop_' . $slug ];
+                    }
+                }
+            }
+
+            return (string) $raw_shop_id;
+        };
+
+        $raw_edit_shop = $edit_t_data ? sywat_get_tournament_shop_id( $edit_t_data ) : ( ! empty( $user_shop_id ) ? $user_shop_id : '' );
+        $edit_t_shop   = $resolve_canonical_shop_id( $raw_edit_shop, $edit_t_data );
         $edit_t_season = $edit_t_data ? sywat_get_tournament_season_slug( $edit_t_data ) : ( function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season()['slug'] : '' );
         $edit_t_start  = ( is_array( $edit_t_data ) && isset( $edit_t_data['start_date'] ) ) ? $edit_t_data['start_date'] : '';
         $edit_t_end    = ( is_array( $edit_t_data ) && isset( $edit_t_data['end_date'] ) ) ? $edit_t_data['end_date'] : '';
@@ -78,10 +150,10 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 
         // Helper: Normalize a shop's configured default lines (day, time, cap_20yd, cap_cub)
         $build_normalized_shop_lines = function( $shop_item, $fallback_20, $fallback_cub ) {
-            if ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
-                $raw = sywat_get_default_tournament_lines( $shop_item );
-            } elseif ( is_array( $shop_item ) && ! empty( $shop_item['default_lines'] ) && is_array( $shop_item['default_lines'] ) ) {
+            if ( is_array( $shop_item ) && ! empty( $shop_item['default_lines'] ) && is_array( $shop_item['default_lines'] ) ) {
                 $raw = $shop_item['default_lines'];
+            } elseif ( function_exists( 'sywat_get_default_tournament_lines' ) ) {
+                $raw = sywat_get_default_tournament_lines( $shop_item );
             } else {
                 $raw = array(
                     array( 'day' => 'Saturday', 'time' => '10:00 AM', 'cap_20yd' => $fallback_20, 'cap_cub' => $fallback_cub ),
@@ -125,7 +197,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         // Resolve target shop key for default line capacity & template initialization
         $target_shop_key = $edit_t_shop;
         if ( empty( $target_shop_key ) && ! empty( $user_shop_id ) ) {
-            $target_shop_key = $user_shop_id;
+            $target_shop_key = $resolve_canonical_shop_id( $user_shop_id );
         }
         if ( empty( $target_shop_key ) && ! empty( $all_shops ) && is_array( $all_shops ) ) {
             $shop_keys       = array_keys( $all_shops );
@@ -166,29 +238,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $shop_display_name   = isset( $all_shops[ $edit_t_shop ]['name'] ) ? $all_shops[ $edit_t_shop ]['name'] : ( isset( $edit_t_data['shop_name'] ) ? $edit_t_data['shop_name'] : 'Host Archery Shop' );
         $season_display_name = isset( $seasons[ $edit_t_season ]['name'] ) ? $seasons[ $edit_t_season ]['name'] : $edit_t_season;
 
-        // Build shop lookup mapping to resolve shop ID by shop name variations
-        $shop_lookup_map = array();
-        foreach ( $all_shops as $s_id => $s_data ) {
-            if ( is_array( $s_data ) ) {
-                $title = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : ( ! empty( $s_data['title'] ) ? $s_data['title'] : '' ) );
-                if ( ! empty( $title ) ) {
-                    $shop_lookup_map[ strtolower( trim( $title ) ) ] = $s_id;
-                }
-            }
-        }
-
         // Calculate existing tournament counts & collect start dates per shop for auto-naming logic
         $shop_counts = array();
         $shop_events = array();
         foreach ( $tournaments as $t_name => $t_info ) {
-            $s_id = sywat_get_tournament_shop_id( $t_info );
-            if ( empty( $s_id ) || ! isset( $all_shops[ $s_id ] ) ) {
-                $shop_name = ! empty( $t_info['shop_name'] ) ? $t_info['shop_name'] : ( ! empty( $t_info['official_shop_name'] ) ? $t_info['official_shop_name'] : '' );
-                $norm_name = strtolower( trim( $shop_name ) );
-                if ( ! empty( $norm_name ) && isset( $shop_lookup_map[ $norm_name ] ) ) {
-                    $s_id = $shop_lookup_map[ $norm_name ];
-                }
-            }
+            $s_id = $resolve_canonical_shop_id( sywat_get_tournament_shop_id( $t_info ), $t_info );
             if ( ! empty( $s_id ) ) {
                 $shop_counts[ $s_id ] = isset( $shop_counts[ $s_id ] ) ? $shop_counts[ $s_id ] + 1 : 1;
                 $start                = ! empty( $t_info['start_date'] ) ? $t_info['start_date'] : '';
@@ -279,11 +333,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                     <input type="hidden"
                                            name="shop_id"
                                            id="sywat_modal_shop_id"
-                                           value="<?php echo esc_attr( $user_shop_id ); ?>"
+                                           value="<?php echo esc_attr( $target_shop_key ); ?>"
                                            data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
                                            data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
                                            data-default-lines="<?php echo esc_attr( wp_json_encode( $default_lines ) ); ?>">
-                                    <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $user_shop_id ]['name'] ) ? $all_shops[ $user_shop_id ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
+                                    <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $target_shop_key ]['name'] ) ? $all_shops[ $target_shop_key ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
                             </div>
 
