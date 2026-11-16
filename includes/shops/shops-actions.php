@@ -2,22 +2,29 @@
 /**
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
+ * Description: Processes Shop & Club CRUD actions, external registration link persistence, CSV/XLSX dry-run imports, and staff linking with scoped Shop Manager self-service permissions.
  * Author: SYWAT Archery / TFAA
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
     function sywat_handle_shop_actions() {
-        $can_manage = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
-        if ( ! $can_manage ) return '';
-        if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) return '';
-        if ( ! wp_verify_nonce( $_POST['sywat_nonce'], 'sywat_desk_action' ) ) return '';
+        if ( ! isset( $_POST['sywat_shop_action'] ) || ! isset( $_POST['sywat_nonce'] ) ) {
+            return '';
+        }
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_desk_action' ) ) {
+            return '';
+        }
 
-        $action  = sanitize_text_field( $_POST['sywat_shop_action'] );
-        $shops   = sywat_get_shops();
-        $user_id = get_current_user_id();
+        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'administrator' );
+        $can_manage_shops   = function_exists( 'sywat_can_manage_shops' ) ? sywat_can_manage_shops() : $can_manage_seasons;
+        $user_id            = get_current_user_id();
+        $assigned_shop_id   = $user_id > 0 ? trim( (string) get_user_meta( $user_id, 'sywat_shop_id', true ) ) : '';
+
+        $action = sanitize_text_field( wp_unslash( $_POST['sywat_shop_action'] ) );
+        $shops  = sywat_get_shops();
 
         // Helper: Sort shops array alphabetically by location name
         $sort_shops = function( &$shops_arr ) {
@@ -30,8 +37,131 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
         };
 
+        // Helper: Parse and sanitize repeatable external online registration links from POST
+        $parse_post_reg_links = function() {
+            $raw_labels = isset( $_POST['reg_link_labels'] ) && is_array( $_POST['reg_link_labels'] )
+                ? wp_unslash( $_POST['reg_link_labels'] )
+                : array();
+            $raw_urls   = isset( $_POST['reg_link_urls'] ) && is_array( $_POST['reg_link_urls'] )
+                ? wp_unslash( $_POST['reg_link_urls'] )
+                : array();
+
+            if ( function_exists( 'sywat_sanitize_registration_links' ) ) {
+                return sywat_sanitize_registration_links( $raw_labels, $raw_urls );
+            }
+            return array();
+        };
+
+        // UPDATE EXISTING SHOP / CLUB (Global Admins/Board OR Assigned Shop Manager for own location)
+        if ( $action === 'update_shop' ) {
+            $shop_id = isset( $_POST['shop_id'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_id'] ) ) : '';
+            $can_edit_target = $can_manage_seasons || ( $can_manage_shops && $assigned_shop_id !== '' && $assigned_shop_id === $shop_id );
+
+            if ( ! $can_edit_target ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. You do not have permission to edit this location.</div>';
+            }
+
+            if ( isset( $shops[$shop_id] ) ) {
+                $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] )
+                    ? array_map( 'sanitize_text_field', wp_unslash( $_POST['facilities'] ) )
+                    : array();
+
+                $shops[$shop_id]['name']               = isset( $_POST['shop_name'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_name'] ) ) : $shops[$shop_id]['name'];
+                $shops[$shop_id]['location_type']      = isset( $_POST['location_type'] ) ? sanitize_text_field( wp_unslash( $_POST['location_type'] ) ) : 'pro_shop';
+                $shops[$shop_id]['district']           = isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '';
+                $shops[$shop_id]['facilities']         = $facilities;
+                $shops[$shop_id]['contact']            = isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '';
+                $shops[$shop_id]['contact_title']      = isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '';
+                $shops[$shop_id]['email']              = isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '';
+                $shops[$shop_id]['phone']              = isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '';
+                $shops[$shop_id]['address_1']          = isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '';
+                $shops[$shop_id]['address_2']          = isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '';
+                $shops[$shop_id]['city']               = isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '';
+                $shops[$shop_id]['state']              = isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas';
+                $shops[$shop_id]['zip']                = isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '';
+                $shops[$shop_id]['registration_links'] = $parse_post_reg_links();
+
+                // Process Additional Contacts Repeater
+                $add_contacts = array();
+                if ( ! empty( $_POST['add_contact_names'] ) && is_array( $_POST['add_contact_names'] ) ) {
+                    $raw_c_names  = wp_unslash( $_POST['add_contact_names'] );
+                    $raw_c_titles = isset( $_POST['add_contact_titles'] ) && is_array( $_POST['add_contact_titles'] ) ? wp_unslash( $_POST['add_contact_titles'] ) : array();
+                    $raw_c_emails = isset( $_POST['add_contact_emails'] ) && is_array( $_POST['add_contact_emails'] ) ? wp_unslash( $_POST['add_contact_emails'] ) : array();
+                    $raw_c_phones = isset( $_POST['add_contact_phones'] ) && is_array( $_POST['add_contact_phones'] ) ? wp_unslash( $_POST['add_contact_phones'] ) : array();
+
+                    foreach ( $raw_c_names as $idx => $c_name ) {
+                        $clean_name = trim( sanitize_text_field( $c_name ) );
+                        if ( ! empty( $clean_name ) ) {
+                            $add_contacts[] = array(
+                                'name'  => $clean_name,
+                                'title' => isset( $raw_c_titles[$idx] ) ? sanitize_text_field( $raw_c_titles[$idx] ) : '',
+                                'email' => isset( $raw_c_emails[$idx] ) ? sanitize_text_field( $raw_c_emails[$idx] ) : '',
+                                'phone' => isset( $raw_c_phones[$idx] ) ? sywat_format_phone_number( $raw_c_phones[$idx] ) : '',
+                            );
+                        }
+                    }
+                }
+                $shops[$shop_id]['additional_contacts'] = $add_contacts;
+
+                // Process SYWAT Indoor Lines
+                if ( ! empty( $_POST['indoor_line_days'] ) && is_array( $_POST['indoor_line_days'] ) ) {
+                    $raw_in_days  = wp_unslash( $_POST['indoor_line_days'] );
+                    $raw_in_times = isset( $_POST['indoor_line_times'] ) && is_array( $_POST['indoor_line_times'] ) ? wp_unslash( $_POST['indoor_line_times'] ) : array();
+                    $raw_cap_20   = isset( $_POST['cap_20yd'] ) && is_array( $_POST['cap_20yd'] ) ? wp_unslash( $_POST['cap_20yd'] ) : array();
+                    $raw_cap_cub  = isset( $_POST['cap_cub'] ) && is_array( $_POST['cap_cub'] ) ? wp_unslash( $_POST['cap_cub'] ) : array();
+
+                    $indoor_lines = array();
+                    foreach ( $raw_in_days as $index => $day ) {
+                        $clean_day  = trim( sanitize_text_field( $day ) );
+                        $clean_time = isset( $raw_in_times[$index] ) ? trim( sanitize_text_field( $raw_in_times[$index] ) ) : '';
+                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
+                            $indoor_lines[] = array(
+                                'day'      => $clean_day,
+                                'time'     => $clean_time,
+                                'name'     => trim( $clean_day . ' ' . $clean_time ),
+                                'cap_20yd' => isset( $raw_cap_20[$index] ) ? intval( $raw_cap_20[$index] ) : 20,
+                                'cap_cub'  => isset( $raw_cap_cub[$index] ) ? intval( $raw_cap_cub[$index] ) : 5,
+                            );
+                        }
+                    }
+                    if ( ! empty( $indoor_lines ) ) {
+                        $shops[$shop_id]['default_lines'] = $indoor_lines;
+                    }
+                }
+
+                // Process SYWAT Outdoor Lines
+                if ( ! empty( $_POST['outdoor_line_days'] ) && is_array( $_POST['outdoor_line_days'] ) ) {
+                    $raw_out_days  = wp_unslash( $_POST['outdoor_line_days'] );
+                    $raw_out_times = isset( $_POST['outdoor_line_times'] ) && is_array( $_POST['outdoor_line_times'] ) ? wp_unslash( $_POST['outdoor_line_times'] ) : array();
+
+                    $outdoor_lines = array();
+                    foreach ( $raw_out_days as $index => $day ) {
+                        $clean_day  = trim( sanitize_text_field( $day ) );
+                        $clean_time = isset( $raw_out_times[$index] ) ? trim( sanitize_text_field( $raw_out_times[$index] ) ) : '';
+                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
+                            $outdoor_lines[] = array(
+                                'day'  => $clean_day,
+                                'time' => $clean_time,
+                                'name' => trim( $clean_day . ' ' . $clean_time ),
+                            );
+                        }
+                    }
+                    $shops[$shop_id]['outdoor_lines'] = $outdoor_lines;
+                }
+
+                $sort_shops( $shops );
+                update_option( 'sywat_shops_list', $shops );
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated details for <strong>' . esc_html( $shops[$shop_id]['name'] ) . '</strong>.</div>';
+            }
+        }
+
+        // All remaining directory, import, deletion, and staff-linking actions require global season/directory authority
+        if ( ! $can_manage_seasons ) {
+            return '';
+        }
+
         if ( $action === 'create_shop' ) {
-            $shop_name = trim( sanitize_text_field( $_POST['shop_name'] ) );
+            $shop_name = isset( $_POST['shop_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['shop_name'] ) ) ) : '';
             if ( empty( $shop_name ) ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Location Name is required.</div>';
             }
@@ -52,8 +182,10 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 array( 'day' => 'Sunday',   'time' => '9:00 AM', 'name' => 'Sunday 9:00 AM' ),
             );
 
-            $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
-            $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
+            $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] )
+                ? array_map( 'sanitize_text_field', wp_unslash( $_POST['facilities'] ) )
+                : array();
+            $loc_type   = isset( $_POST['location_type'] ) ? sanitize_text_field( wp_unslash( $_POST['location_type'] ) ) : 'pro_shop';
 
             if ( empty( $facilities ) ) {
                 $facilities = array( 'indoor_range' );
@@ -63,18 +195,19 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 'id'                  => $shop_slug,
                 'name'                => $shop_name,
                 'location_type'       => $loc_type,
-                'district'            => isset( $_POST['shop_district'] ) ? sywat_normalize_district( $_POST['shop_district'] ) : '',
+                'district'            => isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '',
                 'facilities'          => $facilities,
-                'contact'             => isset( $_POST['shop_contact'] ) ? sanitize_text_field( $_POST['shop_contact'] ) : '',
-                'contact_title'       => isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( $_POST['shop_contact_title'] ) : '',
-                'email'               => isset( $_POST['shop_email'] ) ? sanitize_text_field( $_POST['shop_email'] ) : '',
-                'phone'               => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( $_POST['shop_phone'] ) : '',
+                'contact'             => isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '',
+                'contact_title'       => isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '',
+                'email'               => isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '',
+                'phone'               => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '',
                 'additional_contacts' => array(),
-                'address_1'           => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( $_POST['shop_address_1'] ) : '',
-                'address_2'           => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( $_POST['shop_address_2'] ) : '',
-                'city'                => isset( $_POST['shop_city'] ) ? sanitize_text_field( $_POST['shop_city'] ) : '',
-                'state'               => isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( $_POST['shop_state'] ) : 'TX - Texas',
-                'zip'                 => isset( $_POST['shop_zip'] ) ? sanitize_text_field( $_POST['shop_zip'] ) : '',
+                'registration_links'  => $parse_post_reg_links(),
+                'address_1'           => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '',
+                'address_2'           => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '',
+                'city'                => isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '',
+                'state'               => isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas',
+                'zip'                 => isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '',
                 'default_lines'       => $default_indoor_lines,
                 'outdoor_lines'       => $default_outdoor_lines,
                 'created_at'          => current_time( 'mysql' ),
@@ -85,86 +218,6 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully created location <strong>' . esc_html( $shop_name ) . '</strong>.</div>';
         }
 
-        if ( $action === 'update_shop' ) {
-            $shop_id = sanitize_text_field( $_POST['shop_id'] );
-            if ( isset( $shops[$shop_id] ) ) {
-                $facilities = isset( $_POST['facilities'] ) && is_array( $_POST['facilities'] ) ? array_map( 'sanitize_text_field', $_POST['facilities'] ) : array();
-
-                $shops[$shop_id]['name']          = sanitize_text_field( $_POST['shop_name'] );
-                $shops[$shop_id]['location_type'] = isset( $_POST['location_type'] ) ? sanitize_text_field( $_POST['location_type'] ) : 'pro_shop';
-                $shops[$shop_id]['district']      = isset( $_POST['shop_district'] ) ? sywat_normalize_district( $_POST['shop_district'] ) : '';
-                $shops[$shop_id]['facilities']    = $facilities;
-                $shops[$shop_id]['contact']       = sanitize_text_field( $_POST['shop_contact'] );
-                $shops[$shop_id]['contact_title'] = isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( $_POST['shop_contact_title'] ) : '';
-                $shops[$shop_id]['email']         = sanitize_text_field( $_POST['shop_email'] );
-                $shops[$shop_id]['phone']         = sywat_format_phone_number( $_POST['shop_phone'] );
-                $shops[$shop_id]['address_1']     = sanitize_text_field( $_POST['shop_address_1'] );
-                $shops[$shop_id]['address_2']     = sanitize_text_field( $_POST['shop_address_2'] );
-                $shops[$shop_id]['city']          = sanitize_text_field( $_POST['shop_city'] );
-                $shops[$shop_id]['state']         = sywat_normalize_state_code( $_POST['shop_state'] );
-                $shops[$shop_id]['zip']           = sanitize_text_field( $_POST['shop_zip'] );
-
-                // Process Additional Contacts Repeater
-                $add_contacts = array();
-                if ( ! empty( $_POST['add_contact_names'] ) && is_array( $_POST['add_contact_names'] ) ) {
-                    foreach ( $_POST['add_contact_names'] as $idx => $c_name ) {
-                        $clean_name = trim( sanitize_text_field( $c_name ) );
-                        if ( ! empty( $clean_name ) ) {
-                            $add_contacts[] = array(
-                                'name'  => $clean_name,
-                                'title' => isset( $_POST['add_contact_titles'][$idx] ) ? sanitize_text_field( $_POST['add_contact_titles'][$idx] ) : '',
-                                'email' => isset( $_POST['add_contact_emails'][$idx] ) ? sanitize_text_field( $_POST['add_contact_emails'][$idx] ) : '',
-                                'phone' => isset( $_POST['add_contact_phones'][$idx] ) ? sywat_format_phone_number( $_POST['add_contact_phones'][$idx] ) : '',
-                            );
-                        }
-                    }
-                }
-                $shops[$shop_id]['additional_contacts'] = $add_contacts;
-
-                // Process SYWAT Indoor Lines
-                if ( ! empty( $_POST['indoor_line_days'] ) && is_array( $_POST['indoor_line_days'] ) ) {
-                    $indoor_lines = array();
-                    foreach ( $_POST['indoor_line_days'] as $index => $day ) {
-                        $clean_day  = trim( sanitize_text_field( $day ) );
-                        $clean_time = isset( $_POST['indoor_line_times'][$index] ) ? trim( sanitize_text_field( $_POST['indoor_line_times'][$index] ) ) : '';
-                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
-                            $indoor_lines[] = array(
-                                'day'      => $clean_day,
-                                'time'     => $clean_time,
-                                'name'     => trim( $clean_day . ' ' . $clean_time ),
-                                'cap_20yd' => isset( $_POST['cap_20yd'][$index] ) ? intval( $_POST['cap_20yd'][$index] ) : 20,
-                                'cap_cub'  => isset( $_POST['cap_cub'][$index] ) ? intval( $_POST['cap_cub'][$index] ) : 5,
-                            );
-                        }
-                    }
-                    if ( ! empty( $indoor_lines ) ) {
-                        $shops[$shop_id]['default_lines'] = $indoor_lines;
-                    }
-                }
-
-                // Process SYWAT Outdoor Lines
-                if ( ! empty( $_POST['outdoor_line_days'] ) && is_array( $_POST['outdoor_line_days'] ) ) {
-                    $outdoor_lines = array();
-                    foreach ( $_POST['outdoor_line_days'] as $index => $day ) {
-                        $clean_day  = trim( sanitize_text_field( $day ) );
-                        $clean_time = isset( $_POST['outdoor_line_times'][$index] ) ? trim( sanitize_text_field( $_POST['outdoor_line_times'][$index] ) ) : '';
-                        if ( ! empty( $clean_day ) && ! empty( $clean_time ) ) {
-                            $outdoor_lines[] = array(
-                                'day'  => $clean_day,
-                                'time' => $clean_time,
-                                'name' => trim( $clean_day . ' ' . $clean_time ),
-                            );
-                        }
-                    }
-                    $shops[$shop_id]['outdoor_lines'] = $outdoor_lines;
-                }
-
-                $sort_shops( $shops );
-                update_option( 'sywat_shops_list', $shops );
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully updated details for <strong>' . esc_html( $shops[$shop_id]['name'] ) . '</strong>.</div>';
-            }
-        }
-
         // STEP 1: PARSE FILE & GENERATE DRY-RUN PREVIEW
         if ( $action === 'import_shops' || $action === 'preview_import_shops' ) {
             if ( empty( $_FILES['shop_import_file']['tmp_name'] ) ) {
@@ -172,13 +225,13 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
 
             $file_tmp  = $_FILES['shop_import_file']['tmp_name'];
-            $file_name = $_FILES['shop_import_file']['name'];
+            $file_name = sanitize_file_name( wp_unslash( $_FILES['shop_import_file']['name'] ) );
             $ext       = strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) );
-            $mode      = isset( $_POST['import_mode'] ) ? sanitize_text_field( $_POST['import_mode'] ) : 'upsert';
+            $mode      = isset( $_POST['import_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['import_mode'] ) ) : 'upsert';
 
             $rows = array();
 
-            if ( in_array( $ext, array( 'xlsx', 'xls' ) ) ) {
+            if ( in_array( $ext, array( 'xlsx', 'xls' ), true ) ) {
                 $lib_path  = dirname( __DIR__ ) . '/lib/SimpleXLSX.php';
                 $shop_path = __DIR__ . '/SimpleXLSX.php';
 
@@ -263,7 +316,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
 
             foreach ( $rows as $row ) {
                 $shop_name = $get_cell( $row, array( 'Shop/Club', 'Shop Name', 'Location Name', 'Shop', 'Club' ), 0 );
-                if ( empty( $shop_name ) || in_array( strtolower($shop_name), array( 'shop/club', 'shop name', 'location name', 'shop', 'club' ) ) ) {
+                if ( empty( $shop_name ) || in_array( strtolower($shop_name), array( 'shop/club', 'shop name', 'location name', 'shop', 'club' ), true ) ) {
                     continue;
                 }
 
@@ -436,7 +489,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     // Strip auto-assigned 'pro_shop' facility tag from all imported locations, ensure 'indoor_range' is set
                     $existing_fac = isset( $shops[$shop_slug]['facilities'] ) && is_array( $shops[$shop_slug]['facilities'] ) ? $shops[$shop_slug]['facilities'] : array();
                     $existing_fac = array_diff( $existing_fac, array( 'pro_shop' ) );
-                    if ( ! in_array( 'indoor_range', $existing_fac ) ) {
+                    if ( ! in_array( 'indoor_range', $existing_fac, true ) ) {
                         $existing_fac[] = 'indoor_range';
                     }
                     $shops[$shop_slug]['facilities'] = array_values( $existing_fac );
@@ -455,6 +508,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                         'email'               => $item['email'],
                         'phone'               => $item['phone'],
                         'additional_contacts' => $item['additional_contacts'],
+                        'registration_links'  => array(),
                         'address_1'           => $item['address_1'],
                         'address_2'           => $item['address_2'],
                         'city'                => $item['city'],
@@ -488,7 +542,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         }
 
         if ( $action === 'delete_shop' ) {
-            $shop_id = sanitize_text_field( $_POST['shop_id'] );
+            $shop_id = isset( $_POST['shop_id'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_id'] ) ) : '';
             if ( isset( $shops[$shop_id] ) ) {
                 $deleted_name = $shops[$shop_id]['name'];
                 unset( $shops[$shop_id] );
@@ -506,8 +560,8 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         }
 
         if ( $action === 'assign_staff_to_shop' ) {
-            $target_user_id = intval( $_POST['staff_user_id'] );
-            $target_shop_id = sanitize_text_field( $_POST['target_shop_id'] );
+            $target_user_id = isset( $_POST['staff_user_id'] ) ? intval( wp_unslash( $_POST['staff_user_id'] ) ) : 0;
+            $target_shop_id = isset( $_POST['target_shop_id'] ) ? sanitize_text_field( wp_unslash( $_POST['target_shop_id'] ) ) : '';
             if ( $target_user_id > 0 && isset( $shops[$target_shop_id] ) ) {
                 update_user_meta( $target_user_id, 'sywat_shop_id', $target_shop_id );
                 $u = get_userdata( $target_user_id );
@@ -517,7 +571,7 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
         }
 
         if ( $action === 'remove_staff_from_shop' ) {
-            $target_user_id = intval( $_POST['staff_user_id'] );
+            $target_user_id = isset( $_POST['staff_user_id'] ) ? intval( wp_unslash( $_POST['staff_user_id'] ) ) : 0;
             if ( $target_user_id > 0 ) {
                 delete_user_meta( $target_user_id, 'sywat_shop_id' );
                 $u = get_userdata( $target_user_id );
