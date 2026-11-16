@@ -1,16 +1,21 @@
 /**
  * Module: Pricing Profiles, Round Formats & Promoter Client Controller
  * Path: assets/js/sywat-pricing.js
- * Description: Provides shared client-side pricing & household family cap helpers under window.SYWAT.pricing plus delegated UI event handlers for the [sywat_pricing] administration portal.
+ * Description: Provides shared client-side pricing & household family cap helpers under window.SYWAT.pricing plus delegated UI event handlers and single-prompt confirmation guards for the [sywat_pricing] administration portal.
  * Compliance: Vanilla JS only (zero jQuery), namespaced under window.SYWAT.pricing, delegated data-sywat-action listeners, class-based visibility (.active / .sywat-hidden) with zero element.style.* mutations.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 (function () {
     'use strict';
 
     window.SYWAT = window.SYWAT || {};
+
+    if (window.SYWAT._pricingInitialized) {
+        return;
+    }
+    window.SYWAT._pricingInitialized = true;
 
     var config = (typeof window.sywatPricingConfig !== 'undefined' && window.sywatPricingConfig)
         ? window.sywatPricingConfig
@@ -501,11 +506,27 @@
     });
 
     document.addEventListener('submit', function (e) {
-        var form = e.target;
-        if (!form || !form.getAttribute) return;
-        var confirmMsg = form.getAttribute('data-sywat-confirm');
-        if (confirmMsg && !window.confirm(confirmMsg)) {
+        var form = e.target && e.target.closest ? e.target.closest('form[data-sywat-confirm]') : null;
+        if (!form || e.defaultPrevented) return;
+
+        if (form.dataset.sywatSubmitting === '1') {
             e.preventDefault();
+            return;
+        }
+
+        if (!e._sywatConfirmHandled) {
+            e._sywatConfirmHandled = true;
+            var confirmMsg = form.getAttribute('data-sywat-confirm');
+            if (confirmMsg && !window.confirm(confirmMsg)) {
+                e.preventDefault();
+                return;
+            }
+        }
+
+        form.dataset.sywatSubmitting = '1';
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
         }
     });
 
