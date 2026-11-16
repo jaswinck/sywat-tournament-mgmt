@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule table, filter bar, and external registration links.
- * Compliance: Zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
+ * Description: Renders the public season schedule table, filter bar with current-weekend jump control, status badges, and external registration links.
+ * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.1
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -37,9 +37,23 @@ foreach ( $referenced_shops as $s_id => $s_data ) {
 }
 asort( $filter_shops );
 
+// Determine whether a current/upcoming weekend target exists for the Jump button
+$jump_target_label = '';
+foreach ( $events as $evt_check ) {
+    $code = isset( $evt_check['status_code'] ) ? $evt_check['status_code'] : '';
+    if ( $code === 'active' || $code === 'this_weekend' ) {
+        $jump_target_label = 'This Weekend';
+        break;
+    }
+    if ( $jump_target_label === '' && $code === 'upcoming' ) {
+        $jump_target_label = 'Next Event';
+    }
+}
+
 // Utility Icons
 $icon_pin      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
 $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
+$icon_calendar = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
 ?>
 
 <div class="sywat-public-card">
@@ -97,6 +111,11 @@ $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
             <label for="sywat_schedule_search">Search Event</label>
             <div class="sywat-search-input-wrapper">
                 <input type="text" id="sywat_schedule_search" placeholder="Type event name or city...">
+                <?php if ( $jump_target_label !== '' ) : ?>
+                    <button type="button" class="sywat-btn sywat-btn-secondary" id="sywat_schedule_jump_weekend">
+                        <?php echo $icon_calendar; ?> <?php echo esc_html( $jump_target_label ); ?>
+                    </button>
+                <?php endif; ?>
                 <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" id="sywat_schedule_search_clear">Reset Filters</button>
             </div>
         </div>
@@ -126,10 +145,8 @@ $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                             $status_class = 'sywat-badge-prereg'; // Default blue (upcoming)
                             if ( $evt['status_code'] === 'completed' ) {
                                 $status_class = 'sywat-badge-muted';
-                            } elseif ( $evt['status_code'] === 'active' ) {
+                            } elseif ( $evt['status_code'] === 'active' || $evt['status_code'] === 'this_weekend' ) {
                                 $status_class = 'sywat-badge-open';
-                            } elseif ( $evt['status_code'] === 'this_weekend' ) {
-                                $status_class = 'sywat-badge-pending';
                             }
 
                             // Build Maps URL for location if address is available
@@ -143,7 +160,8 @@ $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                         <tr class="sywat-schedule-row" 
                             data-name="<?php echo esc_attr( $search_payload ); ?>" 
                             data-shop="<?php echo esc_attr( strtolower( $evt['shop_name'] ) ); ?>" 
-                            data-district="<?php echo esc_attr( strtolower( $evt['district'] ) ); ?>">
+                            data-district="<?php echo esc_attr( strtolower( $evt['district'] ) ); ?>"
+                            data-status="<?php echo esc_attr( $evt['status_code'] ); ?>">
                             
                             <!-- 1. DATE & STATUS -->
                             <td>
