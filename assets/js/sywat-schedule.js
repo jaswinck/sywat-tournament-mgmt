@@ -1,10 +1,10 @@
 /**
  * Sub-Module: Public Season Schedule Client Engine (List View & Monthly Calendar View)
  * Path: assets/js/sywat-schedule.js
- * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal with per-line Cubs Only / 20 YD Only pills, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
+ * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal with per-line Cubs Only / 20 YD Only pills and stacked tap-to-call shop phone links, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
  * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden / .active / .is-active class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.3.1
  */
 
 (function() {
@@ -665,7 +665,17 @@
 
                 if ( ! renderedLink ) {
                     if ( evt.shop_phone ) {
-                        html += '<span class="sywat-label-subtext">📞 <strong>Contact Shop:</strong> ' + self.escapeHtml( evt.shop_phone ) + '</span>';
+                        const telHref = String( evt.shop_phone ).replace(/[^0-9+]/g, '');
+                        html += '<div class="sywat-label-subtext">';
+                        html += '<div>📞 <strong>Contact Shop:</strong></div>';
+                        html += '<div>';
+                        if ( telHref ) {
+                            html += '<a href="tel:' + self.escapeHtml( telHref ) + '" class="sywat-table-link">' + self.escapeHtml( evt.shop_phone ) + '</a>';
+                        } else {
+                            html += self.escapeHtml( evt.shop_phone );
+                        }
+                        html += '</div>';
+                        html += '</div>';
                     } else {
                         html += '<span class="sywat-label-subtext">📞 <strong>Contact Host to Register</strong></span>';
                     }
