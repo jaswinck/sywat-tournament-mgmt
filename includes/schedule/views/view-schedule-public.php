@@ -1,407 +1,727 @@
-<?php
 /**
- * View Template: Public Season Schedule (List View & Monthly Calendar View)
- * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
- * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
+ * Sub-Module: Public Season Schedule Client Engine (List View & Monthly Calendar View)
+ * Path: assets/js/sywat-schedule.js
+ * Description: Vanilla JS engine for live filtering, List/Calendar view switching, instant month navigation, event details modal, automatic initial positioning on the current weekend, and jump-to-weekend navigation.
+ * Compliance: Zero jQuery, singleton IIFE encapsulation, zero style.* DOM mutations (uses .sywat-hidden / .active / .is-active class toggling only), zero theme-specific selectors.
  * Author: SYWAT Archery
- * Version: 1.4.1
+ * Version: 1.2.1
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
+(function() {
+    'use strict';
 
-// Extract payload data
-$target_season_slug = isset( $view_data['target_season_slug'] ) ? $view_data['target_season_slug'] : '';
-$seasons            = isset( $view_data['seasons'] ) ? $view_data['seasons'] : array();
-$referenced_shops   = isset( $view_data['referenced_shops'] ) ? $view_data['referenced_shops'] : array();
-$events             = isset( $view_data['events'] ) ? $view_data['events'] : array();
-$calendar           = isset( $view_data['calendar'] ) && is_array( $view_data['calendar'] ) ? $view_data['calendar'] : array();
-
-$cal_months     = isset( $calendar['months'] ) && is_array( $calendar['months'] ) ? $calendar['months'] : array();
-$cal_default_ym = isset( $calendar['default_ym'] ) ? $calendar['default_ym'] : '';
-
-// Build District Filter Options
-$filter_districts = array();
-foreach ( $referenced_shops as $s_id => $s_data ) {
-    if ( ! empty( $s_data['district'] ) && ! in_array( $s_data['district'], $filter_districts, true ) ) {
-        $filter_districts[] = $s_data['district'];
+    // Global Namespace Initialization & Singleton Guard
+    window.SYWAT = window.SYWAT || {};
+    if ( window.SYWAT._scheduleInitialized ) {
+        return;
     }
-}
-sort( $filter_districts );
+    window.SYWAT._scheduleInitialized = true;
 
-// Sort Referenced Shops for Dropdown
-$filter_shops = array();
-foreach ( $referenced_shops as $s_id => $s_data ) {
-    $s_name = ! empty( $s_data['name'] ) ? $s_data['name'] : ( ! empty( $s_data['shop_name'] ) ? $s_data['shop_name'] : '' );
-    if ( ! empty( $s_name ) ) {
-        $filter_shops[ $s_id ] = $s_name;
+    const STATUS_PRIORITY = [ 'active', 'this_weekend', 'upcoming' ];
+
+    const scheduleEngine = {
+        viewMode: 'list',
+        activeYm: '',
+        defaultYm: '',
+        eventsMap: {},
+        lastTriggerEl: null,
+
+        init: function() {
+            this.loadCalendarMetadata();
+            this.mountEventModal();
+            this.bindEvents();
+            this.syncCalendarHeader();
+            this.updateJumpButtonVisibility();
+
+            const self = this;
+            window.requestAnimationFrame(function() {
+                self.scrollToCurrentWeekend( true );
+            });
+        },
+
+        loadCalendarMetadata: function() {
+            const calPanel = document.getElementById('sywat_schedule_calendar_panel');
+            if ( ! calPanel ) {
+                return;
+            }
+
+            this.defaultYm = (calPanel.getAttribute('data-default-ym') || '').trim();
+            this.activeYm  = this.defaultYm;
+
+            if ( ! this.activeYm ) {
+                const firstMonth = calPanel.querySelector('.sywat-cal-month');
+                if ( firstMonth ) {
+                    this.activeYm = (firstMonth.getAttribute('data-ym') || '').trim();
+                }
+            }
+
+            const rawJson = calPanel.getAttribute('data-events') || '{}';
+            try {
+                const parsed = JSON.parse( rawJson );
+                if ( parsed && typeof parsed === 'object' ) {
+                    this.eventsMap = parsed;
+                }
+            } catch ( e ) {
+                this.eventsMap = {};
+            }
+        },
+
+        /**
+         * Moves #sywat_schedule_event_modal to document.body so no theme transform/overflow clips it.
+         */
+        mountEventModal: function() {
+            const modalEl = document.getElementById('sywat_schedule_event_modal');
+            if ( modalEl && document.body && modalEl.parentNode !== document.body ) {
+                document.body.appendChild( modalEl );
+            }
+        },
+
+        bindEvents: function() {
+            const self = this;
+
+            // 1. Season Selector Form Submission
+            const seasonSelect = document.getElementById('sywat_schedule_season_select');
+            if ( seasonSelect ) {
+                seasonSelect.addEventListener('change', function() {
+                    const form = document.getElementById('sywat_schedule_season_form');
+                    if ( form ) {
+                        form.submit();
+                    }
+                });
+            }
+
+            // 2. View Mode Switcher (List View vs. Calendar View)
+            const listViewBtn = document.getElementById('sywat_schedule_view_list');
+            const calViewBtn  = document.getElementById('sywat_schedule_view_calendar');
+
+            if ( listViewBtn ) {
+                listViewBtn.addEventListener('click', function() {
+                    self.setViewMode('list');
+                });
+            }
+            if ( calViewBtn ) {
+                calViewBtn.addEventListener('click', function() {
+                    self.setViewMode('calendar');
+                });
+            }
+
+            // 3. Filter Inputs & Toggles
+            const districtFilter = document.getElementById('sywat_schedule_filter_district');
+            const shopFilter     = document.getElementById('sywat_schedule_filter_shop');
+            const searchInput    = document.getElementById('sywat_schedule_search');
+            const clearBtn       = document.getElementById('sywat_schedule_search_clear');
+            const jumpBtn        = document.getElementById('sywat_schedule_jump_weekend');
+
+            const applyFilters = this.applyFilters.bind(this);
+
+            if ( districtFilter ) districtFilter.addEventListener('change', applyFilters);
+            if ( shopFilter )     shopFilter.addEventListener('change', applyFilters);
+            if ( searchInput )    searchInput.addEventListener('input', applyFilters);
+
+            // 4. Jump to Current Weekend Button Handler (List View)
+            if ( jumpBtn ) {
+                jumpBtn.addEventListener('click', function() {
+                    self.scrollToCurrentWeekend( false );
+                });
+            }
+
+            // 5. Clear/Reset Button Handler
+            if ( clearBtn ) {
+                clearBtn.addEventListener('click', function() {
+                    if ( districtFilter ) districtFilter.value = 'all';
+                    if ( shopFilter )     shopFilter.value = 'all';
+                    if ( searchInput )    searchInput.value = '';
+                    applyFilters();
+                });
+            }
+
+            // 6. Calendar Month Navigation Controls
+            const prevBtn  = document.getElementById('sywat_cal_prev_btn');
+            const nextBtn  = document.getElementById('sywat_cal_next_btn');
+            const todayBtn = document.getElementById('sywat_cal_today_btn');
+
+            if ( prevBtn ) {
+                prevBtn.addEventListener('click', function() {
+                    self.stepCalendarMonth( -1 );
+                });
+            }
+            if ( nextBtn ) {
+                nextBtn.addEventListener('click', function() {
+                    self.stepCalendarMonth( 1 );
+                });
+            }
+            if ( todayBtn ) {
+                todayBtn.addEventListener('click', function() {
+                    if ( self.defaultYm ) {
+                        self.setCalendarMonth( self.defaultYm );
+                    }
+                });
+            }
+
+            // 7. Calendar Event Chip Click Delegation
+            const calPanel = document.getElementById('sywat_schedule_calendar_panel');
+            if ( calPanel ) {
+                calPanel.addEventListener('click', function( e ) {
+                    const chipBtn = e.target.closest('.sywat-cal-event-chip');
+                    if ( chipBtn ) {
+                        const evtId = chipBtn.getAttribute('data-event-id');
+                        self.openSingleEventModal( evtId, chipBtn );
+                    }
+                });
+            }
+
+            // 8. Event Details Modal Close Controls
+            const modalEl       = document.getElementById('sywat_schedule_event_modal');
+            const modalCloseBtn = document.getElementById('sywat_schedule_event_modal_close');
+            const modalDoneBtn  = document.getElementById('sywat_schedule_event_modal_done');
+
+            if ( modalCloseBtn ) {
+                modalCloseBtn.addEventListener('click', function() {
+                    self.closeEventModal();
+                });
+            }
+            if ( modalDoneBtn ) {
+                modalDoneBtn.addEventListener('click', function() {
+                    self.closeEventModal();
+                });
+            }
+            if ( modalEl ) {
+                modalEl.addEventListener('click', function( e ) {
+                    if ( e.target === modalEl ) {
+                        self.closeEventModal();
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function( e ) {
+                if ( e.key === 'Escape' ) {
+                    const activeModal = document.getElementById('sywat_schedule_event_modal');
+                    if ( activeModal && activeModal.classList.contains('active') ) {
+                        self.closeEventModal();
+                    }
+                }
+            });
+        },
+
+        setViewMode: function( mode ) {
+            const nextMode    = (mode === 'calendar') ? 'calendar' : 'list';
+            const listPanel   = document.getElementById('sywat_schedule_list_panel');
+            const calPanel    = document.getElementById('sywat_schedule_calendar_panel');
+            const listViewBtn = document.getElementById('sywat_schedule_view_list');
+            const calViewBtn  = document.getElementById('sywat_schedule_view_calendar');
+
+            this.viewMode = nextMode;
+
+            if ( listPanel ) {
+                listPanel.classList.toggle('sywat-hidden', nextMode !== 'list');
+            }
+            if ( calPanel ) {
+                calPanel.classList.toggle('sywat-hidden', nextMode !== 'calendar');
+            }
+
+            if ( listViewBtn ) {
+                const isList = (nextMode === 'list');
+                listViewBtn.classList.toggle('is-active', isList);
+                listViewBtn.setAttribute('aria-pressed', isList ? 'true' : 'false');
+            }
+            if ( calViewBtn ) {
+                const isCal = (nextMode === 'calendar');
+                calViewBtn.classList.toggle('is-active', isCal);
+                calViewBtn.setAttribute('aria-pressed', isCal ? 'true' : 'false');
+            }
+
+            if ( nextMode === 'calendar' ) {
+                this.syncCalendarHeader();
+            }
+
+            this.updateJumpButtonVisibility();
+        },
+
+        getCalendarMonthPanels: function() {
+            const calPanel = document.getElementById('sywat_schedule_calendar_panel');
+            if ( ! calPanel ) {
+                return [];
+            }
+            return Array.prototype.slice.call( calPanel.querySelectorAll('.sywat-cal-month') );
+        },
+
+        setCalendarMonth: function( targetYm ) {
+            const panels = this.getCalendarMonthPanels();
+            if ( ! panels.length ) {
+                return;
+            }
+
+            let found = false;
+            panels.forEach(function( panel ) {
+                const ym    = (panel.getAttribute('data-ym') || '').trim();
+                const match = (ym === targetYm);
+                panel.classList.toggle('sywat-hidden', ! match);
+                if ( match ) {
+                    found = true;
+                }
+            });
+
+            if ( found ) {
+                this.activeYm = targetYm;
+            } else {
+                panels[ 0 ].classList.remove('sywat-hidden');
+                this.activeYm = (panels[ 0 ].getAttribute('data-ym') || '').trim();
+            }
+
+            this.syncCalendarHeader();
+        },
+
+        stepCalendarMonth: function( delta ) {
+            const panels = this.getCalendarMonthPanels();
+            if ( ! panels.length ) {
+                return;
+            }
+
+            let curIdx = 0;
+            for ( let i = 0; i < panels.length; i++ ) {
+                if ( (panels[ i ].getAttribute('data-ym') || '').trim() === this.activeYm ) {
+                    curIdx = i;
+                    break;
+                }
+            }
+
+            const nextIdx = curIdx + delta;
+            if ( nextIdx < 0 || nextIdx >= panels.length ) {
+                return;
+            }
+
+            const nextYm = (panels[ nextIdx ].getAttribute('data-ym') || '').trim();
+            this.setCalendarMonth( nextYm );
+        },
+
+        syncCalendarHeader: function() {
+            const panels   = this.getCalendarMonthPanels();
+            const titleEl  = document.getElementById('sywat_cal_month_title');
+            const prevBtn  = document.getElementById('sywat_cal_prev_btn');
+            const nextBtn  = document.getElementById('sywat_cal_next_btn');
+            const todayBtn = document.getElementById('sywat_cal_today_btn');
+
+            if ( ! panels.length ) {
+                return;
+            }
+
+            let curIdx   = 0;
+            let curLabel = '';
+
+            for ( let i = 0; i < panels.length; i++ ) {
+                const ym = (panels[ i ].getAttribute('data-ym') || '').trim();
+                if ( ym === this.activeYm ) {
+                    curIdx   = i;
+                    curLabel = panels[ i ].getAttribute('data-label') || ym;
+                    break;
+                }
+            }
+
+            if ( ! curLabel ) {
+                curLabel = panels[ 0 ].getAttribute('data-label') || '';
+                this.activeYm = (panels[ 0 ].getAttribute('data-ym') || '').trim();
+            }
+
+            if ( titleEl ) {
+                titleEl.textContent = curLabel;
+            }
+            if ( prevBtn ) {
+                prevBtn.disabled = (curIdx <= 0);
+            }
+            if ( nextBtn ) {
+                nextBtn.disabled = (curIdx >= panels.length - 1);
+            }
+            if ( todayBtn ) {
+                todayBtn.classList.toggle('sywat-hidden', ! this.defaultYm);
+                todayBtn.disabled = (this.activeYm === this.defaultYm);
+            }
+        },
+
+        /**
+         * Returns the first visible schedule row matching priority:
+         * active ("In Progress") -> this_weekend ("This Weekend") -> upcoming ("Upcoming").
+         */
+        findCurrentWeekendRow: function() {
+            const rows = Array.prototype.slice.call(
+                document.querySelectorAll('.sywat-schedule-row:not(.sywat-hidden)')
+            );
+            if ( ! rows.length ) {
+                return null;
+            }
+
+            for ( let p = 0; p < STATUS_PRIORITY.length; p++ ) {
+                const targetStatus = STATUS_PRIORITY[ p ];
+                for ( let i = 0; i < rows.length; i++ ) {
+                    const rowStatus = (rows[ i ].getAttribute('data-status') || '').toLowerCase().trim();
+                    if ( rowStatus === targetStatus ) {
+                        return rows[ i ];
+                    }
+                }
+            }
+
+            return null;
+        },
+
+        /**
+         * Checks whether any visible completed rows appear ahead of the target row.
+         */
+        hasCompletedRowsBefore: function( targetRow ) {
+            if ( ! targetRow ) {
+                return false;
+            }
+
+            const rows = document.querySelectorAll('.sywat-schedule-row:not(.sywat-hidden)');
+            for ( let i = 0; i < rows.length; i++ ) {
+                if ( rows[ i ] === targetRow ) {
+                    return false;
+                }
+                const rowStatus = (rows[ i ].getAttribute('data-status') || '').toLowerCase().trim();
+                if ( rowStatus === 'completed' ) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+
+        /**
+         * Shows or hides the "This Weekend" jump button based on view mode and visible targets.
+         */
+        updateJumpButtonVisibility: function() {
+            const jumpBtn = document.getElementById('sywat_schedule_jump_weekend');
+            if ( ! jumpBtn ) {
+                return;
+            }
+
+            const shouldShow = (this.viewMode === 'list') && Boolean( this.findCurrentWeekendRow() );
+            jumpBtn.classList.toggle('sywat-hidden', ! shouldShow);
+        },
+
+        /**
+         * Scrolls the schedule container or window to the current weekend row in List View.
+         */
+        scrollToCurrentWeekend: function( isInitialLoad ) {
+            if ( this.viewMode !== 'list' ) {
+                return;
+            }
+            if ( isInitialLoad && window.location.hash ) {
+                return;
+            }
+
+            const targetRow = this.findCurrentWeekendRow();
+            if ( ! targetRow ) {
+                return;
+            }
+
+            if ( isInitialLoad && ! this.hasCompletedRowsBefore( targetRow ) ) {
+                return;
+            }
+
+            const behavior     = isInitialLoad ? 'auto' : 'smooth';
+            const tableWrapper = targetRow.closest('.sywat-table-responsive');
+
+            if ( tableWrapper ) {
+                const wrapperStyle = window.getComputedStyle( tableWrapper );
+                const canScrollY   = ( wrapperStyle.overflowY === 'auto' || wrapperStyle.overflowY === 'scroll' )
+                    && ( tableWrapper.scrollHeight > tableWrapper.clientHeight + 4 );
+
+                if ( canScrollY ) {
+                    const thead        = tableWrapper.querySelector('thead');
+                    const headerHeight = thead ? thead.offsetHeight : 0;
+                    const wrapperRect  = tableWrapper.getBoundingClientRect();
+                    const rowRect      = targetRow.getBoundingClientRect();
+                    const nextTop      = tableWrapper.scrollTop + ( rowRect.top - wrapperRect.top ) - headerHeight;
+
+                    tableWrapper.scrollTo({
+                        top: Math.max( 0, nextTop ),
+                        behavior: behavior
+                    });
+
+                    if ( ! isInitialLoad ) {
+                        targetRow.setAttribute('tabindex', '-1');
+                        targetRow.focus({ preventScroll: true });
+                    }
+                    return;
+                }
+            }
+
+            const adminBarOffset = document.body ? ( document.body.offsetTop || 0 ) : 0;
+            const topClearance   = adminBarOffset + 110;
+            const targetY        = targetRow.getBoundingClientRect().top + window.pageYOffset - topClearance;
+
+            window.scrollTo({
+                top: Math.max( 0, targetY ),
+                behavior: behavior
+            });
+
+            if ( ! isInitialLoad ) {
+                targetRow.setAttribute('tabindex', '-1');
+                targetRow.focus({ preventScroll: true });
+            }
+        },
+
+        applyFilters: function() {
+            const districtEl = document.getElementById('sywat_schedule_filter_district');
+            const shopEl     = document.getElementById('sywat_schedule_filter_shop');
+            const searchEl   = document.getElementById('sywat_schedule_search');
+            const counterEl  = document.getElementById('sywat_schedule_counter');
+
+            const distVal   = districtEl ? districtEl.value.toLowerCase().trim() : 'all';
+            const shopVal   = shopEl ? shopEl.value.toLowerCase().trim() : 'all';
+            const searchVal = searchEl ? searchEl.value.toLowerCase().trim() : '';
+
+            // 1. Filter List View Rows
+            const rows = document.querySelectorAll('.sywat-schedule-row');
+            let totalCount   = 0;
+            let visibleCount = 0;
+
+            rows.forEach(function( row ) {
+                totalCount++;
+                const rowDist   = (row.getAttribute('data-district') || '').toLowerCase().trim();
+                const rowShop   = (row.getAttribute('data-shop') || '').toLowerCase().trim();
+                const rowSearch = (row.getAttribute('data-name') || '').toLowerCase().trim();
+
+                const matchDist   = (distVal === 'all' || rowDist === distVal);
+                const matchShop   = (shopVal === 'all' || rowShop === shopVal);
+                const matchSearch = (searchVal === '' || rowSearch.includes(searchVal));
+
+                if ( matchDist && matchShop && matchSearch ) {
+                    row.classList.remove('sywat-hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('sywat-hidden');
+                }
+            });
+
+            // 2. Synchronize Calendar View Event Chips (All Matching Events Visible)
+            const calChips = document.querySelectorAll('.sywat-cal-event-chip');
+            calChips.forEach(function( chip ) {
+                const chipDist   = (chip.getAttribute('data-district') || '').toLowerCase().trim();
+                const chipShop   = (chip.getAttribute('data-shop') || '').toLowerCase().trim();
+                const chipSearch = (chip.getAttribute('data-name') || '').toLowerCase().trim();
+
+                const matchDist   = (distVal === 'all' || chipDist === distVal);
+                const matchShop   = (shopVal === 'all' || chipShop === shopVal);
+                const matchSearch = (searchVal === '' || chipSearch.includes(searchVal));
+
+                if ( matchDist && matchShop && matchSearch ) {
+                    chip.classList.remove('sywat-hidden');
+                } else {
+                    chip.classList.add('sywat-hidden');
+                }
+            });
+
+            // 3. Update Dynamic Counter Banner
+            if ( counterEl ) {
+                const isFiltered = (distVal !== 'all' || shopVal !== 'all' || searchVal !== '');
+                const iconTarget = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>';
+                
+                if ( ! isFiltered || visibleCount === totalCount ) {
+                    counterEl.classList.remove('is-filtered');
+                    counterEl.innerHTML = iconTarget + ' Total Scheduled Events: <strong>' + totalCount + '</strong>';
+                } else {
+                    counterEl.classList.add('is-filtered');
+                    counterEl.innerHTML = iconTarget + ' Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Scheduled Events';
+                }
+            }
+
+            this.updateJumpButtonVisibility();
+        },
+
+        escapeHtml: function( value ) {
+            return String( value === null || value === undefined ? '' : value )
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        },
+
+        sanitizeUrl: function( rawUrl ) {
+            const url = String( rawUrl || '' ).trim();
+            if ( ! url ) {
+                return '';
+            }
+            if ( url.startsWith('https://') || url.startsWith('http://') || url.startsWith('/') ) {
+                return url;
+            }
+            return '';
+        },
+
+        renderEventCardHtml: function( evt ) {
+            const self = this;
+            let badgeClass = 'sywat-badge-prereg';
+            if ( evt.status_code === 'completed' ) {
+                badgeClass = 'sywat-badge-muted';
+            } else if ( evt.status_code === 'active' || evt.status_code === 'this_weekend' ) {
+                badgeClass = 'sywat-badge-open';
+            }
+
+            const iconPin     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+            const iconExtLink = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
+
+            let html = '<div class="sywat-cal-modal-card">';
+            html += '<div class="sywat-cal-modal-card-top">';
+            html += '<div>';
+            html += '<div class="sywat-cal-modal-date">' + self.escapeHtml( evt.display_dates || '' ) + '</div>';
+            html += '<div class="sywat-cal-modal-title">' + self.escapeHtml( evt.name || '' ) + '</div>';
+            html += '</div>';
+            html += '<span class="sywat-badge ' + badgeClass + '">' + self.escapeHtml( evt.status_label || '' ) + '</span>';
+            html += '</div>';
+
+            // Type & District Pills
+            const hasSpecialType = evt.event_type && evt.event_type !== 'SYWAT';
+            if ( hasSpecialType || evt.district ) {
+                html += '<div class="sywat-cal-modal-badges">';
+                if ( hasSpecialType ) {
+                    html += '<span class="sywat-badge sywat-badge-open">' + self.escapeHtml( evt.event_type ) + '</span>';
+                }
+                if ( evt.district ) {
+                    html += '<span class="sywat-badge sywat-badge-prereg">' + self.escapeHtml( evt.district ) + '</span>';
+                }
+                html += '</div>';
+            }
+
+            // Host Shop & Address
+            if ( evt.shop_name ) {
+                html += '<div class="sywat-tourn-shop"><strong>' + self.escapeHtml( evt.shop_name ) + '</strong></div>';
+            }
+            if ( evt.address ) {
+                const safeMaps = self.sanitizeUrl( evt.maps_url );
+                html += '<div class="sywat-label-subtext sywat-mt-1">' + iconPin + ' ';
+                if ( safeMaps ) {
+                    html += '<a href="' + self.escapeHtml( safeMaps ) + '" target="_blank" rel="noopener noreferrer" class="sywat-table-link">' + self.escapeHtml( evt.address ) + '</a>';
+                } else {
+                    html += self.escapeHtml( evt.address );
+                }
+                html += '</div>';
+            }
+
+            // Grouped Shooting Lines
+            if ( evt.grouped_lines && typeof evt.grouped_lines === 'object' ) {
+                const days = Object.keys( evt.grouped_lines );
+                if ( days.length > 0 ) {
+                    html += '<div class="sywat-cal-modal-lines">';
+                    days.forEach(function( day ) {
+                        const times = Array.isArray( evt.grouped_lines[ day ] ) ? evt.grouped_lines[ day ] : [];
+                        if ( times.length > 0 ) {
+                            html += '<div class="sywat-cal-modal-line-row">';
+                            html += '<strong class="sywat-text-subtle">' + self.escapeHtml( day ) + ':</strong> ';
+                            times.forEach(function( time ) {
+                                html += '<span class="sywat-badge sywat-badge-muted">' + self.escapeHtml( time ) + '</span> ';
+                            });
+                            html += '</div>';
+                        }
+                    });
+                    html += '</div>';
+                }
+            }
+
+            // Registration / Results Actions
+            html += '<div class="sywat-cal-modal-actions">';
+            if ( evt.status_code === 'completed' ) {
+                const safeResults = self.sanitizeUrl( evt.results_url );
+                if ( (evt.scores_published || evt.has_tfaa_url) && safeResults ) {
+                    html += '<a href="' + self.escapeHtml( safeResults ) + '" class="sywat-btn sywat-btn-primary">🏆 View Results</a>';
+                } else {
+                    html += '<span class="sywat-badge sywat-badge-pending">⏳ Results Pending</span>';
+                }
+            } else {
+                const regLinks = Array.isArray( evt.reg_links ) ? evt.reg_links : [];
+                let renderedLink = false;
+                regLinks.forEach(function( link ) {
+                    const safeHref = self.sanitizeUrl( link && link.url );
+                    if ( safeHref ) {
+                        const btnLabel = (link && link.label) ? link.label : 'Register Online';
+                        html += '<a href="' + self.escapeHtml( safeHref ) + '" target="_blank" rel="noopener noreferrer" class="sywat-btn sywat-btn-success">' + iconExtLink + ' ' + self.escapeHtml( btnLabel ) + '</a>';
+                        renderedLink = true;
+                    }
+                });
+
+                if ( ! renderedLink ) {
+                    if ( evt.shop_phone ) {
+                        html += '<span class="sywat-label-subtext">📞 <strong>Contact Shop:</strong> ' + self.escapeHtml( evt.shop_phone ) + '</span>';
+                    } else {
+                        html += '<span class="sywat-label-subtext">📞 <strong>Contact Host to Register</strong></span>';
+                    }
+                }
+            }
+            html += '</div>';
+            html += '</div>';
+
+            return html;
+        },
+
+        openSingleEventModal: function( eventId, triggerEl ) {
+            const evt = this.eventsMap[ String( eventId ) ];
+            if ( ! evt ) {
+                return;
+            }
+            this.openEventModal(
+                evt.name || 'Tournament Details',
+                this.renderEventCardHtml( evt ),
+                triggerEl
+            );
+        },
+
+        openEventModal: function( titleText, bodyHtml, triggerEl ) {
+            const modalEl  = document.getElementById('sywat_schedule_event_modal');
+            const titleEl  = document.getElementById('sywat_schedule_event_modal_title');
+            const bodyEl   = document.getElementById('sywat_schedule_event_modal_body');
+            const closeBtn = document.getElementById('sywat_schedule_event_modal_close');
+
+            if ( ! modalEl || ! bodyEl ) {
+                return;
+            }
+
+            this.lastTriggerEl = triggerEl || document.activeElement;
+
+            if ( titleEl ) {
+                titleEl.textContent = titleText;
+            }
+            bodyEl.innerHTML = bodyHtml;
+            bodyEl.scrollTop = 0;
+
+            modalEl.classList.add('active');
+            document.documentElement.classList.add('sywat-modal-open');
+            if ( document.body ) {
+                document.body.classList.add('sywat-modal-open');
+            }
+
+            if ( closeBtn ) {
+                closeBtn.focus();
+            }
+        },
+
+        closeEventModal: function() {
+            const modalEl = document.getElementById('sywat_schedule_event_modal');
+            if ( ! modalEl ) {
+                return;
+            }
+
+            modalEl.classList.remove('active');
+            document.documentElement.classList.remove('sywat-modal-open');
+            if ( document.body ) {
+                document.body.classList.remove('sywat-modal-open');
+            }
+
+            if ( this.lastTriggerEl && typeof this.lastTriggerEl.focus === 'function' ) {
+                this.lastTriggerEl.focus();
+            }
+            this.lastTriggerEl = null;
+        }
+    };
+
+    // Attach to Global Object
+    window.SYWAT.schedule = scheduleEngine;
+
+    // Execute Safely
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener('DOMContentLoaded', function() {
+            window.SYWAT.schedule.init();
+        });
+    } else {
+        window.SYWAT.schedule.init();
     }
-}
-asort( $filter_shops );
 
-// Determine whether a current/upcoming weekend target exists for the Jump button
-$jump_target_label = '';
-foreach ( $events as $evt_check ) {
-    $code = isset( $evt_check['status_code'] ) ? $evt_check['status_code'] : '';
-    if ( $code === 'active' || $code === 'this_weekend' ) {
-        $jump_target_label = 'This Weekend';
-        break;
-    }
-    if ( $jump_target_label === '' && $code === 'upcoming' ) {
-        $jump_target_label = 'Next Event';
-    }
-}
-
-// Build compact event lookup map for Calendar Event Modal rendering
-$events_lookup = array();
-foreach ( $events as $evt_item ) {
-    $eid                   = isset( $evt_item['id'] ) ? (int) $evt_item['id'] : count( $events_lookup );
-    $events_lookup[ $eid ] = $evt_item;
-}
-
-// Utility Icons
-$icon_pin      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
-$icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
-$icon_calendar = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
-$icon_list     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>';
-
-$weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
-?>
-
-<div class="sywat-public-card">
-    <!-- HEADER BAR: TITLE (LEFT), VIEW SWITCHER & INLINE SEASON SELECTOR (RIGHT) -->
-    <div class="sywat-card-header-bar">
-        <div>
-            <h2>📅 Season Schedule</h2>
-            <div class="sywat-subtitle">
-                View upcoming archery tournaments, event details, and online registration links.
-            </div>
-        </div>
-
-        <div class="sywat-schedule-header-controls">
-            <div class="sywat-view-toggle" role="group" aria-label="Schedule display mode">
-                <button type="button" class="sywat-view-toggle-btn is-active" id="sywat_schedule_view_list" aria-pressed="true">
-                    <?php echo $icon_list; ?> List View
-                </button>
-                <button type="button" class="sywat-view-toggle-btn" id="sywat_schedule_view_calendar" aria-pressed="false">
-                    <?php echo $icon_calendar; ?> Calendar View
-                </button>
-            </div>
-
-            <form method="get" id="sywat_schedule_season_form" class="sywat-header-inline-select">
-                <label for="sywat_schedule_season_select"><strong>Season:</strong></label>
-                <select name="season" id="sywat_schedule_season_select">
-                    <?php foreach ( $seasons as $slug => $s ) : ?>
-                        <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $target_season_slug, $slug ); ?>>
-                            <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <noscript>
-                    <button type="submit" class="sywat-btn sywat-btn-secondary">Go</button>
-                </noscript>
-            </form>
-        </div>
-    </div>
-
-    <!-- FILTER BAR (SHARED ACROSS LIST & CALENDAR VIEWS) -->
-    <div class="sywat-filter-bar">
-        <?php if ( count( $filter_districts ) > 0 ) : ?>
-            <div class="sywat-field-group">
-                <label for="sywat_schedule_filter_district">District</label>
-                <select id="sywat_schedule_filter_district">
-                    <option value="all">All Districts</option>
-                    <?php foreach ( $filter_districts as $d_name ) : ?>
-                        <option value="<?php echo esc_attr( strtolower( $d_name ) ); ?>"><?php echo esc_html( $d_name ); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        <?php endif; ?>
-
-        <?php if ( count( $filter_shops ) > 1 ) : ?>
-            <div class="sywat-field-group">
-                <label for="sywat_schedule_filter_shop">Host Location / Shop</label>
-                <select id="sywat_schedule_filter_shop">
-                    <option value="all">All Locations</option>
-                    <?php foreach ( $filter_shops as $s_id => $s_name ) : ?>
-                        <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        <?php endif; ?>
-
-        <div class="sywat-field-group">
-            <label for="sywat_schedule_search">Search Event</label>
-            <div class="sywat-search-input-wrapper">
-                <input type="text" id="sywat_schedule_search" placeholder="Type event name or city...">
-                <?php if ( $jump_target_label !== '' ) : ?>
-                    <button type="button" class="sywat-btn sywat-btn-secondary" id="sywat_schedule_jump_weekend">
-                        <?php echo $icon_calendar; ?> <?php echo esc_html( $jump_target_label ); ?>
-                    </button>
-                <?php endif; ?>
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" id="sywat_schedule_search_clear">Reset Filters</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- DYNAMIC EVENT COUNT BANNER -->
-    <div id="sywat_schedule_counter" class="sywat-counter-banner">
-        🎯 Total Scheduled Events: <strong><?php echo count( $events ); ?></strong>
-    </div>
-
-    <?php if ( empty( $events ) ) : ?>
-        <p class="sywat-empty-notice">No tournaments are currently scheduled for this season.</p>
-    <?php else : ?>
-        <!-- =================================================================
-             1. LIST VIEW PANEL (DEFAULT)
-             ================================================================= -->
-        <div id="sywat_schedule_list_panel">
-            <div class="sywat-table-responsive">
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th class="sywat-col-w-20">Date &amp; Status</th>
-                            <th class="sywat-col-w-32">Event &amp; Location</th>
-                            <th class="sywat-col-w-24">Shooting Lines</th>
-                            <th class="sywat-col-w-24 sywat-col-left">Registration / Results</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $events as $evt ) : ?>
-                            <?php
-                                $status_class = 'sywat-badge-prereg'; // Default blue (upcoming)
-                                if ( $evt['status_code'] === 'completed' ) {
-                                    $status_class = 'sywat-badge-muted';
-                                } elseif ( $evt['status_code'] === 'active' || $evt['status_code'] === 'this_weekend' ) {
-                                    $status_class = 'sywat-badge-open';
-                                }
-
-                                $maps_url       = ! empty( $evt['maps_url'] ) ? $evt['maps_url'] : '';
-                                $results_url    = ! empty( $evt['results_url'] ) ? $evt['results_url'] : '';
-                                $search_payload = strtolower( $evt['name'] . ' ' . $evt['shop_name'] . ' ' . $evt['address'] );
-                            ?>
-                            <tr class="sywat-schedule-row" 
-                                data-name="<?php echo esc_attr( $search_payload ); ?>" 
-                                data-shop="<?php echo esc_attr( strtolower( $evt['shop_name'] ) ); ?>" 
-                                data-district="<?php echo esc_attr( strtolower( $evt['district'] ) ); ?>"
-                                data-status="<?php echo esc_attr( $evt['status_code'] ); ?>">
-                                
-                                <!-- 1. DATE & STATUS -->
-                                <td>
-                                    <strong><?php echo esc_html( $evt['display_dates'] ); ?></strong>
-                                    <div class="sywat-mt-1">
-                                        <span class="sywat-badge <?php echo esc_attr( $status_class ); ?>">
-                                            <?php echo esc_html( $evt['status_label'] ); ?>
-                                        </span>
-                                    </div>
-                                </td>
-
-                                <!-- 2. EVENT & LOCATION -->
-                                <td>
-                                    <strong class="sywat-tourn-title"><?php echo esc_html( $evt['name'] ); ?></strong>
-                                    <div class="sywat-mt-1 sywat-mb-1">
-                                        <?php if ( $evt['event_type'] !== 'SYWAT' ) : ?>
-                                            <span class="sywat-badge sywat-badge-open"><?php echo esc_html( $evt['event_type'] ); ?></span>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ( ! empty( $evt['district'] ) ) : ?>
-                                            <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $evt['district'] ); ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <div class="sywat-tourn-shop">
-                                        <strong><?php echo esc_html( $evt['shop_name'] ); ?></strong>
-                                    </div>
-                                    
-                                    <?php if ( ! empty( $evt['address'] ) ) : ?>
-                                        <div class="sywat-label-subtext sywat-mt-1">
-                                            <?php echo $icon_pin; ?> 
-                                            <?php if ( ! empty( $maps_url ) ) : ?>
-                                                <a href="<?php echo esc_url( $maps_url ); ?>" target="_blank" rel="noopener noreferrer" class="sywat-table-link">
-                                                    <?php echo esc_html( $evt['address'] ); ?>
-                                                </a>
-                                            <?php else : ?>
-                                                <?php echo esc_html( $evt['address'] ); ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
-
-                                <!-- 3. SHOOTING LINES (Grouped by Day, Stacked for Alignment) -->
-                                <td>
-                                    <?php if ( ! empty( $evt['grouped_lines'] ) ) : ?>
-                                        <div class="sywat-schedule-lines-stack">
-                                            <?php foreach ( $evt['grouped_lines'] as $day => $times ) : ?>
-                                                <div class="sywat-mb-2">
-                                                    <div><strong class="sywat-text-subtle"><?php echo esc_html( $day ); ?>:</strong></div>
-                                                    <div class="sywat-mt-1">
-                                                        <?php foreach ( $times as $time ) : ?>
-                                                            <span class="sywat-badge sywat-badge-muted"><?php echo esc_html( $time ); ?></span>
-                                                        <?php endforeach; ?>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php else : ?>
-                                        <span class="sywat-label-subtext">No lines configured</span>
-                                    <?php endif; ?>
-                                </td>
-
-                                <!-- 4. REGISTRATION / RESULTS -->
-                                <td>
-                                    <div class="sywat-table-actions-vertical">
-                                        <?php if ( $evt['status_code'] === 'completed' ) : ?>
-                                            
-                                            <?php if ( ( $evt['scores_published'] || $evt['has_tfaa_url'] ) && ! empty( $results_url ) ) : ?>
-                                                <a href="<?php echo esc_url( $results_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-full">
-                                                    🏆 View Results
-                                                </a>
-                                            <?php else : ?>
-                                                <span class="sywat-badge sywat-badge-pending sywat-badge-full">
-                                                    ⏳ Results Pending
-                                                </span>
-                                            <?php endif; ?>
-                                            
-                                        <?php else : ?>
-
-                                            <?php if ( ! empty( $evt['reg_links'] ) ) : ?>
-                                                <?php foreach ( $evt['reg_links'] as $link ) : ?>
-                                                    <?php $btn_label = ! empty( $link['label'] ) ? $link['label'] : 'Register Online'; ?>
-                                                    <a href="<?php echo esc_url( $link['url'] ); ?>" target="_blank" rel="noopener noreferrer" class="sywat-btn sywat-btn-success sywat-btn-full sywat-btn-sm">
-                                                        <?php echo $icon_ext_link; ?> <?php echo esc_html( $btn_label ); ?>
-                                                    </a>
-                                                <?php endforeach; ?>
-                                            <?php elseif ( ! empty( $evt['shop_phone'] ) ) : ?>
-                                                <div class="sywat-label-subtext sywat-mt-1">
-                                                    📞 <strong>Contact Shop:</strong> <?php echo esc_html( $evt['shop_phone'] ); ?>
-                                                </div>
-                                            <?php else : ?>
-                                                <div class="sywat-label-subtext sywat-mt-1">
-                                                    📞 <strong>Contact Host to Register</strong>
-                                                </div>
-                                            <?php endif; ?>
-
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- =================================================================
-             2. CALENDAR VIEW PANEL (SUNDAY - SATURDAY MONTHLY GRID)
-             ================================================================= -->
-        <div id="sywat_schedule_calendar_panel"
-             class="sywat-cal-panel sywat-hidden"
-             data-default-ym="<?php echo esc_attr( $cal_default_ym ); ?>"
-             data-events="<?php echo esc_attr( wp_json_encode( $events_lookup ) ); ?>">
-
-            <div class="sywat-cal-header">
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-cal-nav-prev" id="sywat_cal_prev_btn">
-                    &laquo; Previous
-                </button>
-
-                <div class="sywat-cal-title-group">
-                    <h3 class="sywat-cal-month-title" id="sywat_cal_month_title"></h3>
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-cal-today-btn" id="sywat_cal_today_btn">
-                        Today
-                    </button>
-                </div>
-
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-cal-nav-next" id="sywat_cal_next_btn">
-                    Next &raquo;
-                </button>
-            </div>
-
-            <div class="sywat-cal-legend" aria-hidden="true">
-                <span class="sywat-cal-legend-item"><span class="sywat-cal-dot is-current"></span> This Weekend / In Progress</span>
-                <span class="sywat-cal-legend-item"><span class="sywat-cal-dot is-upcoming"></span> Upcoming</span>
-                <span class="sywat-cal-legend-item"><span class="sywat-cal-dot is-completed"></span> Completed</span>
-            </div>
-
-            <?php foreach ( $cal_months as $m_idx => $month ) : ?>
-                <?php
-                    $is_default_month = ( $month['ym'] === $cal_default_ym ) || ( $cal_default_ym === '' && $m_idx === 0 );
-                    $month_classes    = 'sywat-cal-month' . ( $is_default_month ? '' : ' sywat-hidden' );
-                ?>
-                <div class="<?php echo esc_attr( $month_classes ); ?>"
-                     data-ym="<?php echo esc_attr( $month['ym'] ); ?>"
-                     data-label="<?php echo esc_attr( $month['label'] ); ?>">
-
-                    <div class="sywat-cal-scroll-wrap">
-                        <div class="sywat-cal-grid" role="grid" aria-label="<?php echo esc_attr( $month['label'] ); ?>">
-                            <?php foreach ( $weekdays as $day_name ) : ?>
-                                <div class="sywat-cal-dow" role="columnheader"><?php echo esc_html( $day_name ); ?></div>
-                            <?php endforeach; ?>
-
-                            <?php foreach ( $month['days'] as $cell ) : ?>
-                                <?php
-                                    $cell_classes = 'sywat-cal-day';
-                                    if ( empty( $cell['is_current_month'] ) ) {
-                                        $cell_classes .= ' is-outside';
-                                    }
-                                    if ( ! empty( $cell['is_today'] ) ) {
-                                        $cell_classes .= ' is-today';
-                                    }
-                                    $day_events = isset( $cell['events'] ) && is_array( $cell['events'] ) ? $cell['events'] : array();
-                                ?>
-                                <div class="<?php echo esc_attr( $cell_classes ); ?>" role="gridcell" data-date="<?php echo esc_attr( $cell['date'] ); ?>">
-                                    <div class="sywat-cal-day-header">
-                                        <span class="sywat-cal-day-num"><?php echo esc_html( $cell['day_padded'] ); ?></span>
-                                    </div>
-
-                                    <div class="sywat-cal-day-events">
-                                        <?php foreach ( $day_events as $d_evt ) : ?>
-                                            <?php
-                                                $chip_status = isset( $d_evt['status_code'] ) ? $d_evt['status_code'] : 'upcoming';
-                                                $chip_class  = 'sywat-cal-event-chip is-upcoming';
-                                                if ( $chip_status === 'completed' ) {
-                                                    $chip_class = 'sywat-cal-event-chip is-completed';
-                                                } elseif ( $chip_status === 'active' || $chip_status === 'this_weekend' ) {
-                                                    $chip_class = 'sywat-cal-event-chip is-current';
-                                                }
-                                                $d_search   = strtolower( $d_evt['name'] . ' ' . $d_evt['shop_name'] . ' ' . $d_evt['address'] );
-                                                $chip_title = ! empty( $d_evt['shop_name'] ) && $d_evt['shop_name'] !== $d_evt['name']
-                                                    ? $d_evt['name'] . ' — ' . $d_evt['shop_name']
-                                                    : $d_evt['name'];
-                                            ?>
-                                            <button type="button"
-                                                    class="<?php echo esc_attr( $chip_class ); ?>"
-                                                    title="<?php echo esc_attr( $chip_title ); ?>"
-                                                    data-event-id="<?php echo esc_attr( (string) $d_evt['id'] ); ?>"
-                                                    data-name="<?php echo esc_attr( $d_search ); ?>"
-                                                    data-shop="<?php echo esc_attr( strtolower( $d_evt['shop_name'] ) ); ?>"
-                                                    data-district="<?php echo esc_attr( strtolower( $d_evt['district'] ) ); ?>"
-                                                    data-status="<?php echo esc_attr( $chip_status ); ?>">
-                                                <?php echo esc_html( $d_evt['name'] ); ?>
-                                            </button>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</div>
-
-<!-- EVENT DETAILS MODAL (OUTSIDE ALL FORMS PER CONTRACT) -->
-<div class="sywat-modal-backdrop" id="sywat_schedule_event_modal" role="dialog" aria-modal="true" aria-labelledby="sywat_schedule_event_modal_title">
-    <div class="sywat-modal-content sywat-modal-md">
-        <div class="sywat-modal-header">
-            <h3 id="sywat_schedule_event_modal_title">Tournament Details</h3>
-            <button type="button" class="sywat-modal-close" id="sywat_schedule_event_modal_close" aria-label="Close modal">&times;</button>
-        </div>
-        <div class="sywat-modal-body" id="sywat_schedule_event_modal_body"></div>
-        <div class="sywat-modal-footer">
-            <button type="button" class="sywat-btn sywat-btn-secondary" id="sywat_schedule_event_modal_done">Close</button>
-        </div>
-    </div>
-</div>
+})();
