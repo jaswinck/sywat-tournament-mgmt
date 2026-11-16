@@ -5,7 +5,7 @@
  * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.7.0
+ * Version: 5.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -43,7 +43,7 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <!-- Left: Brand Logo & Title -->
                 <div class="sywat-auth-brand-wrapper">
                     <?php if ( ! empty( $logo_url ) ) : ?>
-                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo sywat-auth-logo-sm" onerror="this.style.display='none';">
+                        <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo sywat-auth-logo-sm">
                     <?php endif; ?>
                     
                     <span class="sywat-auth-brand-title">
@@ -54,19 +54,25 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                 <!-- Center: Primary App Navigation Links -->
                 <nav class="sywat-auth-nav-track">
                     
-                    <!-- 1. Operational Tournaments Dropdown (Staff Only) -->
-                    <?php if ( $can_manage_tournaments ) : ?>
-                        <div class="sywat-auth-dropdown">
-                            <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
-                                🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
+                    <!-- 1. Tournaments & Schedule Dropdown (Public & Staff) -->
+                    <div class="sywat-auth-dropdown">
+                        <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
+                            🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
+                        </a>
+                        <div class="sywat-auth-dropdown-menu">
+                            <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>">
+                                📅 Season Schedule
                             </a>
-                            <div class="sywat-auth-dropdown-menu">
+                            <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>">
+                                🏆 Results &amp; Standings
+                            </a>
+                            <?php if ( $can_manage_tournaments ) : ?>
                                 <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>">
                                     🎯 Tournament Portal
                                 </a>
-                            </div>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    </div>
 
                     <!-- 2. Administrative Dropdown (Global Admins & Webmasters Only) -->
                     <?php if ( $can_manage_seasons ) : ?>
@@ -126,11 +132,6 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                             🎯 Shops & Clubs
                         </a>
                     <?php endif; ?>
-
-                    <!-- 4. Public Tournament Results -->
-                    <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>" class="sywat-auth-nav-link">
-                        🏆 Results
-                    </a>
                 </nav>
 
                 <!-- Right: Account Profile Dropdown or Sign In Link -->
@@ -191,7 +192,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
             <!-- Card Header -->
             <div class="sywat-login-card-header">
                 <?php if ( ! empty( $logo_url ) ) : ?>
-                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-login-logo" onerror="this.style.display='none';">
+                    <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-login-logo">
                 <?php endif; ?>
                 <h3 class="sywat-login-title">Texas Field Archery Association</h3>
             </div>
