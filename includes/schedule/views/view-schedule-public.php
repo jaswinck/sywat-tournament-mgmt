@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule (List View & Monthly Calendar View)
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
+ * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.4.1
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -135,7 +135,7 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
         <div class="sywat-field-group">
             <label for="sywat_schedule_search">Search Event</label>
             <div class="sywat-search-input-wrapper">
-                <input type="text" id="sywat_schedule_search" placeholder="Type event name or city...">
+                <input type="text" id="sywat_schedule_search" placeholder="Type event name, city, or line type...">
                 <?php if ( $jump_target_label !== '' ) : ?>
                     <button type="button" class="sywat-btn sywat-btn-secondary" id="sywat_schedule_jump_weekend">
                         <?php echo $icon_calendar; ?> <?php echo esc_html( $jump_target_label ); ?>
@@ -178,9 +178,11 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                     $status_class = 'sywat-badge-open';
                                 }
 
+                                $restr_scope    = isset( $evt['line_restriction_scope'] ) ? $evt['line_restriction_scope'] : '';
+                                $restr_label    = isset( $evt['line_restriction_label'] ) ? $evt['line_restriction_label'] : '';
                                 $maps_url       = ! empty( $evt['maps_url'] ) ? $evt['maps_url'] : '';
                                 $results_url    = ! empty( $evt['results_url'] ) ? $evt['results_url'] : '';
-                                $search_payload = strtolower( $evt['name'] . ' ' . $evt['shop_name'] . ' ' . $evt['address'] );
+                                $search_payload = strtolower( trim( $evt['name'] . ' ' . $evt['shop_name'] . ' ' . $evt['address'] . ' ' . $restr_label ) );
                             ?>
                             <tr class="sywat-schedule-row" 
                                 data-name="<?php echo esc_attr( $search_payload ); ?>" 
@@ -209,6 +211,12 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                         <?php if ( ! empty( $evt['district'] ) ) : ?>
                                             <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $evt['district'] ); ?></span>
                                         <?php endif; ?>
+
+                                        <?php if ( $restr_scope === 'all_cubs' ) : ?>
+                                            <span class="sywat-badge sywat-badge-cubs"><?php echo esc_html( $restr_label ); ?></span>
+                                        <?php elseif ( $restr_scope === 'all_20yd' ) : ?>
+                                            <span class="sywat-badge sywat-badge-20yd"><?php echo esc_html( $restr_label ); ?></span>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <div class="sywat-tourn-shop">
@@ -233,12 +241,27 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                 <td>
                                     <?php if ( ! empty( $evt['grouped_lines'] ) ) : ?>
                                         <div class="sywat-schedule-lines-stack">
-                                            <?php foreach ( $evt['grouped_lines'] as $day => $times ) : ?>
+                                            <?php foreach ( $evt['grouped_lines'] as $day => $slots ) : ?>
                                                 <div class="sywat-mb-2">
                                                     <div><strong class="sywat-text-subtle"><?php echo esc_html( $day ); ?>:</strong></div>
-                                                    <div class="sywat-mt-1">
-                                                        <?php foreach ( $times as $time ) : ?>
-                                                            <span class="sywat-badge sywat-badge-muted"><?php echo esc_html( $time ); ?></span>
+                                                    <div class="sywat-mt-1 sywat-line-pills-wrap">
+                                                        <?php foreach ( $slots as $slot ) : ?>
+                                                            <?php
+                                                                $slot_time   = is_array( $slot ) && isset( $slot['time'] ) ? $slot['time'] : (string) $slot;
+                                                                $slot_code   = is_array( $slot ) && isset( $slot['restriction_code'] ) ? $slot['restriction_code'] : '';
+                                                                $slot_rlabel = is_array( $slot ) && isset( $slot['restriction_label'] ) ? $slot['restriction_label'] : '';
+
+                                                                $pill_class = 'sywat-badge-muted';
+                                                                $pill_text  = $slot_time;
+                                                                if ( $slot_code === 'cubs_only' && $slot_rlabel !== '' ) {
+                                                                    $pill_class = 'sywat-badge-cubs';
+                                                                    $pill_text  = $slot_time . ' · ' . $slot_rlabel;
+                                                                } elseif ( $slot_code === '20yd_only' && $slot_rlabel !== '' ) {
+                                                                    $pill_class = 'sywat-badge-20yd';
+                                                                    $pill_text  = $slot_time . ' · ' . $slot_rlabel;
+                                                                }
+                                                            ?>
+                                                            <span class="sywat-badge <?php echo esc_attr( $pill_class ); ?>"><?php echo esc_html( $pill_text ); ?></span>
                                                         <?php endforeach; ?>
                                                     </div>
                                                 </div>
@@ -365,10 +388,21 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                 } elseif ( $chip_status === 'active' || $chip_status === 'this_weekend' ) {
                                                     $chip_class = 'sywat-cal-event-chip is-current';
                                                 }
-                                                $d_search   = strtolower( $d_evt['name'] . ' ' . $d_evt['shop_name'] . ' ' . $d_evt['address'] );
+
+                                                $d_rscope = isset( $d_evt['line_restriction_scope'] ) ? $d_evt['line_restriction_scope'] : '';
+                                                $d_rlabel = isset( $d_evt['line_restriction_label'] ) ? $d_evt['line_restriction_label'] : '';
+
+                                                $chip_label = $d_evt['name'];
+                                                if ( ( $d_rscope === 'all_cubs' || $d_rscope === 'all_20yd' ) && $d_rlabel !== '' ) {
+                                                    $chip_label .= ' (' . $d_rlabel . ')';
+                                                } elseif ( $d_rscope === 'mixed' && $d_rlabel !== '' ) {
+                                                    $chip_label .= ' · ' . $d_rlabel;
+                                                }
+
+                                                $d_search   = strtolower( trim( $d_evt['name'] . ' ' . $d_evt['shop_name'] . ' ' . $d_evt['address'] . ' ' . $d_rlabel ) );
                                                 $chip_title = ! empty( $d_evt['shop_name'] ) && $d_evt['shop_name'] !== $d_evt['name']
-                                                    ? $d_evt['name'] . ' — ' . $d_evt['shop_name']
-                                                    : $d_evt['name'];
+                                                    ? $chip_label . ' — ' . $d_evt['shop_name']
+                                                    : $chip_label;
                                             ?>
                                             <button type="button"
                                                     class="<?php echo esc_attr( $chip_class ); ?>"
@@ -378,7 +412,7 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                     data-shop="<?php echo esc_attr( strtolower( $d_evt['shop_name'] ) ); ?>"
                                                     data-district="<?php echo esc_attr( strtolower( $d_evt['district'] ) ); ?>"
                                                     data-status="<?php echo esc_attr( $chip_status ); ?>">
-                                                <?php echo esc_html( $d_evt['name'] ); ?>
+                                                <?php echo esc_html( $chip_label ); ?>
                                             </button>
                                         <?php endforeach; ?>
                                     </div>
