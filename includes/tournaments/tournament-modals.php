@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the Add/Edit Tournament modal (with Season-inherited Pricing & Round Format selection), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the Add/Edit Tournament modal (with Season-inherited Pricing & Round Format selection and repeatable External Online Registration Links), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.11.0
+ * Version: 7.12.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -82,6 +83,23 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         }
 
         $init_shop_data = ( ! empty( $target_shop_key ) && isset( $all_shops[ $target_shop_key ] ) ) ? $all_shops[ $target_shop_key ] : array();
+        $init_reg_links = function_exists( 'sywat_get_shop_registration_links' )
+            ? sywat_get_shop_registration_links( $init_shop_data )
+            : ( is_array( $init_shop_data ) && isset( $init_shop_data['registration_links'] ) && is_array( $init_shop_data['registration_links'] ) ? $init_shop_data['registration_links'] : array() );
+
+        // Resolve external registration links for the modal (Edit mode preserves saved links; Create mode inherits shop defaults when shop is preselected)
+        $edit_t_reg_links = array();
+        if ( $is_edit_mode && is_array( $edit_t_data ) ) {
+            if ( array_key_exists( 'registration_links', $edit_t_data ) && is_array( $edit_t_data['registration_links'] ) ) {
+                $edit_t_reg_links = function_exists( 'sywat_get_shop_registration_links' )
+                    ? sywat_get_shop_registration_links( $edit_t_data )
+                    : $edit_t_data['registration_links'];
+            } else {
+                $edit_t_reg_links = $init_reg_links;
+            }
+        } elseif ( ! empty( $edit_t_shop ) ) {
+            $edit_t_reg_links = $init_reg_links;
+        }
 
         if ( function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
             $shop_caps       = sywat_get_shop_capacity_defaults( $init_shop_data );
@@ -161,9 +179,9 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 <div class="sywat-modal-header no-print">
                     <div>
                         <h3>🎯 <?php echo $is_edit_mode ? 'Edit Tournament Configuration' : 'Create New Tournament'; ?></h3>
-                        <div class="sywat-subtitle">Set up tournament details, dates, round pricing formats, and shooting line capacity limits.</div>
+                        <div class="sywat-subtitle">Set up tournament details, dates, round pricing formats, registration links, and shooting line capacity limits.</div>
                     </div>
-                    <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()">&times;</button>
+                    <button type="button" class="sywat-modal-close" onclick="closeAddTournamentModal()" aria-label="Close Tournament Configuration Modal">&times;</button>
                 </div>
 
                 <form method="post" action="?tab=manage" id="sywat_tournament_config_form" onsubmit="return validateTournamentLines();">
@@ -196,6 +214,11 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     $s_cap20  = is_array( $s_name ) && isset( $s_name['cap_20yd'] ) ? $s_name['cap_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_20yd'] ) ) ? $s_name['capacity_20yd'] : ( ( is_array( $s_name ) && isset( $s_name['cap_20'] ) ) ? $s_name['cap_20'] : 20 ) );
                                                     $s_capcub = is_array( $s_name ) && isset( $s_name['cap_cub'] ) ? $s_name['cap_cub'] : ( ( is_array( $s_name ) && isset( $s_name['capacity_cub'] ) ) ? $s_name['capacity_cub'] : ( ( is_array( $s_name ) && isset( $s_name['cub_cap'] ) ) ? $s_name['cub_cap'] : 5 ) );
                                                 }
+
+                                                $s_reglinks = function_exists( 'sywat_get_shop_registration_links' )
+                                                    ? sywat_get_shop_registration_links( $s_name )
+                                                    : ( is_array( $s_name ) && isset( $s_name['registration_links'] ) && is_array( $s_name['registration_links'] ) ? $s_name['registration_links'] : array() );
+                                                $reglinks_json = esc_attr( wp_json_encode( $s_reglinks ) );
                                             ?>
                                             <option value="<?php echo esc_attr( $s_id ); ?>"
                                                     data-name="<?php echo esc_attr( $s_title ); ?>"
@@ -203,13 +226,20 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                                                     data-events="<?php echo $events_json; ?>"
                                                     data-cap20="<?php echo esc_attr( $s_cap20 ); ?>"
                                                     data-capcub="<?php echo esc_attr( $s_capcub ); ?>"
+                                                    data-reglinks="<?php echo $reglinks_json; ?>"
                                                     <?php selected( $edit_t_shop, $s_id ); ?>>
                                                 <?php echo esc_html( $s_title ); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
                                 <?php else : ?>
-                                    <input type="hidden" name="shop_id" id="sywat_modal_shop_id" value="<?php echo esc_attr( $user_shop_id ); ?>" data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>" data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>">
+                                    <input type="hidden"
+                                           name="shop_id"
+                                           id="sywat_modal_shop_id"
+                                           value="<?php echo esc_attr( $user_shop_id ); ?>"
+                                           data-cap20="<?php echo esc_attr( $default_cap_20 ); ?>"
+                                           data-capcub="<?php echo esc_attr( $default_cap_cub ); ?>"
+                                           data-reglinks="<?php echo esc_attr( wp_json_encode( $init_reg_links ) ); ?>">
                                     <input type="text" value="<?php echo esc_attr( isset( $all_shops[ $user_shop_id ]['name'] ) ? $all_shops[ $user_shop_id ]['name'] : 'Current Shop' ); ?>" readonly class="sywat-input-disabled-calc">
                                 <?php endif; ?>
                             </div>
@@ -313,6 +343,34 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                             </div>
                         <?php endif; ?>
 
+                        <!-- ROW 5: EXTERNAL ONLINE REGISTRATION LINKS REPEATER -->
+                        <div class="sywat-table-header-bar sywat-modal-section-header">
+                            <div>
+                                <h2>🔗 External Online Registration Links <span class="sywat-label-subtext">(Optional)</span></h2>
+                                <div class="sywat-meta-subtext">Auto-filled from the host shop's default links. Add, edit, or remove links for this event (e.g., FareHarbor 10-yard Cubs vs. 20-yard Youth/Adult links), or leave empty for SYWAT / onsite registration.</div>
+                            </div>
+                            <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-tourn-reg-link">+ Add Registration Link</button>
+                        </div>
+
+                        <div id="sywat_tourn_reg_links_container" class="sywat-mb-4" data-is-edit="<?php echo $is_edit_mode ? '1' : '0'; ?>">
+                            <?php foreach ( $edit_t_reg_links as $rl ) : ?>
+                                <div class="sywat-reg-link-row sywat-form-grid-2 sywat-mt-3">
+                                    <div class="sywat-field-group">
+                                        <label>Link Label <span class="sywat-label-subtext">(Optional for single link)</span></label>
+                                        <input type="text" name="tourn_reg_link_labels[]" value="<?php echo esc_attr( isset( $rl['label'] ) ? $rl['label'] : '' ); ?>" placeholder="e.g. 10-yard lines (Cubs)">
+                                    </div>
+                                    <div class="sywat-field-group">
+                                        <label>Registration URL *</label>
+                                        <div class="sywat-search-input-group">
+                                            <input type="text" name="tourn_reg_link_urls[]" value="<?php echo esc_attr( isset( $rl['url'] ) ? $rl['url'] : '' ); ?>" placeholder="https://fareharbor.com/embeds/book/...">
+                                            <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete" data-sywat-action="remove-tourn-reg-link">Remove</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <p id="sywat_tourn_no_reg_links_msg" class="sywat-empty-state-notice <?php echo empty( $edit_t_reg_links ) ? '' : 'sywat-hidden'; ?>">No external registration links configured for this event. Click "+ Add Registration Link" above if archers register through an external shop link.</p>
+
                         <!-- STANDARDIZED SUB-HEADER -->
                         <div class="sywat-table-header-bar sywat-modal-section-header">
                             <h2>📋 Shooting Lines & Capacity Templates</h2>
@@ -389,88 +447,6 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
                 </form>
             </div>
         </div>
-
-        <script <?php echo SYWAT_SCRIPT_OPTOUT_ATTRS; ?>>
-        var sywatNameIsCustomized = false;
-        var sywatNameIsUnlocked   = false;
-
-        function sywatToggleTournamentNameLock(btnElem) {
-            var inputBtn   = btnElem || document.getElementById('sywat_toggle_name_lock_btn');
-            var inputName  = document.getElementById('sywat_modal_tournament_name');
-            var statusLabel= document.getElementById('sywat_name_status_label');
-            
-            if (!inputName || !inputBtn) return;
-
-            sywatNameIsUnlocked = !sywatNameIsUnlocked;
-
-            if (sywatNameIsUnlocked) {
-                inputName.removeAttribute('readonly');
-                inputName.classList.remove('sywat-input-disabled-calc');
-                inputBtn.innerHTML = '🔓 Unlocked';
-                inputBtn.classList.remove('sywat-btn-secondary');
-                inputBtn.classList.add('sywat-btn-warning');
-                if (statusLabel) statusLabel.innerHTML = '(Custom name active)';
-                sywatNameIsCustomized = true;
-            } else {
-                inputName.setAttribute('readonly', 'readonly');
-                inputName.classList.add('sywat-input-disabled-calc');
-                inputBtn.innerHTML = '🔒 Locked';
-                inputBtn.classList.remove('sywat-btn-warning');
-                inputBtn.classList.add('sywat-btn-secondary');
-                if (statusLabel) statusLabel.innerHTML = '(Auto-generated)';
-                sywatNameIsCustomized = false;
-                sywatAutoGenerateTournamentName(true); // Force re-generate
-            }
-
-            // Immediately clear focus highlight ring from button
-            if (inputBtn && typeof inputBtn.blur === 'function') {
-                inputBtn.blur();
-            }
-        }
-
-        function sywatMarkNameAsCustomized() {
-            sywatNameIsCustomized = true;
-        }
-
-        function sywatAutoGenerateTournamentName(force) {
-            if (sywatNameIsCustomized && !force) return;
-
-            var shopSelect = document.getElementById('sywat_modal_shop_id');
-            var startDate  = document.getElementById('sywat_modal_start_date');
-            var nameInput  = document.getElementById('sywat_modal_tournament_name');
-            if (!shopSelect || !startDate || !nameInput) return;
-
-            var shopName = '';
-            if (shopSelect.tagName.toLowerCase() === 'select') {
-                var selectedOption = shopSelect.options[shopSelect.selectedIndex];
-                if (selectedOption && selectedOption.dataset.name) {
-                    shopName = selectedOption.dataset.name;
-                }
-            } else {
-                shopName = shopSelect.dataset.name || '';
-            }
-
-            if (!shopName || !startDate.value) return;
-
-            // Auto sequence calculation
-            var existingEvents = [];
-            if (shopSelect.options && shopSelect.selectedIndex >= 0) {
-                try {
-                    existingEvents = JSON.parse(shopSelect.options[shopSelect.selectedIndex].dataset.events || '[]');
-                } catch(e) {}
-            }
-
-            var newStart = startDate.value;
-            var seq = 1;
-            for (var i = 0; i < existingEvents.length; i++) {
-                if (existingEvents[i].start_date < newStart) {
-                    seq++;
-                }
-            }
-
-            nameInput.value = shopName.trim() + ' - ' + seq;
-        }
-        </script>
         <?php
     }
 }
@@ -483,7 +459,7 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
 if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
     function sywat_render_import_schedule_modal( $data ) {
         $seasons        = isset( $data['seasons'] ) ? $data['seasons'] : array();
-        $current_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( $_GET['filter_season'] ) : ( function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season()['slug'] : '' );
+        $current_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_season'] ) ) : ( function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season()['slug'] : '' );
 
         // Handle Cancel Request
         if ( isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'cancel_schedule_import' ) {
@@ -509,7 +485,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                         <h3>📁 Bulk Import Season Schedule</h3>
                         <div class="sywat-subtitle">Upload a 7-column Excel (.xlsx) or CSV file to build the season schedule and line templates in one click.</div>
                     </div>
-                    <button type="button" class="sywat-modal-close" onclick="closeImportScheduleModal()">&times;</button>
+                    <button type="button" class="sywat-modal-close" onclick="closeImportScheduleModal()" aria-label="Close Bulk Import Schedule Modal">&times;</button>
                 </div>
                 <form method="post" action="?tab=manage" enctype="multipart/form-data">
                     <div class="sywat-modal-body">
@@ -554,7 +530,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
                     </div>
                     <form method="post" action="?tab=manage" class="sywat-form-inline">
                         <input type="hidden" name="sywat_action" value="cancel_schedule_import">
-                        <button type="submit" class="sywat-modal-close" title="Close Preview">&times;</button>
+                        <button type="submit" class="sywat-modal-close" title="Close Preview" aria-label="Close Import Preview Modal">&times;</button>
                     </form>
                 </div>
                 <div class="sywat-modal-body">
@@ -652,7 +628,7 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
                         </h3>
                         <div class="sywat-subtitle"><?php echo esc_html( $selected_tournament ); ?></div>
                     </div>
-                    <button type="button" class="sywat-modal-close" onclick="closeSywatModal()">&times;</button>
+                    <button type="button" class="sywat-modal-close" onclick="closeSywatModal()" aria-label="Close Modal">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
                     <?php if ( $open_modal ) : ?>
@@ -691,7 +667,7 @@ if ( ! function_exists( 'sywat_render_tfaa_sync_progress_modal' ) ) {
                         <h3>🔄 TFAA Scorecards Batch Sync</h3>
                         <div class="sywat-subtitle">Real-time progress and event scorecard sync activity log.</div>
                     </div>
-                    <button type="button" class="sywat-modal-close" onclick="sywatCloseTfaaSyncModal()">&times;</button>
+                    <button type="button" class="sywat-modal-close" onclick="sywatCloseTfaaSyncModal()" aria-label="Close TFAA Sync Progress Modal">&times;</button>
                 </div>
                 <div class="sywat-modal-body">
                     <div class="sywat-progress-bar-track">
