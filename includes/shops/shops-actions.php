@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Shop & Club Action Processing & CRUD Logic
  * Path: includes/shops/shops-actions.php
- * Description: Processes Shop & Club CRUD actions, CSV/XLSX dry-run imports, and staff linking with scoped Shop Manager self-service permissions. Normalizes and chronologically sorts shop shooting line templates on save.
+ * Description: Processes Shop & Club CRUD actions, public online registration defaults (On/Off + 15-day lead time), CSV/XLSX dry-run imports, and staff linking with scoped Shop Manager self-service permissions. Normalizes and chronologically sorts shop shooting line templates on save.
  * Compliance: Zero HTML output at include time, pure POST action handlers, omitted closing PHP tag.
  * Author: SYWAT Archery / TFAA
- * Version: 5.3.0
+ * Version: 5.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -52,19 +52,28 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                     ? array_map( 'sanitize_text_field', wp_unslash( $_POST['facilities'] ) )
                     : array();
 
-                $shops[$shop_id]['name']          = isset( $_POST['shop_name'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_name'] ) ) : $shops[$shop_id]['name'];
-                $shops[$shop_id]['location_type'] = isset( $_POST['location_type'] ) ? sanitize_text_field( wp_unslash( $_POST['location_type'] ) ) : 'pro_shop';
-                $shops[$shop_id]['district']      = isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '';
-                $shops[$shop_id]['facilities']    = $facilities;
-                $shops[$shop_id]['contact']       = isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '';
-                $shops[$shop_id]['contact_title'] = isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '';
-                $shops[$shop_id]['email']         = isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '';
-                $shops[$shop_id]['phone']         = isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '';
-                $shops[$shop_id]['address_1']     = isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '';
-                $shops[$shop_id]['address_2']     = isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '';
-                $shops[$shop_id]['city']          = isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '';
-                $shops[$shop_id]['state']         = isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas';
-                $shops[$shop_id]['zip']           = isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '';
+                $public_reg_default = ( isset( $_POST['public_reg_default'] ) && sanitize_text_field( wp_unslash( $_POST['public_reg_default'] ) ) === '1' )
+                    ? '1'
+                    : '0';
+                $public_reg_days = ( isset( $_POST['public_reg_days_before'] ) && $_POST['public_reg_days_before'] !== '' )
+                    ? max( 0, min( 365, intval( wp_unslash( $_POST['public_reg_days_before'] ) ) ) )
+                    : 15;
+
+                $shops[$shop_id]['name']                   = isset( $_POST['shop_name'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_name'] ) ) : $shops[$shop_id]['name'];
+                $shops[$shop_id]['location_type']          = isset( $_POST['location_type'] ) ? sanitize_text_field( wp_unslash( $_POST['location_type'] ) ) : 'pro_shop';
+                $shops[$shop_id]['district']               = isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '';
+                $shops[$shop_id]['facilities']             = $facilities;
+                $shops[$shop_id]['public_reg_default']     = $public_reg_default;
+                $shops[$shop_id]['public_reg_days_before'] = $public_reg_days;
+                $shops[$shop_id]['contact']                = isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '';
+                $shops[$shop_id]['contact_title']          = isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '';
+                $shops[$shop_id]['email']                  = isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '';
+                $shops[$shop_id]['phone']                  = isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '';
+                $shops[$shop_id]['address_1']              = isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '';
+                $shops[$shop_id]['address_2']              = isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '';
+                $shops[$shop_id]['city']                   = isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '';
+                $shops[$shop_id]['state']                  = isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas';
+                $shops[$shop_id]['zip']                    = isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '';
 
                 // Process Additional Contacts Repeater
                 $add_contacts = array();
@@ -195,24 +204,26 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
             }
 
             $shops[$shop_slug] = array(
-                'id'                  => $shop_slug,
-                'name'                => $shop_name,
-                'location_type'       => $loc_type,
-                'district'            => isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '',
-                'facilities'          => $facilities,
-                'contact'             => isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '',
-                'contact_title'       => isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '',
-                'email'               => isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '',
-                'phone'               => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '',
-                'additional_contacts' => array(),
-                'address_1'           => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '',
-                'address_2'           => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '',
-                'city'                => isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '',
-                'state'               => isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas',
-                'zip'                 => isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '',
-                'default_lines'       => $default_indoor_lines,
-                'outdoor_lines'       => $default_outdoor_lines,
-                'created_at'          => current_time( 'mysql' ),
+                'id'                     => $shop_slug,
+                'name'                   => $shop_name,
+                'location_type'          => $loc_type,
+                'district'               => isset( $_POST['shop_district'] ) ? sywat_normalize_district( wp_unslash( $_POST['shop_district'] ) ) : '',
+                'facilities'             => $facilities,
+                'public_reg_default'     => '0',
+                'public_reg_days_before' => 15,
+                'contact'                => isset( $_POST['shop_contact'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact'] ) ) : '',
+                'contact_title'          => isset( $_POST['shop_contact_title'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_contact_title'] ) ) : '',
+                'email'                  => isset( $_POST['shop_email'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_email'] ) ) : '',
+                'phone'                  => isset( $_POST['shop_phone'] ) ? sywat_format_phone_number( wp_unslash( $_POST['shop_phone'] ) ) : '',
+                'additional_contacts'    => array(),
+                'address_1'              => isset( $_POST['shop_address_1'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_1'] ) ) : '',
+                'address_2'              => isset( $_POST['shop_address_2'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_address_2'] ) ) : '',
+                'city'                   => isset( $_POST['shop_city'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_city'] ) ) : '',
+                'state'                  => isset( $_POST['shop_state'] ) ? sywat_normalize_state_code( wp_unslash( $_POST['shop_state'] ) ) : 'TX - Texas',
+                'zip'                    => isset( $_POST['shop_zip'] ) ? sanitize_text_field( wp_unslash( $_POST['shop_zip'] ) ) : '',
+                'default_lines'          => $default_indoor_lines,
+                'outdoor_lines'          => $default_outdoor_lines,
+                'created_at'             => current_time( 'mysql' ),
             );
 
             $sort_shops( $shops );
@@ -500,24 +511,26 @@ if ( ! function_exists( 'sywat_handle_shop_actions' ) ) {
                 } else {
                     // Create new location (Only Indoor Target Range by default)
                     $shops[$shop_slug] = array(
-                        'id'                  => $shop_slug,
-                        'name'                => $item['name'],
-                        'location_type'       => $item['location_type'],
-                        'district'            => $item['district'],
-                        'facilities'          => array( 'indoor_range' ),
-                        'contact'             => $item['contact'],
-                        'contact_title'       => $item['contact_title'],
-                        'email'               => $item['email'],
-                        'phone'               => $item['phone'],
-                        'additional_contacts' => $item['additional_contacts'],
-                        'address_1'           => $item['address_1'],
-                        'address_2'           => $item['address_2'],
-                        'city'                => $item['city'],
-                        'state'               => $item['state'],
-                        'zip'                 => $item['zip'],
-                        'default_lines'       => $default_indoor_lines,
-                        'outdoor_lines'       => $default_outdoor_lines,
-                        'created_at'          => current_time( 'mysql' ),
+                        'id'                     => $shop_slug,
+                        'name'                   => $item['name'],
+                        'location_type'          => $item['location_type'],
+                        'district'               => $item['district'],
+                        'facilities'             => array( 'indoor_range' ),
+                        'public_reg_default'     => '0',
+                        'public_reg_days_before' => 15,
+                        'contact'                => $item['contact'],
+                        'contact_title'          => $item['contact_title'],
+                        'email'                  => $item['email'],
+                        'phone'                  => $item['phone'],
+                        'additional_contacts'    => $item['additional_contacts'],
+                        'address_1'              => $item['address_1'],
+                        'address_2'              => $item['address_2'],
+                        'city'                   => $item['city'],
+                        'state'                  => $item['state'],
+                        'zip'                    => $item['zip'],
+                        'default_lines'          => $default_indoor_lines,
+                        'outdoor_lines'          => $default_outdoor_lines,
+                        'created_at'             => current_time( 'mysql' ),
                     );
                     $created_count++;
                 }
