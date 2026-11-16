@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
- * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation, TFAA schedule scraping, and safe chronological re-sequencing.
+ * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation, TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
+ * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.2
+ * Version: 8.1.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -778,14 +779,27 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         }
         asort( $filter_shops );
 
-        uasort( $scoped_tournaments, function( $a, $b ) {
-            $a_date = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '';
-            $b_date = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '';
-            if ( $a_date === $b_date ) {
-                return 0;
+        if ( count( $scoped_tournaments ) > 1 ) {
+            if ( function_exists( 'sywat_sort_tournaments_chronologically' ) ) {
+                sywat_sort_tournaments_chronologically( $scoped_tournaments, $all_shops );
+            } else {
+                uasort( $scoped_tournaments, function( $a, $b ) {
+                    $a_start = ( is_array( $a ) && ! empty( $a['start_date'] ) ) ? $a['start_date'] : '9999-12-31';
+                    $b_start = ( is_array( $b ) && ! empty( $b['start_date'] ) ) ? $b['start_date'] : '9999-12-31';
+                    if ( $a_start !== $b_start ) {
+                        return ( $a_start < $b_start ) ? -1 : 1;
+                    }
+                    $a_end = ( is_array( $a ) && ! empty( $a['end_date'] ) ) ? $a['end_date'] : $a_start;
+                    $b_end = ( is_array( $b ) && ! empty( $b['end_date'] ) ) ? $b['end_date'] : $b_start;
+                    if ( $a_end !== $b_end ) {
+                        return ( $a_end < $b_end ) ? -1 : 1;
+                    }
+                    $a_shop = ( is_array( $a ) && ! empty( $a['shop_name'] ) ) ? $a['shop_name'] : ( ( is_array( $a ) && ! empty( $a['name'] ) ) ? $a['name'] : '' );
+                    $b_shop = ( is_array( $b ) && ! empty( $b['shop_name'] ) ) ? $b['shop_name'] : ( ( is_array( $b ) && ! empty( $b['name'] ) ) ? $b['name'] : '' );
+                    return strnatcasecmp( $a_shop, $b_shop );
+                } );
             }
-            return ( $a_date < $b_date ) ? -1 : 1;
-        } );
+        }
 
         $tfaa_cache = get_option( 'sywat_tfaa_cache', array() );
         $tfaa_count = isset( $tfaa_cache['count'] ) ? $tfaa_cache['count'] : 0;
