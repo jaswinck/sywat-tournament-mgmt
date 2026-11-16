@@ -5,7 +5,7 @@
  * Description: Renders the public season schedule table, filter bar, and external registration links.
  * Compliance: Zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -40,7 +40,6 @@ asort( $filter_shops );
 // Utility Icons
 $icon_pin      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
 $icon_ext_link = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
-$icon_info     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
 ?>
 
 <div class="sywat-public-card">
@@ -118,7 +117,7 @@ $icon_info     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                         <th class="sywat-col-w-20">Date &amp; Status</th>
                         <th class="sywat-col-w-32">Event &amp; Location</th>
                         <th class="sywat-col-w-24">Shooting Lines</th>
-                        <th class="sywat-col-w-24">Registration / Results</th>
+                        <th class="sywat-col-w-24 sywat-text-left">Registration / Results</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -187,16 +186,18 @@ $icon_info     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                                 <?php endif; ?>
                             </td>
 
-                            <!-- 3. SHOOTING LINES (Grouped by Day) -->
+                            <!-- 3. SHOOTING LINES (Grouped by Day, Stacked for Alignment) -->
                             <td>
                                 <?php if ( ! empty( $evt['grouped_lines'] ) ) : ?>
                                     <div class="sywat-schedule-lines-stack">
                                         <?php foreach ( $evt['grouped_lines'] as $day => $times ) : ?>
-                                            <div class="sywat-mb-1">
-                                                <strong class="sywat-text-subtle"><?php echo esc_html( $day ); ?>:</strong>
-                                                <?php foreach ( $times as $time ) : ?>
-                                                    <span class="sywat-badge sywat-badge-muted"><?php echo esc_html( $time ); ?></span>
-                                                <?php endforeach; ?>
+                                            <div class="sywat-mb-2">
+                                                <strong class="sywat-text-subtle sywat-d-block"><?php echo esc_html( $day ); ?>:</strong>
+                                                <div class="sywat-mt-1">
+                                                    <?php foreach ( $times as $time ) : ?>
+                                                        <span class="sywat-badge sywat-badge-muted"><?php echo esc_html( $time ); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
@@ -216,7 +217,7 @@ $icon_info     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                                             </a>
                                         <?php else : ?>
                                             <span class="sywat-badge sywat-badge-pending sywat-badge-full">
-                                                <?php echo $icon_info; ?> Results Pending
+                                                ⏳ Results Pending
                                             </span>
                                         <?php endif; ?>
                                         
@@ -230,13 +231,13 @@ $icon_info     = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
                                                 </a>
                                             <?php endforeach; ?>
                                         <?php elseif ( ! empty( $evt['shop_phone'] ) ) : ?>
-                                            <span class="sywat-badge sywat-badge-muted sywat-badge-full">
-                                                📞 Contact Shop: <?php echo esc_html( $evt['shop_phone'] ); ?>
-                                            </span>
+                                            <div class="sywat-label-subtext sywat-mt-1">
+                                                📞 <strong>Contact Shop:</strong> <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                            </div>
                                         <?php else : ?>
-                                            <span class="sywat-badge sywat-badge-muted sywat-badge-full">
-                                                📞 Contact Host to Register
-                                            </span>
+                                            <div class="sywat-label-subtext sywat-mt-1">
+                                                📞 <strong>Contact Host to Register</strong>
+                                            </div>
                                         <?php endif; ?>
 
                                     <?php endif; ?>
