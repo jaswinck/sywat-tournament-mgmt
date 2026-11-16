@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Schedule Formatting Helpers
  * Path: includes/schedule/schedule-helpers.php
- * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, detects per-line and event-level distance restrictions (Cubs Only / 20 YD Only) from line capacities, sorts times chronologically, normalizes external registration links, calculates chronological event statuses, and builds Sunday-Saturday calendar month grids.
+ * Description: Pure array/scalar formatters for the public season schedule. Resolves shop data & phone numbers, groups line times by day using the composite name as the single source of truth, detects per-line and event-level distance restrictions (Cubs Only / 20 YD Only) from line capacities, sorts times chronologically, evaluates public online registration window status & deep-linked member registration URLs, normalizes external registration links, calculates chronological event statuses, and builds Sunday-Saturday calendar month grids.
  * Compliance: Zero HTML output at include time, zero DB queries (relies entirely on injected raw payload), omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.4.0
+ * Version: 1.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -103,8 +103,9 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
         $seasons               = isset( $raw_data['seasons'] ) ? $raw_data['seasons'] : array();
         $target_season_slug    = isset( $raw_data['target_season_slug'] ) ? $raw_data['target_season_slug'] : '';
 
-        $today            = current_time( 'Y-m-d' );
-        $results_base_url = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'results' ) : '';
+        $today               = current_time( 'Y-m-d' );
+        $results_base_url    = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'results' ) : '';
+        $member_reg_base_url = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'member_register' ) : '';
 
         // Build a quick name-to-shop map for fallback resolution
         $shop_lookup_map = array();
@@ -266,9 +267,26 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 }
             }
 
-            // 4. Registration Links & Action URLs Normalization
+            // 4. Registration Links, Public Online Registration Window & Action URLs Normalization
             $reg_links = function_exists( 'sywat_get_shop_registration_links' ) ? sywat_get_shop_registration_links( $t_data ) : ( isset( $t_data['registration_links'] ) ? $t_data['registration_links'] : array() );
-            $maps_url  = ! empty( $address )
+
+            $public_reg_status = function_exists( 'sywat_get_public_registration_status' )
+                ? sywat_get_public_registration_status( $t_data, $today )
+                : array(
+                    'status'      => 'closed',
+                    'is_open'     => false,
+                    'enabled'     => false,
+                    'days_before' => 15,
+                    'opens_date'  => '',
+                    'opens_label' => '',
+                    'reason'      => 'disabled',
+                );
+
+            $sywat_reg_url = ( $public_reg_status['status'] === 'open' && $member_reg_base_url !== '' )
+                ? add_query_arg( 'tournament', rawurlencode( $t_name ), $member_reg_base_url )
+                : '';
+
+            $maps_url = ! empty( $address )
                 ? 'https://www.google.com/maps/search/?api=1&query=' . urlencode( $shop_name . ', ' . $address )
                 : '';
             $results_url = ! empty( $results_base_url )
@@ -293,6 +311,10 @@ if ( ! function_exists( 'sywat_schedule_format_view_payload' ) ) {
                 'grouped_lines'          => $grouped_lines,
                 'line_restriction_scope' => $line_restriction_scope,
                 'line_restriction_label' => $line_restriction_label,
+                'public_reg_status'      => $public_reg_status['status'],
+                'public_reg_opens_date'  => isset( $public_reg_status['opens_date'] ) ? $public_reg_status['opens_date'] : '',
+                'public_reg_opens_label' => isset( $public_reg_status['opens_label'] ) ? $public_reg_status['opens_label'] : '',
+                'sywat_reg_url'          => $sywat_reg_url,
                 'reg_links'              => $reg_links,
                 'scores_published'       => ! empty( $t_data['scores_published'] ),
                 'has_tfaa_url'           => ! empty( $t_data['tfaa_results_url'] ),
