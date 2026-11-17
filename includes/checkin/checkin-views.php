@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,6 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Reusable helper to render hidden filter context inputs and eliminate form bloat.
+ *
+ * @param string $selected_tournament Active tournament name.
+ * @param string $selected_line_idx   Active line index or 'all'.
+ * @param string $search_query        Current search query string.
+ * @return void
  */
 if ( ! function_exists( 'sywat_desk_render_hidden_context' ) ) {
     function sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ) {
@@ -25,6 +30,12 @@ if ( ! function_exists( 'sywat_desk_render_hidden_context' ) ) {
     }
 }
 
+/**
+ * Render post-registration family prompt banner when continuing a household group.
+ *
+ * @param array|false $added_family_prompt Household prompt payload or false.
+ * @return void
+ */
 if ( ! function_exists( 'sywat_desk_render_family_banner' ) ) {
     function sywat_desk_render_family_banner( $added_family_prompt ) {
         if ( ! $added_family_prompt ) {
@@ -51,10 +62,19 @@ if ( ! function_exists( 'sywat_desk_render_family_banner' ) ) {
     }
 }
 
+/**
+ * Render role-gated card-docked navigation tabs and unified tournament/line filter bar.
+ *
+ * @param array $data Aggregated Check-In Desk dataset.
+ * @return void
+ */
 if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
     function sywat_desk_render_filter_bar( $data ) {
-        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
-        $selected_t         = isset( $data['selected_tournament'] ) ? $data['selected_tournament'] : '';
+        $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
+        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
+        $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
+        $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $selected_t             = isset( $data['selected_tournament'] ) ? $data['selected_tournament'] : '';
 
         $all_tournaments = get_option( 'sywat_tournaments_list', array() );
         $t_master        = ( is_array( $all_tournaments ) && isset( $all_tournaments[ $selected_t ] ) ) ? $all_tournaments[ $selected_t ] : array();
@@ -74,12 +94,18 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_t, $active_hubs, true );
         $tab_query_args = ! empty( $selected_t ) ? array( 'selected_tournament' => $selected_t ) : array();
         ?>
-        <!-- Master Navigation Tabs (Card-Docked) -->
+        <!-- Master Navigation Tabs (Card-Docked, Role-Gated) -->
         <div class="sywat-nav-tabs no-print">
-            <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
-            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
-            <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+            <?php if ( $can_manage_tournaments ) : ?>
+                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+            <?php endif; ?>
+            <?php if ( $can_access_desk ) : ?>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
+            <?php endif; ?>
+            <?php if ( $can_edit_scores ) : ?>
+                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
+            <?php endif; ?>
             <?php if ( $can_manage_seasons ) : ?>
                 <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
             <?php endif; ?>
@@ -133,6 +159,12 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
     }
 }
 
+/**
+ * Render chronologically ordered Line Capacity Tracker cards with Walk-In & Waitlist triggers.
+ *
+ * @param array $data Aggregated Check-In Desk dataset.
+ * @return void
+ */
 if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
     function sywat_desk_render_capacity_tracker( $data ) {
         $lines               = $data['lines'];
@@ -303,6 +335,12 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
     }
 }
 
+/**
+ * Render Active Registered Archers table with Check-In, Edit, and household OWE badges.
+ *
+ * @param array $data Aggregated Check-In Desk dataset.
+ * @return void
+ */
 if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
     function sywat_desk_render_archers_table( $data ) {
         $tourn_registrations = $data['tourn_registrations'];
