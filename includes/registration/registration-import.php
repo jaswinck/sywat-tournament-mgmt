@@ -5,7 +5,7 @@
  * Description: Handles strict 9-column roster imports, native .xlsx/.csv parsing, automatic template generation, deterministic household grouping (Phone/Contact), O(1) duplicate checks, 10yd Youth pricing locks, Check-In payment mapping (Paid/Unpaid), and Waitlist overflow.
  * Compliance: Pure action/import layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -241,7 +241,11 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             $day    = isset( $ld['day'] ) ? trim( $ld['day'] ) : '';
             $time   = isset( $ld['time'] ) ? trim( $ld['time'] ) : ( isset( $ld['start_time'] ) ? trim( $ld['start_time'] ) : '' );
             
-            $match_str = strtolower( preg_replace( '/\s+/', '', $l_name . $day . $time ) );
+            // Aggressive normalization: Strip ":00" and all non-alphanumeric chars
+            $raw_str   = strtolower( $l_name . ' ' . $day . ' ' . $time );
+            $raw_str   = preg_replace( '/(\d{1,2}):00\s*(am|pm)/', '$1$2', $raw_str );
+            $match_str = preg_replace( '/[^a-z0-9]/', '', $raw_str );
+
             $valid_lines_map[ (string) $idx ] = array(
                 'raw_name'  => $l_name,
                 'match_str' => $match_str,
@@ -294,7 +298,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             $is_paid = ( stripos( $paid_status, 'unpaid' ) === false && stripos( $paid_status, 'paid' ) !== false );
 
             // Match Line Day + Time to Tournament Line
-            $search_target = strtolower( preg_replace( '/\s+/', '', $line_day . $line_time ) );
+            $raw_search    = strtolower( $line_day . ' ' . $line_time );
+            $raw_search    = preg_replace( '/(\d{1,2}):00\s*(am|pm)/', '$1$2', $raw_search );
+            $search_target = preg_replace( '/[^a-z0-9]/', '', $raw_search );
+            
             $matched_idx = '';
             $matched_name = '';
             foreach ( $valid_lines_map as $idx => $l_meta ) {
