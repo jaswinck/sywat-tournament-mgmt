@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal, persists sticky tournament selection across desk portals, dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the [sywat_register] Registration Desk portal, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view/shortcode layer — zero output at include time, zero inline styles, delegated data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -287,7 +288,9 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         }
 
         // POST Handling Notice
-        $notice = '';
+        $notice                 = '';
+        $import_modal_auto_open = false;
+
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) ) {
             $nonce_val      = isset( $_POST['sywat_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ) : '';
             $is_valid_nonce = ! empty( $nonce_val ) && wp_verify_nonce( $nonce_val, 'sywat_desk_action' );
@@ -301,6 +304,9 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                     $import_tourn    = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : $selected_tournament;
                     $target_line_idx = isset( $_POST['target_line_idx'] ) ? sanitize_text_field( wp_unslash( $_POST['target_line_idx'] ) ) : '0';
                     $notice          = sywat_handle_import_shooters( $import_tourn, $target_line_idx, $tournaments, $registrations );
+                    if ( strpos( $notice, 'sywat-alert-danger' ) !== false ) {
+                        $import_modal_auto_open = true;
+                    }
                 } elseif ( $action === 'purge_line' ) {
                     if ( ! function_exists( 'sywat_handle_purge_line' ) && defined( 'SYWAT_PLUGIN_DIR' ) && file_exists( SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php' ) ) {
                         require_once SYWAT_PLUGIN_DIR . 'includes/roster/class-sywat-roster.php';
@@ -320,6 +326,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         }
 
         $tab_query_args = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
+        $has_active_tourn = ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) );
         ?>
 
         <div class="sywat-wrap">
@@ -349,7 +356,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                         <div class="sywat-subtitle">Select an active tournament to register incoming archers.</div>
                     </div>
 
-                    <!-- Tournament Switcher Control Bar -->
+                    <!-- Tournament Switcher & Bulk Upload Control Bar -->
                     <div class="sywat-header-inline-controls">
                         <form method="get" action="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>">
                             <div class="sywat-field-group">
@@ -367,10 +374,23 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                                 </select>
                             </div>
                         </form>
+
+                        <?php if ( $has_active_tourn ) : ?>
+                            <div class="sywat-field-group">
+                                <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="open-import-modal">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    Bulk Upload
+                                </button>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
-                <?php if ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) ) : ?>
+                <?php if ( $has_active_tourn ) : ?>
                     <?php
                     if ( function_exists( 'sywat_render_registration_modal' ) ) {
                         sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
@@ -382,6 +402,16 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             </div>
 
             <?php
+            // Dedicated Bulk Spreadsheet Import Modal (#sywat_import_modal)
+            if ( $has_active_tourn && function_exists( 'sywat_render_import_modal' ) ) {
+                sywat_render_import_modal(
+                    $selected_tournament,
+                    $available_lines,
+                    $tournaments[ $selected_tournament ],
+                    $import_modal_auto_open
+                );
+            }
+
             // Dedicated Waitlist Management Modal (#sywat_waitlist_modal)
             if ( function_exists( 'sywat_maybe_render_waitlist_modal' ) ) {
                 $register_clean_url = add_query_arg(
