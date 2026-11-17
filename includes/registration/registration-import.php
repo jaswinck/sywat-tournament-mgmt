@@ -1,44 +1,101 @@
 <?php
 /**
- * Sub-Module: Bulk Spreadsheet Import Engine (.xlsx, .xls, .csv)
+ * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles strict 9-column roster imports, native .xlsx/.csv parsing, automatic template generation, deterministic household grouping (Phone/Contact), O(1) duplicate checks, 10yd Youth pricing locks, Check-In payment mapping (Paid/Unpaid), and Waitlist overflow.
- * Compliance: Pure action/import layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Defensive fallback include in case registration-import.php is loaded before sywat-archery-manager.php is updated
+if ( ! function_exists( 'sywat_build_import_template_xlsx' ) && defined( 'SYWAT_PLUGIN_DIR' ) ) {
+    $sywat_sheet_helper = SYWAT_PLUGIN_DIR . 'includes/common/sywat-spreadsheet-helpers.php';
+    if ( file_exists( $sywat_sheet_helper ) ) {
+        require_once $sywat_sheet_helper;
+    }
+}
+
 /**
- * Hook to intercept and generate the downloadable Excel (.csv/.xlsx format) template.
- * Triggered via $_GET['sywat_download_import_template']
+ * Intercept and stream the tournament-aware Excel (.xlsx) import template (with .csv fallback).
+ * Runs on template_redirect prior to theme output, guarded by nonce and desk capability.
  */
-add_action( 'init', 'sywat_handle_download_import_template' );
+add_action( 'template_redirect', 'sywat_handle_download_import_template' );
 if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
     function sywat_handle_download_import_template() {
-        if ( isset( $_GET['sywat_download_import_template'] ) && $_GET['sywat_download_import_template'] === '1' ) {
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'sywat_download_import_template' ) ) {
-                wp_die( 'Security token expired. Please refresh the page and try again.' );
+        if ( ! isset( $_GET['sywat_download_import_template'] ) || wp_unslash( $_GET['sywat_download_import_template'] ) !== '1' ) {
+            return;
+        }
+
+        $nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+        if ( $nonce === '' || ! wp_verify_nonce( $nonce, 'sywat_download_import_template' ) ) {
+            wp_die( 'Security token expired. Please refresh the page and try again.', 'Security Check', array( 'response' => 403 ) );
+        }
+
+        if ( ! function_exists( 'sywat_can_access_desk' ) || ! sywat_can_access_desk() ) {
+            wp_die( 'Access denied. Desk management access required.', 'Access Denied', array( 'response' => 403 ) );
+        }
+
+        $tourn_name  = isset( $_GET['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_GET['selected_tournament'] ) ) : '';
+        $tournaments = get_option( 'sywat_tournaments_list', array() );
+        $tourn_data  = ( is_array( $tournaments ) && isset( $tournaments[ $tourn_name ] ) ) ? $tournaments[ $tourn_name ] : array();
+        $t_lines     = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $tourn_data ) : array();
+        $base_slug   = $tourn_name !== '' ? sanitize_title( $tourn_name ) : 'General';
+
+        // Resolve active tournament pricing summary for the Tournament Info reference tab
+        $t_profiles   = function_exists( 'sywat_get_tournament_pricing_profiles' ) ? sywat_get_tournament_pricing_profiles( $tourn_data ) : array();
+        $default_prof = ! empty( $t_profiles ) ? reset( $t_profiles ) : array();
+        $pricing_info = array(
+            'adult_rate' => isset( $default_prof['adult_rate'] ) ? number_format( (float) $default_prof['adult_rate'], 2 ) : '30.00',
+            'youth_rate' => isset( $default_prof['youth_rate'] ) ? number_format( (float) $default_prof['youth_rate'], 2 ) : '25.00',
+            'family_cap' => ( ! empty( $default_prof['family_cap_enabled'] ) && isset( $default_prof['family_cap_amount'] ) )
+                ? '$' . number_format( (float) $default_prof['family_cap_amount'], 2 ) . ' (per shooting line)'
+                : 'Disabled',
+        );
+
+        // Primary Output: Native .xlsx workbook with strict Excel Data Validation dropdowns
+        if ( class_exists( 'ZipArchive' ) && function_exists( 'sywat_build_import_template_xlsx' ) ) {
+            $tmp_file = wp_tempnam( 'sywat_template_' . $base_slug . '.xlsx' );
+            if ( $tmp_file && sywat_build_import_template_xlsx( $tmp_file, $tourn_name, $tourn_data, $t_lines, $pricing_info ) ) {
+                while ( ob_get_level() > 0 ) {
+                    ob_end_clean();
+                }
+                $filename = 'SYWAT_Import_Template_' . $base_slug . '.xlsx';
+                header( 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' );
+                header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+                header( 'Content-Length: ' . filesize( $tmp_file ) );
+                header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+                header( 'Pragma: no-cache' );
+                header( 'Expires: 0' );
+                readfile( $tmp_file );
+                if ( file_exists( $tmp_file ) ) {
+                    wp_delete_file( $tmp_file );
+                }
+                exit;
             }
-            if ( ! function_exists( 'sywat_can_access_desk' ) || ! sywat_can_access_desk() ) {
-                wp_die( 'Access denied.' );
+            if ( $tmp_file && file_exists( $tmp_file ) ) {
+                wp_delete_file( $tmp_file );
             }
+        }
 
-            $tourn_name = isset( $_GET['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_GET['selected_tournament'] ) ) : '';
-            $filename   = 'SYWAT_Import_Template_' . ( ! empty( $tourn_name ) ? sanitize_title( $tourn_name ) : 'General' ) . '.csv';
+        // Fallback Output: Standardized 9-column .csv if PHP ZipArchive is unavailable
+        while ( ob_get_level() > 0 ) {
+            ob_end_clean();
+        }
+        $filename = 'SYWAT_Import_Template_' . $base_slug . '.csv';
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+        header( 'Pragma: no-cache' );
+        header( 'Expires: 0' );
 
-            header( 'Content-Type: text/csv; charset=utf-8' );
-            header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-            header( 'Pragma: no-cache' );
-            header( 'Expires: 0' );
-
-            $output = fopen( 'php://output', 'w' );
-            
-            // Standardized 9-Column Header
-            fputcsv( $output, array(
+        $headers = function_exists( 'sywat_get_import_template_headers' )
+            ? sywat_get_import_template_headers()
+            : array(
                 'Contact Name',
                 'Phone',
                 'Email',
@@ -47,10 +104,12 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 'Line Time (HH:MM AM/PM)',
                 'Distance (10 yds / 20 yds)',
                 'Rate Tier (Youth / Adult)',
-                'Paid Status (Paid / Unpaid)'
-            ) );
+                'Paid Status (Paid / Unpaid)',
+            );
 
-            // Example Row
+        $output = fopen( 'php://output', 'w' );
+        if ( $output !== false ) {
+            fputcsv( $output, $headers );
             fputcsv( $output, array(
                 'John Smith',
                 '817-555-1234',
@@ -60,117 +119,83 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 '10:00 AM',
                 '20 yds',
                 'Adult',
-                'Paid'
+                'Paid',
             ) );
-
             fclose( $output );
-            exit;
         }
+        exit;
     }
 }
 
 /**
- * Native lightweight .xlsx parser using PHP ZipArchive.
- * Reads sharedStrings and sheet1 to extract cell values without external libraries.
- */
-if ( ! function_exists( 'sywat_parse_simple_xlsx' ) ) {
-    function sywat_parse_simple_xlsx( $filepath ) {
-        $rows = array();
-        if ( ! class_exists( 'ZipArchive' ) ) {
-            return $rows; // Fallback handled in main flow
-        }
-        $zip = new ZipArchive();
-        if ( $zip->open( $filepath ) === true ) {
-            $shared_strings = array();
-            if ( ( $ss_idx = $zip->locateName( 'xl/sharedStrings.xml' ) ) !== false ) {
-                $xml = simplexml_load_string( $zip->getFromIndex( $ss_idx ) );
-                if ( $xml ) {
-                    foreach ( $xml->si as $si ) {
-                        $shared_strings[] = (string) $si->t;
-                    }
-                }
-            }
-
-            if ( ( $sheet_idx = $zip->locateName( 'xl/worksheets/sheet1.xml' ) ) !== false ) {
-                $xml = simplexml_load_string( $zip->getFromIndex( $sheet_idx ) );
-                if ( $xml ) {
-                    foreach ( $xml->sheetData->row as $row ) {
-                        $current_row = array();
-                        $col_idx = 0;
-                        foreach ( $row->c as $c ) {
-                            // Account for skipped empty cells via 'r' attribute (e.g., A1, C1)
-                            $cell_ref = (string) $c['r'];
-                            $col_letter = preg_replace( '/[0-9]/', '', $cell_ref );
-                            $expected_idx = ord( strtoupper( $col_letter ) ) - 65; // A=0, B=1
-                            
-                            while ( $col_idx < $expected_idx ) {
-                                $current_row[] = '';
-                                $col_idx++;
-                            }
-
-                            $val = (string) $c->v;
-                            if ( isset( $c['t'] ) && (string) $c['t'] === 's' ) {
-                                $val = isset( $shared_strings[ (int) $val ] ) ? $shared_strings[ (int) $val ] : '';
-                            } else {
-                                // Convert Excel numeric time fraction (e.g., 0.416666 = 10:00 AM)
-                                if ( is_numeric( $val ) && $val > 0 && $val < 1 ) {
-                                    $total_seconds = round( $val * 86400 );
-                                    $val = gmdate( 'g:i A', $total_seconds );
-                                }
-                            }
-                            $current_row[] = trim( $val );
-                            $col_idx++;
-                        }
-                        $rows[] = $current_row;
-                    }
-                }
-            }
-            $zip->close();
-        }
-        return $rows;
-    }
-}
-
-/**
- * Main Importer: Validates, groups, prices, and registers shooters from .csv/.xlsx uploads.
+ * Validate, group, price, and persist shooters uploaded via the 9-column spreadsheet modal (.xlsx or .csv).
+ *
+ * @param string $tourn_name       Selected tournament name (unslashed).
+ * @param string $target_line_idx  Fallback line index (unused when spreadsheet specifies Line Day & Line Time).
+ * @param array  $tournaments      Master tournament configuration array.
+ * @param array  $registrations    Master registration state array reference.
+ * @return string                  Standardized alert HTML notice.
  */
 if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
     function sywat_handle_import_shooters( $tourn_name, $target_line_idx, $tournaments, &$registrations ) {
-        $tourn_name      = sanitize_text_field( wp_unslash( $tourn_name ) );
-        $t_data          = isset( $tournaments[ $tourn_name ] ) ? $tournaments[ $tourn_name ] : array();
-        $tourn_date      = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? (string) $t_data['start_date'] : '';
-        $t_lines         = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : $t_data );
-        $t_slug          = sanitize_title( $tourn_name );
-        
-        $imported_count   = 0;
-        $waitlisted_count = 0;
-        $skipped_dup      = 0;
-        $touched_fams     = array();
-        $errors           = array();
+        global $wpdb;
 
-        // Check file upload
-        if ( ! isset( $_FILES['import_file'] ) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK ) {
-            $GLOBALS['sywat_import_modal_error'] = 'No valid file was received. Please select a .xlsx or .csv file and try again.';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">File upload failed.</div>';
+        $tourn_name = sanitize_text_field( wp_unslash( $tourn_name ) );
+        $t_data     = isset( $tournaments[ $tourn_name ] ) ? $tournaments[ $tourn_name ] : array();
+        $tourn_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? (string) $t_data['start_date'] : '';
+        $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : $t_data );
+        $t_slug     = sanitize_title( $tourn_name );
+
+        // 1. Validate Uploaded File
+        if ( ! isset( $_FILES['import_file'] ) || ! is_array( $_FILES['import_file'] ) ) {
+            $GLOBALS['sywat_import_modal_error'] = 'No spreadsheet file was received. Please select a .xlsx or .csv file and try again.';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import aborted: No file uploaded.</div>';
         }
 
-        $tmp_path = (string) $_FILES['import_file']['tmp_name'];
-        $filename = strtolower( (string) $_FILES['import_file']['name'] );
-        $raw_rows = array();
+        $upload_err = isset( $_FILES['import_file']['error'] ) ? (int) $_FILES['import_file']['error'] : UPLOAD_ERR_NO_FILE;
+        if ( $upload_err !== UPLOAD_ERR_OK ) {
+            $err_msg = 'File upload failed (error code ' . $upload_err . '). Please try again.';
+            if ( $upload_err === UPLOAD_ERR_NO_FILE ) {
+                $err_msg = 'Please choose a .xlsx or .csv file before submitting.';
+            } elseif ( $upload_err === UPLOAD_ERR_INI_SIZE || $upload_err === UPLOAD_ERR_FORM_SIZE ) {
+                $err_msg = 'The selected file exceeds the server upload limit.';
+            }
+            $GLOBALS['sywat_import_modal_error'] = esc_html( $err_msg );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $err_msg ) . '</div>';
+        }
 
-        // Parse File
-        if ( strpos( $filename, '.xlsx' ) !== false ) {
-            if ( ! class_exists( 'ZipArchive' ) ) {
-                $GLOBALS['sywat_import_modal_error'] = 'Your server is missing the PHP ZipArchive extension required for .xlsx files. Please upload a .csv file instead.';
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">ZipArchive extension missing.</div>';
+        $tmp_path = isset( $_FILES['import_file']['tmp_name'] ) ? (string) $_FILES['import_file']['tmp_name'] : '';
+        if ( $tmp_path === '' || ! is_uploaded_file( $tmp_path ) ) {
+            $GLOBALS['sywat_import_modal_error'] = 'Invalid file upload source. Please choose the file again and retry.';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Invalid file upload source.</div>';
+        }
+
+        $orig_name = isset( $_FILES['import_file']['name'] ) ? sanitize_file_name( wp_unslash( $_FILES['import_file']['name'] ) ) : '';
+        $ext       = strtolower( pathinfo( $orig_name, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, array( 'xlsx', 'csv' ), true ) ) {
+            $GLOBALS['sywat_import_modal_error'] = 'Unsupported file type. Please upload an Excel (.xlsx) or CSV (.csv) file using the downloadable template.';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unsupported spreadsheet format.</div>';
+        }
+
+        // 2. Parse Raw Rows
+        $raw_rows = array();
+        if ( $ext === 'xlsx' ) {
+            if ( ! class_exists( 'ZipArchive' ) || ! function_exists( 'sywat_parse_simple_xlsx' ) ) {
+                $GLOBALS['sywat_import_modal_error'] = 'Your server is missing the PHP ZipArchive extension required to read .xlsx files. Please save the template as .csv and upload it instead.';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">PHP ZipArchive extension unavailable.</div>';
             }
             $raw_rows = sywat_parse_simple_xlsx( $tmp_path );
         } else {
-            // CSV Parse
             $handle = fopen( $tmp_path, 'r' );
             if ( $handle !== false ) {
                 while ( ( $data = fgetcsv( $handle, 4000, ',' ) ) !== false ) {
-                    if ( ! empty( array_filter( $data ) ) ) {
+                    if ( isset( $data[0] ) ) {
+                        $data[0] = preg_replace( '/^\xEF\xBB\xBF/', '', (string) $data[0] );
+                    }
+                    $non_empty = array_filter( $data, function( $cell ) {
+                        return trim( (string) $cell ) !== '';
+                    } );
+                    if ( ! empty( $non_empty ) ) {
                         $raw_rows[] = $data;
                     }
                 }
@@ -178,266 +203,419 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
         }
 
-        if ( empty( $raw_rows ) || count( $raw_rows ) < 2 ) {
-            $GLOBALS['sywat_import_modal_error'] = 'The uploaded file appears to be empty or unreadable.';
-            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">File is empty.</div>';
+        if ( count( $raw_rows ) < 2 ) {
+            $GLOBALS['sywat_import_modal_error'] = 'The uploaded spreadsheet has no archer rows. Please enter at least one archer below the header row.';
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Spreadsheet contains no data rows.</div>';
         }
 
-        // Header mapping (Expected 9 columns)
+        // 3. Resolve Header Column Map (Supports both descriptive template headers and strict 0–8 index order)
         $headers = array_map( 'trim', array_map( 'strtolower', $raw_rows[0] ) );
         $col_map = array(
-            'contact'  => -1, 'phone'    => -1, 'email' => -1, 'archer'   => -1,
-            'line_day' => -1, 'line_time'=> -1, 'distance' => -1, 'tier'  => -1, 'paid' => -1
+            'contact'   => -1,
+            'phone'     => -1,
+            'email'     => -1,
+            'archer'    => -1,
+            'line_day'  => -1,
+            'line_time' => -1,
+            'distance'  => -1,
+            'tier'      => -1,
+            'paid'      => -1,
         );
 
         foreach ( $headers as $idx => $hdr ) {
-            if ( strpos( $hdr, 'contact' ) !== false ) $col_map['contact'] = $idx;
-            elseif ( strpos( $hdr, 'phone' ) !== false ) $col_map['phone'] = $idx;
-            elseif ( strpos( $hdr, 'email' ) !== false ) $col_map['email'] = $idx;
-            elseif ( strpos( $hdr, 'archer' ) !== false || strpos( $hdr, 'full name' ) !== false ) $col_map['archer'] = $idx;
-            elseif ( strpos( $hdr, 'line day' ) !== false ) $col_map['line_day'] = $idx;
-            elseif ( strpos( $hdr, 'line time' ) !== false ) $col_map['line_time'] = $idx;
-            elseif ( strpos( $hdr, 'distance' ) !== false ) $col_map['distance'] = $idx;
-            elseif ( strpos( $hdr, 'tier' ) !== false ) $col_map['tier'] = $idx;
-            elseif ( strpos( $hdr, 'paid' ) !== false ) $col_map['paid'] = $idx;
+            if ( strpos( $hdr, 'contact' ) !== false ) {
+                $col_map['contact'] = $idx;
+            } elseif ( strpos( $hdr, 'phone' ) !== false ) {
+                $col_map['phone'] = $idx;
+            } elseif ( strpos( $hdr, 'email' ) !== false ) {
+                $col_map['email'] = $idx;
+            } elseif ( strpos( $hdr, 'archer' ) !== false || strpos( $hdr, 'full name' ) !== false ) {
+                $col_map['archer'] = $idx;
+            } elseif ( strpos( $hdr, 'line day' ) !== false ) {
+                $col_map['line_day'] = $idx;
+            } elseif ( strpos( $hdr, 'line time' ) !== false ) {
+                $col_map['line_time'] = $idx;
+            } elseif ( strpos( $hdr, 'distance' ) !== false ) {
+                $col_map['distance'] = $idx;
+            } elseif ( strpos( $hdr, 'tier' ) !== false ) {
+                $col_map['tier'] = $idx;
+            } elseif ( strpos( $hdr, 'paid' ) !== false ) {
+                $col_map['paid'] = $idx;
+            }
         }
 
-        // If strict headers fail, assume strict column index order 0-8
-        if ( $col_map['archer'] === -1 || $col_map['line_day'] === -1 ) {
+        if ( $col_map['archer'] === -1 || $col_map['line_day'] === -1 || $col_map['line_time'] === -1 ) {
             $col_map = array(
-                'contact' => 0, 'phone' => 1, 'email' => 2, 'archer' => 3,
-                'line_day' => 4, 'line_time' => 5, 'distance' => 6, 'tier' => 7, 'paid' => 8
+                'contact'   => 0,
+                'phone'     => 1,
+                'email'     => 2,
+                'archer'    => 3,
+                'line_day'  => 4,
+                'line_time' => 5,
+                'distance'  => 6,
+                'tier'      => 7,
+                'paid'      => 8,
             );
         }
 
-        // Prepare context
+        // 4. Hoist All Lookups & O(1) Hashtables Outside Iteration Loops
         $t_profiles       = function_exists( 'sywat_get_tournament_pricing_profiles' ) ? sywat_get_tournament_pricing_profiles( $t_data ) : array();
         $default_prof     = ! empty( $t_profiles ) ? reset( $t_profiles ) : array();
         $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
-        
-        $closed_lines_raw = get_option( 'sywat_closed_lines_' . $t_slug, array() );
-        $closed_lines     = is_array( $closed_lines_raw ) ? array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) : array();
 
+        $closed_lines_raw = get_option( 'sywat_closed_lines_' . $t_slug, array() );
+        $closed_lines_map = is_array( $closed_lines_raw ) ? array_flip( array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) ) : array();
+
+        // O(1) Duplicate & Active Line Occupancy Maps
         $dup_lookup       = array();
         $line_dist_counts = array();
-        foreach ( $registrations as $ex ) {
-            if ( isset( $ex['tournament'], $ex['line_index'], $ex['distance'], $ex['name'], $ex['status'] ) && strcasecmp( $ex['tournament'], $tourn_name ) === 0 ) {
-                $ex_line = (string) $ex['line_index'];
-                $ex_dist = (string) $ex['distance'];
-                $dup_key = $ex_line . '|' . strtolower( $ex_dist ) . '|' . strtolower( trim( $ex['name'] ) );
+        if ( is_array( $registrations ) ) {
+            foreach ( $registrations as $ex ) {
+                if ( ! is_array( $ex ) || ! isset( $ex['tournament'], $ex['line_index'], $ex['name'], $ex['status'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $ex['tournament'] ), trim( $tourn_name ) ) !== 0 ) {
+                    continue;
+                }
+                $ex_status = trim( (string) $ex['status'] );
+                if ( strcasecmp( $ex_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+                $ex_line = trim( (string) $ex['line_index'] );
+                $ex_dist = isset( $ex['distance'] ) ? trim( (string) $ex['distance'] ) : '20yd';
+                $dup_key = $ex_line . '|' . strtolower( $ex_dist ) . '|' . strtolower( trim( (string) $ex['name'] ) );
+
                 $dup_lookup[ $dup_key ] = true;
 
-                if ( strcasecmp( $ex['status'], 'Waitlist' ) !== 0 ) {
-                    if ( ! isset( $line_dist_counts[ $ex_line ][ $ex_dist ] ) ) $line_dist_counts[ $ex_line ][ $ex_dist ] = 0;
+                if ( strcasecmp( $ex_status, 'Waitlist' ) !== 0 ) {
+                    if ( ! isset( $line_dist_counts[ $ex_line ][ $ex_dist ] ) ) {
+                        $line_dist_counts[ $ex_line ][ $ex_dist ] = 0;
+                    }
                     $line_dist_counts[ $ex_line ][ $ex_dist ]++;
                 }
             }
         }
 
-        // Map configured tournament lines to easily match Day + Time
-        $valid_lines_map = array();
-        foreach ( $t_lines as $idx => $ld ) {
-            $l_name = isset( $ld['name'] ) ? trim( $ld['name'] ) : '';
-            $day    = isset( $ld['day'] ) ? trim( $ld['day'] ) : '';
-            $time   = isset( $ld['time'] ) ? trim( $ld['time'] ) : ( isset( $ld['start_time'] ) ? trim( $ld['start_time'] ) : '' );
-            
-            // Aggressive normalization: Strip ":00" and all non-alphanumeric chars
-            $raw_str   = strtolower( $l_name . ' ' . $day . ' ' . $time );
-            $raw_str   = preg_replace( '/(\d{1,2}):00\s*(am|pm)/', '$1$2', $raw_str );
-            $match_str = preg_replace( '/[^a-z0-9]/', '', $raw_str );
+        // O(1) Allowed Line Day Map (Friday, Saturday, Sunday)
+        $allowed_days_map = array(
+            'friday'   => 'Friday',
+            'saturday' => 'Saturday',
+            'sunday'   => 'Sunday',
+        );
 
-            $valid_lines_map[ (string) $idx ] = array(
-                'raw_name'  => $l_name,
-                'match_str' => $match_str,
-                'data'      => $ld
-            );
+        // O(1) Allowed 30-Minute Time Slots Map (7:00 AM – 10:00 PM)
+        $valid_time_tokens = array();
+        $standard_slots    = function_exists( 'sywat_get_standard_import_time_slots' ) ? sywat_get_standard_import_time_slots() : array();
+        foreach ( $standard_slots as $slot_label ) {
+            $tok = function_exists( 'sywat_normalize_import_line_time' ) ? sywat_normalize_import_line_time( $slot_label ) : strtolower( preg_replace( '/[^a-z0-9]/i', '', $slot_label ) );
+            if ( $tok !== '' ) {
+                $valid_time_tokens[ $tok ] = $slot_label;
+            }
         }
 
+        // O(1) Configured Tournament Line Token Lookup & Line Capacity Cache
+        $line_token_to_idx = array();
+        $line_meta_by_idx  = array();
+        if ( is_array( $t_lines ) ) {
+            foreach ( $t_lines as $idx => $ld ) {
+                $idx_str = (string) $idx;
+                $l_name  = is_array( $ld ) && isset( $ld['name'] ) ? trim( (string) $ld['name'] ) : '';
+                $day     = is_array( $ld ) && isset( $ld['day'] ) ? trim( (string) $ld['day'] ) : '';
+                $time    = is_array( $ld ) && isset( $ld['time'] )
+                    ? trim( (string) $ld['time'] )
+                    : ( is_array( $ld ) && isset( $ld['start_time'] ) ? trim( (string) $ld['start_time'] ) : '' );
+
+                $cap_20  = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $ld, '20yd' ) : 20;
+                $cap_cub = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $ld, 'Cub' ) : 5;
+
+                $line_meta_by_idx[ $idx_str ] = array(
+                    'name'      => $l_name,
+                    'is_closed' => isset( $closed_lines_map[ $idx_str ] ) || ( $l_name !== '' && isset( $closed_lines_map[ $l_name ] ) ),
+                    'cap_20yd'  => ( $cap_20 && $cap_20 > 0 ) ? (int) $cap_20 : 20,
+                    'cap_Cub'   => ( $cap_cub && $cap_cub > 0 ) ? (int) $cap_cub : 5,
+                );
+
+                if ( $day !== '' && $time !== '' ) {
+                    $t_tok = function_exists( 'sywat_normalize_import_line_time' ) ? sywat_normalize_import_line_time( $time ) : strtolower( preg_replace( '/[^a-z0-9]/i', '', $time ) );
+                    $key1  = strtolower( preg_replace( '/[^a-z0-9]/i', '', $day ) ) . $t_tok;
+                    $line_token_to_idx[ $key1 ] = $idx_str;
+                }
+                if ( $l_name !== '' ) {
+                    $norm_lbl = preg_replace( '/\b0(\d)(?::(\d{2}))?\s*(AM|PM)\b/i', '$1:$2 $3', $l_name );
+                    $norm_lbl = str_replace( ': ', ' ', $norm_lbl );
+                    $norm_lbl = preg_replace( '/\b(\d{1,2}):00\s*(AM|PM)\b/i', '$1 $2', $norm_lbl );
+                    $key2     = strtolower( preg_replace( '/[^a-z0-9]/i', '', $norm_lbl ) );
+                    $line_token_to_idx[ $key2 ] = $idx_str;
+                }
+            }
+        }
+
+        // Pass 1: Pre-Flight Validation & Normalization
         $parsed_shooters = array();
-        
-        // Pass 1: Strict Validation & Parsing
-        for ( $i = 1; $i < count( $raw_rows ); $i++ ) {
-            $row = $raw_rows[$i];
-            $safe_val = function($key) use ($row, $col_map) {
-                return isset( $row[ $col_map[$key] ] ) ? trim( sanitize_text_field( (string) $row[ $col_map[$key] ] ) ) : '';
+        $errors          = array();
+        $total_rows      = count( $raw_rows );
+
+        for ( $i = 1; $i < $total_rows; $i++ ) {
+            $row      = $raw_rows[ $i ];
+            $row_num  = $i + 1;
+            $safe_val = function( $key ) use ( $row, $col_map ) {
+                return isset( $row[ $col_map[ $key ] ] ) ? trim( sanitize_text_field( (string) $row[ $col_map[ $key ] ] ) ) : '';
             };
 
-            $contact_name = $safe_val('contact');
-            $phone_raw    = $safe_val('phone');
-            $email        = $safe_val('email');
-            $archer_name  = $safe_val('archer');
-            $line_day     = $safe_val('line_day');
-            $line_time    = $safe_val('line_time');
-            $distance     = $safe_val('distance');
-            $tier         = $safe_val('tier');
-            $paid_status  = $safe_val('paid');
+            $contact_name = $safe_val( 'contact' );
+            $phone_raw    = $safe_val( 'phone' );
+            $email        = $safe_val( 'email' );
+            $archer_name  = $safe_val( 'archer' );
+            $line_day     = $safe_val( 'line_day' );
+            $line_time    = $safe_val( 'line_time' );
+            $distance     = $safe_val( 'distance' );
+            $tier         = $safe_val( 'tier' );
+            $paid_status  = $safe_val( 'paid' );
 
-            if ( empty( $archer_name ) ) continue; // Skip truly empty trailing rows
-
-            // Required Fields
-            if ( empty( $contact_name ) || empty( $phone_raw ) || empty( $line_day ) || empty( $line_time ) || empty( $distance ) || empty( $paid_status ) ) {
-                $errors[] = "Row " . ($i + 1) . ": Missing mandatory column data. All columns except Email are required.";
+            // Skip blank pre-formatted template rows
+            if ( $archer_name === '' && $contact_name === '' && $phone_raw === '' ) {
                 continue;
             }
 
-            // Normalize Phone (10 digits)
+            if ( $contact_name === '' || $phone_raw === '' || $archer_name === '' || $line_day === '' || $line_time === '' || $distance === '' || $paid_status === '' ) {
+                $errors[] = 'Row ' . $row_num . ': Missing mandatory column data. All columns except Email are required.';
+                continue;
+            }
+
+            // Phone validation (10 digits minimum)
             $phone_digits = preg_replace( '/\D/', '', $phone_raw );
             if ( strlen( $phone_digits ) > 10 && substr( $phone_digits, 0, 1 ) === '1' ) {
-                $phone_digits = substr( $phone_digits, 1 ); // Strip leading 1
+                $phone_digits = substr( $phone_digits, 1 );
             }
             if ( strlen( $phone_digits ) < 10 ) {
-                $errors[] = "Row " . ($i + 1) . ": Phone number must contain at least 10 digits.";
+                $errors[] = 'Row ' . $row_num . ': Phone number must contain at least 10 digits.';
             }
 
-            // Normalize Distance & Tier (10yd strictly locks Youth)
-            $is_cub = ( stripos( $distance, '10' ) !== false || stripos( $distance, 'cub' ) !== false );
-            $dist_val = $is_cub ? 'Cub' : '20yd';
-            $tier_val = $is_cub ? 'Youth' : ( stripos( $tier, 'youth' ) !== false ? 'Youth' : 'Adult' );
-            
-            // Normalize Payment
-            $is_paid = ( stripos( $paid_status, 'unpaid' ) === false && stripos( $paid_status, 'paid' ) !== false );
+            // Optional Email validation
+            if ( $email !== '' && ! is_email( $email ) ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Email address ('{$email}'). Leave blank or enter a valid email.";
+            }
 
-            // Match Line Day + Time to Tournament Line
-            $raw_search    = strtolower( $line_day . ' ' . $line_time );
-            $raw_search    = preg_replace( '/(\d{1,2}):00\s*(am|pm)/', '$1$2', $raw_search );
-            $search_target = preg_replace( '/[^a-z0-9]/', '', $raw_search );
-            
-            $matched_idx = '';
-            $matched_name = '';
-            foreach ( $valid_lines_map as $idx => $l_meta ) {
-                if ( strpos( $l_meta['match_str'], $search_target ) !== false || strpos( $search_target, $l_meta['match_str'] ) !== false ) {
-                    $matched_idx = $idx;
-                    $matched_name = $l_meta['raw_name'] !== '' ? $l_meta['raw_name'] : $line_day . ' ' . $line_time;
-                    break;
+            // Line Day validation (Friday, Saturday, Sunday)
+            $day_lower = strtolower( $line_day );
+            if ( ! isset( $allowed_days_map[ $day_lower ] ) ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Line Day ('{$line_day}'). Must be Friday, Saturday, or Sunday.";
+            }
+
+            // Line Time validation (30-minute increments 7:00 AM–10:00 PM + configured on active tournament)
+            $time_token = function_exists( 'sywat_normalize_import_line_time' )
+                ? sywat_normalize_import_line_time( $line_time )
+                : strtolower( preg_replace( '/[^a-z0-9]/i', '', $line_time ) );
+            $disp_time  = function_exists( 'sywat_format_template_line_time' ) ? sywat_format_template_line_time( $line_time ) : $line_time;
+
+            if ( ! empty( $valid_time_tokens ) && ! isset( $valid_time_tokens[ $time_token ] ) ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Line Time ('{$disp_time}'). Must be on a 30-minute increment between 7:00 AM and 10:00 PM.";
+            }
+
+            // Distance & Rate Tier validation (10 yds locks Youth rate)
+            $dist_lower = strtolower( preg_replace( '/\s+/', '', $distance ) );
+            $is_cub     = false;
+            if ( in_array( $dist_lower, array( '10yds', '10yd', '10', 'cub' ), true ) ) {
+                $is_cub = true;
+            } elseif ( ! in_array( $dist_lower, array( '20yds', '20yd', '20' ), true ) ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Distance ('{$distance}'). Must be '10 yds' or '20 yds'.";
+            }
+
+            $tier_lower = strtolower( $tier );
+            if ( $is_cub ) {
+                $tier_val = 'Youth';
+            } else {
+                if ( $tier_lower !== 'youth' && $tier_lower !== 'adult' ) {
+                    $errors[] = 'Row ' . $row_num . ": Invalid Rate Tier ('{$tier}'). Must be 'Youth' or 'Adult'.";
                 }
+                $tier_val = ( $tier_lower === 'youth' ) ? 'Youth' : 'Adult';
             }
+
+            // Paid Status validation (Paid or Unpaid)
+            $paid_lower = strtolower( $paid_status );
+            if ( $paid_lower !== 'paid' && $paid_lower !== 'unpaid' ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Paid Status ('{$paid_status}'). Must be 'Paid' or 'Unpaid'.";
+            }
+            $is_paid = ( $paid_lower === 'paid' );
+
+            // Match Line Day + Line Time to Configured Tournament Line in O(1)
+            $day_token     = strtolower( preg_replace( '/[^a-z0-9]/i', '', $line_day ) );
+            $search_target = $day_token . $time_token;
+            $matched_idx   = isset( $line_token_to_idx[ $search_target ] ) ? $line_token_to_idx[ $search_target ] : '';
+            $matched_name  = '';
 
             if ( $matched_idx === '' ) {
-                $errors[] = "Row " . ($i + 1) . ": Invalid Line Day/Time combination ('{$line_day} {$line_time}'). Does not match any line configured on this tournament.";
+                $errors[] = 'Row ' . $row_num . ": Invalid Line Day/Time combination ('{$line_day} {$disp_time}'). Does not match any line configured on this tournament.";
+            } else {
+                $canonical_day = isset( $allowed_days_map[ $day_lower ] ) ? $allowed_days_map[ $day_lower ] : ucfirst( $day_lower );
+                $matched_name  = $line_meta_by_idx[ $matched_idx ]['name'] !== ''
+                    ? $line_meta_by_idx[ $matched_idx ]['name']
+                    : trim( $canonical_day . ' ' . $disp_time );
             }
 
-            // Automatic Family Grouping Key (Phone -> Email -> Contact Name)
+            // Deterministic Family Grouping Key (Phone -> Email -> Contact Name)
             $family_key = $phone_digits !== '' ? $phone_digits : ( $email !== '' ? strtolower( $email ) : strtolower( $contact_name ) );
 
             $parsed_shooters[] = array(
-                'row_num'      => $i + 1,
                 'contact_name' => $contact_name,
                 'phone'        => $phone_raw,
                 'email'        => $email,
                 'archer_name'  => $archer_name,
                 'line_idx'     => $matched_idx,
                 'line_name'    => $matched_name,
-                'distance'     => $dist_val,
+                'distance'     => $is_cub ? 'Cub' : '20yd',
                 'rate_tier'    => $tier_val,
                 'is_paid'      => $is_paid,
-                'family_key'   => $family_key
+                'family_key'   => $family_key,
             );
         }
 
-        // Halt on Validation Errors
+        // Halt immediately on pre-flight validation errors (zero inline styles)
         if ( ! empty( $errors ) ) {
-            $GLOBALS['sywat_import_modal_error'] = '<strong>Pre-Flight Validation Failed:</strong><br><ul style="margin-top:8px; padding-left:20px;"><li>' . implode( '</li><li>', array_map( 'esc_html', array_slice( $errors, 0, 10 ) ) ) . '</li></ul>' . ( count( $errors ) > 10 ? '<br>...and more.' : '' );
+            $err_list = '<ul><li>' . implode( '</li><li>', array_map( 'esc_html', array_slice( $errors, 0, 10 ) ) ) . '</li></ul>';
+            if ( count( $errors ) > 10 ) {
+                $err_list .= '<p>...and ' . ( count( $errors ) - 10 ) . ' more error(s).</p>';
+            }
+            $GLOBALS['sywat_import_modal_error'] = '<strong>Pre-Flight Validation Failed:</strong>' . $err_list;
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import aborted due to formatting errors.</div>';
         }
 
-        // Pass 2: Price Calculation, Waitlist Logic, and Save
-        foreach ( $parsed_shooters as $s ) {
-            $line_idx  = $s['line_idx'];
-            $dist_val  = $s['distance'];
-            $tier_val  = $s['rate_tier'];
-            $dup_key   = $line_idx . '|' . strtolower( $dist_val ) . '|' . strtolower( $s['archer_name'] );
+        // Pass 2: Memoized Profile/Fee Resolution & Atomic Transactional Persistence
+        $imported_count   = 0;
+        $waitlisted_count = 0;
+        $skipped_dup      = 0;
+        $touched_fams     = array();
+        $profile_cache    = array();
+        $fee_cache        = array();
+        $now_mysql        = current_time( 'mysql' );
+        $has_persist_fn   = function_exists( 'sywat_waitlist_persist_record' );
+        $has_resolve_fn   = function_exists( 'sywat_resolve_archer_intake_profile' );
+        $has_norm_div_fn  = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_fee_fn       = function_exists( 'sywat_get_archer_individual_fee' );
 
-            if ( isset( $dup_lookup[ $dup_key ] ) ) {
-                $skipped_dup++;
-                continue;
-            }
+        $wpdb->query( 'START TRANSACTION' );
 
-            // Directory lookup for exact age division / gender (Optional enrichment)
-            $resolved = function_exists( 'sywat_resolve_archer_intake_profile' )
-                ? sywat_resolve_archer_intake_profile( $s['archer_name'], $tourn_date )
-                : array();
-            
-            $final_div = ! empty( $resolved['division'] ) ? $resolved['division'] : ( $dist_val === 'Cub' ? 'Cub (8 - 11)' : ( $tier_val === 'Youth' ? 'Youth (12 - 14)' : 'Adult (18 - 49)' ) );
-            if ( function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
-                $final_div = sywat_shooting_styles_normalize_division( $final_div );
-            }
+        try {
+            foreach ( $parsed_shooters as $s ) {
+                $line_idx = $s['line_idx'];
+                $dist_val = $s['distance'];
+                $tier_val = $s['rate_tier'];
+                $name_key = strtolower( trim( $s['archer_name'] ) );
+                $dup_key  = $line_idx . '|' . strtolower( $dist_val ) . '|' . $name_key;
 
-            // Fee Math
-            $shooter_due = 0.00;
-            if ( ! $s['is_paid'] && function_exists( 'sywat_get_archer_individual_fee' ) ) {
-                $shooter_due = sywat_get_archer_individual_fee( $t_data, $final_div, $dist_val, '', $default_prof_key, $tier_val );
-            }
+                if ( isset( $dup_lookup[ $dup_key ] ) ) {
+                    $skipped_dup++;
+                    continue;
+                }
 
-            // Capacity Check
-            $line_data = isset( $t_lines[ $line_idx ] ) ? $t_lines[ $line_idx ] : array();
-            $is_line_closed = in_array( $line_idx, $closed_lines, true );
-            $current_count  = isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ? $line_dist_counts[ $line_idx ][ $dist_val ] : 0;
-            $max_capacity   = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $dist_val ) : ( $dist_val === 'Cub' ? 5 : 20 );
-            
-            $is_waitlist = ( $is_line_closed || $current_count >= $max_capacity );
+                // Memoized Member Directory lookup (runs at most once per unique archer name)
+                if ( ! isset( $profile_cache[ $name_key ] ) ) {
+                    $profile_cache[ $name_key ] = $has_resolve_fn
+                        ? sywat_resolve_archer_intake_profile( $s['archer_name'], $tourn_date )
+                        : array();
+                }
+                $resolved = $profile_cache[ $name_key ];
 
-            $new_reg = array(
-                'id'              => uniqid( 'reg_' ),
-                'tournament'      => $tourn_name,
-                'line_index'      => $line_idx,
-                'line_name'       => $s['line_name'],
-                'name'            => $s['archer_name'],
-                'phone'           => $s['phone'],
-                'email'           => $s['email'],
-                'distance'        => $dist_val,
-                'division'        => $final_div,
-                'gender'          => isset( $resolved['gender'] ) ? $resolved['gender'] : '',
-                'style'           => isset( $resolved['style'] ) ? $resolved['style'] : '',
-                'pricing_profile' => $default_prof_key,
-                'is_promo_free'   => false,
-                'paid'            => $is_waitlist ? 'Waitlist' : $tier_val,
-                'booking_id'      => '',
-                'family_id'       => $s['family_key'],
-                'balance_due'     => $is_waitlist ? 0.00 : $shooter_due,
-                'status'          => $is_waitlist ? 'Waitlist' : 'Pre-Reg',
-                'created_at'      => current_time( 'mysql' ),
-            );
+                $final_div = ! empty( $resolved['division'] )
+                    ? $resolved['division']
+                    : ( $dist_val === 'Cub' ? 'Cub (8 - 11)' : ( $tier_val === 'Youth' ? 'Youth (12 - 14)' : 'Adult (18 - 49)' ) );
+                if ( $has_norm_div_fn ) {
+                    $final_div = sywat_shooting_styles_normalize_division( $final_div );
+                }
 
-            if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
-                sywat_waitlist_persist_record( $new_reg, $registrations );
-            } else {
-                update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-                $registrations[] = $new_reg;
-            }
+                // Memoized Fee Calculation (runs at most once per unique division + distance + tier)
+                $shooter_due = 0.00;
+                if ( ! $s['is_paid'] && $has_fee_fn ) {
+                    $fee_key = $final_div . '|' . $dist_val . '|' . $tier_val;
+                    if ( ! isset( $fee_cache[ $fee_key ] ) ) {
+                        $fee_cache[ $fee_key ] = (float) sywat_get_archer_individual_fee( $t_data, $final_div, $dist_val, '', $default_prof_key, $tier_val );
+                    }
+                    $shooter_due = $fee_cache[ $fee_key ];
+                }
 
-            $dup_lookup[ $dup_key ] = true;
+                // O(1) Line Capacity & Closed-Line Check
+                $l_meta         = $line_meta_by_idx[ $line_idx ];
+                $current_count  = isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ? $line_dist_counts[ $line_idx ][ $dist_val ] : 0;
+                $max_capacity   = ( $dist_val === 'Cub' ) ? $l_meta['cap_Cub'] : $l_meta['cap_20yd'];
+                $is_waitlist    = ( $l_meta['is_closed'] || $current_count >= $max_capacity );
 
-            if ( $is_waitlist ) {
-                $waitlisted_count++;
-            } else {
-                if ( ! isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ) $line_dist_counts[ $line_idx ][ $dist_val ] = 0;
-                $line_dist_counts[ $line_idx ][ $dist_val ]++;
-
-                $touched_fams[ $line_idx . '___' . $s['family_key'] ] = array(
-                    'line_idx'  => $line_idx,
-                    'family_id' => $s['family_key'],
+                $new_reg = array(
+                    'id'              => uniqid( 'reg_' ),
+                    'tournament'      => $tourn_name,
+                    'line_index'      => $line_idx,
+                    'line_name'       => $s['line_name'],
+                    'name'            => $s['archer_name'],
+                    'phone'           => $s['phone'],
+                    'email'           => $s['email'],
+                    'distance'        => $dist_val,
+                    'division'        => $final_div,
+                    'gender'          => isset( $resolved['gender'] ) ? $resolved['gender'] : '',
+                    'style'           => isset( $resolved['style'] ) ? $resolved['style'] : '',
+                    'pricing_profile' => $default_prof_key,
+                    'is_promo_free'   => false,
+                    'paid'            => $is_waitlist ? 'Waitlist' : $tier_val,
+                    'booking_id'      => '',
+                    'family_id'       => $s['family_key'],
+                    'balance_due'     => $is_waitlist ? 0.00 : $shooter_due,
+                    'status'          => $is_waitlist ? 'Waitlist' : 'Pre-Reg',
+                    'created_at'      => $now_mysql,
                 );
-                $imported_count++;
-            }
-        }
 
-        // Pass 3: Reconcile per-line Family Caps automatically for any touched households
-        if ( ! empty( $touched_fams ) && function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
-            foreach ( $touched_fams as $tf ) {
-                sywat_waitlist_recalculate_line_family_fees( $tourn_name, $tf['line_idx'], $tf['family_id'], $registrations, $t_lines );
+                if ( $has_persist_fn ) {
+                    sywat_waitlist_persist_record( $new_reg, $registrations );
+                } else {
+                    update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
+                    $registrations[] = $new_reg;
+                }
+
+                $dup_lookup[ $dup_key ] = true;
+
+                if ( $is_waitlist ) {
+                    $waitlisted_count++;
+                } else {
+                    if ( ! isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ) {
+                        $line_dist_counts[ $line_idx ][ $dist_val ] = 0;
+                    }
+                    $line_dist_counts[ $line_idx ][ $dist_val ]++;
+
+                    $touched_fams[ $line_idx . '___' . $s['family_key'] ] = array(
+                        'line_idx'  => $line_idx,
+                        'family_id' => $s['family_key'],
+                    );
+                    $imported_count++;
+                }
             }
+
+            // Pass 3: Reconcile per-line Family Caps automatically for any touched households
+            if ( ! empty( $touched_fams ) && function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
+                foreach ( $touched_fams as $tf ) {
+                    sywat_waitlist_recalculate_line_family_fees( $tourn_name, $tf['line_idx'], $tf['family_id'], $registrations, $t_lines );
+                }
+            }
+
+            $wpdb->query( 'COMMIT' );
+        } catch ( Exception $e ) {
+            $wpdb->query( 'ROLLBACK' );
+            $GLOBALS['sywat_import_modal_error'] = 'Database error during batch import: ' . esc_html( $e->getMessage() );
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import failed and was rolled back safely.</div>';
         }
 
         if ( $imported_count === 0 && $waitlisted_count === 0 ) {
-            $warn = 'No new shooters were imported. ';
-            $warn .= ( $skipped_dup > 0 ) ? "Skipped {$skipped_dup} duplicate(s)." : "Please verify your template data.";
+            $warn  = 'No new shooters were imported. ';
+            $warn .= ( $skipped_dup > 0 ) ? "Skipped {$skipped_dup} duplicate(s)." : 'Please verify your template data.';
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">' . esc_html( $warn ) . '</div>';
         }
 
         $msg_parts = array();
-        if ( $imported_count > 0 )   $msg_parts[] = "Successfully imported {$imported_count} shooter(s) as Pre-Reg.";
-        if ( $waitlisted_count > 0 ) $msg_parts[] = "Added {$waitlisted_count} over-capacity shooter(s) to the Waitlist ($0.00 due).";
-        if ( $skipped_dup > 0 )      $msg_parts[] = "Skipped {$skipped_dup} duplicate(s).";
+        if ( $imported_count > 0 ) {
+            $msg_parts[] = "Successfully imported {$imported_count} shooter(s) as Pre-Reg.";
+        }
+        if ( $waitlisted_count > 0 ) {
+            $msg_parts[] = "Added {$waitlisted_count} over-capacity shooter(s) to the Waitlist ($0.00 due).";
+        }
+        if ( $skipped_dup > 0 ) {
+            $msg_parts[] = "Skipped {$skipped_dup} duplicate(s).";
+        }
 
         $alert_class = ( $imported_count > 0 ) ? 'sywat-alert-success' : 'sywat-alert-warning';
         return '<div id="sywat-notice" class="sywat-alert ' . $alert_class . '">' . esc_html( implode( ' ', $msg_parts ) ) . '</div>';
