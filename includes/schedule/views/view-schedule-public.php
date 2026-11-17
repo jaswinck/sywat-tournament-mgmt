@@ -2,10 +2,10 @@
 /**
  * View Template: Public Season Schedule (List View & Monthly Calendar View)
  * Path: includes/schedule/views/view-schedule-public.php
- * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, live SYWAT online registration links & upcoming opening date pills, stacked shop phone links, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
+ * Description: Renders the public season schedule with an instant List View / Calendar View switcher, shared filter bar, current-weekend jump control, per-line and event-level Cubs Only / 20 YD Only indicators, live SYWAT online registration links & upcoming opening date pills, tap-to-call shop phone links under every host location, Sunday-Saturday monthly calendar grid displaying all matching events per day, and event details modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, modal outside forms, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.6.0
+ * Version: 1.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -239,6 +239,20 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                             <?php endif; ?>
                                         </div>
                                     <?php endif; ?>
+
+                                    <?php if ( ! empty( $evt['shop_phone'] ) ) : ?>
+                                        <?php $loc_tel_href = preg_replace( '/[^0-9+]/', '', (string) $evt['shop_phone'] ); ?>
+                                        <div class="sywat-label-subtext sywat-mt-1">
+                                            📞
+                                            <?php if ( ! empty( $loc_tel_href ) ) : ?>
+                                                <a href="<?php echo esc_attr( 'tel:' . $loc_tel_href ); ?>" class="sywat-table-link">
+                                                    <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                                </a>
+                                            <?php else : ?>
+                                                <?php echo esc_html( $evt['shop_phone'] ); ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
 
                                 <!-- 3. SHOOTING LINES (Grouped by Day, Stacked for Alignment) -->
@@ -315,23 +329,9 @@ $weekdays = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                                                         <?php echo $icon_ext_link; ?> <?php echo esc_html( $btn_label ); ?>
                                                     </a>
                                                 <?php endforeach; ?>
-                                            <?php elseif ( $pub_reg_status !== 'open' && ! empty( $evt['shop_phone'] ) ) : ?>
-                                                <?php $tel_href = preg_replace( '/[^0-9+]/', '', (string) $evt['shop_phone'] ); ?>
-                                                <div class="sywat-label-subtext sywat-mt-1">
-                                                    <div>📞 <strong>Contact Shop:</strong></div>
-                                                    <div>
-                                                        <?php if ( ! empty( $tel_href ) ) : ?>
-                                                            <a href="<?php echo esc_attr( 'tel:' . $tel_href ); ?>" class="sywat-table-link">
-                                                                <?php echo esc_html( $evt['shop_phone'] ); ?>
-                                                            </a>
-                                                        <?php else : ?>
-                                                            <?php echo esc_html( $evt['shop_phone'] ); ?>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
                                             <?php elseif ( $pub_reg_status !== 'open' && $pub_reg_status !== 'opens_soon' ) : ?>
                                                 <div class="sywat-label-subtext sywat-mt-1">
-                                                    📞 <strong>Contact Host to Register</strong>
+                                                    📞 <strong><?php echo ! empty( $evt['shop_phone'] ) ? 'Contact Shop to Register' : 'Contact Host to Register'; ?></strong>
                                                 </div>
                                             <?php endif; ?>
 
