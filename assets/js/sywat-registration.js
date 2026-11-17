@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-registration.js
  * Description: Manages multi-archer phone intake rows, round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, database-driven age division & distance synchronization, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 (function() {
@@ -707,9 +707,13 @@
 
     window.initAutoDismissAlerts = function() {
         setTimeout(function() {
-            const alerts = document.querySelectorAll('.sywat-alert, #sywat-notice, .sywat-modal-notice');
+            const alerts = document.querySelectorAll('#sywat-notice.sywat-alert-success');
             alerts.forEach(function(alert) {
-                if (alert.querySelector('form') || alert.querySelector('button') || (alert.textContent && alert.textContent.includes('OVERFLOW'))) {
+                if (
+                    alert.closest('.sywat-modal-backdrop') ||
+                    alert.querySelector('form, button, a') ||
+                    (alert.textContent && alert.textContent.includes('OVERFLOW'))
+                ) {
                     return;
                 }
                 alert.classList.add('sywat-dismissing');
