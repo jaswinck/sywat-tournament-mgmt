@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Action Handling & AJAX Batch Engines
  * Path: includes/members/members-actions.php
- * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings in fallback role map), high-performance protected test data purging with cache/hook suspension, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
+ * Description: Nonce-verified action processor for member account creation, household sub-profile management, Head of Household swapping, unlinking dependents into unassigned data pools, transferring standalone primary accounts or linking unassigned pool archers into household rosters, profile updates, DOB/NFAA meta saving, Gender/Pro selection processing, automated bi-directional board position role-syncing and board role preservation during profile edits (including complete Field Governor district mappings in fallback role map), high-performance protected test data purging with cache/hook suspension and member index transient invalidation, 2-step batch spreadsheet importer persistent file staging, output-buffered AJAX progress chunking endpoints, dynamic archer autocomplete search APIs, live Head of Household autocomplete search APIs, self-service Head of Household profile updates, and DRY protected account hashtable maps.
  * Compliance: Zero visual HTML layout templates. Returns standardized alert notices and sets preview data globals.
  * Author: SYWAT Archery
- * Version: 5.1.1
+ * Version: 5.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -234,7 +234,9 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Staged upload file missing or expired. Please upload the spreadsheet again.</div>';
                 }
 
-                return sywat_import_archers_spreadsheet( $persistent_file, 'commit' );
+                $commit_notice = sywat_import_archers_spreadsheet( $persistent_file, 'commit' );
+                delete_transient( 'sywat_member_directory_index_cache' );
+                return $commit_notice;
             }
         }
 
@@ -294,6 +296,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         sywat_update_household_dependent( $primary_user_id, $target_system_id, $old_head_dep );
                     }
 
+                    delete_transient( 'sywat_member_directory_index_cache' );
+
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">👑 <strong>' . esc_html( $new_first . ' ' . $new_last ) . '</strong> is now designated as the Head of Household!</div>';
                 }
             }
@@ -336,6 +340,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 $wpdb->query( 'COMMIT' );
                 wp_suspend_cache_invalidation( false );
                 wp_cache_flush();
+                delete_transient( 'sywat_member_directory_index_cache' );
             }
 
             return sprintf(
@@ -387,6 +392,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     if ( is_wp_error( $system_id ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $system_id->get_error_message() ) . '</div>';
                     }
+                    delete_transient( 'sywat_member_directory_index_cache' );
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Family member <strong>' . esc_html( $first_name . ' ' . $last_name ) . '</strong> added to household successfully!</div>';
                 }
             }
@@ -474,6 +480,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 update_user_meta( $user_id, 'sywat_shop_id', $shop_id );
             }
 
+            delete_transient( 'sywat_member_directory_index_cache' );
+
             $disp_nfaa = ! empty( $nfaa_number ) ? $nfaa_number : 'Unassigned';
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Primary Member account created successfully! Username: <strong>' . esc_html( $username ) . '</strong> | NFAA ID: <strong>' . esc_html( $disp_nfaa ) . '</strong></div>';
         }
@@ -512,6 +520,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     if ( is_wp_error( $res ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
+                    delete_transient( 'sywat_member_directory_index_cache' );
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Household member sub-profile updated successfully.</div>';
                 }
             }
@@ -604,6 +613,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     }
                 }
 
+                delete_transient( 'sywat_member_directory_index_cache' );
+
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member profile updated successfully.</div>';
             }
         }
@@ -668,6 +679,8 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             update_user_meta( $user_id, 'sywat_state', $state );
             update_user_meta( $user_id, 'sywat_zip', $zip );
 
+            delete_transient( 'sywat_member_directory_index_cache' );
+
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Your household master profile has been updated successfully!</div>';
         }
 
@@ -689,6 +702,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     if ( is_wp_error( $res ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
+                    delete_transient( 'sywat_member_directory_index_cache' );
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🗑️ Sub-profile "<strong>' . esc_html( $dep_name ) . '</strong>" permanently deleted from household.</div>';
                 }
             }
@@ -707,6 +721,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
             $deleted_name = $user->display_name;
 
             if ( wp_delete_user( $user_id ) ) {
+                delete_transient( 'sywat_member_directory_index_cache' );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member account "<strong>' . esc_html( $deleted_name ) . '</strong>" has been permanently deleted.</div>';
             } else {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Failed to delete user account. Please try again.</div>';
@@ -747,6 +762,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $res->get_error_message() ) . '</div>';
                     }
                 }
+                delete_transient( 'sywat_member_directory_index_cache' );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>' . esc_html( $dep_name ) . '</strong> has been unlinked from this household and moved to the unassigned archer pool.</div>';
             }
         }
@@ -775,6 +791,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                 if ( is_wp_error( $promoted_id ) ) {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $promoted_id->get_error_message() ) . '</div>';
                 }
+                delete_transient( 'sywat_member_directory_index_cache' );
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Member promoted to standalone Primary Account Holder successfully!</div>';
             }
         }
@@ -884,6 +901,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                     require_once ABSPATH . 'wp-admin/includes/user.php';
                     wp_delete_user( $source_user_id );
                     wp_cache_flush();
+                    delete_transient( 'sywat_member_directory_index_cache' );
 
                     return sprintf(
                         '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 <strong>%s %s</strong> successfully transferred to <strong>%s</strong>\'s household roster! Redundant standalone account merged.</div>',
@@ -911,6 +929,7 @@ if ( ! function_exists( 'sywat_handle_member_post_actions' ) ) {
                         // Clean up unassigned pool record
                         unset( $unassigned_pool[ $target_system_id ] );
                         update_option( 'sywat_unassigned_archers', $unassigned_pool );
+                        delete_transient( 'sywat_member_directory_index_cache' );
 
                         return sprintf(
                             '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🔗 Unassigned archer <strong>%s %s</strong> linked to <strong>%s</strong>\'s household roster successfully!</div>',
@@ -1091,6 +1110,7 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         if ( empty( $purge_queue ) ) {
             delete_transient( $queue_key );
             delete_transient( $meta_key );
+            delete_transient( 'sywat_member_directory_index_cache' );
             wp_cache_flush();
 
             if ( ob_get_length() ) {
@@ -1138,6 +1158,7 @@ if ( ! function_exists( 'sywat_ajax_purge_test_members_chunk' ) ) {
         if ( $finished ) {
             delete_transient( $queue_key );
             delete_transient( $meta_key );
+            delete_transient( 'sywat_member_directory_index_cache' );
             wp_cache_flush();
         }
 
