@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for active tournament selectors, line score tracker, archer score entry table with database-normalized division/style labels, and control toolbars.
+ * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table with database-normalized division/style labels, and control toolbars.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -27,10 +28,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         }
 
         // Administrative & Score Control roles (Includes sywat_shop_manager for Line Lock/Unlock)
-        $admin_roles        = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor', 'sywat_shop_manager' );
-        $is_admin           = is_user_logged_in() && (bool) array_intersect( $admin_roles, (array) $user->roles );
-        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
-        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $admin_roles            = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor', 'sywat_shop_manager' );
+        $is_admin               = is_user_logged_in() && (bool) array_intersect( $admin_roles, (array) $user->roles );
+        $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
+        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
+        $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
         // Handle AJAX Autosave Early
         if ( function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
@@ -172,11 +175,15 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         <div class="sywat-wrap">
             <?php echo $notice; ?>
 
-            <!-- Master Navigation Tabs -->
+            <!-- Master Navigation Tabs (Card-Docked, Role-Gated) -->
             <div class="sywat-nav-tabs no-print">
-                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
-                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
-                <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
+                <?php if ( $can_manage_tournaments ) : ?>
+                    <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+                <?php endif; ?>
+                <?php if ( $can_access_desk ) : ?>
+                    <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+                    <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
+                <?php endif; ?>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
                 <?php if ( $can_manage_seasons ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season">Manage Seasons</a>
@@ -452,7 +459,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </table>
                             </div>
 
-                            <div class="sywat-table-footer-controls" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+                            <div class="sywat-table-footer-controls sywat-modal-form-actions-right sywat-mt-3">
                                 <?php if ( $is_admin ) : ?>
                                     <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" onclick="return confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.');">Reset All Scores to 0</button>
                                 <?php endif; ?>
