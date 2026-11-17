@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the [sywat_register] Registration Desk portal with role-gated desk tabs, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view/shortcode layer — zero output at include time, zero inline styles, delegated data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -210,7 +210,7 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
 }
 
 /**
- * Render Full Registration Desk Page (Shortcode Handler: [sywat_register])
+ * Render Full Registration Desk Page (Shortcode Handler: [sywat_register]).
  *
  * @return string Rendered HTML markup output for the registration portal.
  */
@@ -223,11 +223,12 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         ob_start();
         global $wpdb;
 
-        $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
-        $can_access_desk    = sywat_can_access_desk();
-        $can_edit_scores    = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
+        $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
+        $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
+        $can_access_desk        = sywat_can_access_desk();
+        $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
 
-        $user_shop_id       = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( ! is_array( $tournaments ) ) {
@@ -325,16 +326,18 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             sywat_render_registration_scripts();
         }
 
-        $tab_query_args = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
+        $tab_query_args   = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
         $has_active_tourn = ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) );
         ?>
 
         <div class="sywat-wrap">
             <div class="no-print"><?php echo $notice; ?></div>
 
-            <!-- Master Operational Navigation Tabs (Card-Docked) -->
+            <!-- Master Operational Navigation Tabs (Card-Docked, Role-Gated) -->
             <div class="sywat-nav-tabs no-print">
-                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+                <?php if ( $can_manage_tournaments ) : ?>
+                    <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
+                <?php endif; ?>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register active">Register Shooters</a>
                 <?php if ( $can_access_desk ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
