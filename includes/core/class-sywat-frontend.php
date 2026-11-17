@@ -2,6 +2,7 @@
 /**
  * SYWAT Archery - Front-End Integration Layer
  * Path: includes/core/class-sywat-frontend.php
+ * Version: 7.3.1
  *
  * Keeps the plugin theme-neutral so it behaves the same under Astra, Divi or
  * any other theme:
@@ -110,7 +111,7 @@ if ( ! function_exists( 'sywat_page_defaults' ) ) {
             'shooting_styles'     => array( '/shooting-styles/', 'Shooting Styles & Rules page' ),
             'pricing'             => array( '/pricing/', 'Pricing & Round Formats page' ),
             'after_login_manager' => array( '/tournaments', 'After login: tournament managers go to' ),
-            'after_login_shop'    => array( '/desk', 'After login: shop operators go to' ),
+            'after_login_shop'    => array( '/sywat-desk/', 'After login: shop operators go to' ),
         );
     }
 }
