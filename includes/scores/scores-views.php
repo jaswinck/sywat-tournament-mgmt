@@ -5,7 +5,7 @@
  * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table with database-normalized division/style labels, and control toolbars.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,6 +31,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $admin_roles            = array( 'administrator', 'management', 'tfaa_webmaster', 'tfaa_admin', 'tfaa_president', 'tfaa_tournament_director', 'tfaa_field_governor', 'sywat_shop_manager' );
         $is_admin               = is_user_logged_in() && (bool) array_intersect( $admin_roles, (array) $user->roles );
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
+        $can_register_shooters  = function_exists( 'sywat_can_register_shooters' ) ? sywat_can_register_shooters() : ( function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk() );
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
         $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
@@ -180,8 +181,10 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                 <?php if ( $can_manage_tournaments ) : ?>
                     <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
                 <?php endif; ?>
-                <?php if ( $can_access_desk ) : ?>
+                <?php if ( $can_register_shooters ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+                <?php endif; ?>
+                <?php if ( $can_access_desk ) : ?>
                     <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
                 <?php endif; ?>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'enter_scores' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-edit">Enter Scores</a>
