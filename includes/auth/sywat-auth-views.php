@@ -2,10 +2,10 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
- * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown and role-gated Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.9.1
+ * Version: 5.9.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -103,14 +103,14 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- 3. Shops & Clubs Navigation Item (Dropdown for Staff, Direct Link for Public) -->
-                    <?php if ( $can_manage_shops || ! empty( $user_shop_id ) ) : ?>
+                    <!-- 3. Shops & Clubs Navigation Item (Dropdown for Authorized Shop/Season Staff, Direct Link for Members & Public) -->
+                    <?php if ( $can_manage_shops || $can_manage_seasons ) : ?>
                         <div class="sywat-auth-dropdown">
                             <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
                                 🎯 Shops & Clubs <span class="sywat-dropdown-caret">▼</span>
                             </a>
                             <div class="sywat-auth-dropdown-menu">
-                                <?php if ( ! $is_admin && ! empty( $user_shop_id ) ) : ?>
+                                <?php if ( $can_manage_shops && ! $is_admin && ! empty( $user_shop_id ) ) : ?>
                                     <a href="<?php echo esc_url( add_query_arg( 'edit_shop', rawurlencode( $user_shop_id ), sywat_page_url( 'manage_shops' ) ) ); ?>">
                                         🎯 My Shop / Club Profile
                                     </a>
