@@ -1,13 +1,15 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows, round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, database-driven age division & distance synchronization, dynamic Household Family Cap calculation (line or tournament scope), and TFAA historical shooter autocomplete.
- * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.1.0
+ * Description: Manages multi-archer phone intake rows, round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, database-driven age division & distance synchronization, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
+ * Version: 7.3.0
  */
 
 (function() {
     'use strict';
+
+    window.SYWAT = window.SYWAT || {};
 
     let archerRowCount = 1;
 
@@ -20,6 +22,48 @@
         { slug: 'silver-senior-60-69', code: 'SS', label: 'Silver Senior (60 - 69)',distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Silver Senior'] },
         { slug: 'master-senior-70',    code: 'MS', label: 'Master Senior (70+)',    distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Master Senior', 'Master'] }
     ];
+
+    function cleanImportModalQueryParam() {
+        if (!window.history || typeof window.history.replaceState !== 'function') {
+            return;
+        }
+        try {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('open_import_modal')) {
+                url.searchParams.delete('open_import_modal');
+                window.history.replaceState({}, document.title, url.toString());
+            }
+        } catch (err) {
+            // Ignore malformed URL edge cases
+        }
+    }
+
+    function openImportModal() {
+        const modal = document.getElementById('sywat_import_modal');
+        if (!modal) {
+            return;
+        }
+        modal.classList.add('active');
+        const fileInput = modal.querySelector('input[type="file"]');
+        if (fileInput && typeof fileInput.focus === 'function') {
+            setTimeout(function() {
+                fileInput.focus();
+            }, 30);
+        }
+    }
+
+    function closeImportModal() {
+        const modal = document.getElementById('sywat_import_modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        cleanImportModalQueryParam();
+    }
+
+    window.SYWAT.registration = {
+        openImportModal: openImportModal,
+        closeImportModal: closeImportModal
+    };
 
     function getTfaaShooters() {
         if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
@@ -515,7 +559,7 @@
             </div>
 
             <div class="sywat-col-archer-action">
-                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer"></button>
+                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer" aria-label="Remove Archer"></button>
             </div>
         `;
 
@@ -689,6 +733,29 @@
     });
 
     document.addEventListener('click', function(e) {
+        const actionTrigger = e.target.closest('[data-sywat-action]');
+        if (actionTrigger) {
+            const action = actionTrigger.getAttribute('data-sywat-action');
+            if (action === 'open-import-modal') {
+                e.preventDefault();
+                openImportModal();
+                return;
+            }
+            if (action === 'close-import-modal') {
+                e.preventDefault();
+                closeImportModal();
+                return;
+            }
+            if (action === 'dismiss-overflow-modal') {
+                e.preventDefault();
+                const overflowModal = document.getElementById('sywat_capacity_overflow_modal');
+                if (overflowModal) {
+                    overflowModal.remove();
+                }
+                return;
+            }
+        }
+
         if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && (!e.target.name || !e.target.name.includes('[name]'))) {
             window.closeAllTfaaAutocompletes();
         }
@@ -708,6 +775,15 @@
         });
         window.recalculateGroupTotal();
         window.initAutoDismissAlerts();
+
+        const importModal = document.getElementById('sywat_import_modal');
+        if (importModal) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('open_import_modal') === '1' || importModal.getAttribute('data-auto-open') === '1') {
+                openImportModal();
+                cleanImportModalQueryParam();
+            }
+        }
     });
 
 })();
