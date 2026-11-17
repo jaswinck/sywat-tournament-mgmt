@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member Self-Registration Formatting & Calculation Helpers
  * Path: includes/registration/member-registration-helpers.php
- * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters, open tournament display metadata, live per-line slot availability maps, existing registration status maps, and complete view payloads with zero database queries or HTML output.
+ * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters, open tournament display metadata, live per-line slot availability maps, per-archer/per-line existing registration status maps, and complete view payloads with zero database queries or HTML output.
  * Compliance: Pure helper layer — zero SQL queries, zero get_option/get_user_meta calls, zero HTML output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -276,10 +276,15 @@ if ( ! function_exists( 'sywat_member_reg_resolve_selected_tournament' ) ) {
 }
 
 /**
- * Build an O(1) lookup map of existing non-cancelled registrations keyed by normalized shooter name.
+ * Build an O(1) per-archer, per-shooting-line lookup map of existing non-cancelled registrations
+ * keyed by normalized shooter name, supporting both line_index and normalized line_name lookups.
  *
  * @param array<int, array> $registrations Scoped tournament registration records.
- * @return array<string, array{status: string, line_name: string}>
+ * @return array<string, array{
+ *     by_line_idx: array<string, array{status: string, line_index: string, line_name: string}>,
+ *     by_line_name: array<string, array{status: string, line_index: string, line_name: string}>,
+ *     entries: array<int, array{status: string, line_index: string, line_name: string}>
+ * }>
  */
 if ( ! function_exists( 'sywat_member_reg_build_existing_status_map' ) ) {
     function sywat_member_reg_build_existing_status_map( $registrations ) {
@@ -296,13 +301,37 @@ if ( ! function_exists( 'sywat_member_reg_build_existing_status_map' ) ) {
             if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
                 continue;
             }
+
             $norm_name = strtolower( trim( (string) $reg['name'] ) );
-            if ( $norm_name !== '' && ! isset( $status_map[ $norm_name ] ) ) {
+            if ( $norm_name === '' ) {
+                continue;
+            }
+
+            if ( ! isset( $status_map[ $norm_name ] ) ) {
                 $status_map[ $norm_name ] = array(
-                    'status'    => $status !== '' ? $status : 'Pre-Reg',
-                    'line_name' => isset( $reg['line_name'] ) ? (string) $reg['line_name'] : '',
+                    'by_line_idx'  => array(),
+                    'by_line_name' => array(),
+                    'entries'      => array(),
                 );
             }
+
+            $line_idx       = isset( $reg['line_index'] ) ? trim( (string) $reg['line_index'] ) : '';
+            $line_name      = isset( $reg['line_name'] ) ? trim( (string) $reg['line_name'] ) : '';
+            $norm_line_name = strtolower( $line_name );
+
+            $entry = array(
+                'status'     => $status !== '' ? $status : 'Pre-Reg',
+                'line_index' => $line_idx,
+                'line_name'  => $line_name,
+            );
+
+            if ( $line_idx !== '' && ! isset( $status_map[ $norm_name ]['by_line_idx'][ $line_idx ] ) ) {
+                $status_map[ $norm_name ]['by_line_idx'][ $line_idx ] = $entry;
+            }
+            if ( $norm_line_name !== '' && ! isset( $status_map[ $norm_name ]['by_line_name'][ $norm_line_name ] ) ) {
+                $status_map[ $norm_name ]['by_line_name'][ $norm_line_name ] = $entry;
+            }
+            $status_map[ $norm_name ]['entries'][] = $entry;
         }
 
         return $status_map;
