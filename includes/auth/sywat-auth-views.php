@@ -2,10 +2,10 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
- * Description: Renders master navigation header for logged-in and public users (including Member Online Registration navigation and Head of Household user profile dropdown), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.9.0
+ * Version: 5.9.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -62,14 +62,6 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                         <div class="sywat-auth-dropdown-menu">
                             <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>">
                                 📅 Season Schedule
-                            </a>
-                            <a href="<?php echo esc_url( sywat_page_url( 'member_register' ) ); ?>">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                                    <path d="M9 14l2 2 4-4"></path>
-                                </svg>
-                                Register Online
                             </a>
                             <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>">
                                 🏆 Results &amp; Standings
