@@ -2,10 +2,10 @@
 /**
  * View Template: Public Member Online Tournament Registration Portal
  * Path: includes/registration/views/view-member-registration.php
- * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, open tournament selector, live line capacity availability table, and household multi-archer self-registration form with automatic age division/distance detection and Waitlist placement notices.
+ * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, selected tournament event details, live line capacity availability table, and household multi-archer self-registration form with automatic age division/distance detection, Waitlist placement notices, and Season Schedule cancel/return navigation.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, zero inline event handlers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -26,8 +26,6 @@ $division_options     = isset( $view_data['division_options'] ) && is_array( $vi
 $submission_result    = isset( $view_data['submission_result'] ) && is_array( $view_data['submission_result'] ) ? $view_data['submission_result'] : null;
 
 $icon_clipboard = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14l2 2 4-4"></path></svg>';
-$icon_calendar  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
-$icon_user      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
 
 $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $selected_tournament ] ) )
     ? $open_tournaments[ $selected_tournament ]
@@ -45,12 +43,12 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
         <div class="sywat-header-inline-controls">
             <?php if ( $schedule_url !== '' ) : ?>
                 <a href="<?php echo esc_url( $schedule_url ); ?>" class="sywat-btn sywat-btn-secondary">
-                    <?php echo $icon_calendar; ?> Season Schedule
+                    📅 Season Schedule
                 </a>
             <?php endif; ?>
             <?php if ( $is_logged_in && $profile_url !== '' ) : ?>
                 <a href="<?php echo esc_url( $profile_url ); ?>" class="sywat-btn sywat-btn-secondary">
-                    <?php echo $icon_user; ?> My Household
+                    👤 My Household
                 </a>
             <?php endif; ?>
         </div>
@@ -69,7 +67,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
             <?php endif; ?>
             <?php if ( $schedule_url !== '' ) : ?>
                 <a href="<?php echo esc_url( $schedule_url ); ?>" class="sywat-btn sywat-btn-secondary">
-                    View Season Schedule
+                    📅 View Season Schedule
                 </a>
             <?php endif; ?>
         </div>
@@ -140,13 +138,13 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
             <?php if ( $schedule_url !== '' ) : ?>
                 <div class="sywat-mt-3">
                     <a href="<?php echo esc_url( $schedule_url ); ?>" class="sywat-btn sywat-btn-primary">
-                        <?php echo $icon_calendar; ?> View Season Schedule
+                        📅 View Season Schedule
                     </a>
                 </div>
             <?php endif; ?>
 
         <?php else : ?>
-            <!-- STATE 3: OPEN TOURNAMENT SELECTOR & HOUSEHOLD SELF-REGISTRATION FORM -->
+            <!-- STATE 3: SELECTED EVENT DETAILS & HOUSEHOLD SELF-REGISTRATION FORM -->
             <?php
                 $t_profiles     = isset( $active_event['pricing_profiles'] ) && is_array( $active_event['pricing_profiles'] ) ? $active_event['pricing_profiles'] : array();
                 $is_multi_round = count( $t_profiles ) > 1;
@@ -193,41 +191,22 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 }
             ?>
 
-            <!-- TOURNAMENT SWITCHER -->
-            <form method="get" action="<?php echo esc_url( $form_action_url ); ?>" class="sywat-mt-3 sywat-mb-3">
-                <div class="sywat-form-grid-2">
-                    <div class="sywat-field-group">
-                        <label for="sywat_member_reg_tournament_select"><strong>1. Select Open Tournament *</strong></label>
-                        <div class="sywat-search-input-wrapper">
-                            <select name="tournament" id="sywat_member_reg_tournament_select">
-                                <?php foreach ( $open_tournaments as $t_key => $t_item ) : ?>
-                                    <?php $opt_label = $t_item['name'] . ' — ' . $t_item['display_dates'] . ' (' . $t_item['shop_name'] . ')'; ?>
-                                    <option value="<?php echo esc_attr( $t_key ); ?>" <?php selected( $selected_tournament, $t_key ); ?>>
-                                        <?php echo esc_html( $opt_label ); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <button type="submit" class="sywat-btn sywat-btn-secondary">Load Event</button>
-                        </div>
-                    </div>
-
-                    <div class="sywat-field-group">
-                        <label>Event Details</label>
-                        <div>
-                            <strong><?php echo esc_html( $active_event['shop_name'] ); ?></strong>
-                            <?php if ( $active_event['event_type'] !== 'SYWAT' ) : ?>
-                                <span class="sywat-badge sywat-badge-open sywat-ml-1"><?php echo esc_html( $active_event['event_type'] ); ?></span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="sywat-label-subtext">
-                            <?php echo esc_html( $active_event['display_dates'] ); ?>
-                            <?php if ( ! empty( $format_labels ) ) : ?>
-                                • Format: <?php echo esc_html( implode( ' / ', $format_labels ) ); ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+            <!-- SELECTED TOURNAMENT EVENT DETAILS -->
+            <div class="sywat-alert sywat-alert-info sywat-mt-3 sywat-mb-3">
+                <div>
+                    <strong><?php echo esc_html( $active_event['name'] ); ?></strong>
+                    <?php if ( $active_event['event_type'] !== 'SYWAT' ) : ?>
+                        <span class="sywat-badge sywat-badge-open sywat-ml-1"><?php echo esc_html( $active_event['event_type'] ); ?></span>
+                    <?php endif; ?>
                 </div>
-            </form>
+                <div class="sywat-label-subtext">
+                    <strong>Host:</strong> <?php echo esc_html( $active_event['shop_name'] ); ?>
+                    • <strong>Dates:</strong> <?php echo esc_html( $active_event['display_dates'] ); ?>
+                    <?php if ( ! empty( $format_labels ) ) : ?>
+                        • <strong>Format:</strong> <?php echo esc_html( implode( ' / ', $format_labels ) ); ?>
+                    <?php endif; ?>
+                </div>
+            </div>
 
             <!-- LIVE SHOOTING LINE AVAILABILITY TABLE -->
             <div class="sywat-table-header-bar sywat-mt-3">
@@ -284,7 +263,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
 
                 <div class="sywat-form-grid-2 sywat-mb-3">
                     <div class="sywat-field-group">
-                        <label for="sywat_member_reg_line_idx"><strong>2. Choose Shooting Line *</strong></label>
+                        <label for="sywat_member_reg_line_idx"><strong>1. Choose Shooting Line *</strong></label>
                         <select name="line_idx" id="sywat_member_reg_line_idx" required>
                             <?php foreach ( $line_availability as $l_idx => $l_info ) : ?>
                                 <?php if ( ! empty( $l_info['is_closed'] ) ) continue; ?>
@@ -315,7 +294,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 </div>
 
                 <div class="sywat-table-header-bar sywat-mt-3">
-                    <h3>3. Select Household Archer(s) to Register *</h3>
+                    <h3>2. Select Household Archer(s) to Register *</h3>
                     <?php if ( $profile_url !== '' ) : ?>
                         <a href="<?php echo esc_url( $profile_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-sm">
                             + Manage Family Members
@@ -423,6 +402,11 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                     <button type="submit" class="sywat-btn sywat-btn-success">
                         <?php echo $icon_clipboard; ?> Complete Online Registration
                     </button>
+                    <?php if ( $schedule_url !== '' ) : ?>
+                        <a href="<?php echo esc_url( $schedule_url ); ?>" class="sywat-btn sywat-btn-secondary">
+                            Cancel
+                        </a>
+                    <?php endif; ?>
                 </div>
             </form>
         <?php endif; ?>
