@@ -2,10 +2,10 @@
 /**
  * Sub-Module: FareHarbor CSV & Raw Text Import Engine
  * Path: includes/registration/registration-import.php
- * Description: Handles CSV file and raw text payload roster imports for pre-registration intake, resolving each shooter via sywat_resolve_archer_intake_profile() against database-configured age divisions and tournament pricing/round profiles.
- * Compliance: Pure action/import layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Description: Handles CSV file and raw text payload roster imports for pre-registration intake, validating uploads, stripping UTF-8 BOM headers, resolving each shooter via sywat_resolve_archer_intake_profile() against database-configured age divisions and tournament pricing/round profiles, enforcing O(1) duplicate checks, and placing capacity-overflow or closed-line entries onto the Waitlist ($0.00 due).
+ * Compliance: Pure action/import layer — zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,9 +31,56 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
         $t_slug          = sanitize_title( $tourn_name );
         $allow_partial   = isset( $_POST['allow_partial'] ) && wp_unslash( $_POST['allow_partial'] ) === '1';
         $imported_count  = 0;
+        $waitlisted_count = 0;
         $skipped_dup     = 0;
-        $skipped_cap     = 0;
         $touched_fams    = array();
+
+        // Load closed line locks for this tournament
+        $closed_lines_raw = get_option( 'sywat_closed_lines_' . $t_slug, array() );
+        $closed_lines     = is_array( $closed_lines_raw ) ? array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) : array();
+
+        // Pre-index existing tournament registrations into O(1) duplicate and active capacity maps
+        $dup_lookup       = array();
+        $line_dist_counts = array();
+        if ( is_array( $registrations ) ) {
+            foreach ( $registrations as $existing ) {
+                if ( ! is_array( $existing ) || ! isset( $existing['tournament'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $existing['tournament'] ), trim( $tourn_name ) ) !== 0 ) {
+                    continue;
+                }
+
+                $ex_status = isset( $existing['status'] ) ? trim( (string) $existing['status'] ) : '';
+                if ( strcasecmp( $ex_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $ex_line = isset( $existing['line_index'] ) ? trim( (string) $existing['line_index'] ) : '';
+                $ex_dist = isset( $existing['distance'] )
+                    ? ( function_exists( 'sywat_normalize_dist' ) ? sywat_normalize_dist( $existing['distance'] ) : trim( (string) $existing['distance'] ) )
+                    : '20yd';
+                $ex_name = isset( $existing['name'] ) ? strtolower( trim( (string) $existing['name'] ) ) : '';
+
+                if ( $ex_line !== '' ) {
+                    if ( $ex_name !== '' ) {
+                        $dup_key                = $ex_line . '|' . strtolower( $ex_dist ) . '|' . $ex_name;
+                        $dup_lookup[ $dup_key ] = true;
+                    }
+
+                    // Only active (non-waitlisted) entries count against line slot capacity
+                    if ( strcasecmp( $ex_status, 'Waitlist' ) !== 0 ) {
+                        if ( ! isset( $line_dist_counts[ $ex_line ] ) ) {
+                            $line_dist_counts[ $ex_line ] = array( '20yd' => 0, 'Cub' => 0 );
+                        }
+                        if ( ! isset( $line_dist_counts[ $ex_line ][ $ex_dist ] ) ) {
+                            $line_dist_counts[ $ex_line ][ $ex_dist ] = 0;
+                        }
+                        $line_dist_counts[ $ex_line ][ $ex_dist ]++;
+                    }
+                }
+            }
+        }
 
         // Resolve primary Pricing & Round Profile slug for imported records in this tournament
         $t_profiles       = function_exists( 'sywat_get_tournament_pricing_profiles' )
@@ -97,9 +144,12 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
         }
 
-        $raw_text_payload = ! empty( $_POST['pasted_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['pasted_text'] ) ) : '';
+        $raw_text_payload = isset( $_POST['pasted_text'] ) ? trim( (string) sanitize_textarea_field( wp_unslash( $_POST['pasted_text'] ) ) ) : '';
+        if ( $raw_text_payload !== '' ) {
+            $raw_text_payload = preg_replace( '/^\xEF\xBB\xBF/', '', $raw_text_payload );
+        }
 
-        if ( ! empty( $raw_text_payload ) ) {
+        if ( $raw_text_payload !== '' ) {
             $lines                = explode( "\n", $raw_text_payload );
             $current_dist         = '20yd';
             $current_paid_context = '';
@@ -196,7 +246,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
                 $parsed_shooters[] = array(
                     'name'      => $clean_line,
-                    'line_idx'  => $target_line_idx,
+                    'line_idx'  => (string) $target_line_idx,
                     'distance'  => $dist_val,
                     'paid'      => $final_paid,
                     'division'  => $final_div,
@@ -208,13 +258,15 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 );
             }
 
-            // Group Capacity Pre-Check Guard
+            // Group Capacity Pre-Check Guard for Pasted Text
             if ( ! empty( $parsed_shooters ) && ! $allow_partial ) {
                 $line_data = isset( $t_lines[ $target_line_idx ] ) ? $t_lines[ $target_line_idx ] : array();
                 $line_name = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
                 $dist_val  = $parsed_shooters[0]['distance'];
 
-                $current_count = function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $tourn_name, $target_line_idx, $dist_val, $registrations ) : 0;
+                $current_count = isset( $line_dist_counts[ (string) $target_line_idx ][ $dist_val ] )
+                    ? $line_dist_counts[ (string) $target_line_idx ][ $dist_val ]
+                    : 0;
                 $max_capacity  = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
                 if ( ! $max_capacity || $max_capacity <= 0 ) {
                     $max_capacity = ( $dist_val === 'Cub' ) ? 5 : 20;
@@ -235,9 +287,9 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $prompt .= '<input type="hidden" name="target_line_idx" value="' . esc_attr( $target_line_idx ) . '">';
                     $prompt .= '<input type="hidden" name="pasted_text" value="' . esc_attr( $raw_text_payload ) . '">';
                     $prompt .= '<input type="hidden" name="allow_partial" value="1">';
-                    $prompt .= '<button type="submit" class="sywat-btn sywat-btn-warning">Import Available Spots (' . intval( $open_slots ) . ')</button>';
+                    $prompt .= '<button type="submit" class="sywat-btn sywat-btn-warning">Book Available (' . intval( $open_slots ) . ') &amp; Waitlist Remainder</button>';
                     $prompt .= '</form>';
-                    $prompt .= '<button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="dismiss-overflow-modal">Cancel & Pick Another Line</button>';
+                    $prompt .= '<button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="dismiss-overflow-modal">Cancel &amp; Pick Another Line</button>';
                     $prompt .= '</div></div>';
 
                     $GLOBALS['sywat_modal_notice'] = $prompt;
@@ -246,39 +298,27 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
 
             foreach ( $parsed_shooters as $s ) {
-                $line_idx   = $s['line_idx'];
+                $line_idx   = (string) $s['line_idx'];
                 $line_data  = isset( $t_lines[ $line_idx ] ) ? $t_lines[ $line_idx ] : array();
                 $line_name  = isset( $line_data['name'] ) ? $line_data['name'] : 'Line 1';
                 $dist_val   = $s['distance'];
                 $clean_line = $s['name'];
+                $dup_key    = $line_idx . '|' . strtolower( $dist_val ) . '|' . strtolower( $clean_line );
 
-                $is_duplicate = false;
-                foreach ( $registrations as $existing ) {
-                    if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'], $existing['distance'] ) &&
-                         strcasecmp( $existing['tournament'], $tourn_name ) === 0 &&
-                         (string) $existing['line_index'] === (string) $line_idx &&
-                         strcasecmp( trim( $existing['name'] ), $clean_line ) === 0 &&
-                         strcasecmp( $existing['distance'], $dist_val ) === 0 ) {
-                        $is_duplicate = true;
-                        break;
-                    }
-                }
-
-                if ( $is_duplicate ) {
+                if ( isset( $dup_lookup[ $dup_key ] ) ) {
                     $skipped_dup++;
                     continue;
                 }
 
-                $current_count = function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $tourn_name, $line_idx, $dist_val, $registrations ) : 0;
-                $max_capacity  = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
+                $is_line_closed = in_array( $line_idx, $closed_lines, true )
+                               || ( $line_name !== '' && in_array( trim( (string) $line_name ), $closed_lines, true ) );
+                $current_count  = isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ? $line_dist_counts[ $line_idx ][ $dist_val ] : 0;
+                $max_capacity   = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $dist_val ) : 0;
                 if ( ! $max_capacity || $max_capacity <= 0 ) {
                     $max_capacity = ( $dist_val === 'Cub' ) ? 5 : 20;
                 }
 
-                if ( $current_count >= $max_capacity ) {
-                    $skipped_cap++;
-                    continue;
-                }
+                $is_waitlist = ( $is_line_closed || $current_count >= $max_capacity );
 
                 $new_reg = array(
                     'id'              => uniqid( 'reg_' ),
@@ -294,10 +334,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     'style'           => $s['style'],
                     'pricing_profile' => $default_prof_key,
                     'is_promo_free'   => false,
-                    'paid'            => $s['paid'],
+                    'paid'            => $is_waitlist ? 'Waitlist' : $s['paid'],
                     'family_id'       => $s['family_id'],
                     'balance_due'     => 0,
-                    'status'          => 'Pre-Reg',
+                    'status'          => $is_waitlist ? 'Waitlist' : 'Pre-Reg',
                     'created_at'      => current_time( 'mysql' ),
                 );
 
@@ -308,334 +348,397 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $registrations[] = $new_reg;
                 }
 
-                if ( $s['family_id'] !== '' ) {
-                    $touched_fams[ $line_idx . '___' . $s['family_id'] ] = array(
-                        'line_idx'  => (string) $line_idx,
-                        'family_id' => $s['family_id'],
-                    );
+                $dup_lookup[ $dup_key ] = true;
+
+                if ( $is_waitlist ) {
+                    $waitlisted_count++;
+                } else {
+                    if ( ! isset( $line_dist_counts[ $line_idx ] ) ) {
+                        $line_dist_counts[ $line_idx ] = array( '20yd' => 0, 'Cub' => 0 );
+                    }
+                    $line_dist_counts[ $line_idx ][ $dist_val ] = $current_count + 1;
+
+                    if ( $s['family_id'] !== '' ) {
+                        $touched_fams[ $line_idx . '___' . $s['family_id'] ] = array(
+                            'line_idx'  => $line_idx,
+                            'family_id' => $s['family_id'],
+                        );
+                    }
+                    $imported_count++;
                 }
-                $imported_count++;
             }
-        } elseif ( isset( $_FILES['import_file'] ) && $_FILES['import_file']['error'] === UPLOAD_ERR_OK ) {
-            $handle = fopen( $_FILES['import_file']['tmp_name'], 'r' );
-            if ( $handle !== false ) {
-                $base_line_name = isset( $t_lines[ $target_line_idx ]['name'] ) ? $t_lines[ $target_line_idx ]['name'] : '';
-                $day_context    = '';
-                if ( stripos( $base_line_name, 'Sunday' ) !== false ) {
-                    $day_context = 'Sunday';
-                } elseif ( stripos( $base_line_name, 'Saturday' ) !== false ) {
-                    $day_context = 'Saturday';
-                } elseif ( stripos( $base_line_name, 'Friday' ) !== false ) {
-                    $day_context = 'Friday';
+        } elseif ( isset( $_FILES['import_file'] ) && is_array( $_FILES['import_file'] ) ) {
+            $upload_err = isset( $_FILES['import_file']['error'] ) ? intval( $_FILES['import_file']['error'] ) : UPLOAD_ERR_NO_FILE;
+
+            if ( $upload_err === UPLOAD_ERR_NO_FILE ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please select a CSV or TXT file to upload, or paste report text before submitting.</div>';
+            }
+
+            if ( $upload_err !== UPLOAD_ERR_OK ) {
+                $err_detail = 'File upload failed (error code ' . $upload_err . ').';
+                if ( $upload_err === UPLOAD_ERR_INI_SIZE || $upload_err === UPLOAD_ERR_FORM_SIZE ) {
+                    $err_detail = 'The selected file exceeds the server upload size limit.';
+                } elseif ( $upload_err === UPLOAD_ERR_PARTIAL ) {
+                    $err_detail = 'The file was only partially uploaded. Please try again.';
+                }
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">' . esc_html( $err_detail ) . '</div>';
+            }
+
+            $tmp_path = isset( $_FILES['import_file']['tmp_name'] ) ? (string) $_FILES['import_file']['tmp_name'] : '';
+            if ( $tmp_path === '' || ! is_uploaded_file( $tmp_path ) ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Invalid file upload source. Please choose the file again and retry.</div>';
+            }
+
+            $handle = fopen( $tmp_path, 'r' );
+            if ( $handle === false ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Unable to read the uploaded file. Please verify the file format and try again.</div>';
+            }
+
+            $base_line_name = isset( $t_lines[ $target_line_idx ]['name'] ) ? $t_lines[ $target_line_idx ]['name'] : '';
+            $day_context    = '';
+            if ( stripos( $base_line_name, 'Sunday' ) !== false ) {
+                $day_context = 'Sunday';
+            } elseif ( stripos( $base_line_name, 'Saturday' ) !== false ) {
+                $day_context = 'Saturday';
+            } elseif ( stripos( $base_line_name, 'Friday' ) !== false ) {
+                $day_context = 'Friday';
+            }
+
+            $row_index       = 0;
+            $is_fh_format    = false;
+            $booking_col_idx = -1;
+            $name_col_idx    = -1;
+            $contact_col_idx = -1;
+            $pax_col_idx     = -1;
+            $due_col_idx     = -1;
+            $current_dist    = '20yd';
+
+            while ( ( $data = fgetcsv( $handle, 4000, ',' ) ) !== false ) {
+                $row_index++;
+                if ( isset( $data[0] ) ) {
+                    $data[0] = preg_replace( '/^\xEF\xBB\xBF/', '', (string) $data[0] );
                 }
 
-                $row_index       = 0;
-                $is_fh_format    = false;
-                $booking_col_idx = -1;
-                $name_col_idx    = -1;
-                $contact_col_idx = -1;
-                $pax_col_idx     = -1;
-                $due_col_idx     = -1;
-                $current_dist    = '20yd';
+                $non_empty = array_filter( $data, function( $cell ) {
+                    return trim( (string) $cell ) !== '';
+                } );
+                if ( empty( $non_empty ) ) {
+                    continue;
+                }
 
-                while ( ( $data = fgetcsv( $handle, 4000, ',' ) ) !== false ) {
-                    $row_index++;
-                    if ( empty( array_filter( $data ) ) ) {
-                        continue;
-                    }
+                $first_cell  = isset( $data[0] ) ? trim( (string) $data[0] ) : '';
+                $second_cell = isset( $data[1] ) ? trim( (string) $data[1] ) : '';
 
-                    $first_cell  = isset( $data[0] ) ? trim( $data[0] ) : '';
-                    $second_cell = isset( $data[1] ) ? trim( $data[1] ) : '';
+                $is_section_header = false;
+                if ( stripos( $first_cell, '10 YARDS' ) !== false || stripos( $first_cell, '10 YD' ) !== false ) {
+                    $current_dist      = 'Cub';
+                    $is_section_header = true;
+                } elseif ( stripos( $first_cell, '20 YARDS' ) !== false || stripos( $first_cell, '20 YD' ) !== false ) {
+                    $current_dist      = '20yd';
+                    $is_section_header = true;
+                }
 
-                    $is_section_header = false;
-                    if ( stripos( $first_cell, '10 YARDS' ) !== false || stripos( $first_cell, '10 YD' ) !== false ) {
-                        $current_dist      = 'Cub';
-                        $is_section_header = true;
-                    } elseif ( stripos( $first_cell, '20 YARDS' ) !== false || stripos( $first_cell, '20 YD' ) !== false ) {
-                        $current_dist      = '20yd';
-                        $is_section_header = true;
-                    }
-
-                    if ( $is_section_header ) {
-                        if ( preg_match( '/([0-9]{1,2}):[0-9]{2}\s*(AM|PM)/i', $second_cell, $time_matches ) ) {
-                            $search_str = $time_matches[1] . strtoupper( $time_matches[2] );
-                            if ( ! empty( $t_lines ) ) {
-                                foreach ( $t_lines as $idx => $l_data ) {
-                                    $check_name = isset( $l_data['name'] ) ? $l_data['name'] : '';
-                                    if ( $day_context && stripos( $check_name, $day_context ) === false ) {
-                                        continue;
-                                    }
-                                    if ( stripos( str_replace( ' ', '', $check_name ), $search_str ) !== false ) {
-                                        $target_line_idx = (string) $idx;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        continue;
-                    }
-
-                    $is_header_row = false;
-                    foreach ( $data as $idx => $val ) {
-                        if ( strcasecmp( trim( $val ), 'Booking ID' ) === 0 ) {
-                            $booking_col_idx = $idx;
-                            $is_header_row   = true;
-                        }
-                        if ( strcasecmp( trim( $val ), 'Full Name' ) === 0 ) {
-                            $name_col_idx  = $idx;
-                            $is_header_row = true;
-                        }
-                        if ( strcasecmp( trim( $val ), 'Contact' ) === 0 ) {
-                            $contact_col_idx = $idx;
-                            $is_header_row   = true;
-                        }
-                        if ( strcasecmp( trim( $val ), 'Pax' ) === 0 || strcasecmp( trim( $val ), 'Customers' ) === 0 ) {
-                            $pax_col_idx = $idx;
-                        }
-                        if ( strcasecmp( trim( $val ), 'Due' ) === 0 ) {
-                            $due_col_idx = $idx;
-                        }
-                    }
-
-                    if ( $is_header_row ) {
-                        $is_fh_format = true;
-                        continue;
-                    }
-
-                    $raw_names        = '';
-                    $row_email        = '';
-                    $row_phone        = '';
-                    $booking_id_val   = ( $booking_col_idx !== -1 && isset( $data[ $booking_col_idx ] ) ) ? trim( $data[ $booking_col_idx ] ) : '';
-                    $matched_line_idx = $target_line_idx;
-                    $dist_val         = function_exists( 'sywat_normalize_dist' ) ? sywat_normalize_dist( $current_dist ) : $current_dist;
-                    $row_paid_cat     = function_exists( 'sywat_detect_paid_category' ) ? sywat_detect_paid_category( $data ) : '';
-                    $row_due_val      = ( $due_col_idx !== -1 && isset( $data[ $due_col_idx ] ) && function_exists( 'sywat_extract_due_amount' ) ) ? sywat_extract_due_amount( $data[ $due_col_idx ] ) : 0;
-
-                    if ( $contact_col_idx !== -1 && isset( $data[ $contact_col_idx ] ) ) {
-                        foreach ( preg_split( '/\r\n|\r|\n/', trim( (string) $data[ $contact_col_idx ] ) ) as $c_line ) {
-                            $c_line = trim( $c_line );
-                            if ( $row_email === '' && is_email( $c_line ) ) {
-                                $row_email = sanitize_email( $c_line );
-                            } elseif ( $row_phone === '' && preg_match( '/\d{3}[\s\-\.\)]*\d{3}[\s\-\.]*\d{4}/', $c_line ) ) {
-                                $row_phone = sanitize_text_field( $c_line );
-                            }
-                        }
-                    }
-
-                    if ( $is_fh_format ) {
-                        if ( $name_col_idx !== -1 && isset( $data[ $name_col_idx ] ) ) {
-                            $raw_names = trim( $data[ $name_col_idx ] );
-                        }
-                        if ( empty( $raw_names ) && $contact_col_idx !== -1 && isset( $data[ $contact_col_idx ] ) ) {
-                            $contact_parts = preg_split( '/\r\n|\r|\n/', trim( $data[ $contact_col_idx ] ) );
-                            if ( ! empty( $contact_parts ) ) {
-                                $raw_names = trim( $contact_parts[0] );
-                            }
-                        }
-                        if ( empty( $raw_names ) || strtolower( trim( $raw_names ) ) === 'full name' ) {
-                            continue;
-                        }
-                    } else {
-                        $col_name     = isset( $data[0] ) ? trim( sanitize_text_field( $data[0] ) ) : '';
-                        $col_line     = isset( $data[1] ) ? trim( sanitize_text_field( $data[1] ) ) : '';
-                        $col_distance = isset( $data[2] ) ? trim( sanitize_text_field( $data[2] ) ) : '';
-
-                        if ( $row_index === 1 && ( strcasecmp( $col_name, 'name' ) === 0 || strcasecmp( $col_name, 'shooter name' ) === 0 ) ) {
-                            continue;
-                        }
-                        $raw_names = $col_name;
-
-                        if ( ! empty( $col_line ) && ! empty( $t_lines ) ) {
+                if ( $is_section_header ) {
+                    if ( preg_match( '/([0-9]{1,2}):[0-9]{2}\s*(AM|PM)/i', $second_cell, $time_matches ) ) {
+                        $search_str = $time_matches[1] . strtoupper( $time_matches[2] );
+                        if ( ! empty( $t_lines ) ) {
                             foreach ( $t_lines as $idx => $l_data ) {
-                                if ( isset( $l_data['name'] ) && strcasecmp( trim( $l_data['name'] ), $col_line ) === 0 ) {
-                                    $matched_line_idx = (string) $idx;
+                                $check_name = isset( $l_data['name'] ) ? $l_data['name'] : '';
+                                if ( $day_context && stripos( $check_name, $day_context ) === false ) {
+                                    continue;
+                                }
+                                if ( stripos( str_replace( ' ', '', $check_name ), $search_str ) !== false ) {
+                                    $target_line_idx = (string) $idx;
                                     break;
                                 }
                             }
                         }
-                        if ( ! empty( $col_distance ) ) {
-                            $dist_val = function_exists( 'sywat_normalize_dist' ) ? sywat_normalize_dist( $col_distance ) : $col_distance;
+                    }
+                    continue;
+                }
+
+                $is_header_row = false;
+                foreach ( $data as $idx => $val ) {
+                    $trimmed_hdr = trim( (string) $val );
+                    if ( strcasecmp( $trimmed_hdr, 'Booking ID' ) === 0 ) {
+                        $booking_col_idx = $idx;
+                        $is_header_row   = true;
+                    }
+                    if ( strcasecmp( $trimmed_hdr, 'Full Name' ) === 0 ) {
+                        $name_col_idx  = $idx;
+                        $is_header_row = true;
+                    }
+                    if ( strcasecmp( $trimmed_hdr, 'Contact' ) === 0 ) {
+                        $contact_col_idx = $idx;
+                        $is_header_row   = true;
+                    }
+                    if ( strcasecmp( $trimmed_hdr, 'Pax' ) === 0 || strcasecmp( $trimmed_hdr, 'Customers' ) === 0 ) {
+                        $pax_col_idx = $idx;
+                    }
+                    if ( strcasecmp( $trimmed_hdr, 'Due' ) === 0 ) {
+                        $due_col_idx = $idx;
+                    }
+                }
+
+                if ( $is_header_row ) {
+                    $is_fh_format = true;
+                    continue;
+                }
+
+                $raw_names        = '';
+                $row_email        = '';
+                $row_phone        = '';
+                $booking_id_val   = ( $booking_col_idx !== -1 && isset( $data[ $booking_col_idx ] ) ) ? trim( (string) $data[ $booking_col_idx ] ) : '';
+                $matched_line_idx = (string) $target_line_idx;
+                $dist_val         = function_exists( 'sywat_normalize_dist' ) ? sywat_normalize_dist( $current_dist ) : $current_dist;
+                $row_paid_cat     = function_exists( 'sywat_detect_paid_category' ) ? sywat_detect_paid_category( $data ) : '';
+                $row_due_val      = ( $due_col_idx !== -1 && isset( $data[ $due_col_idx ] ) && function_exists( 'sywat_extract_due_amount' ) ) ? sywat_extract_due_amount( $data[ $due_col_idx ] ) : 0;
+
+                if ( $contact_col_idx !== -1 && isset( $data[ $contact_col_idx ] ) ) {
+                    foreach ( preg_split( '/\r\n|\r|\n/', trim( (string) $data[ $contact_col_idx ] ) ) as $c_line ) {
+                        $c_line = trim( $c_line );
+                        if ( $row_email === '' && is_email( $c_line ) ) {
+                            $row_email = sanitize_email( $c_line );
+                        } elseif ( $row_phone === '' && preg_match( '/\d{3}[\s\-\.\)]*\d{3}[\s\-\.]*\d{4}/', $c_line ) ) {
+                            $row_phone = sanitize_text_field( $c_line );
                         }
                     }
+                }
 
-                    if ( empty( $raw_names ) ) {
+                if ( $is_fh_format ) {
+                    if ( $name_col_idx !== -1 && isset( $data[ $name_col_idx ] ) ) {
+                        $raw_names = trim( (string) $data[ $name_col_idx ] );
+                    }
+                    if ( empty( $raw_names ) && $contact_col_idx !== -1 && isset( $data[ $contact_col_idx ] ) ) {
+                        $contact_parts = preg_split( '/\r\n|\r|\n/', trim( (string) $data[ $contact_col_idx ] ) );
+                        if ( ! empty( $contact_parts ) ) {
+                            $raw_names = trim( $contact_parts[0] );
+                        }
+                    }
+                    if ( empty( $raw_names ) || strtolower( trim( $raw_names ) ) === 'full name' ) {
                         continue;
                     }
+                } else {
+                    $col_name     = isset( $data[0] ) ? trim( sanitize_text_field( (string) $data[0] ) ) : '';
+                    $col_line     = isset( $data[1] ) ? trim( sanitize_text_field( (string) $data[1] ) ) : '';
+                    $col_distance = isset( $data[2] ) ? trim( sanitize_text_field( (string) $data[2] ) ) : '';
 
-                    $split_names = array();
-                    $pax         = ( $pax_col_idx !== -1 && isset( $data[ $pax_col_idx ] ) ) ? intval( $data[ $pax_col_idx ] ) : 1;
-
-                    if ( $is_fh_format ) {
-                        $clean_separators = str_ireplace( array( ' and ', ' & ' ), ',', $raw_names );
-                        if ( strpos( $clean_separators, ',' ) !== false ) {
-                            $parts = explode( ',', $clean_separators );
-                            foreach ( $parts as $p ) {
-                                if ( trim( $p ) ) {
-                                    $split_names[] = trim( $p );
-                                }
-                            }
-                        } elseif ( $pax > 1 ) {
-                            $words = array_values( array_filter( explode( ' ', $raw_names ) ) );
-                            if ( count( $words ) >= ( $pax * 2 ) ) {
-                                $words_per_name = floor( count( $words ) / $pax );
-                                $extra_words    = count( $words ) % $pax;
-                                $offset         = 0;
-                                for ( $i = 0; $i < $pax; $i++ ) {
-                                    $length        = $words_per_name + ( $i < $extra_words ? 1 : 0 );
-                                    $split_names[] = implode( ' ', array_slice( $words, $offset, $length ) );
-                                    $offset       += $length;
-                                }
-                            } else {
-                                for ( $i = 1; $i <= $pax; $i++ ) {
-                                    $split_names[] = trim( $raw_names ) . " ($i)";
-                                }
-                            }
-                        } else {
-                            $split_names[] = $raw_names;
-                        }
-                    } else {
-                        $split_names = preg_split( '/\r\n|\r|\n/', $raw_names );
+                    if ( $row_index === 1 && ( strcasecmp( $col_name, 'name' ) === 0 || strcasecmp( $col_name, 'shooter name' ) === 0 ) ) {
+                        continue;
                     }
+                    $raw_names = $col_name;
 
-                    $base_paid         = ! empty( $row_paid_cat ) ? $row_paid_cat : ( $dist_val === 'Cub' ? 'Youth' : 'Adult' );
-                    $booking_fam_id    = ( $base_paid === 'Family' || count( $split_names ) > 1 )
-                        ? ( ! empty( $booking_id_val ) ? $booking_id_val : uniqid( 'fam_' ) )
-                        : '';
-                    $matched_line_name = isset( $t_lines[ $matched_line_idx ]['name'] ) ? $t_lines[ $matched_line_idx ]['name'] : 'Line 1';
-                    $line_data         = isset( $t_lines[ $matched_line_idx ] ) ? $t_lines[ $matched_line_idx ] : array();
-                    $valid_name_count  = count( array_filter( array_map( 'trim', $split_names ) ) );
-                    $per_shooter_due   = ( $row_due_val > 0 && $valid_name_count > 1 )
-                        ? round( $row_due_val / $valid_name_count, 2 )
-                        : floatval( $row_due_val );
-
-                    foreach ( $split_names as $single_name ) {
-                        $clean_name = trim( sanitize_text_field( $single_name ) );
-                        if ( empty( $clean_name ) ) {
-                            continue;
-                        }
-
-                        // Resolve each shooter individually via Member Directory (DOB age) & prior history
-                        $resolved = function_exists( 'sywat_resolve_archer_intake_profile' )
-                            ? sywat_resolve_archer_intake_profile( $clean_name, $tourn_date, array( 'email' => $row_email, 'phone' => $row_phone ) )
-                            : array();
-
-                        $shooter_dist  = $dist_val;
-                        $shooter_paid  = $base_paid;
-                        $shooter_style = isset( $resolved['style'] ) ? $resolved['style'] : '';
-
-                        if ( ! empty( $resolved['division'] ) ) {
-                            $final_div = $resolved['division'];
-                            if ( isset( $resolved['distance'] ) && $resolved['distance'] === 'Cub' ) {
-                                $shooter_dist = 'Cub';
-                            }
-                            if ( ! empty( $resolved['rate_tier'] ) && ! in_array( $shooter_paid, array( 'Family', 'Pro', 'Field Governor' ), true ) ) {
-                                $shooter_paid = $resolved['rate_tier'];
-                            }
-                        } elseif ( $shooter_dist === 'Cub' ) {
-                            $final_div = $default_cub_div;
-                        } elseif ( $shooter_paid === 'Youth' ) {
-                            $final_div = $default_youth_div;
-                        } else {
-                            $final_div = $default_adult_div;
-                        }
-
-                        if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $final_div !== '' ) {
-                            $final_div = sywat_shooting_styles_normalize_division( $final_div );
-                        }
-
-                        // Align unpaid balance_due with the resolved division's active pricing profile rate
-                        $shooter_due = $per_shooter_due;
-                        if ( $shooter_due > 0 && ! in_array( $shooter_paid, array( 'Family', 'Field Governor' ), true ) && function_exists( 'sywat_get_archer_individual_fee' ) ) {
-                            $shooter_due = sywat_get_archer_individual_fee( $t_context, $final_div, $shooter_dist, $shooter_style, $default_prof_key, $shooter_paid );
-                        }
-
-                        $shooter_fam_id = ! empty( $resolved['family_id'] ) ? $resolved['family_id'] : $booking_fam_id;
-
-                        $is_duplicate = false;
-                        foreach ( $registrations as $existing ) {
-                            if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'], $existing['distance'] ) &&
-                                 strcasecmp( $existing['tournament'], $tourn_name ) === 0 &&
-                                 (string) $existing['line_index'] === (string) $matched_line_idx &&
-                                 strcasecmp( trim( $existing['name'] ), $clean_name ) === 0 &&
-                                 strcasecmp( $existing['distance'], $shooter_dist ) === 0 ) {
-                                $is_duplicate = true;
+                    if ( ! empty( $col_line ) && ! empty( $t_lines ) ) {
+                        foreach ( $t_lines as $idx => $l_data ) {
+                            if ( isset( $l_data['name'] ) && strcasecmp( trim( $l_data['name'] ), $col_line ) === 0 ) {
+                                $matched_line_idx = (string) $idx;
                                 break;
                             }
                         }
+                    }
+                    if ( ! empty( $col_distance ) ) {
+                        $dist_val = function_exists( 'sywat_normalize_dist' ) ? sywat_normalize_dist( $col_distance ) : $col_distance;
+                    }
+                }
 
-                        if ( $is_duplicate ) {
-                            $skipped_dup++;
-                            continue;
+                if ( empty( $raw_names ) ) {
+                    continue;
+                }
+
+                $split_names = array();
+                $pax         = ( $pax_col_idx !== -1 && isset( $data[ $pax_col_idx ] ) ) ? intval( $data[ $pax_col_idx ] ) : 1;
+
+                if ( $is_fh_format ) {
+                    $clean_separators = str_ireplace( array( ' and ', ' & ' ), ',', $raw_names );
+                    if ( strpos( $clean_separators, ',' ) !== false ) {
+                        $parts = explode( ',', $clean_separators );
+                        foreach ( $parts as $p ) {
+                            if ( trim( $p ) ) {
+                                $split_names[] = trim( $p );
+                            }
                         }
-
-                        $current_count = function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $tourn_name, $matched_line_idx, $shooter_dist, $registrations ) : 0;
-                        $max_capacity  = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $shooter_dist ) : 0;
-                        if ( ! $max_capacity || $max_capacity <= 0 ) {
-                            $max_capacity = ( $shooter_dist === 'Cub' ) ? 5 : 20;
-                        }
-
-                        if ( $current_count >= $max_capacity ) {
-                            $skipped_cap++;
-                            continue;
-                        }
-
-                        $new_reg = array(
-                            'id'              => uniqid( 'reg_' ),
-                            'tournament'      => $tourn_name,
-                            'line_index'      => $matched_line_idx,
-                            'line_name'       => $matched_line_name,
-                            'name'            => $clean_name,
-                            'phone'           => isset( $resolved['phone'] ) ? $resolved['phone'] : $row_phone,
-                            'email'           => isset( $resolved['email'] ) ? $resolved['email'] : $row_email,
-                            'distance'        => $shooter_dist,
-                            'division'        => $final_div,
-                            'gender'          => isset( $resolved['gender'] ) ? $resolved['gender'] : '',
-                            'style'           => $shooter_style,
-                            'pricing_profile' => $default_prof_key,
-                            'is_promo_free'   => false,
-                            'paid'            => $shooter_paid,
-                            'booking_id'      => $booking_id_val,
-                            'family_id'       => $shooter_fam_id,
-                            'balance_due'     => $shooter_due,
-                            'status'          => 'Pre-Reg',
-                            'created_at'      => current_time( 'mysql' ),
-                        );
-
-                        if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
-                            sywat_waitlist_persist_record( $new_reg, $registrations );
+                    } elseif ( $pax > 1 ) {
+                        $words = array_values( array_filter( explode( ' ', $raw_names ) ) );
+                        if ( count( $words ) >= ( $pax * 2 ) ) {
+                            $words_per_name = floor( count( $words ) / $pax );
+                            $extra_words    = count( $words ) % $pax;
+                            $offset         = 0;
+                            for ( $i = 0; $i < $pax; $i++ ) {
+                                $length        = $words_per_name + ( $i < $extra_words ? 1 : 0 );
+                                $split_names[] = implode( ' ', array_slice( $words, $offset, $length ) );
+                                $offset       += $length;
+                            }
                         } else {
-                            update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-                            $registrations[] = $new_reg;
+                            for ( $i = 1; $i <= $pax; $i++ ) {
+                                $split_names[] = trim( $raw_names ) . " ($i)";
+                            }
                         }
+                    } else {
+                        $split_names[] = $raw_names;
+                    }
+                } else {
+                    $split_names = preg_split( '/\r\n|\r|\n/', $raw_names );
+                }
+
+                $base_paid         = ! empty( $row_paid_cat ) ? $row_paid_cat : ( $dist_val === 'Cub' ? 'Youth' : 'Adult' );
+                $booking_fam_id    = ( $base_paid === 'Family' || count( $split_names ) > 1 )
+                    ? ( ! empty( $booking_id_val ) ? $booking_id_val : uniqid( 'fam_' ) )
+                    : '';
+                $matched_line_name = isset( $t_lines[ $matched_line_idx ]['name'] ) ? $t_lines[ $matched_line_idx ]['name'] : 'Line 1';
+                $line_data         = isset( $t_lines[ $matched_line_idx ] ) ? $t_lines[ $matched_line_idx ] : array();
+                $valid_name_count  = count( array_filter( array_map( 'trim', $split_names ) ) );
+                $per_shooter_due   = ( $row_due_val > 0 && $valid_name_count > 1 )
+                    ? round( $row_due_val / $valid_name_count, 2 )
+                    : floatval( $row_due_val );
+
+                $is_line_closed = in_array( $matched_line_idx, $closed_lines, true )
+                               || ( $matched_line_name !== '' && in_array( trim( (string) $matched_line_name ), $closed_lines, true ) );
+
+                foreach ( $split_names as $single_name ) {
+                    $clean_name = trim( sanitize_text_field( $single_name ) );
+                    if ( empty( $clean_name ) ) {
+                        continue;
+                    }
+
+                    // Resolve each shooter individually via Member Directory (DOB age) & prior history
+                    $resolved = function_exists( 'sywat_resolve_archer_intake_profile' )
+                        ? sywat_resolve_archer_intake_profile( $clean_name, $tourn_date, array( 'email' => $row_email, 'phone' => $row_phone ) )
+                        : array();
+
+                    $shooter_dist  = $dist_val;
+                    $shooter_paid  = $base_paid;
+                    $shooter_style = isset( $resolved['style'] ) ? $resolved['style'] : '';
+
+                    if ( ! empty( $resolved['division'] ) ) {
+                        $final_div = $resolved['division'];
+                        if ( isset( $resolved['distance'] ) && $resolved['distance'] === 'Cub' ) {
+                            $shooter_dist = 'Cub';
+                        }
+                        if ( ! empty( $resolved['rate_tier'] ) && ! in_array( $shooter_paid, array( 'Family', 'Pro', 'Field Governor' ), true ) ) {
+                            $shooter_paid = $resolved['rate_tier'];
+                        }
+                    } elseif ( $shooter_dist === 'Cub' ) {
+                        $final_div = $default_cub_div;
+                    } elseif ( $shooter_paid === 'Youth' ) {
+                        $final_div = $default_youth_div;
+                    } else {
+                        $final_div = $default_adult_div;
+                    }
+
+                    if ( function_exists( 'sywat_shooting_styles_normalize_division' ) && $final_div !== '' ) {
+                        $final_div = sywat_shooting_styles_normalize_division( $final_div );
+                    }
+
+                    $dup_key = $matched_line_idx . '|' . strtolower( $shooter_dist ) . '|' . strtolower( $clean_name );
+                    if ( isset( $dup_lookup[ $dup_key ] ) ) {
+                        $skipped_dup++;
+                        continue;
+                    }
+
+                    $current_count = isset( $line_dist_counts[ $matched_line_idx ][ $shooter_dist ] )
+                        ? $line_dist_counts[ $matched_line_idx ][ $shooter_dist ]
+                        : 0;
+                    $max_capacity  = function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line_data, $shooter_dist ) : 0;
+                    if ( ! $max_capacity || $max_capacity <= 0 ) {
+                        $max_capacity = ( $shooter_dist === 'Cub' ) ? 5 : 20;
+                    }
+
+                    $is_waitlist = ( $is_line_closed || $current_count >= $max_capacity );
+
+                    // Align unpaid balance_due with the resolved division's active pricing profile rate (or $0.00 if Waitlisted)
+                    $shooter_due = $per_shooter_due;
+                    if ( $is_waitlist ) {
+                        $shooter_due  = 0.00;
+                        $shooter_paid = 'Waitlist';
+                    } elseif ( $shooter_due > 0 && ! in_array( $shooter_paid, array( 'Family', 'Field Governor' ), true ) && function_exists( 'sywat_get_archer_individual_fee' ) ) {
+                        $shooter_due = sywat_get_archer_individual_fee( $t_context, $final_div, $shooter_dist, $shooter_style, $default_prof_key, $shooter_paid );
+                    }
+
+                    $shooter_fam_id = ! empty( $resolved['family_id'] ) ? $resolved['family_id'] : $booking_fam_id;
+
+                    $new_reg = array(
+                        'id'              => uniqid( 'reg_' ),
+                        'tournament'      => $tourn_name,
+                        'line_index'      => $matched_line_idx,
+                        'line_name'       => $matched_line_name,
+                        'name'            => $clean_name,
+                        'phone'           => isset( $resolved['phone'] ) ? $resolved['phone'] : $row_phone,
+                        'email'           => isset( $resolved['email'] ) ? $resolved['email'] : $row_email,
+                        'distance'        => $shooter_dist,
+                        'division'        => $final_div,
+                        'gender'          => isset( $resolved['gender'] ) ? $resolved['gender'] : '',
+                        'style'           => $shooter_style,
+                        'pricing_profile' => $default_prof_key,
+                        'is_promo_free'   => false,
+                        'paid'            => $shooter_paid,
+                        'booking_id'      => $booking_id_val,
+                        'family_id'       => $shooter_fam_id,
+                        'balance_due'     => $shooter_due,
+                        'status'          => $is_waitlist ? 'Waitlist' : 'Pre-Reg',
+                        'created_at'      => current_time( 'mysql' ),
+                    );
+
+                    if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
+                        sywat_waitlist_persist_record( $new_reg, $registrations );
+                    } else {
+                        update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
+                        $registrations[] = $new_reg;
+                    }
+
+                    $dup_lookup[ $dup_key ] = true;
+
+                    if ( $is_waitlist ) {
+                        $waitlisted_count++;
+                    } else {
+                        if ( ! isset( $line_dist_counts[ $matched_line_idx ] ) ) {
+                            $line_dist_counts[ $matched_line_idx ] = array( '20yd' => 0, 'Cub' => 0 );
+                        }
+                        $line_dist_counts[ $matched_line_idx ][ $shooter_dist ] = $current_count + 1;
 
                         if ( $shooter_fam_id !== '' ) {
                             $touched_fams[ $matched_line_idx . '___' . $shooter_fam_id ] = array(
-                                'line_idx'  => (string) $matched_line_idx,
+                                'line_idx'  => $matched_line_idx,
                                 'family_id' => $shooter_fam_id,
                             );
                         }
                         $imported_count++;
                     }
                 }
-                fclose( $handle );
             }
+            fclose( $handle );
+        } else {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">No import file or pasted report text was received. Please select a .csv or .txt file and try again.</div>';
         }
 
-        // Reconcile household family cap fees across any family groups touched during import
+        // Reconcile household family cap fees across any active family groups touched during import
         if ( ! empty( $touched_fams ) && function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
             foreach ( $touched_fams as $tf ) {
                 sywat_waitlist_recalculate_line_family_fees( $tourn_name, $tf['line_idx'], $tf['family_id'], $registrations, $t_lines );
             }
         }
 
-        $msg = 'Successfully imported ' . $imported_count . ' shooter(s) as Pre-Reg.';
-        if ( $skipped_dup > 0 ) {
-            $msg .= ' Skipped ' . $skipped_dup . ' duplicate(s).';
-        }
-        if ( $skipped_cap > 0 ) {
-            $msg .= ' Skipped ' . $skipped_cap . ' due to capacity limits.';
+        if ( $imported_count === 0 && $waitlisted_count === 0 ) {
+            $warn_msg = 'No new shooters were imported.';
+            if ( $skipped_dup > 0 ) {
+                $warn_msg .= ' Skipped ' . $skipped_dup . ' duplicate(s).';
+            } else {
+                $warn_msg .= ' Please verify the CSV columns (Full Name / Contact) or report text format.';
+            }
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-warning">' . esc_html( $warn_msg ) . '</div>';
         }
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">' . esc_html( $msg ) . '</div>';
+        $msg_parts = array();
+        if ( $imported_count > 0 ) {
+            $msg_parts[] = 'Successfully imported ' . $imported_count . ' shooter(s) as Pre-Reg.';
+        }
+        if ( $waitlisted_count > 0 ) {
+            $msg_parts[] = 'Added ' . $waitlisted_count . ' over-capacity shooter(s) to the Waitlist ($0.00 due).';
+        }
+        if ( $skipped_dup > 0 ) {
+            $msg_parts[] = 'Skipped ' . $skipped_dup . ' duplicate(s).';
+        }
+
+        $alert_class = ( $imported_count > 0 ) ? 'sywat-alert-success' : 'sywat-alert-warning';
+        return '<div id="sywat-notice" class="sywat-alert ' . $alert_class . '">' . esc_html( implode( ' ', $msg_parts ) ) . '</div>';
     }
 }
