@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), O(1) member record lookup by full name/contact, hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk scalar SQL pre-fetching with transient caching for 10,000+ record scalability, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), O(1) member record lookup by exact and First+Last name/contact, hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 6.1.0
+ * Version: 6.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -31,6 +31,156 @@ if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
             'orderby'  => 'display_name',
             'order'    => 'ASC',
         ) );
+    }
+}
+
+if ( ! function_exists( 'sywat_get_bulk_member_directory_records' ) ) {
+    /**
+     * Bulk scalar SQL retrieval of all Member Directory archers (Primary Heads of Household,
+     * Household Dependents, and Unassigned Pool Archers) cached in a 15-minute transient.
+     * Executes only 2 scalar SQL queries with zero WP_User ORM hydration for 10,000+ record scale.
+     *
+     * @return array List of lightweight scalar archer associative arrays.
+     */
+    function sywat_get_bulk_member_directory_records() {
+        $cached = get_transient( 'sywat_member_directory_index_cache' );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        global $wpdb;
+
+        $allowed_roles = array(
+            'tfaa_member', 'tfaa_president', 'tfaa_vice_president', 'tfaa_treasurer',
+            'tfaa_secretary', 'tfaa_tournament_director', 'tfaa_social_media_director',
+            'tfaa_webmaster', 'tfaa_field_governor', 'sywat_shop_manager',
+            'sywat_shop_user', 'administrator',
+        );
+
+        $user_rows = $wpdb->get_results( "SELECT ID, display_name, user_email FROM {$wpdb->users}" );
+        $users_map = array();
+        if ( ! empty( $user_rows ) ) {
+            foreach ( $user_rows as $u_row ) {
+                $uid = intval( $u_row->ID );
+                if ( $uid > 0 ) {
+                    $users_map[ $uid ] = array(
+                        'display_name' => trim( (string) $u_row->display_name ),
+                        'email'        => trim( (string) $u_row->user_email ),
+                    );
+                }
+            }
+        }
+
+        $cap_key   = $wpdb->prefix . 'capabilities';
+        $meta_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT user_id, meta_key, meta_value FROM {$wpdb->usermeta} WHERE meta_key IN (%s, 'sywat_phone', 'sywat_gender', 'sywat_dob', 'sywat_is_pro', 'sywat_household_dependents')",
+                $cap_key
+            )
+        );
+
+        $meta_by_user = array();
+        $dep_blobs    = array();
+        if ( ! empty( $meta_rows ) ) {
+            foreach ( $meta_rows as $m_row ) {
+                $uid  = intval( $m_row->user_id );
+                $mkey = (string) $m_row->meta_key;
+                if ( $mkey === 'sywat_household_dependents' ) {
+                    if ( $m_row->meta_value !== '' && $m_row->meta_value !== 'a:0:{}' ) {
+                        $dep_blobs[ $uid ] = $m_row->meta_value;
+                    }
+                } else {
+                    $meta_by_user[ $uid ][ $mkey ] = $m_row->meta_value;
+                }
+            }
+        }
+
+        $records = array();
+
+        foreach ( $users_map as $uid => $u_info ) {
+            $raw_caps = isset( $meta_by_user[ $uid ][ $cap_key ] ) ? maybe_unserialize( $meta_by_user[ $uid ][ $cap_key ] ) : array();
+            if ( ! is_array( $raw_caps ) || empty( $raw_caps ) ) {
+                continue;
+            }
+            if ( empty( array_intersect( $allowed_roles, array_keys( array_filter( $raw_caps ) ) ) ) || $u_info['display_name'] === '' ) {
+                continue;
+            }
+
+            $records[] = array(
+                'account_type' => 'head',
+                'user_id'      => $uid,
+                'head_user_id' => $uid,
+                'display_name' => $u_info['display_name'],
+                'email'        => $u_info['email'],
+                'phone'        => isset( $meta_by_user[ $uid ]['sywat_phone'] ) ? trim( (string) $meta_by_user[ $uid ]['sywat_phone'] ) : '',
+                'gender'       => isset( $meta_by_user[ $uid ]['sywat_gender'] ) ? trim( (string) $meta_by_user[ $uid ]['sywat_gender'] ) : '',
+                'dob'          => isset( $meta_by_user[ $uid ]['sywat_dob'] ) ? trim( (string) $meta_by_user[ $uid ]['sywat_dob'] ) : '',
+                'is_pro'       => isset( $meta_by_user[ $uid ]['sywat_is_pro'] ) ? trim( (string) $meta_by_user[ $uid ]['sywat_is_pro'] ) : 'no',
+            );
+        }
+
+        foreach ( $dep_blobs as $head_id => $blob ) {
+            $deps = maybe_unserialize( $blob );
+            if ( ! is_array( $deps ) || empty( $deps ) ) {
+                continue;
+            }
+            $head_email = isset( $users_map[ $head_id ]['email'] ) ? $users_map[ $head_id ]['email'] : '';
+            $head_phone = isset( $meta_by_user[ $head_id ]['sywat_phone'] ) ? trim( (string) $meta_by_user[ $head_id ]['sywat_phone'] ) : '';
+
+            foreach ( $deps as $d ) {
+                if ( ! is_array( $d ) ) {
+                    continue;
+                }
+                $fn   = isset( $d['first_name'] ) ? trim( (string) $d['first_name'] ) : '';
+                $ln   = isset( $d['last_name'] ) ? trim( (string) $d['last_name'] ) : '';
+                $name = ! empty( $d['display_name'] ) ? trim( (string) $d['display_name'] ) : trim( $fn . ' ' . $ln );
+                if ( $name === '' ) {
+                    continue;
+                }
+
+                $records[] = array(
+                    'account_type' => 'dependent',
+                    'user_id'      => 0,
+                    'head_user_id' => $head_id,
+                    'display_name' => $name,
+                    'email'        => ! empty( $d['email'] ) ? trim( (string) $d['email'] ) : $head_email,
+                    'phone'        => ! empty( $d['phone'] ) ? trim( (string) $d['phone'] ) : $head_phone,
+                    'gender'       => isset( $d['gender'] ) ? trim( (string) $d['gender'] ) : '',
+                    'dob'          => isset( $d['dob'] ) ? trim( (string) $d['dob'] ) : '',
+                    'is_pro'       => isset( $d['is_pro'] ) ? trim( (string) $d['is_pro'] ) : 'no',
+                );
+            }
+        }
+
+        $unassigned_pool = get_option( 'sywat_unassigned_archers', array() );
+        if ( is_array( $unassigned_pool ) && ! empty( $unassigned_pool ) ) {
+            foreach ( $unassigned_pool as $u_item ) {
+                if ( ! is_array( $u_item ) ) {
+                    continue;
+                }
+                $fn   = isset( $u_item['first_name'] ) ? trim( (string) $u_item['first_name'] ) : '';
+                $ln   = isset( $u_item['last_name'] ) ? trim( (string) $u_item['last_name'] ) : '';
+                $name = ! empty( $u_item['display_name'] ) ? trim( (string) $u_item['display_name'] ) : trim( $fn . ' ' . $ln );
+                if ( $name === '' ) {
+                    continue;
+                }
+
+                $records[] = array(
+                    'account_type' => 'unassigned',
+                    'user_id'      => 0,
+                    'head_user_id' => 0,
+                    'display_name' => $name,
+                    'email'        => isset( $u_item['email'] ) ? trim( (string) $u_item['email'] ) : '',
+                    'phone'        => isset( $u_item['phone'] ) ? trim( (string) $u_item['phone'] ) : '',
+                    'gender'       => isset( $u_item['gender'] ) ? trim( (string) $u_item['gender'] ) : '',
+                    'dob'          => isset( $u_item['dob'] ) ? trim( (string) $u_item['dob'] ) : '',
+                    'is_pro'       => isset( $u_item['is_pro'] ) ? trim( (string) $u_item['is_pro'] ) : 'no',
+                );
+            }
+        }
+
+        set_transient( 'sywat_member_directory_index_cache', $records, 15 * MINUTE_IN_SECONDS );
+        return $records;
     }
 }
 
@@ -286,78 +436,95 @@ if ( ! function_exists( 'sywat_get_import_preview_db_maps' ) ) {
 
 if ( ! function_exists( 'sywat_find_member_record_by_name' ) ) {
     /**
-     * Retrieve a single Member Directory archer record by full name (with optional email/phone tie-breaker)
-     * using an O(1) static hashtable index built once per request from sywat_get_all_flat_archers().
+     * Retrieve a single Member Directory archer record by full name (with First+Last middle-initial folding
+     * and optional email/phone tie-breaker) using O(1) static hashtable indexes built once per request
+     * from sywat_get_bulk_member_directory_records().
      *
      * @param string $full_name Archer full name.
      * @param string $email     Optional email hint for duplicate-name disambiguation.
      * @param string $phone     Optional phone hint for duplicate-name disambiguation.
-     * @return array|null       Standardized archer record array (with inherited household contact fallback) or null.
+     * @return array|null       Standardized archer record array or null.
      */
     function sywat_find_member_record_by_name( $full_name, $email = '', $phone = '' ) {
-        static $name_index    = null;
-        static $head_contacts = null;
+        static $exact_index = null;
+        static $fl_index    = null;
 
         $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $full_name ) );
         if ( $clean_name === '' ) {
             return null;
         }
 
-        if ( $name_index === null ) {
-            $name_index    = array();
-            $head_contacts = array();
-            $flat_archers  = sywat_get_all_flat_archers();
+        $build_keys = function( $raw ) {
+            if ( function_exists( 'sywat_normalize_archer_match_keys' ) ) {
+                return sywat_normalize_archer_match_keys( $raw );
+            }
+            $norm  = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', (string) $raw ) ) ) );
+            $parts = $norm !== '' ? explode( ' ', $norm ) : array();
+            return array(
+                'exact' => $norm,
+                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+            );
+        };
 
-            foreach ( $flat_archers as $arch ) {
+        if ( $exact_index === null ) {
+            $exact_index = array();
+            $fl_index    = array();
+            $records     = sywat_get_bulk_member_directory_records();
+
+            foreach ( $records as $arch ) {
                 if ( ! is_array( $arch ) || empty( $arch['display_name'] ) ) {
                     continue;
                 }
-                $key = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', (string) $arch['display_name'] ) ) );
-                if ( $key === '' ) {
-                    continue;
+                $keys = $build_keys( $arch['display_name'] );
+                if ( $keys['exact'] !== '' ) {
+                    $exact_index[ $keys['exact'] ][] = $arch;
                 }
-                $name_index[ $key ][] = $arch;
-
-                if ( isset( $arch['account_type'] ) && $arch['account_type'] === 'head' && ! empty( $arch['user_id'] ) ) {
-                    $head_contacts[ intval( $arch['user_id'] ) ] = array(
-                        'email' => isset( $arch['email'] ) ? trim( (string) $arch['email'] ) : '',
-                        'phone' => isset( $arch['phone'] ) ? trim( (string) $arch['phone'] ) : '',
-                    );
+                if ( $keys['fl'] !== '' ) {
+                    $fl_index[ $keys['fl'] ][] = $arch;
                 }
             }
         }
 
-        $norm_key = strtolower( $clean_name );
-        if ( empty( $name_index[ $norm_key ] ) ) {
+        $query_keys = $build_keys( $clean_name );
+        if ( $query_keys['exact'] === '' ) {
             return null;
         }
 
-        $candidates = $name_index[ $norm_key ];
-        $matched    = $candidates[0];
         $hint_email = strtolower( trim( (string) $email ) );
         $hint_phone = preg_replace( '/\D+/', '', (string) $phone );
 
-        if ( count( $candidates ) > 1 && ( $hint_email !== '' || strlen( $hint_phone ) >= 7 ) ) {
-            foreach ( $candidates as $cand ) {
-                $h_uid  = isset( $cand['head_user_id'] ) ? intval( $cand['head_user_id'] ) : 0;
-                $c_mail = ! empty( $cand['email'] ) ? $cand['email'] : ( isset( $head_contacts[ $h_uid ]['email'] ) ? $head_contacts[ $h_uid ]['email'] : '' );
-                $c_tel  = ! empty( $cand['phone'] ) ? $cand['phone'] : ( isset( $head_contacts[ $h_uid ]['phone'] ) ? $head_contacts[ $h_uid ]['phone'] : '' );
-
-                if ( ( $hint_email !== '' && strtolower( trim( $c_mail ) ) === $hint_email )
-                  || ( strlen( $hint_phone ) >= 7 && preg_replace( '/\D+/', '', $c_tel ) === $hint_phone ) ) {
-                    $matched = $cand;
-                    break;
+        $disambiguate = function( $candidates ) use ( $hint_email, $hint_phone ) {
+            if ( empty( $candidates ) ) {
+                return null;
+            }
+            if ( count( $candidates ) === 1 ) {
+                return $candidates[0];
+            }
+            if ( $hint_email !== '' || strlen( $hint_phone ) >= 7 ) {
+                foreach ( $candidates as $cand ) {
+                    $c_mail = isset( $cand['email'] ) ? trim( (string) $cand['email'] ) : '';
+                    $c_tel  = isset( $cand['phone'] ) ? trim( (string) $cand['phone'] ) : '';
+                    if ( ( $hint_email !== '' && strtolower( $c_mail ) === $hint_email )
+                      || ( strlen( $hint_phone ) >= 7 && preg_replace( '/\D+/', '', $c_tel ) === $hint_phone ) ) {
+                        return $cand;
+                    }
                 }
             }
+            return null;
+        };
+
+        if ( ! empty( $exact_index[ $query_keys['exact'] ] ) ) {
+            $matched = $disambiguate( $exact_index[ $query_keys['exact'] ] );
+            return $matched ? $matched : $exact_index[ $query_keys['exact'] ][0];
         }
 
-        $h_uid = isset( $matched['head_user_id'] ) ? intval( $matched['head_user_id'] ) : 0;
-        if ( empty( $matched['email'] ) && isset( $head_contacts[ $h_uid ]['email'] ) ) {
-            $matched['email'] = $head_contacts[ $h_uid ]['email'];
+        if ( $query_keys['fl'] !== '' && ! empty( $fl_index[ $query_keys['fl'] ] ) ) {
+            return $disambiguate( $fl_index[ $query_keys['fl'] ] );
         }
-        if ( empty( $matched['phone'] ) && isset( $head_contacts[ $h_uid ]['phone'] ) ) {
-            $matched['phone'] = $head_contacts[ $h_uid ]['phone'];
-        }
+
+        return null;
+    }
+}
 
         return $matched;
     }
