@@ -2,10 +2,10 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
- * Description: Renders master navigation header for logged-in and public users (including Head of Household user profile dropdown and role-gated Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
- * Compliance: Zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
+ * Description: Renders master navigation header for logged-in and public users (including role-gated Tournament Portal / Check-In & Scores links, Head of Household user profile dropdown, and Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Compliance: Zero output at include time, zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.9.2
+ * Version: 5.9.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,7 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Render Master App Navigation Bar for Logged-In & Public Users
+ * Render Master App Navigation Bar for Logged-In & Public Users.
+ *
+ * @return void
  */
 if ( ! function_exists( 'sywat_render_auth_header' ) ) {
     function sywat_render_auth_header() {
@@ -25,12 +27,11 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         $current_user = $is_logged_in ? wp_get_current_user() : null;
         $user_id      = $is_logged_in ? $current_user->ID : 0;
 
-        // Dynamic capability checks tied directly to sywat-permissions
+        // Dynamic capability checks tied directly to class-sywat-permissions.php
         $is_admin               = $is_logged_in && current_user_can( 'administrator' );
         $can_manage_tournaments = $is_logged_in && function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments( $user_id );
         $can_access_desk        = $is_logged_in && function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk( $user_id );
         $can_edit_scores        = $is_logged_in && function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores( $user_id );
-        $can_view_members       = $is_logged_in && function_exists( 'sywat_can_view_members' ) && sywat_can_view_members( $user_id );
         $can_manage_seasons     = $is_logged_in && function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons( $user_id );
         $can_manage_shops       = $is_logged_in && function_exists( 'sywat_can_manage_shops' ) && sywat_can_manage_shops( $user_id );
         $user_shop_id           = $is_logged_in && function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : '';
@@ -69,6 +70,14 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                             <?php if ( $can_manage_tournaments ) : ?>
                                 <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>">
                                     🎯 Tournament Portal
+                                </a>
+                            <?php elseif ( $can_access_desk ) : ?>
+                                <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>">
+                                    📋 Check-In &amp; Scores
+                                </a>
+                            <?php elseif ( $can_edit_scores ) : ?>
+                                <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>">
+                                    ✏️ Enter Scores
                                 </a>
                             <?php endif; ?>
                         </div>
@@ -166,18 +175,23 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
 add_action( 'wp_body_open', 'sywat_render_auth_header', 5 );
 
 /**
- * Render Custom TFAA Front-End Auth Screen (Sign In, Lost Password, & Set New Password)
+ * Render Custom TFAA Front-End Auth Screen (Sign In, Lost Password, & Set New Password).
+ *
+ * @return void
  */
 if ( ! function_exists( 'sywat_render_login_screen' ) ) {
     function sywat_render_login_screen() {
         $auth_error   = ! empty( $GLOBALS['sywat_auth_error'] ) ? $GLOBALS['sywat_auth_error'] : '';
         $auth_message = ! empty( $GLOBALS['sywat_auth_message'] ) ? $GLOBALS['sywat_auth_message'] : '';
         
-        $action      = isset( $_GET['action'] ) ? sanitize_text_field( $_GET['action'] ) : 'login';
-        $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( $_GET['key'] ) : '';
-        $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( $_GET['login'] ) : '';
+        $action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : 'login';
+        $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
+        $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( wp_unslash( $_GET['login'] ) ) : '';
         
-        $redirect_to = ! empty( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : sywat_page_url( 'manage_tournaments' );
+        // Leave empty unless explicitly supplied so sywat_get_post_login_redirect_url() applies role-based routing
+        $redirect_to = ! empty( $_REQUEST['redirect_to'] )
+            ? wp_validate_redirect( esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ), '' )
+            : '';
 
         if ( ! empty( $rp_key ) && ! empty( $rp_login ) ) {
             $action = 'rp';
@@ -276,7 +290,9 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
                     <form method="post" id="sywat_plugin_login_form">
                         <?php wp_nonce_field( 'sywat_auth_action', 'sywat_auth_nonce' ); ?>
                         <input type="hidden" name="sywat_auth_action" value="login">
-                        <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
+                        <?php if ( $redirect_to !== '' ) : ?>
+                            <input type="hidden" name="redirect_to" value="<?php echo esc_url( $redirect_to ); ?>">
+                        <?php endif; ?>
 
                         <div class="sywat-field-group sywat-auth-field-group">
                             <label>Username or Email Address</label>
@@ -314,6 +330,8 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
 /**
  * Shortcode Handler: [sywat_login]
+ *
+ * @return string Rendered HTML buffer output.
  */
 if ( ! function_exists( 'sywat_render_login_shortcode' ) ) {
     function sywat_render_login_shortcode() {
