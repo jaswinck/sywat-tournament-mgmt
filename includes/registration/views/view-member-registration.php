@@ -2,10 +2,10 @@
 /**
  * View Template: Public Member Online Tournament Registration Portal
  * Path: includes/registration/views/view-member-registration.php
- * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, selected tournament event details, unified live line availability and mandatory radio selection table (no pre-selected default), and household multi-archer self-registration form with automatic age division/distance detection, Waitlist placement notices, and Season Schedule cancel/return navigation.
+ * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, selected tournament event details, live line capacity availability table, and household multi-archer / multi-line checkbox matrix form (with zero pre-checked defaults, per-line status badges, automatic age division/distance detection, line-by-line confirmation breakdown, and Season Schedule cancel/return navigation).
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, zero inline event handlers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -86,46 +86,104 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 </div>
             <?php endif; ?>
 
-            <?php if ( ! empty( $submission_result['registered'] ) ) : ?>
-                <div class="sywat-alert sywat-alert-success sywat-mt-3">
-                    <strong>Registration Confirmed!</strong> Reserved spot(s) for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> on <strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>:
-                    <ul>
-                        <?php foreach ( $submission_result['registered'] as $reg_item ) : ?>
-                            <li>
-                                <strong><?php echo esc_html( $reg_item['name'] ); ?></strong> —
-                                <?php echo esc_html( $reg_item['division'] ); ?> (<?php echo esc_html( $reg_item['distance'] ); ?>)
-                                <?php if ( ! empty( $reg_item['is_promo_free'] ) ) : ?>
-                                    <span class="sywat-badge sywat-badge-open sywat-ml-1">First-Time/Lapsed Promo ($0.00)</span>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <div>
-                        <strong>Estimated Balance Due at Check-In Desk:</strong> $<?php echo esc_html( number_format( floatval( $submission_result['total_due'] ), 2 ) ); ?>
-                        <?php if ( ! empty( $submission_result['family_cap_applied'] ) ) : ?>
-                            <span class="sywat-badge sywat-badge-open sywat-ml-1">Household Family Cap Applied</span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
+            <?php
+                $line_summaries = isset( $submission_result['line_summaries'] ) && is_array( $submission_result['line_summaries'] )
+                    ? $submission_result['line_summaries']
+                    : array();
+            ?>
 
-            <?php if ( ! empty( $submission_result['waitlisted'] ) ) : ?>
-                <div class="sywat-alert sywat-alert-warning sywat-mt-3">
-                    <strong>Added to Shooting Line Waitlist:</strong> The selected line was at capacity for the target distance, so the following archer(s) were placed on the <strong>Waitlist</strong> for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> (<strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>) with <strong>$0.00</strong> due until a spot opens:
-                    <ul>
-                        <?php foreach ( $submission_result['waitlisted'] as $wl_item ) : ?>
-                            <li>
-                                <strong><?php echo esc_html( $wl_item['name'] ); ?></strong> —
-                                <?php echo esc_html( $wl_item['division'] ); ?> (<?php echo esc_html( $wl_item['distance'] ); ?>)
-                            </li>
+            <?php if ( ! empty( $line_summaries ) ) : ?>
+                <?php if ( ! empty( $submission_result['registered'] ) ) : ?>
+                    <div class="sywat-alert sywat-alert-success sywat-mt-3">
+                        <strong>Registration Confirmed for <?php echo esc_html( $submission_result['tournament'] ); ?>!</strong>
+                        <?php foreach ( $line_summaries as $l_sum ) : ?>
+                            <?php if ( empty( $l_sum['registered'] ) ) continue; ?>
+                            <div class="sywat-mt-2">
+                                <strong><?php echo esc_html( $l_sum['line_name'] ); ?></strong>
+                                — Line Balance Due at Check-In: <strong>$<?php echo esc_html( number_format( floatval( $l_sum['total_due'] ), 2 ) ); ?></strong>
+                                <?php if ( ! empty( $l_sum['family_cap_applied'] ) ) : ?>
+                                    <span class="sywat-badge sywat-badge-open sywat-ml-1">Household Family Cap Applied</span>
+                                <?php endif; ?>
+                                <ul>
+                                    <?php foreach ( $l_sum['registered'] as $reg_item ) : ?>
+                                        <li>
+                                            <strong><?php echo esc_html( $reg_item['name'] ); ?></strong> —
+                                            <?php echo esc_html( $reg_item['division'] ); ?> (<?php echo esc_html( $reg_item['distance'] ); ?>)
+                                            <?php if ( ! empty( $reg_item['is_promo_free'] ) ) : ?>
+                                                <span class="sywat-badge sywat-badge-open sywat-ml-1">First-Time/Lapsed Promo ($0.00)</span>
+                                            <?php endif; ?>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
-                </div>
+                        <div class="sywat-mt-2">
+                            <strong>Total Estimated Balance Due at Check-In Desk:</strong> $<?php echo esc_html( number_format( floatval( $submission_result['total_due'] ), 2 ) ); ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ( ! empty( $submission_result['waitlisted'] ) ) : ?>
+                    <div class="sywat-alert sywat-alert-warning sywat-mt-3">
+                        <strong>Added to Shooting Line Waitlist:</strong> The selected line(s) were at capacity for the target distance, so the following archer(s) were placed on the <strong>Waitlist</strong> for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> with <strong>$0.00</strong> due until a spot opens:
+                        <?php foreach ( $line_summaries as $l_sum ) : ?>
+                            <?php if ( empty( $l_sum['waitlisted'] ) ) continue; ?>
+                            <div class="sywat-mt-2">
+                                <strong><?php echo esc_html( $l_sum['line_name'] ); ?>:</strong>
+                                <ul>
+                                    <?php foreach ( $l_sum['waitlisted'] as $wl_item ) : ?>
+                                        <li>
+                                            <strong><?php echo esc_html( $wl_item['name'] ); ?></strong> —
+                                            <?php echo esc_html( $wl_item['division'] ); ?> (<?php echo esc_html( $wl_item['distance'] ); ?>)
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            <?php else : ?>
+                <?php if ( ! empty( $submission_result['registered'] ) ) : ?>
+                    <div class="sywat-alert sywat-alert-success sywat-mt-3">
+                        <strong>Registration Confirmed!</strong> Reserved spot(s) for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> on <strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>:
+                        <ul>
+                            <?php foreach ( $submission_result['registered'] as $reg_item ) : ?>
+                                <li>
+                                    <strong><?php echo esc_html( $reg_item['name'] ); ?></strong> —
+                                    <?php echo esc_html( $reg_item['division'] ); ?> (<?php echo esc_html( $reg_item['distance'] ); ?>)
+                                    <?php if ( ! empty( $reg_item['is_promo_free'] ) ) : ?>
+                                        <span class="sywat-badge sywat-badge-open sywat-ml-1">First-Time/Lapsed Promo ($0.00)</span>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <div>
+                            <strong>Estimated Balance Due at Check-In Desk:</strong> $<?php echo esc_html( number_format( floatval( $submission_result['total_due'] ), 2 ) ); ?>
+                            <?php if ( ! empty( $submission_result['family_cap_applied'] ) ) : ?>
+                                <span class="sywat-badge sywat-badge-open sywat-ml-1">Household Family Cap Applied</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ( ! empty( $submission_result['waitlisted'] ) ) : ?>
+                    <div class="sywat-alert sywat-alert-warning sywat-mt-3">
+                        <strong>Added to Shooting Line Waitlist:</strong> The selected line was at capacity for the target distance, so the following archer(s) were placed on the <strong>Waitlist</strong> for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> (<strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>) with <strong>$0.00</strong> due until a spot opens:
+                        <ul>
+                            <?php foreach ( $submission_result['waitlisted'] as $wl_item ) : ?>
+                                <li>
+                                    <strong><?php echo esc_html( $wl_item['name'] ); ?></strong> —
+                                    <?php echo esc_html( $wl_item['division'] ); ?> (<?php echo esc_html( $wl_item['distance'] ); ?>)
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ( ! empty( $submission_result['duplicates'] ) ) : ?>
                 <div class="sywat-alert sywat-alert-warning sywat-mt-3">
-                    <strong>Already Registered on This Line:</strong> <?php echo esc_html( implode( ', ', $submission_result['duplicates'] ) ); ?>.
+                    <strong>Already Registered on Selected Line(s):</strong> <?php echo esc_html( implode( ', ', $submission_result['duplicates'] ) ); ?>.
                 </div>
             <?php endif; ?>
         <?php endif; ?>
@@ -144,7 +202,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
             <?php endif; ?>
 
         <?php else : ?>
-            <!-- STATE 3: SELECTED EVENT DETAILS & HOUSEHOLD SELF-REGISTRATION FORM -->
+            <!-- STATE 3: SELECTED EVENT DETAILS & PER-ARCHER MULTI-LINE MATRIX FORM -->
             <?php
                 $t_profiles     = isset( $active_event['pricing_profiles'] ) && is_array( $active_event['pricing_profiles'] ) ? $active_event['pricing_profiles'] : array();
                 $is_multi_round = count( $t_profiles ) > 1;
@@ -172,9 +230,6 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 if ( isset( $_POST['contact_phone'] ) ) {
                     $head_phone_default = sanitize_text_field( wp_unslash( $_POST['contact_phone'] ) );
                 }
-
-                // Intentionally empty on initial load so the user must explicitly choose a shooting line
-                $posted_line_idx = isset( $_POST['line_idx'] ) ? sanitize_text_field( wp_unslash( $_POST['line_idx'] ) ) : '';
             ?>
 
             <!-- SELECTED TOURNAMENT EVENT DETAILS -->
@@ -194,83 +249,58 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 </div>
             </div>
 
-            <!-- HOUSEHOLD REGISTRATION FORM -->
+            <!-- LIVE SHOOTING LINE AVAILABILITY SUMMARY -->
+            <div class="sywat-table-header-bar sywat-mt-3">
+                <h3>Shooting Line Availability</h3>
+            </div>
+            <div class="sywat-table-responsive sywat-mb-4">
+                <table class="sywat-table">
+                    <thead>
+                        <tr>
+                            <th>Shooting Line</th>
+                            <th class="sywat-col-center">20yd Spots</th>
+                            <th class="sywat-col-center">Cub (10yd) Spots</th>
+                            <th class="sywat-col-center">Line Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $line_availability as $l_idx => $l_info ) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html( $l_info['label'] ); ?></strong></td>
+                                <td class="sywat-col-center">
+                                    <?php if ( intval( $l_info['m_20'] ) <= 0 ) : ?>
+                                        <span class="sywat-label-subtext">N/A (Cubs Only)</span>
+                                    <?php else : ?>
+                                        <strong><?php echo intval( $l_info['rem_20'] ); ?></strong> of <?php echo intval( $l_info['m_20'] ); ?> open
+                                    <?php endif; ?>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <?php if ( intval( $l_info['m_cub'] ) <= 0 ) : ?>
+                                        <span class="sywat-label-subtext">N/A (20yd Only)</span>
+                                    <?php else : ?>
+                                        <strong><?php echo intval( $l_info['rem_cub'] ); ?></strong> of <?php echo intval( $l_info['m_cub'] ); ?> open
+                                    <?php endif; ?>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <?php if ( ! empty( $l_info['is_closed'] ) ) : ?>
+                                        <span class="sywat-badge sywat-badge-muted">Closed</span>
+                                    <?php elseif ( intval( $l_info['rem_20'] ) > 0 || intval( $l_info['rem_cub'] ) > 0 ) : ?>
+                                        <span class="sywat-badge sywat-badge-open">Open</span>
+                                    <?php else : ?>
+                                        <span class="sywat-badge sywat-badge-warning">Waitlist Only</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- HOUSEHOLD MULTI-LINE REGISTRATION MATRIX FORM -->
             <form method="post" action="<?php echo esc_url( $form_action_url ); ?>">
                 <?php wp_nonce_field( 'sywat_member_self_register', 'sywat_member_reg_nonce' ); ?>
                 <input type="hidden" name="sywat_member_reg_submit" value="1">
                 <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $selected_tournament ); ?>">
-
-                <!-- 1. UNIFIED SHOOTING LINE AVAILABILITY & MANDATORY RADIO SELECTOR -->
-                <div class="sywat-table-header-bar sywat-mt-3">
-                    <h3>1. Choose Shooting Line *</h3>
-                </div>
-                <div class="sywat-table-responsive sywat-mb-3">
-                    <table class="sywat-table">
-                        <thead>
-                            <tr>
-                                <th class="sywat-col-center">Select</th>
-                                <th>Shooting Line</th>
-                                <th class="sywat-col-center">20yd Spots</th>
-                                <th class="sywat-col-center">Cub (10yd) Spots</th>
-                                <th class="sywat-col-center">Line Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ( $line_availability as $l_idx => $l_info ) : ?>
-                                <?php
-                                    $is_closed = ! empty( $l_info['is_closed'] );
-                                    $radio_id  = 'sywat_mreg_line_' . sanitize_key( (string) $l_idx );
-                                ?>
-                                <tr>
-                                    <td class="sywat-col-center">
-                                        <?php if ( $is_closed ) : ?>
-                                            <span class="sywat-label-subtext">—</span>
-                                        <?php else : ?>
-                                            <input type="radio"
-                                                   id="<?php echo esc_attr( $radio_id ); ?>"
-                                                   name="line_idx"
-                                                   value="<?php echo esc_attr( (string) $l_idx ); ?>"
-                                                   <?php checked( $posted_line_idx, (string) $l_idx ); ?>
-                                                   required>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ( $is_closed ) : ?>
-                                            <strong><?php echo esc_html( $l_info['label'] ); ?></strong>
-                                        <?php else : ?>
-                                            <label for="<?php echo esc_attr( $radio_id ); ?>">
-                                                <strong><?php echo esc_html( $l_info['label'] ); ?></strong>
-                                            </label>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="sywat-col-center">
-                                        <?php if ( intval( $l_info['m_20'] ) <= 0 ) : ?>
-                                            <span class="sywat-label-subtext">N/A (Cubs Only)</span>
-                                        <?php else : ?>
-                                            <strong><?php echo intval( $l_info['rem_20'] ); ?></strong> of <?php echo intval( $l_info['m_20'] ); ?> open
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="sywat-col-center">
-                                        <?php if ( intval( $l_info['m_cub'] ) <= 0 ) : ?>
-                                            <span class="sywat-label-subtext">N/A (20yd Only)</span>
-                                        <?php else : ?>
-                                            <strong><?php echo intval( $l_info['rem_cub'] ); ?></strong> of <?php echo intval( $l_info['m_cub'] ); ?> open
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="sywat-col-center">
-                                        <?php if ( $is_closed ) : ?>
-                                            <span class="sywat-badge sywat-badge-muted">Closed</span>
-                                        <?php elseif ( intval( $l_info['rem_20'] ) > 0 || intval( $l_info['rem_cub'] ) > 0 ) : ?>
-                                            <span class="sywat-badge sywat-badge-open">Open</span>
-                                        <?php else : ?>
-                                            <span class="sywat-badge sywat-badge-warning">Waitlist Only</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
 
                 <div class="sywat-form-grid-2 sywat-mb-3">
                     <div class="sywat-field-group">
@@ -279,9 +309,11 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                     </div>
                 </div>
 
-                <!-- 2. HOUSEHOLD ARCHER SELECTION TABLE -->
                 <div class="sywat-table-header-bar sywat-mt-3">
-                    <h3>2. Select Household Archer(s) to Register *</h3>
+                    <div>
+                        <h3>Select Household Archer(s) &amp; Shooting Line(s) *</h3>
+                        <div class="sywat-label-subtext">Check one or more shooting lines for each household archer you wish to register.</div>
+                    </div>
                     <?php if ( $profile_url !== '' ) : ?>
                         <a href="<?php echo esc_url( $profile_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-sm">
                             + Manage Family Members
@@ -293,37 +325,45 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                     <table class="sywat-table">
                         <thead>
                             <tr>
-                                <th class="sywat-col-center">Select</th>
                                 <th>Archer</th>
                                 <th>Age Division</th>
                                 <?php if ( $is_multi_round ) : ?>
                                     <th>Round Format</th>
                                 <?php endif; ?>
                                 <th class="sywat-col-center">Distance</th>
-                                <th class="sywat-col-center">Registration Status</th>
+                                <?php foreach ( $line_availability as $l_idx => $l_info ) : ?>
+                                    <th class="sywat-col-center">
+                                        <?php echo esc_html( $l_info['label'] ); ?>
+                                        <?php if ( ! empty( $l_info['is_closed'] ) ) : ?>
+                                            <div class="sywat-label-subtext">Closed</div>
+                                        <?php elseif ( intval( $l_info['rem_20'] ) <= 0 && intval( $l_info['rem_cub'] ) <= 0 ) : ?>
+                                            <div class="sywat-label-subtext">Waitlist</div>
+                                        <?php endif; ?>
+                                    </th>
+                                <?php endforeach; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ( $household as $m_key => $member ) : ?>
                                 <?php
-                                    $norm_name     = strtolower( trim( $member['name'] ) );
-                                    $existing_info = isset( $existing_member_regs[ $norm_name ] ) ? $existing_member_regs[ $norm_name ] : null;
-                                    $cb_id         = 'sywat_mreg_cb_' . sanitize_key( $m_key );
-                                    $div_id        = 'sywat_mreg_div_' . sanitize_key( $m_key );
-                                    $round_id      = 'sywat_mreg_rnd_' . sanitize_key( $m_key );
-                                    $is_cub        = ( $member['distance'] === 'Cub' );
+                                    $norm_name   = strtolower( trim( $member['name'] ) );
+                                    $member_regs = isset( $existing_member_regs[ $norm_name ] ) && is_array( $existing_member_regs[ $norm_name ] )
+                                        ? $existing_member_regs[ $norm_name ]
+                                        : array();
+                                    $by_line_idx  = isset( $member_regs['by_line_idx'] ) && is_array( $member_regs['by_line_idx'] )
+                                        ? $member_regs['by_line_idx']
+                                        : array();
+                                    $by_line_name = isset( $member_regs['by_line_name'] ) && is_array( $member_regs['by_line_name'] )
+                                        ? $member_regs['by_line_name']
+                                        : array();
+
+                                    $div_id   = 'sywat_mreg_div_' . sanitize_key( $m_key );
+                                    $round_id = 'sywat_mreg_rnd_' . sanitize_key( $m_key );
+                                    $is_cub   = ( $member['distance'] === 'Cub' );
                                 ?>
                                 <tr>
-                                    <td class="sywat-col-center">
-                                        <input type="checkbox"
-                                               id="<?php echo esc_attr( $cb_id ); ?>"
-                                               name="selected_members[]"
-                                               value="<?php echo esc_attr( $m_key ); ?>">
-                                    </td>
                                     <td>
-                                        <label for="<?php echo esc_attr( $cb_id ); ?>">
-                                            <strong><?php echo esc_html( $member['name'] ); ?></strong>
-                                        </label>
+                                        <strong><?php echo esc_html( $member['name'] ); ?></strong>
                                         <div class="sywat-meta-subtext">
                                             <?php echo esc_html( $member['role_label'] ); ?>
                                             <?php if ( ! empty( $member['nfaa_number'] ) && $member['nfaa_number'] !== 'Unassigned' ) : ?>
@@ -366,15 +406,33 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                                             <?php echo $is_cub ? 'Cub (10yd)' : '20yd'; ?>
                                         </span>
                                     </td>
-                                    <td class="sywat-col-center">
-                                        <?php if ( is_array( $existing_info ) ) : ?>
-                                            <span class="sywat-badge <?php echo ( strcasecmp( $existing_info['status'], 'Waitlist' ) === 0 ) ? 'sywat-badge-warning' : 'sywat-badge-checkedin'; ?>">
-                                                <?php echo esc_html( $existing_info['status'] . ': ' . $existing_info['line_name'] ); ?>
-                                            </span>
-                                        <?php else : ?>
-                                            <span class="sywat-label-subtext">Not Registered</span>
-                                        <?php endif; ?>
-                                    </td>
+                                    <?php foreach ( $line_availability as $l_idx => $l_info ) : ?>
+                                        <?php
+                                            $l_idx_str     = (string) $l_idx;
+                                            $norm_lbl      = strtolower( trim( (string) $l_info['label'] ) );
+                                            $existing_line = isset( $by_line_idx[ $l_idx_str ] )
+                                                ? $by_line_idx[ $l_idx_str ]
+                                                : ( isset( $by_line_name[ $norm_lbl ] ) ? $by_line_name[ $norm_lbl ] : null );
+                                            $is_closed     = ! empty( $l_info['is_closed'] );
+                                            $cell_cb_id    = 'sywat_mreg_cb_' . sanitize_key( $m_key ) . '_l' . sanitize_key( $l_idx_str );
+                                            $cell_aria     = $member['name'] . ' — ' . $l_info['label'];
+                                        ?>
+                                        <td class="sywat-col-center">
+                                            <?php if ( is_array( $existing_line ) ) : ?>
+                                                <span class="sywat-badge <?php echo ( strcasecmp( $existing_line['status'], 'Waitlist' ) === 0 ) ? 'sywat-badge-warning' : 'sywat-badge-checkedin'; ?>">
+                                                    <?php echo esc_html( $existing_line['status'] ); ?>
+                                                </span>
+                                            <?php elseif ( $is_closed ) : ?>
+                                                <span class="sywat-label-subtext">Closed</span>
+                                            <?php else : ?>
+                                                <input type="checkbox"
+                                                       id="<?php echo esc_attr( $cell_cb_id ); ?>"
+                                                       name="member_lines[<?php echo esc_attr( $m_key ); ?>][]"
+                                                       value="<?php echo esc_attr( $l_idx_str ); ?>"
+                                                       aria-label="<?php echo esc_attr( $cell_aria ); ?>">
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php endforeach; ?>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -382,7 +440,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                 </div>
 
                 <div class="sywat-alert sywat-alert-info sywat-mb-3">
-                    <strong>Payment &amp; Waitlist Policy:</strong> Entry fees are collected at the host shop check-in desk on tournament day. If your selected line is full for an archer's target distance, that archer is automatically placed on the <strong>Waitlist</strong> at <strong>$0.00</strong> due until a spot opens.
+                    <strong>Payment &amp; Waitlist Policy:</strong> Entry fees are collected at the host shop check-in desk on tournament day (Household Family Caps apply per shooting line). If a selected line is full for an archer's target distance, that archer is automatically placed on that line's <strong>Waitlist</strong> at <strong>$0.00</strong> due until a spot opens.
                 </div>
 
                 <div class="sywat-header-inline-controls">
