@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member Self-Registration Formatting & Calculation Helpers
  * Path: includes/registration/member-registration-helpers.php
- * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters, open tournament display metadata, and live per-line slot availability maps with zero database queries or HTML output.
+ * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters, open tournament display metadata, live per-line slot availability maps, existing registration status maps, and complete view payloads with zero database queries or HTML output.
  * Compliance: Pure helper layer — zero SQL queries, zero get_option/get_user_meta calls, zero HTML output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -241,5 +241,175 @@ if ( ! function_exists( 'sywat_member_reg_build_line_availability' ) ) {
         }
 
         return $availability;
+    }
+}
+
+/**
+ * Resolve the active tournament key from a map of open tournaments using exact or
+ * case-insensitive matching, falling back to the nearest open tournament.
+ *
+ * @param array<string, array> $open_tournaments Formatted open tournaments map.
+ * @param string               $requested_tourn  Optional requested tournament name.
+ * @return string                                Resolved tournament key or empty string.
+ */
+if ( ! function_exists( 'sywat_member_reg_resolve_selected_tournament' ) ) {
+    function sywat_member_reg_resolve_selected_tournament( $open_tournaments, $requested_tourn = '' ) {
+        if ( ! is_array( $open_tournaments ) || empty( $open_tournaments ) ) {
+            return '';
+        }
+
+        $requested = trim( (string) $requested_tourn );
+        if ( $requested !== '' ) {
+            if ( isset( $open_tournaments[ $requested ] ) ) {
+                return $requested;
+            }
+            foreach ( array_keys( $open_tournaments ) as $open_key ) {
+                if ( strcasecmp( (string) $open_key, $requested ) === 0 ) {
+                    return (string) $open_key;
+                }
+            }
+        }
+
+        reset( $open_tournaments );
+        return (string) key( $open_tournaments );
+    }
+}
+
+/**
+ * Build an O(1) lookup map of existing non-cancelled registrations keyed by normalized shooter name.
+ *
+ * @param array<int, array> $registrations Scoped tournament registration records.
+ * @return array<string, array{status: string, line_name: string}>
+ */
+if ( ! function_exists( 'sywat_member_reg_build_existing_status_map' ) ) {
+    function sywat_member_reg_build_existing_status_map( $registrations ) {
+        if ( ! is_array( $registrations ) || empty( $registrations ) ) {
+            return array();
+        }
+
+        $status_map = array();
+        foreach ( $registrations as $reg ) {
+            if ( ! is_array( $reg ) || empty( $reg['name'] ) ) {
+                continue;
+            }
+            $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
+            if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                continue;
+            }
+            $norm_name = strtolower( trim( (string) $reg['name'] ) );
+            if ( $norm_name !== '' && ! isset( $status_map[ $norm_name ] ) ) {
+                $status_map[ $norm_name ] = array(
+                    'status'    => $status !== '' ? $status : 'Pre-Reg',
+                    'line_name' => isset( $reg['line_name'] ) ? (string) $reg['line_name'] : '',
+                );
+            }
+        }
+
+        return $status_map;
+    }
+}
+
+/**
+ * Format raw active division records into dropdown option items.
+ *
+ * @param array<int, array> $div_records Raw active division records.
+ * @return array<int, array{label: string, distance: string}>
+ */
+if ( ! function_exists( 'sywat_member_reg_format_division_options' ) ) {
+    function sywat_member_reg_format_division_options( $div_records ) {
+        if ( ! is_array( $div_records ) || empty( $div_records ) ) {
+            return array();
+        }
+
+        $options = array();
+        foreach ( $div_records as $rec ) {
+            if ( is_array( $rec ) && ! empty( $rec['label'] ) ) {
+                $options[] = array(
+                    'label'    => (string) $rec['label'],
+                    'distance' => isset( $rec['distance'] ) ? (string) $rec['distance'] : '20yd',
+                );
+            }
+        }
+
+        return $options;
+    }
+}
+
+/**
+ * Assemble the complete presentation payload ($view_data) for view-member-registration.php
+ * from pre-fetched raw data arrays without executing any database or option queries.
+ *
+ * @param array $raw_context {
+ *     @type bool        $is_logged_in
+ *     @type int         $user_id
+ *     @type string      $login_url
+ *     @type string      $schedule_url
+ *     @type string      $profile_url
+ *     @type string      $member_reg_url
+ *     @type string      $requested_tourn
+ *     @type array       $raw_open_tournaments
+ *     @type array       $registrations
+ *     @type array       $raw_household
+ *     @type array       $raw_divisions
+ *     @type array|null  $submission_result
+ * }
+ * @return array Formatted $view_data array for view-member-registration.php.
+ */
+if ( ! function_exists( 'sywat_member_reg_build_view_data' ) ) {
+    function sywat_member_reg_build_view_data( $raw_context ) {
+        $is_logged_in    = ! empty( $raw_context['is_logged_in'] );
+        $user_id         = isset( $raw_context['user_id'] ) ? intval( $raw_context['user_id'] ) : 0;
+        $login_url       = isset( $raw_context['login_url'] ) ? (string) $raw_context['login_url'] : '';
+        $schedule_url    = isset( $raw_context['schedule_url'] ) ? (string) $raw_context['schedule_url'] : '';
+        $profile_url     = isset( $raw_context['profile_url'] ) ? (string) $raw_context['profile_url'] : '';
+        $member_reg_url  = isset( $raw_context['member_reg_url'] ) ? (string) $raw_context['member_reg_url'] : '';
+        $requested_tourn = isset( $raw_context['requested_tourn'] ) ? (string) $raw_context['requested_tourn'] : '';
+        $raw_open        = isset( $raw_context['raw_open_tournaments'] ) && is_array( $raw_context['raw_open_tournaments'] ) ? $raw_context['raw_open_tournaments'] : array();
+        $registrations   = isset( $raw_context['registrations'] ) && is_array( $raw_context['registrations'] ) ? $raw_context['registrations'] : array();
+        $raw_household   = isset( $raw_context['raw_household'] ) && is_array( $raw_context['raw_household'] ) ? $raw_context['raw_household'] : array();
+        $raw_divisions   = isset( $raw_context['raw_divisions'] ) && is_array( $raw_context['raw_divisions'] ) ? $raw_context['raw_divisions'] : array();
+        $submission_res  = isset( $raw_context['submission_result'] ) && is_array( $raw_context['submission_result'] ) ? $raw_context['submission_result'] : null;
+
+        $open_tournaments    = sywat_member_reg_format_open_tournaments( $raw_open );
+        $selected_tournament = sywat_member_reg_resolve_selected_tournament( $open_tournaments, $requested_tourn );
+
+        $form_action_url = ( $selected_tournament !== '' && $member_reg_url !== '' )
+            ? add_query_arg( 'tournament', rawurlencode( $selected_tournament ), $member_reg_url )
+            : $member_reg_url;
+
+        $line_availability    = array();
+        $household            = array();
+        $existing_member_regs = array();
+
+        if ( $is_logged_in && $selected_tournament !== '' && isset( $open_tournaments[ $selected_tournament ] ) ) {
+            $active_event         = $open_tournaments[ $selected_tournament ];
+            $line_availability    = sywat_member_reg_build_line_availability(
+                $selected_tournament,
+                isset( $active_event['lines'] ) ? $active_event['lines'] : array(),
+                isset( $active_event['closed_lines'] ) ? $active_event['closed_lines'] : array(),
+                $registrations
+            );
+            $household            = sywat_member_reg_format_household_roster(
+                $raw_household,
+                isset( $active_event['start_date'] ) ? $active_event['start_date'] : ''
+            );
+            $existing_member_regs = sywat_member_reg_build_existing_status_map( $registrations );
+        }
+
+        return array(
+            'is_logged_in'         => $is_logged_in,
+            'user_id'              => $user_id,
+            'login_url'            => $login_url,
+            'schedule_url'         => $schedule_url,
+            'profile_url'          => $profile_url,
+            'form_action_url'      => $form_action_url,
+            'open_tournaments'     => $open_tournaments,
+            'selected_tournament'  => $selected_tournament,
+            'line_availability'    => $line_availability,
+            'household'            => $household,
+            'existing_member_regs' => $existing_member_regs,
+            'division_options'     => sywat_member_reg_format_division_options( $raw_divisions ),
+            'submission_result'    => $submission_res,
+        );
     }
 }
