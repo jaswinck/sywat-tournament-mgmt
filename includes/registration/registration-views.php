@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal with role-gated desk tabs, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the [sywat_register] Registration Desk portal with role-gated capability checks and desk tabs, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view/shortcode layer — zero output at include time, zero inline styles, delegated data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -216,8 +216,12 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
  */
 if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
     function sywat_render_registration_desk() {
-        if ( ! function_exists( 'sywat_can_access_desk' ) || ! sywat_can_access_desk() ) {
-            return '<div class="sywat-alert sywat-alert-danger">Access denied. Desk management access required.</div>';
+        $can_register = function_exists( 'sywat_can_register_shooters' )
+            ? sywat_can_register_shooters()
+            : ( function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk() );
+
+        if ( ! $can_register ) {
+            return '<div class="sywat-alert sywat-alert-danger">Access denied. Registration intake access required.</div>';
         }
 
         ob_start();
@@ -225,7 +229,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
         $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
-        $can_access_desk        = sywat_can_access_desk();
+        $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
 
         $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
