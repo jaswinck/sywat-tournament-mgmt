@@ -5,7 +5,7 @@
  * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -71,6 +71,7 @@ if ( ! function_exists( 'sywat_desk_render_family_banner' ) ) {
 if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
     function sywat_desk_render_filter_bar( $data ) {
         $can_manage_tournaments = function_exists( 'sywat_can_manage_tournaments' ) && sywat_can_manage_tournaments();
+        $can_register_shooters  = function_exists( 'sywat_can_register_shooters' ) ? sywat_can_register_shooters() : ( function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk() );
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
@@ -99,8 +100,10 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
             <?php if ( $can_manage_tournaments ) : ?>
                 <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament">Manage Tournaments</a>
             <?php endif; ?>
-            <?php if ( $can_access_desk ) : ?>
+            <?php if ( $can_register_shooters ) : ?>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'register' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
+            <?php endif; ?>
+            <?php if ( $can_access_desk ) : ?>
                 <a href="<?php echo esc_url( add_query_arg( $tab_query_args, sywat_page_url( 'desk' ) ) ); ?>" class="sywat-tab-item active sywat-tab-icon-checkin">Check In Archers</a>
             <?php endif; ?>
             <?php if ( $can_edit_scores ) : ?>
