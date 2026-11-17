@@ -2,16 +2,21 @@
 /**
  * Sub-Module: Central Roles & Permissions Management
  * Path: includes/core/class-sywat-permissions.php
- * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks.
+ * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks across all sub-modules.
+ * Compliance: Pure core permissions layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 3.6.0
+ * Version: 3.7.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Register clean, essential organizational roles safely in WordPress.
  * Grants read and private page access without elevating roles to WP site administrators.
+ *
+ * @return void
  */
 if ( ! function_exists( 'sywat_register_custom_roles' ) ) {
     function sywat_register_custom_roles() {
@@ -73,6 +78,8 @@ add_action( 'init', 'sywat_register_custom_roles' );
 
 /**
  * Utility: Returns array of official organizational role slugs.
+ *
+ * @return array List of custom organizational role slugs.
  */
 if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
     function sywat_get_custom_roles_slugs() {
@@ -94,6 +101,8 @@ if ( ! function_exists( 'sywat_get_custom_roles_slugs' ) ) {
 
 /**
  * Utility: Master list of official TFAA Board Positions (for checkboxes / dropdowns).
+ *
+ * @return array Associative array of board position slug => display label.
  */
 if ( ! function_exists( 'sywat_get_tfaa_board_positions_list' ) ) {
     function sywat_get_tfaa_board_positions_list() {
@@ -118,6 +127,9 @@ if ( ! function_exists( 'sywat_get_tfaa_board_positions_list' ) ) {
 
 /**
  * Utility: Fetch current or target WP_User object safely.
+ *
+ * @param int $user_id Optional target user ID (0 defaults to current user).
+ * @return WP_User|false
  */
 if ( ! function_exists( 'sywat_get_user_object' ) ) {
     function sywat_get_user_object( $user_id = 0 ) {
@@ -131,6 +143,9 @@ if ( ! function_exists( 'sywat_get_user_object' ) ) {
 /**
  * Utility: Normalize role and board position slugs for uniform comparison.
  * Strips 'tfaa_' and 'sywat_' prefixes and maps district governor variants to 'field_governor'.
+ *
+ * @param string $slug Raw role or board position slug.
+ * @return string      Normalized role token.
  */
 if ( ! function_exists( 'sywat_normalize_role_slug' ) ) {
     function sywat_normalize_role_slug( $slug ) {
@@ -146,6 +161,10 @@ if ( ! function_exists( 'sywat_normalize_role_slug' ) ) {
 /**
  * Utility: Internal role & board position match checker.
  * Checks WP Primary Roles AND User Meta board designations (sywat_board_position / sywat_tfaa_role).
+ *
+ * @param array $allowed_roles Array of permitted role slugs.
+ * @param int   $user_id       Optional target user ID (0 defaults to current user).
+ * @return bool
  */
 if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
     function sywat_user_has_any_role( $allowed_roles, $user_id = 0 ) {
@@ -174,7 +193,10 @@ if ( ! function_exists( 'sywat_user_has_any_role' ) ) {
 }
 
 /**
- * Permission 1: Can view the Members Directory portal.
+ * Permission 1: Can view the Members Directory / Self-Service Household Profile portal.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_view_members' ) ) {
     function sywat_can_view_members( $user_id = 0 ) {
@@ -198,6 +220,9 @@ if ( ! function_exists( 'sywat_can_view_members' ) ) {
 
 /**
  * Permission 2: Can access Master Tournament Management portal & shooter administration.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
     function sywat_can_manage_tournaments( $user_id = 0 ) {
@@ -219,6 +244,9 @@ if ( ! function_exists( 'sywat_can_manage_tournaments' ) ) {
 
 /**
  * Permission 3: Can manage Season CRUD configurations & global settings.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
     function sywat_can_manage_seasons( $user_id = 0 ) {
@@ -235,6 +263,9 @@ if ( ! function_exists( 'sywat_can_manage_seasons' ) ) {
 
 /**
  * Permission 4: Can add, edit, or delete archery shop profiles.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
     function sywat_can_manage_shops( $user_id = 0 ) {
@@ -253,6 +284,10 @@ if ( ! function_exists( 'sywat_can_manage_shops' ) ) {
 
 /**
  * Permission 5: Can enter or edit scores (Desk, Score Entry page, Public Results edit shortcuts).
+ * Restricted to Shop Users, Shop Managers, Board/Officers, and Administrators (excludes general tfaa_member).
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
     function sywat_can_edit_scores( $user_id = 0 ) {
@@ -268,14 +303,17 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
             'tfaa_social_media_director',
             'sywat_shop_manager',
             'sywat_shop_user',
-            'tfaa_member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
 }
 
 /**
- * Permission 6: Can access the Check-In Desk portal.
+ * Permission 6: Can access the Check-In Desk & Registration Intake portals.
+ * Restricted to Shop Users, Shop Managers, Board/Officers, and Administrators (excludes general tfaa_member).
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_access_desk' ) ) {
     function sywat_can_access_desk( $user_id = 0 ) {
@@ -291,7 +329,6 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
             'tfaa_social_media_director',
             'sywat_shop_manager',
             'sywat_shop_user',
-            'tfaa_member',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
@@ -299,6 +336,9 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
 
 /**
  * Permission 7: Can create or manage member user accounts.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_create_members' ) ) {
     function sywat_can_create_members( $user_id = 0 ) {
@@ -316,6 +356,9 @@ if ( ! function_exists( 'sywat_can_create_members' ) ) {
 
 /**
  * Permission 8: Can assign, edit, or remove Board Members.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
  */
 if ( ! function_exists( 'sywat_can_manage_board' ) ) {
     function sywat_can_manage_board( $user_id = 0 ) {
@@ -331,11 +374,16 @@ if ( ! function_exists( 'sywat_can_manage_board' ) ) {
 
 /**
  * Helper: Retrieve assigned District slug for Field Governor user scoping.
+ *
+ * @param int $user_id Optional target user ID.
+ * @return string
  */
 if ( ! function_exists( 'sywat_get_user_district' ) ) {
     function sywat_get_user_district( $user_id = 0 ) {
         $user = sywat_get_user_object( $user_id );
-        if ( ! $user ) return '';
+        if ( ! $user ) {
+            return '';
+        }
         $district = get_user_meta( $user->ID, 'sywat_district', true );
         return ! empty( $district ) ? $district : 'district_1';
     }
