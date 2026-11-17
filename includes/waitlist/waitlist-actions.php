@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Action Handlers (Manual Promotion, Top-Bar Open-Line Moves & Removal)
  * Path: includes/waitlist/waitlist-actions.php
- * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, legacy 'No Show' metadata cleanup, capacity guards, and per-line $75.00 Family Cap reconciliation.
+ * Description: Processes single/group promotions from Waitlist to Pre-Reg, multi-select moves from the top-of-modal Open Line toolbar, waitlist entry removal, database-driven division/style/distance normalization, capacity guards, First-Time/Lapsed Shooter promo checks, and dynamic Household Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 2.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -75,26 +75,106 @@ if ( ! function_exists( 'sywat_waitlist_get_posted_tournament' ) ) {
 }
 
 /**
- * Clean up any legacy 'No Show' division/gender/style flags on a waitlisted record
- * before promoting or moving it onto an active Pre-Reg shooting line.
+ * Resolve canonical distance ('Cub' or '20yd') for a registration record using
+ * database-configured division settings first, with safe fallback to stored distance.
+ *
+ * @param array $record Registration record.
+ * @return string       Canonical distance ('Cub' or '20yd').
+ */
+if ( ! function_exists( 'sywat_waitlist_resolve_record_distance' ) ) {
+    function sywat_waitlist_resolve_record_distance( $record ) {
+        $raw_div = isset( $record['division'] ) ? trim( (string) $record['division'] ) : '';
+        if ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
+            return sywat_shooting_styles_get_division_distance( $raw_div );
+        }
+        return sywat_waitlist_normalize_distance( isset( $record['distance'] ) ? $record['distance'] : '20yd' );
+    }
+}
+
+/**
+ * Resolve default active division label from database configuration for a target distance ('Cub' vs '20yd').
+ *
+ * @param string $dist_val Target distance ('Cub' or '20yd').
+ * @return string          Canonical active division label.
+ */
+if ( ! function_exists( 'sywat_waitlist_get_default_division_for_distance' ) ) {
+    function sywat_waitlist_get_default_division_for_distance( $dist_val ) {
+        $want_cub = ( strcasecmp( trim( (string) $dist_val ), 'Cub' ) === 0 );
+
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $records = sywat_get_division_records( false );
+            if ( is_array( $records ) ) {
+                foreach ( $records as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    $rec_dist = ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd';
+                    if ( $want_cub && $rec_dist === 'Cub' ) {
+                        return $rec['label'];
+                    }
+                    if ( ! $want_cub && $rec_dist === '20yd' && isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Adult' ) {
+                        return $rec['label'];
+                    }
+                }
+                if ( ! $want_cub ) {
+                    foreach ( $records as $rec ) {
+                        if ( ! empty( $rec['label'] ) && ( ! isset( $rec['distance'] ) || $rec['distance'] !== 'Cub' ) ) {
+                            return $rec['label'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $want_cub ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+    }
+}
+
+/**
+ * Clean up any legacy 'No Show' division/gender/style flags and normalize division,
+ * shooting style, and distance against database configuration before promoting or moving
+ * a waitlisted record onto an active Pre-Reg shooting line.
  *
  * @param array  $record   Registration record passed by reference.
- * @param string $dist_val Normalized distance ('20yd' or 'Cub').
+ * @param string $dist_val Normalized distance ('20yd' or 'Cub') passed by reference.
  * @return void
  */
 if ( ! function_exists( 'sywat_waitlist_sanitize_promoted_record' ) ) {
-    function sywat_waitlist_sanitize_promoted_record( &$record, $dist_val ) {
+    function sywat_waitlist_sanitize_promoted_record( &$record, &$dist_val ) {
         $raw_div = isset( $record['division'] ) ? trim( (string) $record['division'] ) : '';
-        if ( $raw_div === '' || strcasecmp( $raw_div, 'No Show' ) === 0 ) {
-            $record['division'] = ( $dist_val === 'Cub' ) ? 'Cub (8 - 11)' : 'Adult (18 - 49)';
+        if ( $raw_div === '' || $raw_div === '—' || strcasecmp( $raw_div, 'No Show' ) === 0 ) {
+            $record['division'] = sywat_waitlist_get_default_division_for_distance( $dist_val );
+        } elseif ( function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+            $record['division'] = sywat_shooting_styles_normalize_division( $raw_div );
         }
 
         if ( isset( $record['gender'] ) && strcasecmp( trim( (string) $record['gender'] ), 'No Show' ) === 0 ) {
             $record['gender'] = '';
         }
 
-        if ( isset( $record['style'] ) && strcasecmp( trim( (string) $record['style'] ), 'No Show' ) === 0 ) {
+        $raw_style = isset( $record['style'] ) ? trim( (string) $record['style'] ) : '';
+        if ( strcasecmp( $raw_style, 'No Show' ) === 0 ) {
             $record['style'] = '';
+        } elseif ( $raw_style !== '' && $raw_style !== '—' && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
+            $record['style'] = sywat_shooting_styles_normalize_style( $raw_style );
+        }
+
+        if ( ! empty( $record['style'] ) && ! empty( $record['division'] ) && function_exists( 'sywat_resolve_style_and_division' ) ) {
+            $resolved = sywat_resolve_style_and_division( $record['style'], $record['division'] );
+            if ( is_array( $resolved ) ) {
+                if ( ! empty( $resolved['style'] ) ) {
+                    $record['style'] = $resolved['style'];
+                }
+                if ( ! empty( $resolved['division'] ) ) {
+                    $record['division'] = $resolved['division'];
+                }
+            }
+        }
+
+        if ( function_exists( 'sywat_shooting_styles_get_division_distance' ) && ! empty( $record['division'] ) ) {
+            $dist_val = sywat_shooting_styles_get_division_distance( $record['division'] );
+        } else {
+            $dist_val = sywat_waitlist_normalize_distance( $dist_val );
         }
 
         $record['checked_in'] = 0;
@@ -311,7 +391,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         $needed_20  = 0;
         $needed_cub = 0;
         foreach ( $candidates as $cand ) {
-            $dist = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist = sywat_waitlist_resolve_record_distance( $cand );
             if ( $dist === 'Cub' ) {
                 $needed_cub++;
             } else {
@@ -342,27 +422,40 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         }
 
         $promoted_names    = array();
+        $promo_names       = array();
         $affected_families = array();
 
         foreach ( $candidates as $cand ) {
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
-            $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist_val = sywat_waitlist_resolve_record_distance( $cand );
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
+            $style_val     = isset( $cand['style'] ) ? $cand['style'] : '';
+            $round_slug    = isset( $cand['pricing_profile'] ) ? $cand['pricing_profile'] : '';
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
+
+            $is_promo_free = ! empty( $cand['is_promo_free'] );
+            if ( ! $is_promo_free && strcasecmp( trim( (string) $existing_paid ), 'Field Governor' ) !== 0 && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+                $promo_res     = sywat_check_archer_promo_eligibility( $cand['name'], $tourn_name, $round_slug, $registrations, $cand['id'] );
+                $is_promo_free = ! empty( $promo_res['eligible'] );
+            }
 
             $cand['status']         = 'Pre-Reg';
             $cand['line_index']     = $target_line_idx;
             $cand['line_name']      = $line_label;
             $cand['distance']       = $dist_val;
-            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid );
-            $cand['balance_due']    = ( $cand['paid'] === 'Field Governor' ) ? 0.00 : sywat_waitlist_get_individual_rate( $div_val, $dist_val );
+            $cand['is_promo_free']  = $is_promo_free;
+            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid, $is_promo_free );
+            $cand['balance_due']    = sywat_waitlist_get_individual_rate( $div_val, $dist_val, $tourn_name, $round_slug, $style_val, $cand['paid'] );
             $cand['_just_promoted'] = true;
 
             if ( sywat_waitlist_persist_record( $cand, $registrations ) ) {
                 $promoted_names[] = $cand['name'];
+                if ( $is_promo_free ) {
+                    $promo_names[] = $cand['name'];
+                }
                 if ( ! empty( $cand['family_id'] ) ) {
                     $affected_families[ trim( (string) $cand['family_id'] ) ] = true;
                 }
@@ -379,17 +472,28 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
         unset( $r );
 
         $cap_applied = false;
+        $cap_amount  = 75.00;
         foreach ( array_keys( $affected_families ) as $fam_key ) {
             $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_idx, $fam_key, $registrations, $t_lines );
             if ( ! empty( $rec_res['is_family_capped'] ) ) {
                 $cap_applied = true;
+                if ( isset( $rec_res['cap_amount'] ) && floatval( $rec_res['cap_amount'] ) > 0 ) {
+                    $cap_amount = floatval( $rec_res['cap_amount'] );
+                }
             }
         }
 
         $count_promoted = count( $promoted_names );
-        $cap_note       = $cap_applied ? ' ($75.00 Family Cap applied for this line).' : '.';
+        $notes_parts    = array();
+        if ( ! empty( $promo_names ) ) {
+            $notes_parts[] = 'First-Time/Lapsed Promo ($0.00) applied to ' . implode( ', ', $promo_names );
+        }
+        if ( $cap_applied ) {
+            $notes_parts[] = '$' . number_format( $cap_amount, 2 ) . ' Family Cap applied';
+        }
+        $extra_note = ! empty( $notes_parts ) ? ' (' . implode( '; ', $notes_parts ) . ').' : '.';
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Promoted <strong>' . intval( $count_promoted ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $promoted_names ) ) . '</strong>) to Pre-Reg on <strong>' . esc_html( $line_label ) . '</strong>' . esc_html( $cap_note ) . '</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Promoted <strong>' . intval( $count_promoted ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $promoted_names ) ) . '</strong>) to Pre-Reg on <strong>' . esc_html( $line_label ) . '</strong>' . esc_html( $extra_note ) . '</div>';
     }
 }
 
@@ -397,7 +501,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_promote' ) ) {
  * Action Handler: Move Checkbox-Selected Waitlisted Archers (or Single/Group)
  * from their current waitlisted line(s) to a selected open shooting line as 'Pre-Reg'.
  * Keeps moved members of the same household grouped together on the destination line
- * and reconciles per-line $75.00 Family Cap fees on both origin and destination lines.
+ * and reconciles dynamic Household Family Cap fees on both origin and destination lines.
  *
  * @param array $tournaments   Tournaments master list.
  * @param array $registrations Reference to registrations array.
@@ -482,7 +586,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
             if ( sywat_waitlist_has_line_duplicate( $registrations, $tourn_name, $target_line_raw, $cand['name'], $cand['id'], $t_lines ) ) {
                 $duplicate_names[] = $cand['name'];
             }
-            $dist = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist = sywat_waitlist_resolve_record_distance( $cand );
             if ( $dist === 'Cub' ) {
                 $needed_cub++;
             } else {
@@ -533,6 +637,7 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         }
 
         $moved_names          = array();
+        $promo_names          = array();
         $dest_family_ids      = array();
         $origin_family_scopes = array();
 
@@ -543,18 +648,27 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
 
             unset( $cand['_resolved_line'], $cand['_created_ts'], $cand['_seq'] );
 
-            $dist_val = sywat_waitlist_normalize_distance( isset( $cand['distance'] ) ? $cand['distance'] : '20yd' );
+            $dist_val = sywat_waitlist_resolve_record_distance( $cand );
             sywat_waitlist_sanitize_promoted_record( $cand, $dist_val );
 
             $div_val       = isset( $cand['division'] ) ? $cand['division'] : '';
+            $style_val     = isset( $cand['style'] ) ? $cand['style'] : '';
+            $round_slug    = isset( $cand['pricing_profile'] ) ? $cand['pricing_profile'] : '';
             $existing_paid = isset( $cand['paid'] ) ? $cand['paid'] : '';
+
+            $is_promo_free = ! empty( $cand['is_promo_free'] );
+            if ( ! $is_promo_free && strcasecmp( trim( (string) $existing_paid ), 'Field Governor' ) !== 0 && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+                $promo_res     = sywat_check_archer_promo_eligibility( $cand['name'], $tourn_name, $round_slug, $registrations, $cand['id'] );
+                $is_promo_free = ! empty( $promo_res['eligible'] );
+            }
 
             $cand['line_index']     = (string) $target_line_raw;
             $cand['line_name']      = $dest_label;
             $cand['distance']       = $dist_val;
             $cand['status']         = 'Pre-Reg';
-            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid );
-            $cand['balance_due']    = ( $cand['paid'] === 'Field Governor' ) ? 0.00 : sywat_waitlist_get_individual_rate( $div_val, $dist_val );
+            $cand['is_promo_free']  = $is_promo_free;
+            $cand['paid']           = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $existing_paid, $is_promo_free );
+            $cand['balance_due']    = sywat_waitlist_get_individual_rate( $div_val, $dist_val, $tourn_name, $round_slug, $style_val, $cand['paid'] );
             $cand['_just_promoted'] = true;
 
             if ( $old_fam_id !== '' ) {
@@ -576,6 +690,9 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
 
             if ( sywat_waitlist_persist_record( $cand, $registrations ) ) {
                 $moved_names[] = $cand['name'];
+                if ( $is_promo_free ) {
+                    $promo_names[] = $cand['name'];
+                }
             }
         }
 
@@ -589,10 +706,14 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         unset( $r );
 
         $cap_applied = false;
+        $cap_amount  = 75.00;
         foreach ( array_keys( $dest_family_ids ) as $df_id ) {
             $rec_res = sywat_waitlist_recalculate_line_family_fees( $tourn_name, $target_line_raw, $df_id, $registrations, $t_lines );
             if ( ! empty( $rec_res['is_family_capped'] ) ) {
                 $cap_applied = true;
+                if ( isset( $rec_res['cap_amount'] ) && floatval( $rec_res['cap_amount'] ) > 0 ) {
+                    $cap_amount = floatval( $rec_res['cap_amount'] );
+                }
             }
         }
 
@@ -602,15 +723,22 @@ if ( ! function_exists( 'sywat_waitlist_handle_move_line' ) ) {
         }
 
         $count_moved = count( $moved_names );
-        $cap_note    = $cap_applied ? ' ($75.00 Family Cap applied on destination line).' : '.';
+        $notes_parts = array();
+        if ( ! empty( $promo_names ) ) {
+            $notes_parts[] = 'First-Time/Lapsed Promo ($0.00) applied to ' . implode( ', ', $promo_names );
+        }
+        if ( $cap_applied ) {
+            $notes_parts[] = '$' . number_format( $cap_amount, 2 ) . ' Family Cap applied on destination line';
+        }
+        $extra_note = ! empty( $notes_parts ) ? ' (' . implode( '; ', $notes_parts ) . ').' : '.';
 
-        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Moved <strong>' . intval( $count_moved ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $moved_names ) ) . '</strong>) to <strong>' . esc_html( $dest_label ) . '</strong> as Pre-Reg' . esc_html( $cap_note ) . '</div>';
+        return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Moved <strong>' . intval( $count_moved ) . '</strong> archer(s) (<strong>' . esc_html( implode( ', ', $moved_names ) ) . '</strong>) to <strong>' . esc_html( $dest_label ) . '</strong> as Pre-Reg' . esc_html( $extra_note ) . '</div>';
     }
 }
 
 /**
  * Action Handler: Remove a Single Waitlisted Archer Entry across all host portals
- * (Register, Manage Tournaments, Roster, Check-In) and reconcile line family fees.
+ * (Register, Manage Tournaments, Roster, Check-In) and reconcile household family fees.
  *
  * @param array $tournaments   Tournaments master list.
  * @param array $registrations Reference to registrations array.

@@ -2,13 +2,15 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk database pre-fetching, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), O(1) member record lookup by full name/contact, hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
  * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
  * Author: SYWAT Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 if ( ! function_exists( 'sywat_get_all_tfaa_members' ) ) {
     /**
@@ -279,5 +281,84 @@ if ( ! function_exists( 'sywat_get_import_preview_db_maps' ) ) {
             'existing_nfaa_set'  => $existing_nfaa_set,
             'existing_email_set' => $existing_email_set,
         );
+    }
+}
+
+if ( ! function_exists( 'sywat_find_member_record_by_name' ) ) {
+    /**
+     * Retrieve a single Member Directory archer record by full name (with optional email/phone tie-breaker)
+     * using an O(1) static hashtable index built once per request from sywat_get_all_flat_archers().
+     *
+     * @param string $full_name Archer full name.
+     * @param string $email     Optional email hint for duplicate-name disambiguation.
+     * @param string $phone     Optional phone hint for duplicate-name disambiguation.
+     * @return array|null       Standardized archer record array (with inherited household contact fallback) or null.
+     */
+    function sywat_find_member_record_by_name( $full_name, $email = '', $phone = '' ) {
+        static $name_index    = null;
+        static $head_contacts = null;
+
+        $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $full_name ) );
+        if ( $clean_name === '' ) {
+            return null;
+        }
+
+        if ( $name_index === null ) {
+            $name_index    = array();
+            $head_contacts = array();
+            $flat_archers  = sywat_get_all_flat_archers();
+
+            foreach ( $flat_archers as $arch ) {
+                if ( ! is_array( $arch ) || empty( $arch['display_name'] ) ) {
+                    continue;
+                }
+                $key = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', (string) $arch['display_name'] ) ) );
+                if ( $key === '' ) {
+                    continue;
+                }
+                $name_index[ $key ][] = $arch;
+
+                if ( isset( $arch['account_type'] ) && $arch['account_type'] === 'head' && ! empty( $arch['user_id'] ) ) {
+                    $head_contacts[ intval( $arch['user_id'] ) ] = array(
+                        'email' => isset( $arch['email'] ) ? trim( (string) $arch['email'] ) : '',
+                        'phone' => isset( $arch['phone'] ) ? trim( (string) $arch['phone'] ) : '',
+                    );
+                }
+            }
+        }
+
+        $norm_key = strtolower( $clean_name );
+        if ( empty( $name_index[ $norm_key ] ) ) {
+            return null;
+        }
+
+        $candidates = $name_index[ $norm_key ];
+        $matched    = $candidates[0];
+        $hint_email = strtolower( trim( (string) $email ) );
+        $hint_phone = preg_replace( '/\D+/', '', (string) $phone );
+
+        if ( count( $candidates ) > 1 && ( $hint_email !== '' || strlen( $hint_phone ) >= 7 ) ) {
+            foreach ( $candidates as $cand ) {
+                $h_uid  = isset( $cand['head_user_id'] ) ? intval( $cand['head_user_id'] ) : 0;
+                $c_mail = ! empty( $cand['email'] ) ? $cand['email'] : ( isset( $head_contacts[ $h_uid ]['email'] ) ? $head_contacts[ $h_uid ]['email'] : '' );
+                $c_tel  = ! empty( $cand['phone'] ) ? $cand['phone'] : ( isset( $head_contacts[ $h_uid ]['phone'] ) ? $head_contacts[ $h_uid ]['phone'] : '' );
+
+                if ( ( $hint_email !== '' && strtolower( trim( $c_mail ) ) === $hint_email )
+                  || ( strlen( $hint_phone ) >= 7 && preg_replace( '/\D+/', '', $c_tel ) === $hint_phone ) ) {
+                    $matched = $cand;
+                    break;
+                }
+            }
+        }
+
+        $h_uid = isset( $matched['head_user_id'] ) ? intval( $matched['head_user_id'] ) : 0;
+        if ( empty( $matched['email'] ) && isset( $head_contacts[ $h_uid ]['email'] ) ) {
+            $matched['email'] = $head_contacts[ $h_uid ]['email'];
+        }
+        if ( empty( $matched['phone'] ) && isset( $head_contacts[ $h_uid ]['phone'] ) ) {
+            $matched['phone'] = $head_contacts[ $h_uid ]['phone'];
+        }
+
+        return $matched;
     }
 }

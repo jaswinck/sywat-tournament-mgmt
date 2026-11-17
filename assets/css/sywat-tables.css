@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.5.0
+   Version: 7.5.2
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -87,6 +87,46 @@
     font-size: 12px;
 }
 
+/* Compact Order Column Move Up / Move Down Controls */
+.sywat-order-controls {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.sywat-order-num {
+    display: inline-block;
+    min-width: 22px;
+    font-weight: 700;
+    color: var(--sywat-navy);
+    text-align: center;
+}
+
+.sywat-order-form {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    width: auto;
+}
+
+.sywat-table .sywat-btn.sywat-btn-order {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+    line-height: 1;
+}
+
+.sywat-table .sywat-btn.sywat-btn-order:disabled,
+.sywat-table .sywat-btn.sywat-btn-order:disabled:hover {
+    background-color: var(--sywat-surface-muted);
+    border-color: var(--sywat-border);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* Row Hover & Member Table Link Styling */
 .sywat-member-row,
 .sywat-board-row {
@@ -136,7 +176,7 @@
     justify-content: center !important;
     gap: 5px !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     margin: 0 auto !important;
 }
 
@@ -155,7 +195,7 @@
     align-items: center !important;
     margin: 0 auto !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     box-sizing: border-box !important;
 }
 
@@ -166,7 +206,7 @@
     align-items: center !important;
     margin: 0 auto !important;
     width: 100% !important;
-    max-width: 140px !important;
+    max-width: 140px;
     height: 28px !important;
     box-sizing: border-box !important;
     border-radius: 4px !important;

@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with sticky tournament carryover, Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.9.3
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -179,51 +180,17 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                     <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
                 </div>
             </div>
-            <?php if ( ! empty( $lines ) ) : ?>
+            <?php if ( ! empty( $lines ) && is_array( $lines ) ) : ?>
                 <?php
-                    $ordered_lines = array();
-                    foreach ( $lines as $idx => $line ) {
-                        $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ( $idx + 1 );
-                        $weight     = 50;
-
-                        if ( stripos( $line_title, 'Sat' ) !== false ) {
-                            if ( stripos( $line_title, '10' ) !== false ) {
-                                $weight = 10;
-                            } elseif ( stripos( $line_title, '2' ) !== false ) {
-                                $weight = 20;
-                            } else {
-                                $weight = 25;
-                            }
-                        } elseif ( stripos( $line_title, 'Sun' ) !== false ) {
-                            if ( stripos( $line_title, '10' ) !== false ) {
-                                $weight = 30;
-                            } elseif ( stripos( $line_title, '2' ) !== false ) {
-                                $weight = 40;
-                            } else {
-                                $weight = 45;
-                            }
-                        }
-
-                        $ordered_lines[] = array(
-                            'idx'    => (string) $idx,
-                            'line'   => $line,
-                            'weight' => $weight,
-                        );
+                    if ( function_exists( 'sywat_compare_tournament_lines' ) ) {
+                        uasort( $lines, 'sywat_compare_tournament_lines' );
                     }
-
-                    usort( $ordered_lines, function( $a, $b ) {
-                        if ( $a['weight'] !== $b['weight'] ) {
-                            return $a['weight'] <=> $b['weight'];
-                        }
-                        return $a['idx'] <=> $b['idx'];
-                    } );
                 ?>
 
                 <div class="sywat-tracker-grid">
-                    <?php foreach ( $ordered_lines as $item ) : ?>
+                    <?php foreach ( $lines as $raw_idx => $line ) : ?>
                         <?php
-                            $idx       = $item['idx'];
-                            $line      = $item['line'];
+                            $idx       = (string) $raw_idx;
                             $line_name = isset( $line['name'] ) ? trim( $line['name'] ) : '';
 
                             $booked_20yd     = 0;
@@ -274,7 +241,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                             <div>
                                 <div class="sywat-tracker-card-header">
                                     <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
-                                    <div class="sywat-tracker-header-badges" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                    <div class="sywat-tracker-header-badges sywat-table-actions-vertical">
                                         <span class="sywat-badge sywat-badge-prereg">
                                             <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                         </span>
@@ -344,7 +311,24 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         $selected_tournament = $data['selected_tournament'];
         $selected_line_idx   = $data['selected_line_idx'];
         $lines               = $data['lines'];
-        $tournaments_map     = isset( $data['tournaments'] ) ? $data['tournaments'] : array();
+        $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
+
+        $t_profiles     = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
+        $is_multi_round = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
+
+        // Resolve active tournament Family Cap threshold for fallback evaluations
+        $active_cap_amount = 75.00;
+        if ( ! empty( $t_profiles ) ) {
+            $max_prof_cap = 0.00;
+            foreach ( $t_profiles as $tp ) {
+                if ( ! empty( $tp['family_cap_enabled'] ) && isset( $tp['family_cap_amount'] ) ) {
+                    $max_prof_cap = max( $max_prof_cap, floatval( $tp['family_cap_amount'] ) );
+                }
+            }
+            if ( $max_prof_cap > 0 ) {
+                $active_cap_amount = $max_prof_cap;
+            }
+        }
 
         $active_t_slug    = isset( $data['active_t_slug'] ) ? $data['active_t_slug'] : sanitize_title( $selected_tournament );
         $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
@@ -426,6 +410,25 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $paid_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['paid'] ) ? $reg['paid'] : '—' );
                                     $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? $reg['distance'] : 'N/A' );
 
+                                    $is_promo_free = ! $is_no_show && (
+                                        ! empty( $reg['is_promo_free'] )
+                                        || strcasecmp( $paid_disp, 'Promo (Free)' ) === 0
+                                        || stripos( $paid_disp, 'Promo' ) === 0
+                                    );
+
+                                    $round_slug  = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : '';
+                                    $round_label = '';
+                                    if ( $is_multi_round && $round_slug !== '' ) {
+                                        if ( isset( $t_profiles[ $round_slug ] ) ) {
+                                            $round_label = $t_profiles[ $round_slug ]['label'];
+                                        } elseif ( function_exists( 'sywat_find_pricing_profile' ) ) {
+                                            $rp = sywat_find_pricing_profile( $round_slug );
+                                            if ( is_array( $rp ) && ! empty( $rp['label'] ) ) {
+                                                $round_label = $rp['label'];
+                                            }
+                                        }
+                                    }
+
                                     $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && strcasecmp( $reg['paid'], 'Family' ) === 0 ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
 
                                     // Evaluate household-wide unpaid balance so every family member reflects an open family balance
@@ -451,12 +454,17 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                                 }
                                             }
                                         }
-                                        $is_true_family_cap = ( $effective_due >= 75.00 );
+                                        $is_true_family_cap = ( $effective_due >= $active_cap_amount );
                                     }
                                 ?>
                                 <tr class="sywat-archer-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                     <td>
-                                        <div class="sywat-archer-name"><?php echo esc_html( $reg['name'] ); ?></div>
+                                        <div class="sywat-archer-name">
+                                            <?php echo esc_html( $reg['name'] ); ?>
+                                            <?php if ( $round_label !== '' ) : ?>
+                                                <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $round_label ); ?></span>
+                                            <?php endif; ?>
+                                        </div>
                                         <!-- OWE Badge Rule: Show across all members of an unpaid household; suppress for No Shows and Zero Balances -->
                                         <?php if ( ! $is_no_show && $effective_due > 0 ) : ?>
                                             <div class="sywat-owe-badge-wrap">
@@ -477,7 +485,13 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     <td><?php echo esc_html( $div_disp ); ?></td>
                                     <td class="sywat-col-center"><?php echo esc_html( $gender_disp ); ?></td>
                                     <td><?php echo esc_html( $style_disp ); ?></td>
-                                    <td class="sywat-col-paid"><?php echo esc_html( $paid_disp ); ?></td>
+                                    <td class="sywat-col-paid">
+                                        <?php if ( $is_promo_free ) : ?>
+                                            <span class="sywat-badge sywat-badge-open">Promo ($0.00)</span>
+                                        <?php else : ?>
+                                            <?php echo esc_html( $paid_disp ); ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="sywat-col-center"><?php echo esc_html( $dist_disp ); ?></td>
                                     <td class="sywat-col-center">
                                         <div class="sywat-table-actions-vertical">

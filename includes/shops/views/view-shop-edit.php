@@ -2,8 +2,10 @@
 /**
  * View Template: Admin Edit Location (Tabbed Layout)
  * Path: includes/shops/views/view-shop-edit.php
+ * Description: Renders the tabbed Edit Location view with Profile & Address, Public Online Registration defaults (On/Off + 15-day default lead time), Contacts, SYWAT Indoor Lines, and SYWAT Outdoor Lines using standardized 30-minute AM/PM shooting line dropdowns.
+ * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery / TFAA
- * Version: 6.8.3
+ * Version: 6.12.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -11,10 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
 $fallback_list_url  = $can_manage_seasons ? add_query_arg( 'type', $type_filter, $page_url ) : sywat_page_url( 'shops_public' );
 
-$curr_fac       = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
-$curr_dist      = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
-$curr_type      = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
-$add_contacts   = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
+$curr_fac     = isset( $editing_shop['facilities'] ) && is_array( $editing_shop['facilities'] ) ? $editing_shop['facilities'] : array();
+$curr_dist    = isset( $editing_shop['district'] ) ? $editing_shop['district'] : '';
+$curr_type    = isset( $editing_shop['location_type'] ) ? $editing_shop['location_type'] : 'pro_shop';
+$add_contacts = isset( $editing_shop['additional_contacts'] ) && is_array( $editing_shop['additional_contacts'] ) ? $editing_shop['additional_contacts'] : array();
+
+$curr_reg_enabled = ! empty( $editing_shop['public_reg_default'] ) ? '1' : '0';
+$curr_reg_days    = ( isset( $editing_shop['public_reg_days_before'] ) && $editing_shop['public_reg_days_before'] !== '' )
+    ? max( 0, intval( $editing_shop['public_reg_days_before'] ) )
+    : 15;
 
 $raw_state = isset( $editing_shop['state'] ) ? trim( (string) $editing_shop['state'] ) : '';
 $curr_st   = ( $raw_state !== '' && function_exists( 'sywat_normalize_state_code' ) ) ? sywat_normalize_state_code( $raw_state ) : $raw_state;
@@ -98,6 +105,22 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                     <label>
                         <input type="checkbox" name="facilities[]" value="3d_range" <?php checked( in_array( '3d_range', $curr_fac, true ), true ); ?>> 🦌 3D Animal Range
                     </label>
+                </div>
+            </div>
+
+            <!-- Public Online Registration Defaults (Applies to Future Tournaments) -->
+            <div class="sywat-subtitle sywat-mt-4 sywat-mb-4">Public Online Registration Defaults (Applies to Future Tournaments)</div>
+            <div class="sywat-form-grid-2">
+                <div class="sywat-field-group">
+                    <label for="sywat_edit_public_reg_default">Allow Public Online Registration (Default)</label>
+                    <select id="sywat_edit_public_reg_default" name="public_reg_default">
+                        <option value="0" <?php selected( $curr_reg_enabled, '0' ); ?>>Off (External Link or Phone Intake Only)</option>
+                        <option value="1" <?php selected( $curr_reg_enabled, '1' ); ?>>On (Members Can Register Online via SYWAT)</option>
+                    </select>
+                </div>
+                <div class="sywat-field-group">
+                    <label for="sywat_edit_public_reg_days_before">Open Online Registration (Days Before Event)</label>
+                    <input type="number" id="sywat_edit_public_reg_days_before" name="public_reg_days_before" value="<?php echo esc_attr( $curr_reg_days ); ?>" min="0" max="365" required>
                 </div>
             </div>
 
@@ -217,18 +240,22 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                     <tbody>
                         <?php
                             $indoor_lines = isset( $editing_shop['default_lines'] ) && is_array( $editing_shop['default_lines'] ) ? $editing_shop['default_lines'] : array(
-                                array( 'day' => 'Saturday', 'time' => '10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                array( 'day' => 'Saturday', 'time' => '2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                array( 'day' => 'Sunday',   'time' => '10:00 AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
-                                array( 'day' => 'Sunday',   'time' => '2:00 PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                array( 'day' => 'Saturday', 'time' => '10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                array( 'day' => 'Saturday', 'time' => '2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                array( 'day' => 'Sunday',   'time' => '10AM', 'cap_20yd' => 20, 'cap_cub' => 5 ),
+                                array( 'day' => 'Sunday',   'time' => '2PM',  'cap_20yd' => 20, 'cap_cub' => 5 ),
                             );
                             foreach ( $indoor_lines as $i => $l ):
                                 $day_val  = isset( $l['day'] ) ? $l['day'] : '';
                                 $time_val = isset( $l['time'] ) ? $l['time'] : '';
-                                if ( empty( $day_val ) && ! empty( $l['name'] ) ) {
-                                    $parts    = explode( ' ', trim( $l['name'] ), 2 );
-                                    $day_val  = $parts[0];
-                                    $time_val = isset( $parts[1] ) ? $parts[1] : '';
+                                if ( ( empty( $day_val ) || empty( $time_val ) ) && ! empty( $l['name'] ) ) {
+                                    $parts = explode( ' ', trim( $l['name'] ), 2 );
+                                    if ( empty( $day_val ) ) {
+                                        $day_val = $parts[0];
+                                    }
+                                    if ( empty( $time_val ) && isset( $parts[1] ) ) {
+                                        $time_val = $parts[1];
+                                    }
                                 }
                         ?>
                             <tr>
@@ -244,7 +271,15 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                                 </td>
                                 <td>
                                     <div class="sywat-field-group">
-                                        <input type="text" name="indoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 10:00 AM" required>
+                                        <select name="indoor_line_times[]" required>
+                                            <?php
+                                                if ( function_exists( 'sywat_render_line_time_options' ) ) {
+                                                    echo sywat_render_line_time_options( $time_val );
+                                                } else {
+                                                    echo '<option value="' . esc_attr( $time_val ) . '" selected>' . esc_html( $time_val ) . '</option>';
+                                                }
+                                            ?>
+                                        </select>
                                     </div>
                                 </td>
                                 <td>
@@ -287,16 +322,20 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                     <tbody>
                         <?php
                             $outdoor_lines = isset( $editing_shop['outdoor_lines'] ) && is_array( $editing_shop['outdoor_lines'] ) ? $editing_shop['outdoor_lines'] : array(
-                                array( 'day' => 'Saturday', 'time' => '9:00 AM' ),
-                                array( 'day' => 'Sunday',   'time' => '9:00 AM' ),
+                                array( 'day' => 'Saturday', 'time' => '9AM' ),
+                                array( 'day' => 'Sunday',   'time' => '9AM' ),
                             );
                             foreach ( $outdoor_lines as $i => $l ):
                                 $day_val  = isset( $l['day'] ) ? $l['day'] : '';
                                 $time_val = isset( $l['time'] ) ? $l['time'] : '';
-                                if ( empty( $day_val ) && ! empty( $l['name'] ) ) {
-                                    $parts    = explode( ' ', trim( $l['name'] ), 2 );
-                                    $day_val  = $parts[0];
-                                    $time_val = isset( $parts[1] ) ? $parts[1] : '';
+                                if ( ( empty( $day_val ) || empty( $time_val ) ) && ! empty( $l['name'] ) ) {
+                                    $parts = explode( ' ', trim( $l['name'] ), 2 );
+                                    if ( empty( $day_val ) ) {
+                                        $day_val = $parts[0];
+                                    }
+                                    if ( empty( $time_val ) && isset( $parts[1] ) ) {
+                                        $time_val = $parts[1];
+                                    }
                                 }
                         ?>
                             <tr>
@@ -312,7 +351,15 @@ $active_sub_tab = isset( $_POST['active_tab'] ) ? sanitize_text_field( wp_unslas
                                 </td>
                                 <td>
                                     <div class="sywat-field-group">
-                                        <input type="text" name="outdoor_line_times[]" value="<?php echo esc_attr( $time_val ); ?>" placeholder="e.g. 9:00 AM" required>
+                                        <select name="outdoor_line_times[]" required>
+                                            <?php
+                                                if ( function_exists( 'sywat_render_line_time_options' ) ) {
+                                                    echo sywat_render_line_time_options( $time_val );
+                                                } else {
+                                                    echo '<option value="' . esc_attr( $time_val ) . '" selected>' . esc_html( $time_val ) . '</option>';
+                                                }
+                                            ?>
+                                        </select>
                                     </div>
                                 </td>
                                 <td class="sywat-col-center">

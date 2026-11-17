@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
- * Description: Renders the Registered Archer Roster modal with alphabetical active shooters and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
+ * Description: Renders the Registered Archer Roster modal with alphabetical active shooters, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
  * Author: SYWAT Archery
- * Version: 6.9.1
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -100,6 +100,15 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
         }
         $roster_post_url = add_query_arg( $roster_post_args, $manage_base_url );
 
+        // Resolve offered Pricing & Round Profiles for multi-round display badges
+        $t_data         = ( is_array( $tournaments ) && isset( $tournaments[ $selected_tournament ] ) )
+            ? $tournaments[ $selected_tournament ]
+            : $selected_tournament;
+        $t_profiles     = function_exists( 'sywat_get_tournament_pricing_profiles' )
+            ? sywat_get_tournament_pricing_profiles( $t_data )
+            : array();
+        $is_multi_round = count( $t_profiles ) > 1;
+
         // Build Tournament- & Line-Scoped Family Groups array for JS dynamic dropdowns & labels
         if ( function_exists( 'sywat_waitlist_build_family_labels_by_line' ) ) {
             $existing_families_by_line = sywat_waitlist_build_family_labels_by_line( $selected_tournament, $available_lines, $registrations );
@@ -112,7 +121,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                     continue;
                 }
 
-                $fid = ! empty( $r['family_id'] ) ? trim( $r['family_id'] ) : '';
+                $fid = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
                 if ( empty( $fid ) ) {
                     continue;
                 }
@@ -131,7 +140,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                 if ( ! isset( $family_members_by_id[ $fid ] ) ) {
                     $family_members_by_id[ $fid ] = array(
                         'line_idx'    => $resolved_l_idx,
-                        'family_name' => ! empty( $r['family_name'] ) ? trim( $r['family_name'] ) : '',
+                        'family_name' => ! empty( $r['family_name'] ) ? trim( (string) $r['family_name'] ) : '',
                         'names'       => array(),
                     );
                 }
@@ -226,7 +235,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
 
         // Enqueue Roster Client Scripts
         if ( function_exists( 'sywat_render_roster_scripts' ) ) {
-            sywat_render_roster_scripts( $existing_families_by_line );
+            sywat_render_roster_scripts( $existing_families_by_line, $selected_tournament );
         }
         ?>
 
@@ -338,8 +347,22 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             $badge_type  = ! empty( $reg['is_walkin'] ) || ( isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ) ? 'Walk-In' : 'Pre-Reg';
                                             $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
 
-                                            $paid_status = isset( $reg['paid'] ) ? $reg['paid'] : '';
-                                            $lidx        = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $available_lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+                                            $paid_status   = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
+                                            $is_promo_free = ! empty( $reg['is_promo_free'] ) || strcasecmp( $paid_status, 'Promo (Free)' ) === 0 || stripos( $paid_status, 'Promo' ) === 0;
+                                            $lidx          = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $available_lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+
+                                            $round_slug  = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : '';
+                                            $round_label = '';
+                                            if ( $is_multi_round && $round_slug !== '' ) {
+                                                if ( isset( $t_profiles[ $round_slug ] ) ) {
+                                                    $round_label = $t_profiles[ $round_slug ]['label'];
+                                                } elseif ( function_exists( 'sywat_find_pricing_profile' ) ) {
+                                                    $rp = sywat_find_pricing_profile( $round_slug );
+                                                    if ( is_array( $rp ) && ! empty( $rp['label'] ) ) {
+                                                        $round_label = $rp['label'];
+                                                    }
+                                                }
+                                            }
 
                                             $fam_label = '';
                                             if ( $paid_status === 'Family' && ! empty( $reg['family_id'] ) ) {
@@ -371,6 +394,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                         <tr class="sywat-manage-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
                                             <td>
                                                 <strong><?php echo esc_html( $reg['name'] ); ?></strong>
+                                                <?php if ( $round_label !== '' ) : ?>
+                                                    <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $round_label ); ?></span>
+                                                <?php endif; ?>
                                                 <?php if ( ! empty( $fam_label ) ) : ?>
                                                     <div>
                                                         <span class="sywat-chip-family">🟢 <?php echo esc_html( $fam_label ); ?></span>
@@ -379,7 +405,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             </td>
                                             <td class="sywat-col-center">
                                                 <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge_type ); ?></span>
-                                                <?php if ( $paid_status === 'Family' ) : ?>
+                                                <?php if ( $is_promo_free ) : ?>
+                                                    <br><span class="sywat-badge sywat-badge-open">Promo ($0.00)</span>
+                                                <?php elseif ( $paid_status === 'Family' ) : ?>
                                                     <br><span class="sywat-badge-family-cap">Family Cap</span>
                                                 <?php endif; ?>
                                             </td>

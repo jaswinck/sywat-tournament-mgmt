@@ -1,11 +1,11 @@
 <?php
 /**
- * Sub-Module: Waitlist Fee Calculation, Per-Line Family Cap Reconciler & Persistence Helpers
+ * Sub-Module: Waitlist Fee Calculation, Household Family Cap Reconciler & Persistence Helpers
  * Path: includes/waitlist/waitlist-helpers.php
- * Description: Pure business-rule helpers for Youth/Adult rate evaluation, strict per-line $75.00 Family Cap reconciliation, household-wide balance resolution, and atomic multi-store registration persistence.
+ * Description: Pure business-rule helpers for database-driven Youth/Adult/Pro/Promo rate evaluation, dynamic Household Family Cap reconciliation, household-wide balance resolution, and atomic multi-store registration persistence.
  * Compliance: Pure helper layer — zero HTML echo, zero POST handling, zero script/style output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,7 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Determine whether a division/distance qualifies for the Youth ($25.00) tier.
+ * Determine whether a division/distance qualifies for the Youth tier
+ * using database-configured age division rate tiers (with safe NFAA fallback).
  *
  * @param string $division Archer age division label.
  * @param string $distance Optional target distance label.
@@ -25,6 +26,13 @@ if ( ! function_exists( 'sywat_waitlist_is_youth_division' ) ) {
         $dist_clean = function_exists( 'sywat_waitlist_normalize_distance' )
             ? sywat_waitlist_normalize_distance( $distance )
             : ( strcasecmp( trim( (string) $distance ), 'Cub' ) === 0 ? 'Cub' : '20yd' );
+
+        if ( $div_clean !== '' && strcasecmp( $div_clean, 'No Show' ) !== 0 && function_exists( 'sywat_find_division' ) ) {
+            $div_rec = sywat_find_division( $div_clean );
+            if ( is_array( $div_rec ) && isset( $div_rec['rate_tier'] ) ) {
+                return ( $div_rec['rate_tier'] === 'Youth' );
+            }
+        }
 
         if ( $dist_clean === 'Cub' ) {
             return true;
@@ -50,47 +58,70 @@ if ( ! function_exists( 'sywat_waitlist_is_youth_division' ) ) {
 }
 
 /**
- * Return standard individual entry fee ($25.00 Youth/Cub, $30.00 Adult/Senior, $0.00 No Show).
+ * Return standard individual entry fee using the active Tournament / Round Pricing Profile
+ * (with safe fallback to database-configured default rates).
  *
- * @param string $division Archer age division label.
- * @param string $distance Optional target distance label.
- * @return float           Standard individual entry fee.
+ * @param string $division        Archer age division label.
+ * @param string $distance        Optional target distance label.
+ * @param string $tournament_name Optional tournament title for round/format resolution.
+ * @param string $round_slug      Optional archer-selected round format slug (e.g., 'field', 'field-50').
+ * @param string $style           Optional shooting style label (for Pro rate evaluation).
+ * @param string $paid_status     Optional existing paid tier ('Field Governor', 'Promo (Free)', etc.).
+ * @return float                  Calculated individual entry fee.
  */
 if ( ! function_exists( 'sywat_waitlist_get_individual_rate' ) ) {
-    function sywat_waitlist_get_individual_rate( $division, $distance = '' ) {
+    function sywat_waitlist_get_individual_rate( $division, $distance = '', $tournament_name = '', $round_slug = '', $style = '', $paid_status = '' ) {
         if ( strcasecmp( trim( (string) $division ), 'No Show' ) === 0 ) {
             return 0.00;
         }
+
+        if ( function_exists( 'sywat_get_archer_individual_fee' ) ) {
+            return sywat_get_archer_individual_fee( $tournament_name, $division, $distance, $style, $round_slug, $paid_status );
+        }
+
+        $clean_paid = trim( (string) $paid_status );
+        if ( strcasecmp( $clean_paid, 'Field Governor' ) === 0 || strcasecmp( $clean_paid, 'Promo (Free)' ) === 0 || stripos( $clean_paid, 'Promo' ) === 0 ) {
+            return 0.00;
+        }
+
         return sywat_waitlist_is_youth_division( $division, $distance ) ? 25.00 : 30.00;
     }
 }
 
 /**
- * Resolve canonical non-family paid tier ('Field Governor', 'Youth', or 'Adult').
+ * Resolve canonical non-family paid tier ('Field Governor', 'Promo (Free)', 'Youth', or 'Adult').
  *
  * @param string $division      Archer age division label.
  * @param string $distance      Optional target distance label.
  * @param string $existing_paid Optional existing paid status.
+ * @param bool   $is_promo_free Optional flag indicating First-Time/Lapsed Shooter promo eligibility.
  * @return string               Canonical paid status label.
  */
 if ( ! function_exists( 'sywat_waitlist_get_paid_tier' ) ) {
-    function sywat_waitlist_get_paid_tier( $division, $distance = '', $existing_paid = '' ) {
-        if ( strcasecmp( trim( (string) $existing_paid ), 'Field Governor' ) === 0 ) {
+    function sywat_waitlist_get_paid_tier( $division, $distance = '', $existing_paid = '', $is_promo_free = false ) {
+        $clean_paid = trim( (string) $existing_paid );
+
+        if ( $is_promo_free || strcasecmp( $clean_paid, 'Promo (Free)' ) === 0 || stripos( $clean_paid, 'Promo' ) === 0 ) {
+            return 'Promo (Free)';
+        }
+
+        if ( strcasecmp( $clean_paid, 'Field Governor' ) === 0 ) {
             return 'Field Governor';
         }
+
         return sywat_waitlist_is_youth_division( $division, $distance ) ? 'Youth' : 'Adult';
     }
 }
 
 /**
  * Evaluate household-wide unpaid balance across all active members sharing the same
- * family_id or booking_id on the same shooting line so no family member can check in
- * while a family balance remains unpaid.
+ * family_id or booking_id (scoped per shooting line or tournament-wide per active Pricing Profile)
+ * so no family member can check in while a family balance remains unpaid.
  *
  * @param array $reg           Target archer registration record.
  * @param array $registrations All registrations for the active tournament.
  * @param array $t_lines       Optional tournament lines array for index resolution.
- * @return array               Household balance summary ('has_family', 'family_id', 'group_due', 'individual_due', 'effective_due', 'is_family_capped').
+ * @return array               Household balance summary ('has_family', 'family_id', 'group_due', 'individual_due', 'effective_due', 'is_family_capped', 'cap_amount').
  */
 if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
     function sywat_get_household_balance_info( $reg, $registrations, $t_lines = array() ) {
@@ -110,6 +141,7 @@ if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
                 'individual_due'   => $ind_due,
                 'effective_due'    => $ind_due,
                 'is_family_capped' => false,
+                'cap_amount'       => 0.00,
             );
         }
 
@@ -117,6 +149,40 @@ if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
         $target_line  = function_exists( 'sywat_waitlist_resolve_line_idx' )
             ? sywat_waitlist_resolve_line_idx( $reg, $t_lines )
             : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+
+        // Determine cap scope & thresholds from active tournament pricing profile(s)
+        $use_tourn_wide  = false;
+        $any_cap_enabled = false;
+        $effective_cap   = 0.00;
+        $effective_min   = 99;
+
+        if ( $target_tourn !== '' && function_exists( 'sywat_get_tournament_pricing_profiles' ) ) {
+            $t_profiles = sywat_get_tournament_pricing_profiles( $target_tourn );
+            foreach ( $t_profiles as $tp ) {
+                if ( ! empty( $tp['family_cap_enabled'] ) ) {
+                    $any_cap_enabled = true;
+                    $p_cap           = isset( $tp['family_cap_amount'] ) ? floatval( $tp['family_cap_amount'] ) : 75.00;
+                    $p_min           = isset( $tp['family_min_archers'] ) ? max( 2, intval( $tp['family_min_archers'] ) ) : 3;
+                    if ( $p_cap > $effective_cap ) {
+                        $effective_cap = $p_cap;
+                    }
+                    if ( $p_min < $effective_min ) {
+                        $effective_min = $p_min;
+                    }
+                    if ( isset( $tp['family_cap_scope'] ) && $tp['family_cap_scope'] === 'tournament' ) {
+                        $use_tourn_wide = true;
+                    }
+                }
+            }
+        } else {
+            $any_cap_enabled = true;
+            $effective_cap   = 75.00;
+            $effective_min   = 3;
+        }
+
+        if ( $effective_min === 99 ) {
+            $effective_min = 3;
+        }
 
         $group_due_sum    = 0.00;
         $active_member_ct = 0;
@@ -136,12 +202,14 @@ if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
                 continue;
             }
 
-            $other_line = function_exists( 'sywat_waitlist_resolve_line_idx' )
-                ? sywat_waitlist_resolve_line_idx( $other, $t_lines )
-                : ( isset( $other['line_index'] ) ? (string) $other['line_index'] : '0' );
+            if ( ! $use_tourn_wide ) {
+                $other_line = function_exists( 'sywat_waitlist_resolve_line_idx' )
+                    ? sywat_waitlist_resolve_line_idx( $other, $t_lines )
+                    : ( isset( $other['line_index'] ) ? (string) $other['line_index'] : '0' );
 
-            if ( $other_line !== $target_line ) {
-                continue;
+                if ( $other_line !== $target_line ) {
+                    continue;
+                }
             }
 
             $other_fam  = ! empty( $other['family_id'] ) ? trim( (string) $other['family_id'] ) : '';
@@ -158,24 +226,32 @@ if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
                 continue;
             }
 
-            $active_member_ct++;
+            $o_paid  = isset( $other['paid'] ) ? trim( (string) $other['paid'] ) : '';
+            $is_free = ( strcasecmp( $o_paid, 'Field Governor' ) === 0 )
+                || ( strcasecmp( $o_paid, 'Promo (Free)' ) === 0 )
+                || ( stripos( $o_paid, 'Promo' ) === 0 )
+                || ! empty( $other['is_promo_free'] );
+
             $other_due      = isset( $other['balance_due'] ) ? max( 0.00, floatval( $other['balance_due'] ) ) : 0.00;
             $group_due_sum += $other_due;
-
-            $o_div  = isset( $other['division'] ) ? $other['division'] : '';
-            $o_dist = isset( $other['distance'] ) ? $other['distance'] : '20yd';
-            $o_paid = isset( $other['paid'] ) ? trim( (string) $other['paid'] ) : '';
 
             if ( strcasecmp( $o_paid, 'Family' ) === 0 ) {
                 $any_family_tag = true;
             }
-            if ( strcasecmp( $o_paid, 'Field Governor' ) !== 0 ) {
-                $raw_rate_sum += sywat_waitlist_get_individual_rate( $o_div, $o_dist );
+
+            if ( ! $is_free ) {
+                $active_member_ct++;
+                $o_div   = isset( $other['division'] ) ? $other['division'] : '';
+                $o_dist  = isset( $other['distance'] ) ? $other['distance'] : '20yd';
+                $o_style = isset( $other['style'] ) ? $other['style'] : '';
+                $o_round = isset( $other['pricing_profile'] ) ? $other['pricing_profile'] : '';
+
+                $raw_rate_sum += sywat_waitlist_get_individual_rate( $o_div, $o_dist, $target_tourn, $o_round, $o_style, '' );
             }
         }
 
         $effective_due    = round( max( $ind_due, $group_due_sum ), 2 );
-        $is_family_capped = $any_family_tag && ( $active_member_ct >= 3 || $raw_rate_sum >= 75.00 || $effective_due >= 75.00 );
+        $is_family_capped = $any_cap_enabled && $any_family_tag && ( $active_member_ct >= $effective_min || ( $effective_cap > 0 && $raw_rate_sum > $effective_cap ) );
 
         return array(
             'has_family'       => ( $active_member_ct > 1 || $any_family_tag ),
@@ -184,6 +260,7 @@ if ( ! function_exists( 'sywat_get_household_balance_info' ) ) {
             'individual_due'   => round( $ind_due, 2 ),
             'effective_due'    => $effective_due,
             'is_family_capped' => $is_family_capped,
+            'cap_amount'       => round( $effective_cap, 2 ),
         );
     }
 }
@@ -263,185 +340,27 @@ if ( ! function_exists( 'sywat_waitlist_persist_record' ) ) {
 
 /**
  * Reconcile paid tiers and balances for all active (non-waitlisted, non-cancelled)
- * members of a family group on a single shooting line.
+ * members of a household group using the active Pricing Profile's Family Cap rules
+ * (delegating to sywat_recalculate_household_fees() for single-source-of-truth math).
  *
  * @param string $tourn_name    Active tournament name.
  * @param string $line_idx      Target shooting line index.
  * @param string $family_id     Family group identifier.
  * @param array  $registrations In-memory registrations list passed by reference.
  * @param array  $t_lines       Optional tournament lines config for index resolution.
- * @return array                Summary array ('is_family_capped', 'active_count', 'line_total_due').
+ * @return array                Summary array ('is_family_capped', 'active_count', 'line_total_due', 'cap_amount').
  */
 if ( ! function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
     function sywat_waitlist_recalculate_line_family_fees( $tourn_name, $line_idx, $family_id, &$registrations, $t_lines = array() ) {
-        $target_tourn = trim( (string) $tourn_name );
-        $target_line  = (string) $line_idx;
-        $target_fam   = trim( (string) $family_id );
-
-        if ( $target_tourn === '' || $target_fam === '' || ! is_array( $registrations ) ) {
-            return array(
-                'is_family_capped' => false,
-                'active_count'     => 0,
-                'line_total_due'   => 0.00,
-            );
-        }
-
-        $active_indices              = array();
-        $prior_due_sum               = 0.00;
-        $prior_paid_sum              = 0.00;
-        $had_explicit_paid_tracking  = false;
-        $was_previously_capped       = false;
-        $prior_active_individual_sum = 0.00;
-
-        foreach ( $registrations as $idx => $reg ) {
-            if ( ! is_array( $reg ) || ! isset( $reg['tournament'], $reg['id'] ) ) {
-                continue;
-            }
-            if ( strcasecmp( trim( (string) $reg['tournament'] ), $target_tourn ) !== 0 ) {
-                continue;
-            }
-
-            $reg_fam = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
-            if ( $reg_fam !== $target_fam ) {
-                continue;
-            }
-
-            $resolved_l = function_exists( 'sywat_waitlist_resolve_line_idx' )
-                ? sywat_waitlist_resolve_line_idx( $reg, $t_lines )
-                : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-
-            if ( $resolved_l !== $target_line ) {
-                continue;
-            }
-
-            $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
-            if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
-                continue;
-            }
-
-            // Waitlisted members always carry $0.00 balance due until promoted
-            if ( strcasecmp( $status, 'Waitlist' ) === 0 ) {
-                if ( ( isset( $reg['balance_due'] ) && floatval( $reg['balance_due'] ) !== 0.0 ) || ( isset( $reg['paid'] ) && $reg['paid'] !== 'Waitlist' ) ) {
-                    $reg['paid']        = 'Waitlist';
-                    $reg['balance_due'] = 0.00;
-                    sywat_waitlist_persist_record( $reg, $registrations );
-                }
-                continue;
-            }
-
-            $paid_val = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
-            if ( strcasecmp( $paid_val, 'Field Governor' ) === 0 ) {
-                continue;
-            }
-
-            $div_val  = isset( $reg['division'] ) ? $reg['division'] : '';
-            $dist_val = isset( $reg['distance'] ) ? $reg['distance'] : '20yd';
-            $ind_rate = sywat_waitlist_get_individual_rate( $div_val, $dist_val );
-
-            if ( strcasecmp( $paid_val, 'Family' ) === 0 ) {
-                $was_previously_capped = true;
-            }
-
-            // Track prior balances/payments from members who were already active before this change
-            $is_newly_promoted = ! empty( $reg['_just_promoted'] );
-            if ( ! $is_newly_promoted ) {
-                $prior_due_sum               += isset( $reg['balance_due'] ) ? max( 0.00, floatval( $reg['balance_due'] ) ) : 0.00;
-                $prior_active_individual_sum += $ind_rate;
-
-                if ( isset( $reg['amount_paid'] ) ) {
-                    $had_explicit_paid_tracking = true;
-                    $prior_paid_sum            += max( 0.00, floatval( $reg['amount_paid'] ) );
-                }
-            }
-
-            $active_indices[] = array(
-                'index'         => $idx,
-                'ind_rate'      => $ind_rate,
-                'checked_in'    => ! empty( $reg['checked_in'] ),
-                'just_promoted' => $is_newly_promoted,
-            );
-        }
-
-        $active_count = count( $active_indices );
-        if ( $active_count === 0 ) {
-            return array(
-                'is_family_capped' => false,
-                'active_count'     => 0,
-                'line_total_due'   => 0.00,
-            );
-        }
-
-        $raw_sum = 0.00;
-        foreach ( $active_indices as $item ) {
-            $raw_sum += $item['ind_rate'];
-        }
-
-        $is_family_capped  = ( $active_count >= 3 && $raw_sum >= 75.00 );
-        $target_line_total = $is_family_capped ? 75.00 : $raw_sum;
-
-        // Calculate payments already collected on this line so nobody is double-billed
-        if ( $had_explicit_paid_tracking ) {
-            $amount_already_paid = $prior_paid_sum;
-        } else {
-            $prior_billed_total  = $was_previously_capped ? 75.00 : $prior_active_individual_sum;
-            $amount_already_paid = max( 0.00, round( $prior_billed_total - $prior_due_sum, 2 ) );
-        }
-
-        $remaining_line_due = max( 0.00, round( $target_line_total - $amount_already_paid, 2 ) );
-
-        if ( $is_family_capped ) {
-            $due_holder_pos = 0;
-            foreach ( $active_indices as $pos => $item ) {
-                if ( $item['just_promoted'] ) {
-                    $due_holder_pos = $pos;
-                    break;
-                }
-                if ( ! $item['checked_in'] ) {
-                    $due_holder_pos = $pos;
-                }
-            }
-
-            foreach ( $active_indices as $pos => $item ) {
-                $reg_copy = $registrations[ $item['index'] ];
-                unset( $reg_copy['_just_promoted'] );
-
-                $reg_copy['paid']        = 'Family';
-                $reg_copy['balance_due'] = ( $pos === $due_holder_pos ) ? $remaining_line_due : 0.00;
-
-                sywat_waitlist_persist_record( $reg_copy, $registrations );
-            }
-        } else {
-            $running_paid_credit = $amount_already_paid;
-
-            foreach ( $active_indices as $item ) {
-                $reg_copy = $registrations[ $item['index'] ];
-                unset( $reg_copy['_just_promoted'] );
-
-                $div_val  = isset( $reg_copy['division'] ) ? $reg_copy['division'] : '';
-                $dist_val = isset( $reg_copy['distance'] ) ? $reg_copy['distance'] : '20yd';
-                $ind_rate = $item['ind_rate'];
-
-                $reg_copy['paid'] = sywat_waitlist_get_paid_tier( $div_val, $dist_val );
-
-                if ( $item['checked_in'] ) {
-                    $reg_copy['balance_due'] = 0.00;
-                    $running_paid_credit     = max( 0.00, round( $running_paid_credit - $ind_rate, 2 ) );
-                } elseif ( $running_paid_credit >= $ind_rate ) {
-                    $reg_copy['balance_due'] = 0.00;
-                    $running_paid_credit     = round( $running_paid_credit - $ind_rate, 2 );
-                } else {
-                    $reg_copy['balance_due'] = round( $ind_rate - $running_paid_credit, 2 );
-                    $running_paid_credit     = 0.00;
-                }
-
-                sywat_waitlist_persist_record( $reg_copy, $registrations );
-            }
+        if ( function_exists( 'sywat_recalculate_household_fees' ) ) {
+            return sywat_recalculate_household_fees( $tourn_name, $line_idx, $family_id, $registrations, $t_lines );
         }
 
         return array(
-            'is_family_capped' => $is_family_capped,
-            'active_count'     => $active_count,
-            'line_total_due'   => $remaining_line_due,
+            'is_family_capped' => false,
+            'active_count'     => 0,
+            'line_total_due'   => 0.00,
+            'cap_amount'       => 0.00,
         );
     }
 }

@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.5.0
+   Version: 7.5.2
    ========================================================================== */
 
 :root {
@@ -310,6 +310,9 @@ body.sywat-hide-theme-chrome #page-container {
 }
 
 .sywat-tab-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 10px 18px;
     font-weight: 700;
     text-decoration: none !important;
@@ -359,6 +362,9 @@ body.sywat-hide-theme-chrome #page-container {
     font-size: 20px;
     font-weight: 700;
     color: var(--sywat-heading);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 /* High-Contrast Subtitles & Typography Utilities */
@@ -424,6 +430,9 @@ body.sywat-hide-theme-chrome #page-container {
     margin: 0;
     font-weight: 700;
     color: var(--sywat-navy);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .sywat-table-header-controls {

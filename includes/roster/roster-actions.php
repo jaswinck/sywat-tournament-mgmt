@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Action Handlers (Edit, Remove & Line Purge)
  * Path: includes/roster/roster-actions.php
- * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync), removing individual shooters, and clearing active line rosters while reconciling per-line $75.00 Family Cap fees and multi-store persistence.
+ * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -55,7 +55,7 @@ if ( ! function_exists( 'sywat_roster_resolve_line_idx' ) ) {
 }
 
 /**
- * Enforce division-based shooting style rules so invalid combinations are normalized.
+ * Enforce division-based shooting style rules using database configuration so invalid combinations are normalized.
  *
  * @param string $style    Submitted shooting style.
  * @param string $division Submitted age division.
@@ -70,6 +70,14 @@ if ( ! function_exists( 'sywat_roster_sanitize_style_for_division' ) ) {
             return 'No Show';
         }
 
+        if ( function_exists( 'sywat_resolve_style_and_division' ) ) {
+            $resolved = sywat_resolve_style_and_division( $clean_style, $clean_div );
+            if ( is_array( $resolved ) && ! empty( $resolved['style'] ) ) {
+                return $resolved['style'];
+            }
+        }
+
+        // Legacy fallback if shooting styles engine is unavailable
         if ( stripos( $clean_style, 'Genesis' ) !== false && $clean_div !== 'Cub (8 - 11)' ) {
             return 'FS – Freestyle';
         }
@@ -112,8 +120,8 @@ if ( ! function_exists( 'sywat_roster_sanitize_style_for_division' ) ) {
  */
 if ( ! function_exists( 'sywat_roster_delete_record_storage' ) ) {
     function sywat_roster_delete_record_storage( $tourn_name, $reg_id, &$registrations ) {
-        $t_slug     = sanitize_title( (string) $tourn_name );
-        $target_id  = (string) $reg_id;
+        $t_slug    = sanitize_title( (string) $tourn_name );
+        $target_id = (string) $reg_id;
 
         if ( $t_slug !== '' && $target_id !== '' ) {
             delete_option( 'sywat_t_' . $t_slug . '_' . $target_id );
@@ -143,8 +151,10 @@ if ( ! function_exists( 'sywat_roster_delete_record_storage' ) ) {
 
 /**
  * Action Handler: Save Edited Archer Registration from the Roster Modal.
- * Synchronizes Pre-Reg / Waitlist status, enforces $0.00 balance due on Waitlist,
- * validates duplicate names on target lines, and reconciles per-line $75.00 Family Cap fees.
+ * Synchronizes Pre-Reg / Waitlist status, round/pricing profile selection, Promotional Free Entry status,
+ * recalculates unpaid fees on division/round changes, enforces database-driven style & division rules,
+ * enforces $0.00 balance due on Waitlist, validates duplicate names on target lines, and reconciles
+ * dynamic Household Family Cap fees.
  *
  * @param array $tournaments   Master tournaments array.
  * @param array $registrations Reference to registrations array.
@@ -178,26 +188,50 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer registration record could not be found.</div>';
         }
 
+        $t_entry = ( is_array( $tournaments ) && isset( $tournaments[ $tourn_name ] ) ) ? $tournaments[ $tourn_name ] : $tourn_name;
         $t_lines = array();
-        if ( is_array( $tournaments ) && isset( $tournaments[ $tourn_name ] ) ) {
+        if ( is_array( $t_entry ) ) {
             $t_lines = function_exists( 'sywat_get_tournament_lines' )
-                ? sywat_get_tournament_lines( $tournaments[ $tourn_name ] )
-                : ( isset( $tournaments[ $tourn_name ]['lines'] ) ? $tournaments[ $tourn_name ]['lines'] : array() );
+                ? sywat_get_tournament_lines( $t_entry )
+                : ( isset( $t_entry['lines'] ) ? $t_entry['lines'] : array() );
         }
+
+        // Resolve offered Pricing & Round Profiles for this tournament
+        $t_profiles       = function_exists( 'sywat_get_tournament_pricing_profiles' )
+            ? sywat_get_tournament_pricing_profiles( $t_entry )
+            : array();
+        $default_prof     = ! empty( $t_profiles )
+            ? reset( $t_profiles )
+            : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() );
+        $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
 
         $orig_name     = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
         $orig_line_idx = sywat_roster_resolve_line_idx( $reg, $t_lines );
         $orig_fam_id   = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+        $orig_div      = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+        $orig_round    = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+        $orig_due      = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.00;
 
         $edit_name     = isset( $_POST['edit_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) : $orig_name;
         $new_line_idx  = isset( $_POST['edit_line_index'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) ) ) : $orig_line_idx;
         $raw_status    = isset( $_POST['edit_status'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_status'] ) ) ) : ( isset( $reg['status'] ) ? $reg['status'] : 'Pre-Reg' );
-        $division      = isset( $_POST['edit_division'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_division'] ) ) ) : ( isset( $reg['division'] ) ? $reg['division'] : 'Adult (18 - 49)' );
+        $raw_division  = isset( $_POST['edit_division'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_division'] ) ) ) : ( isset( $reg['division'] ) ? $reg['division'] : 'Adult (18 - 49)' );
         $gender        = isset( $_POST['edit_gender'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_gender'] ) ) ) : ( isset( $reg['gender'] ) ? $reg['gender'] : 'Male' );
         $raw_style     = isset( $_POST['edit_style'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_style'] ) ) ) : ( isset( $reg['style'] ) ? $reg['style'] : 'FS – Freestyle' );
         $pay_opt       = isset( $_POST['edit_pay_option'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_pay_option'] ) ) ) : 'Individual';
         $sel_fam_id    = isset( $_POST['edit_family_group_id'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_family_group_id'] ) ) ) : '';
         $posted_due    = isset( $_POST['edit_balance_due'] ) ? max( 0.00, floatval( wp_unslash( $_POST['edit_balance_due'] ) ) ) : 0.00;
+
+        $raw_round = isset( $_POST['edit_pricing_profile'] )
+            ? sanitize_title( wp_unslash( $_POST['edit_pricing_profile'] ) )
+            : ( ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key );
+
+        if ( $raw_round === '' || ( ! empty( $t_profiles ) && ! isset( $t_profiles[ $raw_round ] ) ) ) {
+            $legacy_prof = ( $raw_round !== '' && function_exists( 'sywat_find_pricing_profile' ) ) ? sywat_find_pricing_profile( $raw_round ) : null;
+            if ( ! is_array( $legacy_prof ) ) {
+                $raw_round = $default_prof_key;
+            }
+        }
 
         if ( $edit_name === '' ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer full name is required.</div>';
@@ -239,8 +273,33 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             }
         }
 
-        $distance  = ( $division === 'Cub (8 - 11)' ) ? 'Cub' : '20yd';
-        $style     = sywat_roster_sanitize_style_for_division( $raw_style, $division );
+        // Normalize & enforce database-driven shooting style and age division rules
+        $division = ( $raw_division !== '' && strcasecmp( $raw_division, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_division' ) )
+            ? sywat_shooting_styles_normalize_division( $raw_division )
+            : $raw_division;
+
+        $style = ( $raw_style !== '' && strcasecmp( $raw_style, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_normalize_style' ) )
+            ? sywat_shooting_styles_normalize_style( $raw_style )
+            : $raw_style;
+
+        if ( strcasecmp( $division, 'No Show' ) !== 0 && strcasecmp( $style, 'No Show' ) !== 0 && function_exists( 'sywat_resolve_style_and_division' ) ) {
+            $resolved = sywat_resolve_style_and_division( $style, $division );
+            if ( is_array( $resolved ) ) {
+                if ( ! empty( $resolved['style'] ) ) {
+                    $style = $resolved['style'];
+                }
+                if ( ! empty( $resolved['division'] ) ) {
+                    $division = $resolved['division'];
+                }
+            }
+        } else {
+            $style = sywat_roster_sanitize_style_for_division( $style, $division );
+        }
+
+        $distance = function_exists( 'sywat_shooting_styles_get_division_distance' )
+            ? sywat_shooting_styles_get_division_distance( $division )
+            : ( ( $division === 'Cub (8 - 11)' ) ? 'Cub' : '20yd' );
+
         $line_name = '';
         if ( isset( $t_lines[ $new_line_idx ] ) ) {
             $line_name = function_exists( 'sywat_roster_format_line_display' )
@@ -251,15 +310,18 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $line_name = ! empty( $reg['line_name'] ) ? $reg['line_name'] : ( 'Line ' . ( (int) $new_line_idx + 1 ) );
         }
 
-        $reg['tournament'] = $tourn_name;
-        $reg['name']       = $edit_name;
-        $reg['line_index'] = $new_line_idx;
-        $reg['line_name']  = $line_name;
-        $reg['distance']   = $distance;
-        $reg['division']   = $division;
-        $reg['gender']     = $gender;
-        $reg['style']      = $style;
-        $reg['status']     = $new_status;
+        $div_changed = ( strcasecmp( $orig_div, $division ) !== 0 || $orig_round !== $raw_round );
+
+        $reg['tournament']      = $tourn_name;
+        $reg['name']            = $edit_name;
+        $reg['line_index']      = $new_line_idx;
+        $reg['line_name']       = $line_name;
+        $reg['distance']        = $distance;
+        $reg['division']        = $division;
+        $reg['pricing_profile'] = $raw_round;
+        $reg['gender']          = $gender;
+        $reg['style']           = $style;
+        $reg['status']          = $new_status;
 
         // Resolve line-scoped family group assignment
         if ( $pay_opt === 'Family' ) {
@@ -281,26 +343,50 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             unset( $reg['family_id'], $reg['family_name'] );
         }
 
-        // Synchronize paid tier and balance_due with registration status
+        // Synchronize paid tier, promo status, and balance_due with registration status
         if ( $new_status === 'Waitlist' ) {
-            $reg['paid']        = 'Waitlist';
-            $reg['balance_due'] = 0.00;
-            $reg['checked_in']  = 0;
+            $reg['paid']          = 'Waitlist';
+            $reg['is_promo_free'] = false;
+            $reg['balance_due']   = 0.00;
+            $reg['checked_in']    = 0;
         } elseif ( $new_status === 'Cancelled' ) {
-            $reg['paid']        = 'Cancelled';
-            $reg['balance_due'] = 0.00;
-            $reg['checked_in']  = 0;
+            $reg['paid']          = 'Cancelled';
+            $reg['is_promo_free'] = false;
+            $reg['balance_due']   = 0.00;
+            $reg['checked_in']    = 0;
         } else {
-            if ( $pay_opt === 'Family' ) {
-                $reg['paid'] = 'Family';
+            if ( strcasecmp( $pay_opt, 'Promo (Free)' ) === 0 || stripos( $pay_opt, 'Promo' ) === 0 ) {
+                $reg['paid']          = 'Promo (Free)';
+                $reg['is_promo_free'] = true;
+                $reg['balance_due']   = 0.00;
+            } elseif ( $pay_opt === 'Family' ) {
+                $reg['paid']          = 'Family';
+                $reg['is_promo_free'] = false;
+                $reg['balance_due']   = $posted_due;
             } elseif ( $pay_opt === 'Field Governor' ) {
-                $reg['paid'] = 'Field Governor';
+                $reg['paid']          = 'Field Governor';
+                $reg['is_promo_free'] = false;
+                $reg['balance_due']   = 0.00;
             } else {
-                $reg['paid'] = function_exists( 'sywat_waitlist_get_paid_tier' )
-                    ? sywat_waitlist_get_paid_tier( $division, $distance )
-                    : ( in_array( $division, array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' ), true ) ? 'Youth' : 'Adult' );
+                $reg['is_promo_free'] = false;
+                if ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
+                    $reg['paid'] = sywat_shooting_styles_get_division_rate_tier( $division );
+                } elseif ( function_exists( 'sywat_waitlist_get_paid_tier' ) ) {
+                    $reg['paid'] = sywat_waitlist_get_paid_tier( $division, $distance );
+                } else {
+                    $reg['paid'] = in_array( $division, array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' ), true ) ? 'Youth' : 'Adult';
+                }
+
+                // Recalculate unpaid balance if division or round changed and balance was not manually overridden
+                if ( $orig_due > 0 && abs( $posted_due - $orig_due ) < 0.01 && $div_changed ) {
+                    $recalc_fee = function_exists( 'sywat_get_archer_individual_fee' )
+                        ? sywat_get_archer_individual_fee( $t_entry, $division, $distance, $style, $raw_round, '' )
+                        : ( $reg['paid'] === 'Youth' ? 25.00 : 30.00 );
+                    $reg['balance_due'] = round( floatval( $recalc_fee ), 2 );
+                } else {
+                    $reg['balance_due'] = $posted_due;
+                }
             }
-            $reg['balance_due'] = ( $reg['paid'] === 'Field Governor' ) ? 0.00 : $posted_due;
         }
 
         if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
@@ -325,7 +411,7 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             }
         }
 
-        // Reconcile per-line $75.00 Family Cap fees for affected family groups
+        // Reconcile dynamic Household Family Cap fees for affected family groups
         $new_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
         if ( function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
             if ( $orig_fam_id !== '' ) {
@@ -358,8 +444,8 @@ if ( ! function_exists( 'sywat_handle_delete_shooter' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Missing archer identifier. Unable to remove archer.</div>';
         }
 
-        $t_slug      = sanitize_title( $tourn_name );
-        $target_reg  = get_option( 'sywat_t_' . $t_slug . '_' . $reg_id, null );
+        $t_slug     = sanitize_title( $tourn_name );
+        $target_reg = get_option( 'sywat_t_' . $t_slug . '_' . $reg_id, null );
 
         if ( ! is_array( $target_reg ) && is_array( $registrations ) ) {
             foreach ( $registrations as $candidate ) {

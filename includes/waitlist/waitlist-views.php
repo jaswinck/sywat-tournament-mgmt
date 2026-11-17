@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Dedicated Management Modal & Trigger Views
  * Path: includes/waitlist/waitlist-views.php
- * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with uniform-height top filter/move toolbars, FIFO family-grouped queue table, neatly aligned mobile-friendly stacked actions, and reusable clickable waitlist badges/buttons.
+ * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with uniform-height top filter/move toolbars, FIFO family-grouped queue table, dynamic Family Cap & round-format indicators, mobile-friendly stacked actions, and reusable clickable waitlist badges/buttons.
  * Compliance: Pure view layer — zero DB writes, zero inline scripts/styles, zero inline event attributes, accessible SVG + text controls, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 2.1.0
+ * Version: 2.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -146,7 +146,8 @@ if ( ! function_exists( 'sywat_waitlist_render_context_inputs' ) ) {
         <?php elseif ( $context === 'checkin' ) : ?>
             <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $filter_line_idx ); ?>">
             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( isset( $extra_context['search_query'] ) ? $extra_context['search_query'] : '' ); ?>">
-        <?php endif;
+        <?php endif; ?>
+        <?php
     }
 }
 
@@ -174,6 +175,41 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
 
         $t_slug       = sanitize_title( $selected_tournament );
         $closed_lines = get_option( 'sywat_closed_lines_' . $t_slug, array() );
+
+        // Resolve active Pricing Profile(s) & Family Cap rules for the selected tournament
+        $t_profiles    = function_exists( 'sywat_get_tournament_pricing_profiles' )
+            ? sywat_get_tournament_pricing_profiles( $selected_tournament )
+            : array();
+        $cap_enabled   = false;
+        $cap_amount    = 0.00;
+        $cap_min       = 99;
+        $cap_scope_lbl = 'on this line';
+
+        if ( ! empty( $t_profiles ) ) {
+            foreach ( $t_profiles as $tp ) {
+                if ( ! empty( $tp['family_cap_enabled'] ) ) {
+                    $cap_enabled = true;
+                    $p_cap       = isset( $tp['family_cap_amount'] ) ? floatval( $tp['family_cap_amount'] ) : 75.00;
+                    $p_min       = isset( $tp['family_min_archers'] ) ? max( 2, intval( $tp['family_min_archers'] ) ) : 3;
+                    if ( $p_cap > $cap_amount ) {
+                        $cap_amount = $p_cap;
+                    }
+                    if ( $p_min < $cap_min ) {
+                        $cap_min = $p_min;
+                    }
+                    if ( isset( $tp['family_cap_scope'] ) && $tp['family_cap_scope'] === 'tournament' ) {
+                        $cap_scope_lbl = 'for this tournament';
+                    }
+                }
+            }
+        } else {
+            $cap_enabled = true;
+            $cap_amount  = 75.00;
+            $cap_min     = 3;
+        }
+        if ( $cap_min === 99 ) {
+            $cap_min = 3;
+        }
 
         $active_line_filter = ( $filter_line_idx === '' ) ? 'all' : (string) $filter_line_idx;
         $queue_data         = sywat_waitlist_get_grouped_queue( $selected_tournament, $available_lines, $registrations, $active_line_filter, $closed_lines );
@@ -361,7 +397,7 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     <span class="sywat-chip-family">Family Group: <?php echo esc_html( $grp['group_label'] ); ?> (<?php echo intval( $member_count ); ?> Waitlisted)</span>
                                                     <?php if ( $active_fam_cnt > 0 ) : ?>
                                                         <div class="sywat-label-subtext">
-                                                            <strong>Split Family:</strong> <?php echo intval( $active_fam_cnt ); ?> member(s) already active on <?php echo esc_html( $src_line_name ); ?> ($75.00 Family Cap applies at 3+ active archers).
+                                                            <strong>Split Family:</strong> <?php echo intval( $active_fam_cnt ); ?> member(s) already active on <?php echo esc_html( $src_line_name ); ?><?php if ( $cap_enabled && $cap_amount > 0 ) : ?> ($<?php echo esc_html( number_format( $cap_amount, 2 ) ); ?> Family Cap applies at <?php echo intval( $cap_min ); ?>+ active archers <?php echo esc_html( $cap_scope_lbl ); ?>)<?php endif; ?>.
                                                         </div>
                                                     <?php endif; ?>
                                                     <?php if ( $group_phone !== '' || ! empty( $grp['earliest_created_at'] ) ) : ?>
@@ -429,7 +465,21 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                 $can_fit_member = ! empty( $m['can_fit_member'] );
                                                 $avail_for_dist = ( $m_dist === 'Cub' ) ? (int) $grp['open_cub'] : (int) $grp['open_20yd'];
 
-                                                $div_style_parts = array_filter( array( $m_div, $m_style ) );
+                                                $m_round_slug  = ! empty( $m['pricing_profile'] ) ? sanitize_title( (string) $m['pricing_profile'] ) : '';
+                                                $m_round_label = '';
+                                                if ( $m_round_slug !== '' && ( count( $t_profiles ) > 1 || isset( $t_profiles[ $m_round_slug ] ) ) ) {
+                                                    if ( isset( $t_profiles[ $m_round_slug ] ) ) {
+                                                        $rp            = $t_profiles[ $m_round_slug ];
+                                                        $m_round_label = $rp['label'] . ( ! empty( $rp['round_subtitle'] ) ? ' (' . $rp['round_subtitle'] . ')' : '' );
+                                                    } elseif ( function_exists( 'sywat_find_pricing_profile' ) ) {
+                                                        $rp = sywat_find_pricing_profile( $m_round_slug );
+                                                        if ( is_array( $rp ) && ! empty( $rp['label'] ) ) {
+                                                            $m_round_label = $rp['label'] . ( ! empty( $rp['round_subtitle'] ) ? ' (' . $rp['round_subtitle'] . ')' : '' );
+                                                        }
+                                                    }
+                                                }
+
+                                                $div_style_parts = array_filter( array( $m_round_label, $m_div, $m_style ) );
                                                 $div_style_label = implode( ' • ', $div_style_parts );
 
                                                 $single_promote_confirm = $can_fit_member

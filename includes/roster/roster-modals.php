@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
- * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, division/style controls, and line-scoped family group assignment.
+ * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, multi-round format selection, database-driven division/style/pricing controls, Promotional Free Entry support, and line-scoped family group assignment.
+ * Compliance: Pure view layer — zero DB writes, zero inline style/script attributes, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.9.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,39 +49,99 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
             $manage_base_url
         );
 
-        $divs = array(
-            'Cub (8 - 11)',
-            'Youth (12 - 14)',
-            'Young Adult (15 - 17)',
-            'Adult (18 - 49)',
-            'Senior (50 - 59)',
-            'Silver Senior (60 - 69)',
-            'Master Senior (70+)',
-        );
+        // Resolve active Pricing & Round Profiles for this tournament
+        $t_profiles       = ( ! empty( $selected_tournament ) && function_exists( 'sywat_get_tournament_pricing_profiles' ) )
+            ? sywat_get_tournament_pricing_profiles( $selected_tournament )
+            : array();
+        $is_multi_round   = count( $t_profiles ) > 1;
+        $default_prof     = ! empty( $t_profiles )
+            ? reset( $t_profiles )
+            : ( function_exists( 'sywat_get_default_pricing_profile' ) ? sywat_get_default_pricing_profile() : array() );
+        $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
+
+        // Load active database-configured age divisions (with safe NFAA fallback)
+        $division_options = array();
+        $all_div_records  = array();
+        if ( function_exists( 'sywat_get_division_records' ) ) {
+            $all_div_records = sywat_get_division_records( true );
+            if ( is_array( $all_div_records ) ) {
+                foreach ( $all_div_records as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    if ( isset( $rec['status'] ) && $rec['status'] !== 'active' ) {
+                        continue;
+                    }
+                    $division_options[ $rec['label'] ] = array(
+                        'label'     => $rec['label'],
+                        'distance'  => ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd',
+                        'rate_tier' => ( isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Youth' ) ? 'Youth' : 'Adult',
+                    );
+                }
+            }
+        }
+
+        if ( empty( $division_options ) ) {
+            $fallback_divs = array(
+                array( 'label' => 'Cub (8 - 11)',           'distance' => 'Cub',  'rate_tier' => 'Youth' ),
+                array( 'label' => 'Youth (12 - 14)',        'distance' => '20yd', 'rate_tier' => 'Youth' ),
+                array( 'label' => 'Young Adult (15 - 17)',  'distance' => '20yd', 'rate_tier' => 'Youth' ),
+                array( 'label' => 'Adult (18 - 49)',        'distance' => '20yd', 'rate_tier' => 'Adult' ),
+                array( 'label' => 'Senior (50 - 59)',       'distance' => '20yd', 'rate_tier' => 'Adult' ),
+                array( 'label' => 'Silver Senior (60 - 69)','distance' => '20yd', 'rate_tier' => 'Adult' ),
+                array( 'label' => 'Master Senior (70+)',    'distance' => '20yd', 'rate_tier' => 'Adult' ),
+            );
+            foreach ( $fallback_divs as $fd ) {
+                $division_options[ $fd['label'] ] = $fd;
+            }
+        }
+
+        // Load active database-configured shooting styles (with safe NFAA fallback)
+        $style_options     = array();
+        $all_style_records = array();
+        if ( function_exists( 'sywat_get_shooting_styles' ) ) {
+            $all_style_records = sywat_get_shooting_styles( true );
+            if ( is_array( $all_style_records ) ) {
+                foreach ( $all_style_records as $rec ) {
+                    if ( empty( $rec['label'] ) ) {
+                        continue;
+                    }
+                    if ( isset( $rec['status'] ) && $rec['status'] !== 'active' ) {
+                        continue;
+                    }
+                    $style_options[ $rec['label'] ] = $rec['label'];
+                }
+            }
+        }
+
+        if ( empty( $style_options ) ) {
+            $fallback_styles = array(
+                'FS – Freestyle',
+                'FS Pro – Freestyle Pro',
+                'FSL – Freestyle Limited',
+                'FSLR – Freestyle Limited Recurve (or Olympic Recurve)',
+                'BHFS – Bowhunter Freestyle',
+                'MBH – Modern Bowhunter',
+                'BB – Barebow',
+                'BBC – Barebow Compound',
+                'BBR – Barebow Recurve',
+                'TRAD – Traditional',
+                'LB – Longbow',
+                'Genesis',
+            );
+            foreach ( $fallback_styles as $fs ) {
+                $style_options[ $fs ] = $fs;
+            }
+        }
 
         $genders = array( 'Male', 'Female' );
-
-        $sywat_styles = array(
-            'FS – Freestyle',
-            'FS Pro – Freestyle Pro',
-            'FSL – Freestyle Limited',
-            'FSLR – Freestyle Limited Recurve (or Olympic Recurve)',
-            'BHFS – Bowhunter Freestyle',
-            'MBH – Modern Bowhunter',
-            'BB Barebow',
-            'BBC – Barebow Compound',
-            'BBR – Barebow Recurve',
-            'TRAD – Traditional',
-            'LB – Longbow',
-            'Genesis',
-        );
         ?>
         <div class="sywat-modal-backdrop sywat-nested-modal <?php echo $open_edit_modal ? 'active' : ''; ?>" id="sywat_edit_archer_modal">
             <div class="sywat-modal-content sywat-modal-md">
                 <div class="sywat-modal-header">
                     <div>
                         <h3>✏️ Edit Archer Registration</h3>
-                        <div class="sywat-subtitle">Update registration status, division, shooting line, or payment category details.</div>
+                        <div class="sywat-subtitle">Update registration status, round format, division, shooting line, or payment category details.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Edit Archer Modal" data-sywat-action="close-edit-archer-modal">&times;</button>
                 </div>
@@ -94,12 +155,97 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                             ? 'Waitlist'
                             : ( ( strcasecmp( $raw_status, 'Cancelled' ) === 0 ) ? 'Cancelled' : 'Pre-Reg' );
 
-                        $curr_paid           = isset( $target_archer['paid'] ) ? $target_archer['paid'] : '';
-                        $is_family_member    = ( $curr_paid === 'Family' ) || ( $curr_status === 'Waitlist' && $curr_fam_id !== '' );
-                        $curr_pay_opt        = $is_family_member ? 'Family' : ( ( $curr_paid === 'Field Governor' ) ? 'Field Governor' : 'Individual' );
-                        $curr_div            = isset( $target_archer['division'] ) ? $target_archer['division'] : 'Adult (18 - 49)';
-                        $curr_gen            = isset( $target_archer['gender'] ) ? $target_archer['gender'] : 'Male';
-                        $curr_sty            = isset( $target_archer['style'] ) ? $target_archer['style'] : '';
+                        // Resolve archer's assigned Round / Pricing Profile
+                        $curr_round = ! empty( $target_archer['pricing_profile'] )
+                            ? sanitize_title( (string) $target_archer['pricing_profile'] )
+                            : $default_prof_key;
+
+                        $round_options = $t_profiles;
+                        if ( $curr_round !== '' && ! isset( $round_options[ $curr_round ] ) ) {
+                            $legacy_prof = function_exists( 'sywat_find_pricing_profile' ) ? sywat_find_pricing_profile( $curr_round ) : null;
+                            if ( is_array( $legacy_prof ) ) {
+                                $round_options[ $curr_round ] = $legacy_prof;
+                            } else {
+                                $curr_round = $default_prof_key;
+                            }
+                        }
+
+                        $active_prof = isset( $round_options[ $curr_round ] ) ? $round_options[ $curr_round ] : $default_prof;
+                        $youth_rate  = is_array( $active_prof ) && isset( $active_prof['youth_rate'] ) ? floatval( $active_prof['youth_rate'] ) : 25.00;
+                        $adult_rate  = is_array( $active_prof ) && isset( $active_prof['adult_rate'] ) ? floatval( $active_prof['adult_rate'] ) : 30.00;
+                        $cap_enabled = is_array( $active_prof ) && ! empty( $active_prof['family_cap_enabled'] );
+                        $cap_amount  = is_array( $active_prof ) && isset( $active_prof['family_cap_amount'] ) ? floatval( $active_prof['family_cap_amount'] ) : 75.00;
+                        $cap_min     = is_array( $active_prof ) && isset( $active_prof['family_min_archers'] ) ? max( 2, intval( $active_prof['family_min_archers'] ) ) : 3;
+
+                        $ind_rate_label = ( abs( $youth_rate - $adult_rate ) < 0.01 )
+                            ? sprintf( 'Individual Rate ($%s)', number_format( $adult_rate, 0 ) )
+                            : sprintf( 'Individual Rate ($%s / $%s)', number_format( $youth_rate, 0 ), number_format( $adult_rate, 0 ) );
+
+                        $fam_rate_label = $cap_enabled
+                            ? sprintf( 'Family Group ($%s Cap for %d+ Archers)', number_format( $cap_amount, 0 ), $cap_min )
+                            : 'Family Group';
+
+                        $curr_paid        = isset( $target_archer['paid'] ) ? trim( (string) $target_archer['paid'] ) : '';
+                        $is_promo_free    = ! empty( $target_archer['is_promo_free'] )
+                            || strcasecmp( $curr_paid, 'Promo (Free)' ) === 0
+                            || stripos( $curr_paid, 'Promo' ) === 0;
+                        $is_family_member = ( strcasecmp( $curr_paid, 'Family' ) === 0 ) || ( $curr_status === 'Waitlist' && $curr_fam_id !== '' );
+
+                        if ( $is_promo_free ) {
+                            $curr_pay_opt = 'Promo (Free)';
+                        } elseif ( $is_family_member ) {
+                            $curr_pay_opt = 'Family';
+                        } elseif ( strcasecmp( $curr_paid, 'Field Governor' ) === 0 ) {
+                            $curr_pay_opt = 'Field Governor';
+                        } else {
+                            $curr_pay_opt = 'Individual';
+                        }
+
+                        $raw_curr_div = isset( $target_archer['division'] ) ? trim( (string) $target_archer['division'] ) : '';
+                        if ( $raw_curr_div !== '' && $raw_curr_div !== '—' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+                            $curr_div = sywat_shooting_styles_normalize_division( $raw_curr_div );
+                        } else {
+                            $curr_div = ( $raw_curr_div !== '' && $raw_curr_div !== '—' ) ? $raw_curr_div : 'Adult (18 - 49)';
+                        }
+
+                        // Preserve retired or custom division currently assigned to this archer
+                        $archer_division_options = $division_options;
+                        if ( $curr_div !== '' && ! isset( $archer_division_options[ $curr_div ] ) ) {
+                            $retired_dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
+                                ? sywat_shooting_styles_get_division_distance( $curr_div )
+                                : ( ( stripos( $curr_div, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
+                            $retired_tier = function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
+                                ? sywat_shooting_styles_get_division_rate_tier( $curr_div )
+                                : 'Adult';
+                            $archer_division_options[ $curr_div ] = array(
+                                'label'     => $curr_div . ' (Retired)',
+                                'distance'  => $retired_dist,
+                                'rate_tier' => $retired_tier,
+                            );
+                        }
+
+                        $curr_gen = isset( $target_archer['gender'] ) ? $target_archer['gender'] : 'Male';
+
+                        $raw_curr_sty = isset( $target_archer['style'] ) ? trim( (string) $target_archer['style'] ) : '';
+                        if ( $raw_curr_sty !== '' && $raw_curr_sty !== '—' && function_exists( 'sywat_shooting_styles_normalize_style' ) ) {
+                            $curr_sty = sywat_shooting_styles_normalize_style( $raw_curr_sty );
+                        } else {
+                            $curr_sty = ( $raw_curr_sty !== '—' ) ? $raw_curr_sty : '';
+                        }
+
+                        // Preserve retired or legacy shooting style currently assigned to this archer
+                        $archer_style_options = $style_options;
+                        if ( $curr_sty !== '' && ! isset( $archer_style_options[ $curr_sty ] ) ) {
+                            $archer_style_options[ $curr_sty ] = $curr_sty . ' (Retired)';
+                        }
+
+                        $calc_dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
+                            ? sywat_shooting_styles_get_division_distance( $curr_div )
+                            : ( ( $curr_div === 'Cub (8 - 11)' ) ? 'Cub' : '20yd' );
+
+                        $default_paid_label = $curr_paid !== ''
+                            ? $curr_paid
+                            : ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ? sywat_shooting_styles_get_division_rate_tier( $curr_div ) : 'Adult' );
                     ?>
                     <form method="post" action="<?php echo esc_url( $edit_form_action ); ?>">
                         <div class="sywat-modal-body">
@@ -115,11 +261,34 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <input type="hidden" name="return_to" value="<?php echo esc_attr( $return_to ); ?>">
                             <?php endif; ?>
 
+                            <?php if ( ! $is_multi_round && count( $round_options ) <= 1 ) : ?>
+                                <input type="hidden" name="edit_pricing_profile" value="<?php echo esc_attr( $curr_round ); ?>">
+                            <?php endif; ?>
+
                             <div class="sywat-form-grid-2">
-                                <div class="sywat-field-group sywat-full-width">
+                                <div class="sywat-field-group <?php echo ( $is_multi_round || count( $round_options ) > 1 ) ? '' : 'sywat-full-width'; ?>">
                                     <label for="edit_name">Full Name</label>
                                     <input type="text" id="edit_name" name="edit_name" value="<?php echo esc_attr( $target_archer['name'] ); ?>" required>
                                 </div>
+
+                                <?php if ( $is_multi_round || count( $round_options ) > 1 ) : ?>
+                                    <div class="sywat-field-group">
+                                        <label for="edit_pricing_profile">Round Format</label>
+                                        <select name="edit_pricing_profile" id="edit_pricing_profile" required data-sywat-action="roster-edit-round-change">
+                                            <?php foreach ( $round_options as $r_slug => $r_rec ) : ?>
+                                                <?php
+                                                    $r_label = $r_rec['label'];
+                                                    if ( ! empty( $r_rec['round_subtitle'] ) ) {
+                                                        $r_label .= ' (' . $r_rec['round_subtitle'] . ')';
+                                                    }
+                                                ?>
+                                                <option value="<?php echo esc_attr( $r_slug ); ?>" <?php selected( $curr_round, $r_slug ); ?>>
+                                                    <?php echo esc_html( $r_label ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                <?php endif; ?>
 
                                 <div class="sywat-field-group">
                                     <label for="edit_line_index">Shooting Line</label>
@@ -151,9 +320,14 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <div class="sywat-field-group">
                                     <label for="edit_division">Division</label>
                                     <select name="edit_division" id="edit_division" required data-sywat-action="roster-edit-division-change">
-                                        <?php foreach ( $divs as $d ) : ?>
-                                            <option value="<?php echo esc_attr( $d ); ?>" <?php selected( $curr_div, $d ); ?>>
-                                                <?php echo esc_html( $d ); ?>
+                                        <?php foreach ( $archer_division_options as $div_val => $div_meta ) : ?>
+                                            <option
+                                                value="<?php echo esc_attr( $div_val ); ?>"
+                                                data-distance="<?php echo esc_attr( $div_meta['distance'] ); ?>"
+                                                data-rate-tier="<?php echo esc_attr( $div_meta['rate_tier'] ); ?>"
+                                                <?php selected( $curr_div, $div_val ); ?>
+                                            >
+                                                <?php echo esc_html( $div_meta['label'] ); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -172,10 +346,13 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
 
                                 <div class="sywat-field-group">
                                     <label for="edit_style">Style</label>
-                                    <select name="edit_style" id="edit_style" required>
-                                        <?php foreach ( $sywat_styles as $s ) : ?>
-                                            <option value="<?php echo esc_attr( $s ); ?>" <?php selected( $curr_sty, $s ); ?>>
-                                                <?php echo esc_html( $s ); ?>
+                                    <select name="edit_style" id="edit_style" required data-sywat-action="roster-edit-style-change">
+                                        <?php if ( $curr_sty === '' ) : ?>
+                                            <option value="" selected>-- Select Style --</option>
+                                        <?php endif; ?>
+                                        <?php foreach ( $archer_style_options as $sty_val => $sty_label ) : ?>
+                                            <option value="<?php echo esc_attr( $sty_val ); ?>" <?php selected( $curr_sty, $sty_val ); ?>>
+                                                <?php echo esc_html( $sty_label ); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -184,9 +361,10 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 <div class="sywat-field-group">
                                     <label for="edit_pay_option">Paid Option</label>
                                     <select name="edit_pay_option" id="edit_pay_option" required data-sywat-action="roster-edit-pay-change">
-                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual Rate ($25 / $30)</option>
-                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family Group ($75 Cap for 3+ Archers)</option>
+                                        <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>><?php echo esc_html( $ind_rate_label ); ?></option>
+                                        <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>><?php echo esc_html( $fam_rate_label ); ?></option>
                                         <option value="Field Governor" <?php selected( $curr_pay_opt, 'Field Governor' ); ?>>Field Governor (Free)</option>
+                                        <option value="Promo (Free)" <?php selected( $curr_pay_opt, 'Promo (Free)' ); ?>>Promotional Free Entry ($0.00)</option>
                                     </select>
                                 </div>
 
@@ -209,19 +387,19 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
 
                                 <div class="sywat-field-group">
                                     <label for="edit_distance_display">Distance (Calculated)</label>
-                                    <input type="text" id="edit_distance_display" class="sywat-input-disabled-calc" value="<?php echo ( $curr_div === 'Cub (8 - 11)' ) ? 'Cub' : '20yd'; ?>" disabled>
+                                    <input type="text" id="edit_distance_display" class="sywat-input-disabled-calc" value="<?php echo esc_attr( $calc_dist ); ?>" disabled>
                                 </div>
                             </div>
 
                             <div class="sywat-calculated-status-box">
                                 <span class="sywat-calculated-status-label">Calculated Paid Status:</span>
-                                <span id="edit_paid_status_display" class="sywat-calculated-status-value"><?php echo esc_html( $curr_paid ?: 'Adult' ); ?></span>
+                                <span id="edit_paid_status_display" class="sywat-calculated-status-value"><?php echo esc_html( $default_paid_label ); ?></span>
                             </div>
                         </div>
 
                         <div class="sywat-modal-footer">
                             <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="close-edit-archer-modal">Cancel</button>
-                            <button type="submit" class="sywat-btn sywat-btn-success">Save Changes</button>
+                            <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save Changes</button>
                         </div>
                     </form>
                 <?php endif; ?>

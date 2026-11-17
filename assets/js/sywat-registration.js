@@ -1,13 +1,25 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Version: 6.4.0
+ * Description: Manages multi-archer phone intake rows, round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, database-driven age division & distance synchronization, dynamic Household Family Cap calculation (line or tournament scope), and TFAA historical shooter autocomplete.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
+ * Version: 7.1.0
  */
 
 (function() {
     'use strict';
 
     let archerRowCount = 1;
+
+    const DEFAULT_DIVISIONS = [
+        { slug: 'cub-8-11',            code: 'C',  label: 'Cub (8 - 11)',           distance: 'Cub',  rate_tier: 'Youth', fee: 25, aliases: ['Cub'] },
+        { slug: 'youth-12-14',         code: 'Y',  label: 'Youth (12 - 14)',        distance: '20yd', rate_tier: 'Youth', fee: 25, aliases: ['Youth'] },
+        { slug: 'young-adult-15-17',   code: 'YA', label: 'Young Adult (15 - 17)',  distance: '20yd', rate_tier: 'Youth', fee: 25, aliases: ['Young Adult'] },
+        { slug: 'adult-18-49',         code: 'A',  label: 'Adult (18 - 49)',        distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Adult'] },
+        { slug: 'senior-50-59',        code: 'S',  label: 'Senior (50 - 59)',       distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Senior'] },
+        { slug: 'silver-senior-60-69', code: 'SS', label: 'Silver Senior (60 - 69)',distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Silver Senior'] },
+        { slug: 'master-senior-70',    code: 'MS', label: 'Master Senior (70+)',    distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Master Senior', 'Master'] }
+    ];
 
     function getTfaaShooters() {
         if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
@@ -20,13 +32,169 @@
     }
 
     function getPhoneCache() {
-        if (window.sywatRegData && typeof window.sywatRegData.phoneCache === 'object') {
+        if (window.sywatRegData && typeof window.sywatRegData.phoneCache === 'object' && window.sywatRegData.phoneCache !== null) {
             return window.sywatRegData.phoneCache;
         }
-        if (typeof sywatPhoneCache !== 'undefined' && typeof sywatPhoneCache === 'object') {
+        if (typeof sywatPhoneCache !== 'undefined' && typeof sywatPhoneCache === 'object' && sywatPhoneCache !== null) {
             return sywatPhoneCache;
         }
         return {};
+    }
+
+    function getProfiles() {
+        if (window.sywatRegData && typeof window.sywatRegData.profiles === 'object' && window.sywatRegData.profiles !== null) {
+            return window.sywatRegData.profiles;
+        }
+        if (window.SYWAT && window.SYWAT.pricing && typeof window.SYWAT.pricing.getProfiles === 'function') {
+            return window.SYWAT.pricing.getProfiles();
+        }
+        return {};
+    }
+
+    function getDefaultProfileKey() {
+        if (window.sywatRegData && window.sywatRegData.defaultProfile) {
+            return String(window.sywatRegData.defaultProfile);
+        }
+        const container = document.getElementById('sywat_archer_rows_container');
+        if (container && container.getAttribute('data-default-profile')) {
+            return String(container.getAttribute('data-default-profile'));
+        }
+        const profiles = getProfiles();
+        const keys = Object.keys(profiles);
+        return keys.length > 0 ? keys[0] : 'indoor';
+    }
+
+    function getProfile(profileSlug) {
+        const profiles = getProfiles();
+        const slug = String(profileSlug || '').trim();
+        if (slug && profiles[slug]) {
+            return profiles[slug];
+        }
+        const defSlug = getDefaultProfileKey();
+        return profiles[defSlug] || null;
+    }
+
+    function getPromoRules() {
+        if (window.sywatRegData && typeof window.sywatRegData.promoRules === 'object' && window.sywatRegData.promoRules !== null) {
+            return window.sywatRegData.promoRules;
+        }
+        return {};
+    }
+
+    function isArcherPromoEligible(archerName, profileSlug) {
+        const cleanName = String(archerName || '').trim().toLowerCase();
+        if (!cleanName) {
+            return false;
+        }
+        const rules = getPromoRules();
+        const slug = String(profileSlug || getDefaultProfileKey()).trim();
+        const rule = rules[slug];
+        if (!rule || !rule.active) {
+            return false;
+        }
+        if (rule.ineligible && Object.prototype.hasOwnProperty.call(rule.ineligible, cleanName)) {
+            return false;
+        }
+        return true;
+    }
+
+    function getDivisions() {
+        if (window.sywatRegData && Array.isArray(window.sywatRegData.divisions) && window.sywatRegData.divisions.length > 0) {
+            return window.sywatRegData.divisions;
+        }
+        return DEFAULT_DIVISIONS;
+    }
+
+    function findDivisionConfig(divValue) {
+        if (!divValue) return null;
+        const needle = String(divValue).trim().toLowerCase();
+        if (!needle) return null;
+
+        const divisions = getDivisions();
+        for (let i = 0; i < divisions.length; i++) {
+            const d = divisions[i];
+            if ((d.label || '').trim().toLowerCase() === needle || (d.code || '').trim().toLowerCase() === needle) {
+                return d;
+            }
+            if (Array.isArray(d.aliases)) {
+                for (let j = 0; j < d.aliases.length; j++) {
+                    if (String(d.aliases[j] || '').trim().toLowerCase() === needle) {
+                        return d;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve individual entry fee for a specific round profile + division + distance.
+     */
+    function getFeeForRow(profileSlug, divSlug, divLabel, distance) {
+        const prof = getProfile(profileSlug);
+        const divCfg = divLabel ? findDivisionConfig(divLabel) : null;
+        const resolvedSlug = divSlug || (divCfg && divCfg.slug ? divCfg.slug : '');
+
+        if (prof) {
+            if (
+                resolvedSlug &&
+                prof.division_overrides &&
+                typeof prof.division_overrides[resolvedSlug] !== 'undefined' &&
+                prof.division_overrides[resolvedSlug] !== ''
+            ) {
+                const ovVal = parseFloat(prof.division_overrides[resolvedSlug]);
+                if (!Number.isNaN(ovVal) && ovVal >= 0) {
+                    return ovVal;
+                }
+            }
+
+            const isYouth = (distance === 'Cub') || (divCfg && divCfg.rate_tier === 'Youth');
+            const tierRate = isYouth ? parseFloat(prof.youth_rate) : parseFloat(prof.adult_rate);
+            if (!Number.isNaN(tierRate) && tierRate >= 0) {
+                return tierRate;
+            }
+        }
+
+        if (divCfg && typeof divCfg.fee !== 'undefined' && !Number.isNaN(parseFloat(divCfg.fee))) {
+            return parseFloat(divCfg.fee);
+        }
+
+        return (distance === 'Cub' || (divCfg && divCfg.rate_tier === 'Youth')) ? 25 : 30;
+    }
+
+    /**
+     * Update division option labels and data-fee attributes on a single intake row
+     * whenever its Round Format selector changes (e.g., Field vs. Field 50).
+     */
+    function updateRowDivisionOptionLabels(row) {
+        if (!row) return;
+        const roundSelect = row.querySelector('.sywat-round-profile-select');
+        const roundInput  = row.querySelector('.sywat-round-profile-input');
+        const divSelect   = row.querySelector('.sywat-division-select');
+        if (!divSelect) return;
+
+        const roundSlug = roundSelect
+            ? roundSelect.value
+            : (roundInput ? roundInput.value : getDefaultProfileKey());
+
+        Array.from(divSelect.options).forEach(opt => {
+            if (!opt.value) return;
+            const optSlug = opt.getAttribute('data-slug') || '';
+            const optDist = opt.getAttribute('data-distance') || '20yd';
+            const fee     = getFeeForRow(roundSlug, optSlug, opt.value, optDist);
+            opt.setAttribute('data-fee', fee.toFixed(2));
+            opt.textContent = opt.value + ' [$' + fee.toFixed(2) + ']';
+        });
+    }
+
+    function getDefaultCubDivisionLabel() {
+        const divisions = getDivisions();
+        for (let i = 0; i < divisions.length; i++) {
+            if (divisions[i].distance === 'Cub' && divisions[i].label) {
+                return divisions[i].label;
+            }
+        }
+        return 'Cub (8 - 11)';
     }
 
     function escapeHtml(str) {
@@ -84,8 +252,13 @@
         if (row) {
             const distSelect = row.querySelector('.sywat-distance-select');
             if (distSelect) {
-                const selectedDiv = divSelect.value;
-                if (selectedDiv && selectedDiv.includes('Cub')) {
+                const selectedDiv  = divSelect.value;
+                const selectedOpt  = divSelect.options[divSelect.selectedIndex];
+                const optDist      = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
+                const divCfg       = optDist ? null : findDivisionConfig(selectedDiv);
+                const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
+
+                if (resolvedDist === 'Cub' || (resolvedDist === '' && selectedDiv && selectedDiv.includes('Cub'))) {
                     distSelect.value = 'Cub';
                 } else if (selectedDiv !== '') {
                     distSelect.value = '20yd';
@@ -102,12 +275,21 @@
         const divSelect = row.querySelector('.sywat-division-select');
         if (!divSelect) return;
 
+        const defaultCubLabel = getDefaultCubDivisionLabel();
+
         if (distSelect.value === 'Cub') {
-            divSelect.value = 'Cub (8 - 11)';
+            divSelect.value = defaultCubLabel;
             divSelect.dataset.userChosen = 'true';
-        } else if (distSelect.value === '20yd' && divSelect.value === 'Cub (8 - 11)') {
-            divSelect.value = '';
-            delete divSelect.dataset.userChosen;
+        } else if (distSelect.value === '20yd') {
+            const selectedOpt  = divSelect.options[divSelect.selectedIndex];
+            const optDist      = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
+            const divCfg       = optDist ? null : findDivisionConfig(divSelect.value);
+            const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
+
+            if (resolvedDist === 'Cub' || divSelect.value === defaultCubLabel) {
+                divSelect.value = '';
+                delete divSelect.dataset.userChosen;
+            }
         }
         window.recalculateGroupTotal();
     };
@@ -116,6 +298,7 @@
         if (!tfaaDiv || !selectEl) return;
         const cleanTfaa = tfaaDiv.trim().toLowerCase();
 
+        // 1. Direct option value match
         for (let opt of selectEl.options) {
             if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
                 selectEl.value = opt.value;
@@ -124,6 +307,19 @@
             }
         }
 
+        // 2. Match via configured division aliases or export code
+        const matchedCfg = findDivisionConfig(tfaaDiv);
+        if (matchedCfg && matchedCfg.label) {
+            for (let opt of selectEl.options) {
+                if (opt.value && opt.value.trim().toLowerCase() === matchedCfg.label.trim().toLowerCase()) {
+                    selectEl.value = opt.value;
+                    window.handleDivisionChange(selectEl);
+                    return;
+                }
+            }
+        }
+
+        // 3. Base-name fuzzy fallback
         const tfaaBaseName = cleanTfaa.split(' (')[0].trim();
 
         for (let opt of selectEl.options) {
@@ -241,12 +437,14 @@
         if (!container) return;
 
         const existingRows = container.querySelectorAll('.sywat-archer-input-row');
-        const rowIndex = existingRows.length > 0 ? existingRows.length : archerRowCount;
+        const rowIndex     = existingRows.length > 0 ? existingRows.length : archerRowCount;
+        const isMultiRound = container.getAttribute('data-multi-round') === '1';
+        const defProfKey   = getDefaultProfileKey();
 
         const savedLineIdx = sessionStorage.getItem('sywat_last_line_idx');
         const defaultLineSelect = document.getElementById('sywat_default_line_idx');
-        const defaultLineIdx = savedLineIdx !== null 
-            ? savedLineIdx 
+        const defaultLineIdx = savedLineIdx !== null
+            ? savedLineIdx
             : (defaultLineSelect ? defaultLineSelect.value : '0');
 
         let lineOptionsHtml = '';
@@ -257,6 +455,36 @@
             });
         }
 
+        let roundControlHtml = '';
+        if (isMultiRound) {
+            const profiles = getProfiles();
+            let roundOptionsHtml = '';
+            Object.keys(profiles).forEach(pSlug => {
+                const pRec    = profiles[pSlug];
+                const isSel   = (pSlug === defProfKey) ? 'selected' : '';
+                const optText = pRec.label + (pRec.round_subtitle ? ' (' + pRec.round_subtitle + ')' : '');
+                roundOptionsHtml += `<option value="${escapeHtml(pSlug)}" ${isSel}>${escapeHtml(optText)}</option>`;
+            });
+            roundControlHtml = `
+                <div class="sywat-field-group sywat-col-archer-dist">
+                    <select name="archers[${rowIndex}][pricing_profile]" class="sywat-round-profile-select" onchange="recalculateGroupTotal()">
+                        ${roundOptionsHtml}
+                    </select>
+                </div>
+            `;
+        } else {
+            roundControlHtml = `<input type="hidden" name="archers[${rowIndex}][pricing_profile]" class="sywat-round-profile-input" value="${escapeHtml(defProfKey)}">`;
+        }
+
+        let divisionOptionsHtml = '<option value="" disabled selected hidden>Select Division</option>';
+        getDivisions().forEach(d => {
+            const dist     = d.distance === 'Cub' ? 'Cub' : '20yd';
+            const rateTier = d.rate_tier === 'Youth' ? 'Youth' : 'Adult';
+            const divSlug  = d.slug || '';
+            const fee      = getFeeForRow(defProfKey, divSlug, d.label, dist);
+            divisionOptionsHtml += `<option value="${escapeHtml(d.label)}" data-slug="${escapeHtml(divSlug)}" data-distance="${escapeHtml(dist)}" data-rate-tier="${escapeHtml(rateTier)}" data-fee="${fee.toFixed(2)}">${escapeHtml(d.label)} [$${fee.toFixed(2)}]</option>`;
+        });
+
         const rowDiv = document.createElement('div');
         rowDiv.className = 'sywat-archer-input-row';
 
@@ -264,7 +492,9 @@
             <div class="sywat-field-group sywat-col-archer-name">
                 <input type="text" name="archers[${rowIndex}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
             </div>
-            
+
+            ${roundControlHtml}
+
             <div class="sywat-field-group sywat-col-archer-dist">
                 <select name="archers[${rowIndex}][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
                     <option value="20yd" selected>20yd</option>
@@ -274,14 +504,7 @@
 
             <div class="sywat-field-group sywat-col-archer-div">
                 <select name="archers[${rowIndex}][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
-                    <option value="" disabled selected hidden>Select Division</option>
-                    <option value="Cub (8 - 11)">Cub (8 - 11) [$25]</option>
-                    <option value="Youth (12 - 14)">Youth (12 - 14) [$25]</option>
-                    <option value="Young Adult (15 - 17)">Young Adult (15 - 17) [$25]</option>
-                    <option value="Adult (18 - 49)">Adult (18 - 49) [$30]</option>
-                    <option value="Senior (50 - 59)">Senior (50 - 59) [$30]</option>
-                    <option value="Silver Senior (60 - 69)">Silver Senior (60 - 69) [$30]</option>
-                    <option value="Master Senior (70+) ">Master Senior (70+) [$30]</option>
+                    ${divisionOptionsHtml}
                 </select>
             </div>
 
@@ -312,45 +535,95 @@
     };
 
     window.recalculateGroupTotal = function() {
-        const rows = document.querySelectorAll('.sywat-archer-input-row');
-        const youthDivisions = ['Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)'];
-        const lineMap = {};
+        const rows      = document.querySelectorAll('.sywat-archer-input-row');
+        const profiles  = getProfiles();
+        const defSlug   = getDefaultProfileKey();
+        const bucketMap = {};
+
+        // Check if any offered pricing profile uses tournament-wide family caps
+        let useTournWideCap = false;
+        Object.keys(profiles).forEach(pSlug => {
+            const p = profiles[pSlug];
+            if (p && p.family_cap_enabled && p.family_cap_scope === 'tournament') {
+                useTournWideCap = true;
+            }
+        });
+
+        const claimedPromoNames = {};
+        let promoAppliedCount   = 0;
 
         rows.forEach(row => {
-            const nameInput  = row.querySelector('input[type="text"]');
-            const distSelect = row.querySelector('.sywat-distance-select');
-            const divSelect  = row.querySelector('.sywat-division-select');
-            const lineSelect = row.querySelector('.sywat-line-override-select');
+            const nameInput   = row.querySelector('input[type="text"]');
+            const roundSelect = row.querySelector('.sywat-round-profile-select');
+            const roundInput  = row.querySelector('.sywat-round-profile-input');
+            const distSelect  = row.querySelector('.sywat-distance-select');
+            const divSelect   = row.querySelector('.sywat-division-select');
+            const lineSelect  = row.querySelector('.sywat-line-override-select');
 
             if (nameInput && nameInput.value.trim() !== '') {
-                const lIdx = lineSelect ? lineSelect.value : '0';
-                const dist = distSelect ? distSelect.value : '20yd';
-                const div  = divSelect ? divSelect.value : '';
+                const rawName   = nameInput.value.trim();
+                const normName  = rawName.toLowerCase();
+                const roundSlug = roundSelect
+                    ? roundSelect.value
+                    : (roundInput ? roundInput.value : defSlug);
+                const lIdx      = lineSelect ? lineSelect.value : '0';
+                const dist      = distSelect ? distSelect.value : '20yd';
+                const div       = divSelect ? divSelect.value : '';
+                const selectedOpt = (divSelect && divSelect.selectedIndex >= 0) ? divSelect.options[divSelect.selectedIndex] : null;
+                const divSlug   = selectedOpt ? (selectedOpt.getAttribute('data-slug') || '') : '';
 
-                if (!lineMap[lIdx]) {
-                    lineMap[lIdx] = { count: 0, rawTotal: 0 };
+                let isPromoFree = false;
+                if (!claimedPromoNames[normName] && isArcherPromoEligible(rawName, roundSlug)) {
+                    isPromoFree = true;
+                    claimedPromoNames[normName] = true;
+                    promoAppliedCount++;
                 }
 
-                lineMap[lIdx].count++;
-                if (dist === 'Cub' || youthDivisions.includes(div)) {
-                    lineMap[lIdx].rawTotal += 25;
-                } else {
-                    lineMap[lIdx].rawTotal += 30;
+                const archerFee = isPromoFree ? 0 : getFeeForRow(roundSlug, divSlug, div, dist);
+                const profRec   = getProfile(roundSlug);
+                const capBucket = useTournWideCap ? 'tournament' : String(lIdx);
+
+                if (!isPromoFree) {
+                    if (!bucketMap[capBucket]) {
+                        bucketMap[capBucket] = {
+                            count: 0,
+                            rawTotal: 0,
+                            capEnabled: false,
+                            capAmount: 0,
+                            minArchers: 99
+                        };
+                    }
+
+                    bucketMap[capBucket].count++;
+                    bucketMap[capBucket].rawTotal += archerFee;
+
+                    if (profRec && profRec.family_cap_enabled) {
+                        bucketMap[capBucket].capEnabled = true;
+                        const pCap = parseFloat(profRec.family_cap_amount) || 0;
+                        const pMin = parseInt(profRec.family_min_archers, 10) || 3;
+                        if (pCap > bucketMap[capBucket].capAmount) {
+                            bucketMap[capBucket].capAmount = pCap;
+                        }
+                        if (pMin < bucketMap[capBucket].minArchers) {
+                            bucketMap[capBucket].minArchers = pMin;
+                        }
+                    }
                 }
             }
         });
 
-        let overallTotal = 0;
-        let anyCapped = false;
-        let cappedLinesCount = 0;
+        let overallTotal       = 0;
+        let anyCapped          = false;
+        let cappedBucketsCount = 0;
 
-        Object.keys(lineMap).forEach(lIdx => {
-            const grp = lineMap[lIdx];
-            const isCapped = (grp.count >= 3 && grp.rawTotal >= 75.00);
+        Object.keys(bucketMap).forEach(bKey => {
+            const grp       = bucketMap[bKey];
+            const minNeeded = (grp.minArchers && grp.minArchers !== 99) ? grp.minArchers : 3;
+            const isCapped  = grp.capEnabled && grp.count >= minNeeded && grp.rawTotal > grp.capAmount;
             if (isCapped) {
                 anyCapped = true;
-                cappedLinesCount++;
-                overallTotal += 75.00;
+                cappedBucketsCount++;
+                overallTotal += grp.capAmount;
             } else {
                 overallTotal += grp.rawTotal;
             }
@@ -363,15 +636,26 @@
 
         if (totalDisp) totalDisp.textContent = '$' + overallTotal.toFixed(2);
         if (capBadge) {
-            if (anyCapped) {
+            if (anyCapped || promoAppliedCount > 0) {
                 capBadge.classList.remove('sywat-hidden');
-                capBadge.textContent = '🟢 Family Cap Applied (' + cappedLinesCount + ' Line' + (cappedLinesCount > 1 ? 's' : '') + ')';
+                const badgeParts = [];
+                if (anyCapped) {
+                    badgeParts.push(
+                        useTournWideCap
+                            ? '🟢 Family Cap Applied'
+                            : '🟢 Family Cap Applied (' + cappedBucketsCount + ' Line' + (cappedBucketsCount > 1 ? 's' : '') + ')'
+                    );
+                }
+                if (promoAppliedCount > 0) {
+                    badgeParts.push('🎟️ Promo Free Entry ($0.00 × ' + promoAppliedCount + ')');
+                }
+                capBadge.textContent = badgeParts.join(' • ');
             } else {
                 capBadge.classList.add('sywat-hidden');
             }
         }
 
-        const paidVal = paidInput ? parseFloat(paidInput.value) || 0 : 0;
+        const paidVal    = paidInput ? parseFloat(paidInput.value) || 0 : 0;
         const balanceDue = Math.max(0, overallTotal - paidVal);
 
         if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
@@ -396,6 +680,14 @@
         }
     });
 
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('sywat-round-profile-select')) {
+            const row = e.target.closest('.sywat-archer-input-row');
+            updateRowDivisionOptionLabels(row);
+            window.recalculateGroupTotal();
+        }
+    });
+
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && (!e.target.name || !e.target.name.includes('[name]'))) {
             window.closeAllTfaaAutocompletes();
@@ -411,6 +703,9 @@
                 window.updateAllArcherLines(savedLineIdx);
             }
         }
+        document.querySelectorAll('.sywat-archer-input-row').forEach(row => {
+            updateRowDivisionOptionLabels(row);
+        });
         window.recalculateGroupTotal();
         window.initAutoDismissAlerts();
     });

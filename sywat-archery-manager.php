@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     6.8.1
+ * Version:     7.2.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '6.8.1' );
+define( 'SYWAT_PLUGIN_VERSION', '7.2.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -35,6 +35,10 @@ function sywat_archery_activate() {
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-frontend.php';
 
 // Load Shared Core Engines & Utilities
+require_once SYWAT_PLUGIN_DIR . 'includes/shooting-styles/class-sywat-shooting-styles.php'; // Shooting Styles & Divisions Configuration Engine ([sywat_shooting_styles])
+if ( file_exists( SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php' ) ) {
+    require_once SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php';               // Dynamic Pricing, Round Formats & Promoter Engine ([sywat_pricing])
+}
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
 
 // Load TFAA Authentication Engine Sub-Modules
@@ -53,4 +57,5 @@ require_once SYWAT_PLUGIN_DIR . 'includes/shops/class-sywat-shops.php';         
 // Load Front-End Operations Apps
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';      // Check-In Desk App ([sywat_desk])
 require_once SYWAT_PLUGIN_DIR . 'includes/scores/class-sywat-scores.php';         // Batch Score Entry App ([sywat_scores])
+require_once SYWAT_PLUGIN_DIR . 'includes/schedule/class-sywat-schedule.php';    // Public Season Schedule ([sywat_schedule])
 require_once SYWAT_PLUGIN_DIR . 'includes/results/class-sywat-results.php';      // Public Standings & Results ([sywat_results])

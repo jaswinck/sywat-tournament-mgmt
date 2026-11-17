@@ -2,11 +2,15 @@
 /**
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
+ * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, public online registration window gatekeepers, TFAA name matchers, and spreadsheet parsers.
+ * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, O(N) hoisted sort key pre-computation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.1
+ * Version: 7.8.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 /**
  * Central Permission Checker for Season/Shop Administration
@@ -86,6 +90,295 @@ if ( ! function_exists( 'sywat_format_line_time_token' ) ) {
 }
 
 /**
+ * Returns the standardized 30-minute AM/PM start time options map.
+ * Keys are canonical storage tokens (e.g. "10AM", "6PM", "6:30PM");
+ * values are human-readable 12-hour AM/PM labels (e.g. "10:00 AM", "6:00 PM", "6:30 PM").
+ *
+ * @return array<string, string> Canonical token => display label map.
+ */
+if ( ! function_exists( 'sywat_get_standard_line_time_options' ) ) {
+    function sywat_get_standard_line_time_options() {
+        static $options = null;
+        if ( $options !== null ) {
+            return $options;
+        }
+
+        $options = array();
+        // 7:00 AM (420 mins) through 9:30 PM (1290 mins) in 30-minute steps
+        for ( $mins = 7 * 60; $mins <= ( 21 * 60 ) + 30; $mins += 30 ) {
+            $hour_24  = intdiv( $mins, 60 );
+            $minute   = $mins % 60;
+            $meridiem = ( $hour_24 >= 12 ) ? 'PM' : 'AM';
+            $hour_12  = $hour_24 % 12;
+            if ( $hour_12 === 0 ) {
+                $hour_12 = 12;
+            }
+
+            $min_padded = str_pad( (string) $minute, 2, '0', STR_PAD_LEFT );
+            $token      = $hour_12 . ( $minute === 0 ? '' : ':' . $min_padded ) . $meridiem;
+            $label      = $hour_12 . ':' . $min_padded . ' ' . $meridiem;
+
+            $options[ $token ] = $label;
+        }
+
+        return $options;
+    }
+}
+
+/**
+ * Renders HTML <option> tags for the standardized 30-minute AM/PM line start time dropdown.
+ * Normalizes legacy stored values ("6:00 PM", "6PM", "10:00 AM") so existing rows pre-select accurately,
+ * and preserves non-30-minute legacy tokens as a selected fallback option so existing data is never lost.
+ *
+ * @param string $selected_val        Currently saved time value.
+ * @param bool   $include_placeholder Whether to prepend a disabled placeholder option.
+ * @return string Escaped <option> HTML markup.
+ */
+if ( ! function_exists( 'sywat_render_line_time_options' ) ) {
+    function sywat_render_line_time_options( $selected_val = '', $include_placeholder = false ) {
+        $options    = sywat_get_standard_line_time_options();
+        $normalized = ( trim( (string) $selected_val ) !== '' )
+            ? sywat_format_line_time_token( (string) $selected_val )
+            : '';
+
+        $html = '';
+        if ( $include_placeholder ) {
+            $html .= '<option value="" disabled' . selected( $normalized, '', false ) . '>-- Select Time --</option>';
+        }
+
+        // Preserve any legacy off-interval time (e.g. 6:15PM) so opening Edit never silently alters saved data
+        if ( $normalized !== '' && ! isset( $options[ $normalized ] ) ) {
+            $html .= '<option value="' . esc_attr( $normalized ) . '" selected>' . esc_html( trim( (string) $selected_val ) ) . '</option>';
+        }
+
+        foreach ( $options as $token => $label ) {
+            $html .= '<option value="' . esc_attr( $token ) . '"' . selected( $normalized, $token, false ) . '>' . esc_html( $label ) . '</option>';
+        }
+
+        return $html;
+    }
+}
+
+/**
+ * Sorts an associative array of tournaments ($tournaments[ $t_name => $t_data ]) in place using
+ * a hoisted O(N) pre-computed 4-tier sort key map (zero regexes or lookups inside the comparator):
+ *   1. Start Date (YYYY-MM-DD ascending; undated events sort last)
+ *   2. Event Tier (TFAA State -> National -> SYWAT) & End Date (YYYY-MM-DD ascending)
+ *   3. Host Shop Name (A -> Z natural case-insensitive)
+ *   4. Event Title (A -> Z natural case-insensitive)
+ *
+ * @param array $tournaments Associative array of tournaments passed by reference.
+ * @param array $all_shops   Optional pre-fetched master shops map for O(1) shop name resolution.
+ * @return void
+ */
+if ( ! function_exists( 'sywat_sort_tournaments_chronologically' ) ) {
+    function sywat_sort_tournaments_chronologically( &$tournaments, $all_shops = array() ) {
+        if ( ! is_array( $tournaments ) || count( $tournaments ) <= 1 ) {
+            return;
+        }
+
+        if ( empty( $all_shops ) ) {
+            if ( function_exists( 'sywat_get_shops' ) ) {
+                $all_shops = sywat_get_shops();
+            } elseif ( function_exists( 'sywat_get_all_shops' ) ) {
+                $all_shops = sywat_get_all_shops();
+            }
+        }
+        if ( ! is_array( $all_shops ) ) {
+            $all_shops = array();
+        }
+
+        // Build O(1) shop lookup maps once outside the tournament loop
+        $shop_id_to_name   = array();
+        $norm_name_to_name = array();
+        foreach ( $all_shops as $s_id => $s_info ) {
+            if ( is_array( $s_info ) ) {
+                $title = ! empty( $s_info['name'] )
+                    ? trim( (string) $s_info['name'] )
+                    : ( ! empty( $s_info['shop_name'] )
+                        ? trim( (string) $s_info['shop_name'] )
+                        : ( ! empty( $s_info['title'] ) ? trim( (string) $s_info['title'] ) : '' ) );
+                if ( $title !== '' ) {
+                    $shop_id_to_name[ (string) $s_id ]      = $title;
+                    $norm_name_to_name[ strtolower( $title ) ] = $title;
+                }
+            }
+        }
+
+        // Single O(N) pass: pre-compute scalar sort keys for every tournament
+        $sort_keys = array();
+        foreach ( $tournaments as $t_key => $t_data ) {
+            $t_name = ( is_array( $t_data ) && ! empty( $t_data['name'] ) ) ? trim( (string) $t_data['name'] ) : trim( (string) $t_key );
+
+            $start_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? trim( (string) $t_data['start_date'] ) : '9999-12-31';
+            $end_date   = ( is_array( $t_data ) && ! empty( $t_data['end_date'] ) ) ? trim( (string) $t_data['end_date'] ) : $start_date;
+
+            $ev_type = ( is_array( $t_data ) && ! empty( $t_data['event_type'] ) ) ? trim( (string) $t_data['event_type'] ) : 'SYWAT';
+            if ( strcasecmp( $ev_type, 'TFAA State' ) === 0 ) {
+                $tier_weight = 1;
+            } elseif ( strcasecmp( $ev_type, 'National' ) === 0 ) {
+                $tier_weight = 2;
+            } else {
+                $tier_weight = 3;
+            }
+
+            // O(1) host shop name resolution
+            $shop_name = '';
+            $s_id      = ( is_array( $t_data ) && ! empty( $t_data['shop_id'] ) ) ? (string) $t_data['shop_id'] : '';
+            if ( $s_id !== '' && isset( $shop_id_to_name[ $s_id ] ) ) {
+                $shop_name = $shop_id_to_name[ $s_id ];
+            } elseif ( is_array( $t_data ) ) {
+                if ( ! empty( $t_data['official_shop_name'] ) ) {
+                    $shop_name = trim( (string) $t_data['official_shop_name'] );
+                } elseif ( ! empty( $t_data['shop_name'] ) ) {
+                    $shop_name = trim( (string) $t_data['shop_name'] );
+                } elseif ( ! empty( $t_data['location_display'] ) ) {
+                    $shop_name = trim( (string) $t_data['location_display'] );
+                }
+            }
+
+            if ( $shop_name === '' && $t_name !== '' ) {
+                $base_title = preg_replace( '/\s*[\-\#]\s*\d+$/i', '', $t_name );
+                $norm_base  = strtolower( trim( $base_title ) );
+                $shop_name  = isset( $norm_name_to_name[ $norm_base ] ) ? $norm_name_to_name[ $norm_base ] : ( $base_title !== '' ? $base_title : $t_name );
+            }
+
+            $sort_keys[ $t_key ] = array(
+                'start' => $start_date,
+                'tier'  => $tier_weight,
+                'end'   => $end_date,
+                'shop'  => $shop_name,
+                'name'  => $t_name,
+            );
+        }
+
+        // Pure scalar comparison inside uksort (zero regexes or lookups)
+        uksort( $tournaments, function( $key_a, $key_b ) use ( $sort_keys ) {
+            $ka = $sort_keys[ $key_a ];
+            $kb = $sort_keys[ $key_b ];
+
+            if ( $ka['start'] !== $kb['start'] ) {
+                return ( $ka['start'] < $kb['start'] ) ? -1 : 1;
+            }
+            if ( $ka['tier'] !== $kb['tier'] ) {
+                return ( $ka['tier'] < $kb['tier'] ) ? -1 : 1;
+            }
+            if ( $ka['end'] !== $kb['end'] ) {
+                return ( $ka['end'] < $kb['end'] ) ? -1 : 1;
+            }
+
+            $shop_cmp = strnatcasecmp( $ka['shop'], $kb['shop'] );
+            if ( $shop_cmp !== 0 ) {
+                return $shop_cmp;
+            }
+
+            return strnatcasecmp( $ka['name'], $kb['name'] );
+        } );
+    }
+}
+
+/**
+ * Chronological comparator for tournament shooting lines.
+ * Orders by day of week (Mon-Thu -> Friday -> Saturday -> Sunday) and 24-hour start time.
+ *
+ * @param array $a First line slot array.
+ * @param array $b Second line slot array.
+ * @return int Comparison result (-1, 0, 1).
+ */
+if ( ! function_exists( 'sywat_compare_tournament_lines' ) ) {
+    function sywat_compare_tournament_lines( $a, $b ) {
+        if ( ! is_array( $a ) || ! is_array( $b ) ) {
+            return 0;
+        }
+
+        $day_weights = array(
+            'mon'       => 1,
+            'monday'    => 1,
+            'tue'       => 2,
+            'tues'      => 2,
+            'tuesday'   => 2,
+            'wed'       => 3,
+            'wednesday' => 3,
+            'thu'       => 4,
+            'thur'      => 4,
+            'thurs'     => 4,
+            'thursday'  => 4,
+            'fri'       => 5,
+            'friday'    => 5,
+            'sat'       => 6,
+            'saturday'  => 6,
+            'sun'       => 7,
+            'sunday'    => 7,
+        );
+
+        $extract_sort_key = function( $line ) use ( $day_weights ) {
+            $name_raw = isset( $line['name'] ) ? trim( (string) $line['name'] ) : '';
+            $day_raw  = isset( $line['day'] ) ? trim( (string) $line['day'] ) : '';
+            $time_raw = isset( $line['time'] ) ? trim( (string) $line['time'] ) : '';
+
+            if ( ( $day_raw === '' || $time_raw === '' ) && $name_raw !== '' ) {
+                $parts = preg_split( '/\s+/', $name_raw, 2 );
+                if ( $day_raw === '' && isset( $parts[0] ) ) {
+                    $day_raw = $parts[0];
+                }
+                if ( $time_raw === '' && isset( $parts[1] ) ) {
+                    $time_raw = $parts[1];
+                }
+            }
+
+            $day_norm   = strtolower( preg_replace( '/[^a-z]/i', '', $day_raw ) );
+            $day_weight = isset( $day_weights[ $day_norm ] ) ? $day_weights[ $day_norm ] : 99;
+
+            $minutes = 9999;
+            if ( $time_raw !== '' && preg_match( '/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i', $time_raw, $m ) ) {
+                $hour     = intval( $m[1] );
+                $mins     = ( isset( $m[2] ) && $m[2] !== '' ) ? intval( $m[2] ) : 0;
+                $meridiem = isset( $m[3] ) ? strtoupper( $m[3] ) : '';
+
+                if ( $meridiem === '' ) {
+                    if ( $hour === 6 || $hour === 12 || ( $hour >= 1 && $hour <= 5 ) ) {
+                        $meridiem = 'PM';
+                    } else {
+                        $meridiem = 'AM';
+                    }
+                }
+
+                // Archery rule: 6 o'clock lines are always PM
+                if ( $hour === 6 ) {
+                    $meridiem = 'PM';
+                }
+
+                if ( $meridiem === 'PM' && $hour < 12 ) {
+                    $hour += 12;
+                } elseif ( $meridiem === 'AM' && $hour === 12 ) {
+                    $hour = 0;
+                }
+
+                $minutes = ( $hour * 60 ) + $mins;
+            } elseif ( $time_raw !== '' ) {
+                $parsed = strtotime( '1970-01-01 ' . $time_raw );
+                if ( $parsed !== false ) {
+                    $minutes = ( intval( date( 'G', $parsed ) ) * 60 ) + intval( date( 'i', $parsed ) );
+                }
+            }
+
+            return array( $day_weight, $minutes, $name_raw );
+        };
+
+        list( $day_a, $min_a, $name_a ) = $extract_sort_key( $a );
+        list( $day_b, $min_b, $name_b ) = $extract_sort_key( $b );
+
+        if ( $day_a !== $day_b ) {
+            return ( $day_a < $day_b ) ? -1 : 1;
+        }
+        if ( $min_a !== $min_b ) {
+            return ( $min_a < $min_b ) ? -1 : 1;
+        }
+        return strnatcasecmp( $name_a, $name_b );
+    }
+}
+
+/**
  * Universal Token & Qualifier Matcher for TFAA Tournament Names
  * Resolves local short names (e.g., "Fort Grard - 1", "Archery HQ - 1") to official TFAA index strings.
  */
@@ -145,7 +438,7 @@ if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
 
 /**
  * Parses raw human line string into structured line slot arrays.
- * Enforces standardized day labels and named slot titles.
+ * Enforces standardized day labels, named slot titles, and chronological Fri->Sat->Sun order.
  *
  * @param string $line_str      Raw schedule string from import file or input.
  * @param int    $default_20yd  Default 20-yard line capacity.
@@ -207,6 +500,10 @@ if ( ! function_exists( 'sywat_parse_imported_line_schedule' ) ) {
             }
         }
 
+        if ( count( $lines ) > 1 ) {
+            usort( $lines, 'sywat_compare_tournament_lines' );
+        }
+
         return $lines;
     }
 }
@@ -225,7 +522,7 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
 
         // 1. Excel (.xlsx) Parser via includes/lib/SimpleXLSX.php
         if ( $ext === 'xlsx' ) {
-            $lib_path = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
+            $lib_path  = plugin_dir_path( __FILE__ ) . '../lib/SimpleXLSX.php';
             if ( file_exists( $lib_path ) && ! class_exists( 'SimpleXLSX' ) ) {
                 require_once $lib_path;
             }
@@ -257,13 +554,13 @@ if ( ! function_exists( 'sywat_parse_schedule_file_rows' ) ) {
             while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
                 if ( count( $data ) >= 3 ) {
                     $raw_rows[] = array(
-                        'start_date'           => isset( $data[0] ) ? trim( $data[0] ) : '',
-                        'end_date'             => isset( $data[1] ) ? trim( $data[1] ) : '',
-                        'host_shop_city'       => isset( $data[2] ) ? trim( $data[2] ) : '',
-                        'line_times'           => isset( $data[3] ) ? trim( $data[3] ) : '',
-                        'event_type'           => isset( $data[4] ) ? trim( $data[4] ) : '',
-                        'national_event_title' => isset( $data[5] ) ? trim( $data[5] ) : '',
-                        'notes'                => isset( $data[6] ) ? trim( $data[6] ) : '',
+                        'start_date'           => isset( $data[0] ) ? trim( (string) $data[0] ) : '',
+                        'end_date'             => isset( $data[1] ) ? trim( (string) $data[1] ) : '',
+                        'host_shop_city'       => isset( $data[2] ) ? trim( (string) $data[2] ) : '',
+                        'line_times'           => isset( $data[3] ) ? trim( (string) $data[3] ) : '',
+                        'event_type'           => isset( $data[4] ) ? trim( (string) $data[4] ) : '',
+                        'national_event_title' => isset( $data[5] ) ? trim( (string) $data[5] ) : '',
+                        'notes'                => isset( $data[6] ) ? trim( (string) $data[6] ) : '',
                     );
                 }
             }
@@ -357,7 +654,7 @@ if ( ! function_exists( 'sywat_get_shop_capacity_defaults' ) ) {
 }
 
 /**
- * Builds the default 4-line template using host shop capacity limits.
+ * Builds the default 4-line template using host shop capacity limits and canonical time tokens.
  *
  * @param array|string $shop_data_or_id Optional shop dataset array, shop ID, or shop name string.
  * @return array Default lines template.
@@ -366,10 +663,10 @@ if ( ! function_exists( 'sywat_get_default_tournament_lines' ) ) {
     function sywat_get_default_tournament_lines( $shop_data_or_id = array() ) {
         $caps = sywat_get_shop_capacity_defaults( $shop_data_or_id );
         return array(
-            array( 'day' => 'Saturday', 'time' => '10:00 AM', 'name' => 'Saturday 10:00 AM', 'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Saturday', 'time' => '2:00 PM',  'name' => 'Saturday 2:00 PM',  'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Sunday',   'time' => '10:00 AM', 'name' => 'Sunday 10:00 AM',   'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
-            array( 'day' => 'Sunday',   'time' => '2:00 PM',  'name' => 'Sunday 2:00 PM',    'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Saturday', 'time' => '10AM', 'name' => 'Saturday 10AM', 'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Saturday', 'time' => '2PM',  'name' => 'Saturday 2PM',  'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '10AM', 'name' => 'Sunday 10AM',   'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
+            array( 'day' => 'Sunday',   'time' => '2PM',  'name' => 'Sunday 2PM',    'cap_20yd' => $caps['cap_20yd'], 'cap_cub' => $caps['cap_cub'] ),
         );
     }
 }
@@ -475,13 +772,23 @@ if ( ! function_exists( 'sywat_format_tournament_dates' ) ) {
     }
 }
 
+/**
+ * Retrieves tournament shooting lines sorted chronologically (Friday -> Saturday -> Sunday, then by time)
+ * while preserving each line's original array index key (uasort) so stored registration line_index mappings remain intact.
+ *
+ * @param array $t_data Tournament configuration array or raw lines array.
+ * @return array Key-preserved, chronologically sorted line slots.
+ */
 if ( ! function_exists( 'sywat_get_tournament_lines' ) ) {
     function sywat_get_tournament_lines( $t_data ) {
-        if ( ! is_array( $t_data ) ) return array();
-        if ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) {
-            return $t_data['lines'];
+        if ( ! is_array( $t_data ) ) {
+            return array();
         }
-        return $t_data;
+        $lines = ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) ? $t_data['lines'] : $t_data;
+        if ( count( $lines ) > 1 ) {
+            uasort( $lines, 'sywat_compare_tournament_lines' );
+        }
+        return $lines;
     }
 }
 
@@ -613,5 +920,154 @@ if ( ! function_exists( 'sywat_is_archer_on_line' ) ) {
             }
         }
         return false;
+    }
+}
+
+/**
+ * Resolves a host shop's default Public Online Registration policy (On/Off + Days Before Event).
+ * Supports O(1) lookup when a pre-fetched $all_shops array is supplied during batch imports.
+ *
+ * @param array|string $shop_data_or_id Shop record array, shop ID, or shop name.
+ * @param array        $all_shops       Optional pre-fetched shops directory map.
+ * @return array{public_reg_default: string, public_reg_days_before: int}
+ */
+if ( ! function_exists( 'sywat_get_shop_public_reg_defaults' ) ) {
+    function sywat_get_shop_public_reg_defaults( $shop_data_or_id, $all_shops = array() ) {
+        $enabled     = '0';
+        $days_before = 15;
+        $shop_data   = array();
+
+        if ( is_array( $shop_data_or_id ) ) {
+            $shop_data = $shop_data_or_id;
+        } elseif ( is_string( $shop_data_or_id ) && trim( $shop_data_or_id ) !== '' ) {
+            if ( empty( $all_shops ) ) {
+                if ( function_exists( 'sywat_get_shops' ) ) {
+                    $all_shops = sywat_get_shops();
+                } elseif ( function_exists( 'sywat_get_all_shops' ) ) {
+                    $all_shops = sywat_get_all_shops();
+                }
+            }
+            if ( is_array( $all_shops ) ) {
+                $lookup_key = trim( $shop_data_or_id );
+                if ( isset( $all_shops[ $lookup_key ] ) && is_array( $all_shops[ $lookup_key ] ) ) {
+                    $shop_data = $all_shops[ $lookup_key ];
+                } else {
+                    $search_lower = strtolower( $lookup_key );
+                    foreach ( $all_shops as $s_id => $s_info ) {
+                        if ( is_array( $s_info ) ) {
+                            $s_name  = isset( $s_info['name'] ) ? strtolower( trim( (string) $s_info['name'] ) ) : '';
+                            $s_title = isset( $s_info['title'] ) ? strtolower( trim( (string) $s_info['title'] ) ) : '';
+                            $s_key   = strtolower( trim( (string) $s_id ) );
+                            if ( $s_key === $search_lower || $s_name === $search_lower || $s_title === $search_lower ) {
+                                $shop_data = $s_info;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if ( is_array( $shop_data ) && ! empty( $shop_data ) ) {
+            $enabled = ! empty( $shop_data['public_reg_default'] ) ? '1' : '0';
+            if ( isset( $shop_data['public_reg_days_before'] ) && $shop_data['public_reg_days_before'] !== '' ) {
+                $days_before = max( 0, min( 365, intval( $shop_data['public_reg_days_before'] ) ) );
+            }
+        }
+
+        return array(
+            'public_reg_default'     => $enabled,
+            'public_reg_days_before' => $days_before,
+        );
+    }
+}
+
+/**
+ * Evaluates a tournament's Public Online Registration gatekeeper status dynamically on read.
+ * Compares today's date (site timezone) against (start_date - days_before) and end_date.
+ *
+ * @param array  $t_data    Tournament configuration array.
+ * @param string $today_ymd Optional 'YYYY-MM-DD' override for deterministic evaluation.
+ * @return array{
+ *     status: string,
+ *     is_open: bool,
+ *     enabled: bool,
+ *     days_before: int,
+ *     opens_date: string,
+ *     opens_label: string,
+ *     reason: string
+ * }
+ */
+if ( ! function_exists( 'sywat_get_public_registration_status' ) ) {
+    function sywat_get_public_registration_status( $t_data, $today_ymd = '' ) {
+        $enabled     = is_array( $t_data ) && ! empty( $t_data['public_reg_enabled'] );
+        $days_before = ( is_array( $t_data ) && isset( $t_data['public_reg_days_before'] ) && $t_data['public_reg_days_before'] !== '' )
+            ? max( 0, min( 365, intval( $t_data['public_reg_days_before'] ) ) )
+            : 15;
+
+        if ( ! $enabled ) {
+            return array(
+                'status'      => 'closed',
+                'is_open'     => false,
+                'enabled'     => false,
+                'days_before' => $days_before,
+                'opens_date'  => '',
+                'opens_label' => '',
+                'reason'      => 'disabled',
+            );
+        }
+
+        $today = ( $today_ymd !== '' )
+            ? trim( (string) $today_ymd )
+            : ( function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : date( 'Y-m-d' ) );
+
+        $start_date = ( is_array( $t_data ) && ! empty( $t_data['start_date'] ) ) ? trim( (string) $t_data['start_date'] ) : '';
+        $end_date   = ( is_array( $t_data ) && ! empty( $t_data['end_date'] ) ) ? trim( (string) $t_data['end_date'] ) : $start_date;
+
+        if ( $end_date !== '' && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $end_date ) && $today > $end_date ) {
+            return array(
+                'status'      => 'closed',
+                'is_open'     => false,
+                'enabled'     => true,
+                'days_before' => $days_before,
+                'opens_date'  => '',
+                'opens_label' => '',
+                'reason'      => 'past',
+            );
+        }
+
+        $opens_date  = '';
+        $opens_label = '';
+
+        if ( $start_date !== '' && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start_date ) ) {
+            $start_ts = strtotime( $start_date . ' 00:00:00' );
+            if ( $start_ts !== false ) {
+                $opens_ts    = ( $days_before > 0 ) ? strtotime( '-' . $days_before . ' days', $start_ts ) : $start_ts;
+                $opens_date  = ( $opens_ts !== false ) ? date( 'Y-m-d', $opens_ts ) : $start_date;
+                $opens_label = ( $opens_ts !== false ) ? date( 'M j', $opens_ts ) : '';
+
+                if ( $days_before > 0 && $today < $opens_date ) {
+                    return array(
+                        'status'      => 'opens_soon',
+                        'is_open'     => false,
+                        'enabled'     => true,
+                        'days_before' => $days_before,
+                        'opens_date'  => $opens_date,
+                        'opens_label' => $opens_label,
+                        'reason'      => 'opens_soon',
+                    );
+                }
+            }
+        }
+
+        return array(
+            'status'      => 'open',
+            'is_open'     => true,
+            'enabled'     => true,
+            'days_before' => $days_before,
+            'opens_date'  => $opens_date,
+            'opens_label' => $opens_label,
+            'reason'      => 'open',
+        );
     }
 }

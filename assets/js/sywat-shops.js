@@ -1,13 +1,21 @@
 /**
- * SYWAT Archery - Shops Module Client Scripts
+ * SYWAT Archery - Shops & Clubs Module Client Engine
  * Path: assets/js/sywat-shops.js
- * Version: 6.8.3
+ * Description: Manages Edit Location tabs, facility visibility toggles, repeatable contacts, standardized 30-minute AM/PM shooting line dropdown repeaters & duplicate checks, directory search/district filters, and single-prompt confirmations.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden / .active).
+ * Author: SYWAT Archery / TFAA
+ * Version: 6.11.0
  */
 
 (function() {
     'use strict';
 
     window.SYWAT = window.SYWAT || {};
+
+    if (window.SYWAT._shopsInitialized) {
+        return;
+    }
+    window.SYWAT._shopsInitialized = true;
 
     let sywatIsFormDirty = false;
 
@@ -26,6 +34,79 @@
         } else {
             el.classList.add('sywat-hidden');
         }
+    }
+
+    /**
+     * Normalizes a line time string into a canonical token (e.g. "10:00 AM" -> "10AM", "6:30 PM" -> "6:30PM").
+     * Enforces the TFAA rule that 6 o'clock lines are always PM.
+     */
+    function normalizeLineTimeToken(rawToken) {
+        const token = String(rawToken || '').trim();
+        if (!token) return '';
+
+        const match = token.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+        if (match) {
+            const hour = parseInt(match[1], 10);
+            let mins = match[2] || '';
+            let meridiem = (match[3] || '').toUpperCase();
+
+            if (mins === '00') {
+                mins = '';
+            }
+            const minStr = mins ? ':' + mins : '';
+
+            if (!meridiem) {
+                if (hour === 6 || hour === 12 || (hour >= 1 && hour <= 5)) {
+                    meridiem = 'PM';
+                } else {
+                    meridiem = 'AM';
+                }
+            }
+
+            if (hour === 6) {
+                meridiem = 'PM';
+            }
+
+            return hour + minStr + meridiem;
+        }
+
+        return token.toUpperCase();
+    }
+
+    /**
+     * Builds standardized 30-minute AM/PM <option> HTML (7:00 AM through 9:30 PM)
+     * matching sywat_get_standard_line_time_options() in tournament-helpers.php.
+     */
+    function buildStandardLineTimeOptionsHtml(defaultTime) {
+        const normalizedDefault = normalizeLineTimeToken(defaultTime || '10AM');
+        const options = [];
+
+        for (let mins = 7 * 60; mins <= (21 * 60) + 30; mins += 30) {
+            const hour24 = Math.floor(mins / 60);
+            const minute = mins % 60;
+            const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+            let hour12 = hour24 % 12;
+            if (hour12 === 0) {
+                hour12 = 12;
+            }
+
+            const minPadded = String(minute).padStart(2, '0');
+            const token = hour12 + (minute === 0 ? '' : ':' + minPadded) + meridiem;
+            const label = hour12 + ':' + minPadded + ' ' + meridiem;
+            const selectedAttr = (normalizedDefault === token) ? ' selected' : '';
+
+            options.push('<option value="' + token + '"' + selectedAttr + '>' + label + '</option>');
+        }
+
+        return options.join('');
+    }
+
+    function getTimeFieldDisplayLabel(fieldEl) {
+        if (!fieldEl) return '';
+        if (fieldEl.tagName && fieldEl.tagName.toLowerCase() === 'select' && fieldEl.selectedIndex >= 0) {
+            return fieldEl.options[fieldEl.selectedIndex].text;
+        }
+        return fieldEl.value || '';
     }
 
     function switchEditShopTab(tabName) {
@@ -148,10 +229,10 @@
         if (!tr || !table) return true;
 
         const daySelect = tr.querySelector('select[name="indoor_line_days[]"], select[name="outdoor_line_days[]"]');
-        const timeInput = tr.querySelector('input[name="indoor_line_times[]"], input[name="outdoor_line_times[]"]');
+        const timeField = tr.querySelector('select[name="indoor_line_times[]"], input[name="indoor_line_times[]"], select[name="outdoor_line_times[]"], input[name="outdoor_line_times[]"]');
 
         const dayVal = (daySelect ? daySelect.value : '').trim();
-        const timeVal = (timeInput ? timeInput.value : '').trim().toLowerCase();
+        const timeVal = normalizeLineTimeToken(timeField ? timeField.value : '').toLowerCase();
 
         if (!dayVal || !timeVal) return true;
 
@@ -165,13 +246,13 @@
             if (row === tr) continue;
 
             const otherDaySelect = row.querySelector('select[name="indoor_line_days[]"], select[name="outdoor_line_days[]"]');
-            const otherTimeInput = row.querySelector('input[name="indoor_line_times[]"], input[name="outdoor_line_times[]"]');
+            const otherTimeField = row.querySelector('select[name="indoor_line_times[]"], input[name="indoor_line_times[]"], select[name="outdoor_line_times[]"], input[name="outdoor_line_times[]"]');
 
             const otherDay = (otherDaySelect ? otherDaySelect.value : '').trim().toLowerCase();
-            const otherTime = (otherTimeInput ? otherTimeInput.value : '').trim().toLowerCase();
+            const otherTime = normalizeLineTimeToken(otherTimeField ? otherTimeField.value : '').toLowerCase();
 
             if (otherDay && otherTime && (otherDay + ' @ ' + otherTime) === currentCombo) {
-                window.alert('Duplicate ' + label + ' shooting line detected: "' + dayVal + ' ' + timeInput.value + '". This day and start time is already assigned to another line.');
+                window.alert('Duplicate ' + label + ' shooting line detected: "' + dayVal + ' ' + getTimeFieldDisplayLabel(timeField) + '". This day and start time is already assigned to another line.');
                 if (daySelect) {
                     daySelect.value = '';
                     daySelect.focus();
@@ -200,7 +281,9 @@
             '</td>' +
             '<td>' +
                 '<div class="sywat-field-group">' +
-                    '<input type="text" name="indoor_line_times[]" value="10:00 AM" placeholder="e.g. 10:00 AM" required>' +
+                    '<select name="indoor_line_times[]" required>' +
+                        buildStandardLineTimeOptionsHtml('10AM') +
+                    '</select>' +
                 '</div>' +
             '</td>' +
             '<td>' +
@@ -249,7 +332,9 @@
             '</td>' +
             '<td>' +
                 '<div class="sywat-field-group">' +
-                    '<input type="text" name="outdoor_line_times[]" value="9:00 AM" placeholder="e.g. 9:00 AM" required>' +
+                    '<select name="outdoor_line_times[]" required>' +
+                        buildStandardLineTimeOptionsHtml('9AM') +
+                    '</select>' +
                 '</div>' +
             '</td>' +
             '<td class="sywat-col-center">' +
@@ -275,12 +360,12 @@
         if (!table) return true;
 
         const daySelects = table.querySelectorAll('select[name="' + dayInputName + '"]');
-        const timeInputs = table.querySelectorAll('input[name="' + timeInputName + '"]');
+        const timeFields = table.querySelectorAll('select[name="' + timeInputName + '"], input[name="' + timeInputName + '"]');
 
         const seen = new Map();
         for (let i = 0; i < daySelects.length; i++) {
             const dayVal = (daySelects[i] ? daySelects[i].value : '').trim();
-            const timeVal = (timeInputs[i] ? timeInputs[i].value : '').trim().toLowerCase();
+            const timeVal = normalizeLineTimeToken(timeFields[i] ? timeFields[i].value : '').toLowerCase();
 
             if (!dayVal) {
                 window.alert('Please select a Shooting Day for row ' + (i + 1) + ' in ' + label + ' lines.');
@@ -291,7 +376,7 @@
             if (dayVal && timeVal) {
                 const combo = dayVal + ' @ ' + timeVal;
                 if (seen.has(combo)) {
-                    window.alert('Duplicate ' + label + ' shooting line detected: "' + dayVal + ' ' + timeInputs[i].value + '". Please choose a different day or start time.');
+                    window.alert('Duplicate ' + label + ' shooting line detected: "' + dayVal + ' ' + getTimeFieldDisplayLabel(timeFields[i]) + '". Please choose a different day or start time.');
                     daySelects[i].value = '';
                     daySelects[i].focus();
                     return false;
@@ -443,27 +528,37 @@
         }
     });
 
-    // Delegated form submit confirmation listener
+    // Delegated form submit confirmation listener (single-prompt coordinated)
     document.addEventListener('submit', function(e) {
-        const form = e.target;
-        if (!form || !form.getAttribute) return;
+        const form = e.target && e.target.closest ? e.target.closest('form[data-sywat-confirm]') : null;
+        if (!form || e.defaultPrevented || e._sywatConfirmHandled) return;
+
+        if (form.dataset.sywatSubmitting === '1') {
+            e.preventDefault();
+            return;
+        }
+
+        e._sywatConfirmHandled = true;
         const confirmMsg = form.getAttribute('data-sywat-confirm');
         if (confirmMsg && !window.confirm(confirmMsg)) {
             e.preventDefault();
+            return;
         }
+
+        form.dataset.sywatSubmitting = '1';
     });
 
     // Delegated change listener for dynamic shooting line duplicate checks
     document.addEventListener('change', function(e) {
         const el = e.target;
         if (!el || !el.matches) return;
-        if (el.matches('select[name="indoor_line_days[]"], input[name="indoor_line_times[]"], select[name="outdoor_line_days[]"], input[name="outdoor_line_times[]"]')) {
+        if (el.matches('select[name="indoor_line_days[]"], select[name="indoor_line_times[]"], input[name="indoor_line_times[]"], select[name="outdoor_line_days[]"], select[name="outdoor_line_times[]"], input[name="outdoor_line_times[]"]')) {
             checkShopLineDuplicate(el);
             markFormDirty();
         }
     });
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function initShopsModule() {
         const editForm = document.getElementById('sywat_edit_shop_form');
         if (editForm) {
             editForm.addEventListener('change', markFormDirty);
@@ -513,7 +608,13 @@
                 }, 500);
             }, 5000);
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initShopsModule);
+    } else {
+        initShopsModule();
+    }
 
     // Expose namespaced API + legacy compatibility aliases
     window.SYWAT.shops = {

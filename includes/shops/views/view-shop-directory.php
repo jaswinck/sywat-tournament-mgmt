@@ -2,8 +2,9 @@
 /**
  * View Template: Admin Shop Directory & Creation / Import Modals
  * Path: includes/shops/views/view-shop-directory.php
+ * Description: Renders the administrative Shop & Club directory table, 2-step CSV/XLSX import modal, and Create New Location modal.
  * Author: SYWAT Archery / TFAA
- * Version: 6.8.3
+ * Version: 6.10.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
