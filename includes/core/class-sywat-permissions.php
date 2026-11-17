@@ -5,7 +5,7 @@
  * Description: Registers clean TFAA & Shop roles automatically and provides central capability checks across all sub-modules.
  * Compliance: Pure core permissions layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -309,7 +309,7 @@ if ( ! function_exists( 'sywat_can_edit_scores' ) ) {
 }
 
 /**
- * Permission 6: Can access the Check-In Desk & Registration Intake portals.
+ * Permission 6: Can access the Check-In Desk portal.
  * Restricted to Shop Users, Shop Managers, Board/Officers, and Administrators (excludes general tfaa_member).
  *
  * @param int $user_id Optional target user ID.
@@ -329,6 +329,31 @@ if ( ! function_exists( 'sywat_can_access_desk' ) ) {
             'tfaa_social_media_director',
             'sywat_shop_manager',
             'sywat_shop_user',
+        );
+        return sywat_user_has_any_role( $allowed, $user_id );
+    }
+}
+
+/**
+ * Permission 6b: Can access the Phone & Bulk Shooter Registration Intake portal ([sywat_register]).
+ * Restricted to Shop Managers, Board/Officers, and Administrators (excludes sywat_shop_user and tfaa_member).
+ *
+ * @param int $user_id Optional target user ID.
+ * @return bool
+ */
+if ( ! function_exists( 'sywat_can_register_shooters' ) ) {
+    function sywat_can_register_shooters( $user_id = 0 ) {
+        $allowed = array(
+            'administrator',
+            'tfaa_president',
+            'tfaa_vice_president',
+            'tfaa_treasurer',
+            'tfaa_secretary',
+            'tfaa_webmaster',
+            'tfaa_field_governor',
+            'tfaa_tournament_director',
+            'tfaa_social_media_director',
+            'sywat_shop_manager',
         );
         return sywat_user_has_any_role( $allowed, $user_id );
     }
