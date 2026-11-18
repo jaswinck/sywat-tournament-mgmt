@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-checkin.js
  * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 (function() {
@@ -124,7 +124,7 @@
         const unified = [];
         const seen    = new Set();
 
-        // 1. Add Member Directory profiles first (authoritative official names, DOB divisions, gender, phone)
+        // 1. Add Member Directory profiles first (authoritative official names, enriched with TFAA division/style history)
         for (let i = 0; i < memberRaw.length; i++) {
             const m = memberRaw[i];
             if (!m) continue;
@@ -139,7 +139,7 @@
             if (tfaaHits.length > 0) {
                 for (let j = 0; j < tfaaHits.length; j++) {
                     const th     = tfaaHits[j];
-                    const divStr = (m.division || th.division || '').trim();
+                    const divStr = (th.division || m.division || '').trim();
                     const genStr = (m.gender || th.gender || '').trim();
                     const styStr = (th.style || m.style || '').trim();
                     const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
@@ -885,6 +885,7 @@
         const uStyCfg = findDeskStyleConfig(currStyle);
 
         let isCategoryMatch      = false;
+        let isStyleOnlyMatch     = false;
         let knownStyles          = [];
         const hasMultipleMatches = tfaaMatches.length > 1;
 
@@ -909,20 +910,27 @@
             const uGen = currGen.toLowerCase();
             const uSty = currStyle.toLowerCase();
 
-            const divMatch = (cDivCfg && uDivCfg && cDivCfg.label === uDivCfg.label)
+            const divMatch = !cDiv
+                || (cDivCfg && uDivCfg && cDivCfg.label === uDivCfg.label)
                 || (cDiv === uDiv)
                 || (cDiv && uDiv && (cDiv.includes(uDiv.split(' (')[0].trim()) || uDiv.includes(cDiv.split(' (')[0].trim())));
 
-            const genMatch = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
+            const genMatch = !cGen
+                || (cGen === uGen)
+                || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
 
-            const cStylePrefix = cSty.split(' – ')[0].split(' - ')[0].trim();
-            const uStylePrefix = uSty.split(' – ')[0].split(' - ')[0].trim();
+            const cStylePrefix = cSty.split(/\s+[\u2013\u2014-]\s+/)[0].trim();
+            const uStylePrefix = uSty.split(/\s+[\u2013\u2014-]\s+/)[0].trim();
             const cStyleClean  = cStylePrefix.replace(/[^a-z0-9]/g, '');
             const uStyleClean  = uStylePrefix.replace(/[^a-z0-9]/g, '');
             const styleMatch   = (cStyCfg && uStyCfg && cStyCfg.label === uStyCfg.label)
                 || (cSty === uSty)
                 || (cStyleClean.length >= 2 && cStyleClean === uStyleClean)
                 || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
+
+            if (styleMatch && (!hasMultipleMatches || cleanDeskName(catName) === cleanTyped)) {
+                isStyleOnlyMatch = true;
+            }
 
             if (divMatch && genMatch && (styleMatch || !cSty)) {
                 if (!hasMultipleMatches || cleanDeskName(catName) === cleanTyped) {
@@ -990,6 +998,9 @@
         } else if (!currStyle || currStyle.toLowerCase() === 'no show') {
             badgeEl.className = 'sywat-badge-known';
             badgeText = '🔵 Member Profile Available (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
+        } else if (isStyleOnlyMatch) {
+            badgeEl.className = 'sywat-badge-known';
+            badgeText = '⚠️ Division / Gender Mismatch (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
         } else {
             badgeEl.className = 'sywat-badge-known';
             badgeText = '⚠️ Style Mismatch (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
