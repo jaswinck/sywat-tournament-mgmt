@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-checkin.js
  * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.4
+ * Version: 7.3.5
  */
 
 (function() {
@@ -28,13 +28,14 @@
     }
 
     /**
-     * Build normalized exact and First+Last (+ generational suffix) keys for smart archer name matching.
+     * Build normalized exact, First+Last, and individual token keys for smart archer name matching.
      * Folds middle initials/names (e.g., "Mark E. Tanner" -> "mark___tanner") while preserving
      * generational suffixes (Jr, Sr, II, III, IV) so parent and child records never collide.
+     * Also exposes explicit first/last tokens for safe fuzzy alias matching (e.g., Steve vs Steven).
      */
     function buildDeskNameMatchKeys(rawName) {
         if (!rawName) {
-            return { exact: '', fl: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
+            return { exact: '', fl: '', first: '', last: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
         }
 
         let cleaned = String(rawName)
@@ -46,7 +47,7 @@
             .toLowerCase();
 
         if (!cleaned) {
-            return { exact: '', fl: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
+            return { exact: '', fl: '', first: '', last: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
         }
 
         const tokens = cleaned.split(' ');
@@ -59,17 +60,20 @@
 
         const coreExact = tokens.join(' ');
         const exactKey  = suffix ? (coreExact + ' ' + suffix) : coreExact;
-        let flKey       = (tokens.length >= 2) ? (tokens[0] + '___' + tokens[tokens.length - 1]) : coreExact;
+        
+        const firstTok  = tokens.length > 0 ? tokens[0] : '';
+        const lastTok   = tokens.length > 1 ? tokens[tokens.length - 1] : (tokens.length === 1 ? tokens[0] : '');
+        let flKey       = (tokens.length >= 2) ? (firstTok + '___' + lastTok) : coreExact;
 
         if (suffix && flKey) {
             flKey += '___' + suffix;
         }
 
-        const lastTok = tokens.length > 0 ? tokens[tokens.length - 1] : '';
-
         return {
             exact: exactKey,
             fl: flKey,
+            first: firstTok,
+            last: lastTok,
             suffix: suffix,
             tokenCount: tokens.length,
             lastTokenLen: lastTok.length
@@ -139,7 +143,7 @@
             if (tfaaHits.length > 0) {
                 for (let j = 0; j < tfaaHits.length; j++) {
                     const th     = tfaaHits[j];
-                    const divStr = (th.division || m.division || '').trim();
+                    const divStr = (th.division || m.division || '').trim(); // TFAA History wins over Member DB default
                     const genStr = (th.gender || m.gender || '').trim();
                     const styStr = (th.style || m.style || '').trim();
                     const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
@@ -523,7 +527,7 @@
     /**
      * Smart Shooter Match Engine querying BOTH the Member Database and 18-Month TFAA History.
      * Supports exact match, First+Last (+ suffix) middle-initial folding ("Mark E. Tanner" -> "Mark Tanner"),
-     * and optional substring matching when allowPartial is true (for autocomplete dropdowns).
+     * safe fuzzy alias prefix matching ("Steven" -> "Steve"), and optional substring matching for autocomplete.
      */
     function getAllTfaaMatches(typedName, allowPartial) {
         if (!typedName) return [];
@@ -543,7 +547,21 @@
             const isFlMatch    = (qKeys.tokenCount >= 2 && qKeys.lastTokenLen >= 2 && qKeys.fl && sKeys.fl === qKeys.fl);
             const isPartial    = allowPartial && (sName.includes(clean) || clean.includes(sName));
 
-            if (isExactMatch || isFlMatch || isPartial) {
+            // Safe Fuzzy Alias Prefix Match (e.g., "steven" vs "steve" + exact last name)
+            let isFuzzyMatch = false;
+            if (!isExactMatch && !isFlMatch && qKeys.tokenCount >= 2 && sKeys.tokenCount >= 2) {
+                if (qKeys.last === sKeys.last && qKeys.suffix === sKeys.suffix) {
+                    const qFirst = qKeys.first;
+                    const sFirst = sKeys.first;
+                    if (qFirst.length >= 3 && sFirst.length >= 3) {
+                        if (qFirst.startsWith(sFirst) || sFirst.startsWith(qFirst)) {
+                            isFuzzyMatch = true;
+                        }
+                    }
+                }
+            }
+
+            if (isExactMatch || isFlMatch || isFuzzyMatch || isPartial) {
                 matches.push({
                     name: s.name,
                     full_name: s.name,
@@ -552,12 +570,12 @@
                     style: s.style || '',
                     phone: s.phone || '',
                     source: s.source || 'tfaa_history',
-                    matchRank: isExactMatch ? 3 : (isFlMatch ? 2 : 1)
+                    matchRank: isExactMatch ? 4 : (isFlMatch ? 3 : (isFuzzyMatch ? 2 : 1))
                 });
             }
         }
 
-        // Sort: Exact name matches first, then First+Last canonical matches, then Member DB & Pro styles
+        // Sort: Exact matches first, First+Last canonical, Fuzzy alias, Member DB/Pro styles
         matches.sort(function(a, b) {
             if (a.matchRank !== b.matchRank) return b.matchRank - a.matchRank;
 
@@ -1062,7 +1080,7 @@
                 if (canonicalOfficial && cleanDeskName(canonicalOfficial) !== cleanDeskName(typedName)) {
                     nameInput.dataset.normalizedFrom = typedName;
                     nameInput.value = canonicalOfficial;
-                    preserveExisting = false; // Aggressively overwrite dropdowns if we successfully auto-corrected the name
+                    preserveExisting = false; // Aggressively overwrite dropdowns if we successfully auto-corrected the name (e.g., Steve vs Steven)
                 }
             }
         }
@@ -1080,7 +1098,7 @@
             const canSetDiv   = divEl && historyRecord.division && (!preserveExisting || !divEl.value || divEl.value === 'No Show');
             const canSetGen   = genEl && historyRecord.gender && (!preserveExisting || !genEl.value || genEl.value === 'No Show');
             
-            // Only auto-fill the style if the archer has exactly ONE known distinct style to prevent masking multi-style options (e.g. Alexis Barker)
+            // Only auto-fill the style if the archer has exactly ONE known distinct style to prevent masking multi-style options
             const canSetStyle = styleEl && historyRecord.style && (distinctStylesCount <= 1) && (!preserveExisting || !styleEl.value || styleEl.value === 'No Show');
 
             if (canSetDiv) matchDeskTfaaSelect(historyRecord.division, divEl);
