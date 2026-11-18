@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table with database-normalized division/style labels, and control toolbars.
+ * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table with responsive mobile card labels and database-normalized division/style labels, and control toolbars.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.1
+ * Version: 7.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -398,7 +398,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
 
                         <?php if ( ! empty( $tourn_registrations ) ) : ?>
                             <div class="sywat-table-responsive">
-                                <table class="sywat-table">
+                                <table class="sywat-table sywat-table-mobile-cards">
                                     <thead>
                                         <tr>
                                             <th class="sywat-col-center sywat-col-num">#</th>
@@ -437,19 +437,19 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 $line_disp = isset( $lines[ $lidx ]['name'] ) ? $lines[ $lidx ]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
                                             ?>
                                             <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr( $reg_id ); ?>" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
-                                                <td class="sywat-col-center"><strong><?php echo $num++; ?></strong></td>
-                                                <td><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
-                                                <td><?php echo esc_html( $line_disp ); ?></td>
-                                                <td class="sywat-col-center"><?php echo esc_html( $gender_str ); ?></td>
-                                                <td><?php echo esc_html( $div_str ); ?></td>
-                                                <td><?php echo esc_html( $style_str ); ?></td>
-                                                <td class="sywat-col-center">
+                                                <td class="sywat-col-center" data-label="#"><strong><?php echo $num++; ?></strong></td>
+                                                <td data-label="Archer Name"><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
+                                                <td data-label="Shooting Line"><?php echo esc_html( $line_disp ); ?></td>
+                                                <td class="sywat-col-center" data-label="Gender"><?php echo esc_html( $gender_str ); ?></td>
+                                                <td data-label="Division"><?php echo esc_html( $div_str ); ?></td>
+                                                <td data-label="Style"><?php echo esc_html( $style_str ); ?></td>
+                                                <td class="sywat-col-center" data-label="Score (Max 300)">
                                                     <input type="number" name="scores[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo esc_attr( $score ); ?>" value="<?php echo esc_attr( $score ); ?>" min="0" max="300" placeholder="0" class="sywat-score-input score-val" <?php echo $dis_attr; ?>>
                                                 </td>
-                                                <td class="sywat-col-center">
+                                                <td class="sywat-col-center" data-label="X Count (Max 60)">
                                                     <input type="number" name="x_counts[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo esc_attr( $x_count ); ?>" value="<?php echo esc_attr( $x_count ); ?>" min="0" max="60" placeholder="0" class="sywat-score-input x-val" <?php echo $dis_attr; ?>>
                                                 </td>
-                                                <td class="sywat-col-center">
+                                                <td class="sywat-col-center" data-label="Status">
                                                     <?php if ( $is_locked ) : ?>
                                                         <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins & Shop Managers Only">🔒 Locked</span>
                                                     <?php else : ?>
