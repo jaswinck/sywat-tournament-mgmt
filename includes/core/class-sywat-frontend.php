@@ -2,7 +2,7 @@
 /**
  * SYWAT Archery - Front-End Integration Layer
  * Path: includes/core/class-sywat-frontend.php
- * Version: 7.3.1
+ * Version: 7.3.2
  *
  * Keeps the plugin theme-neutral so it behaves the same under Astra, Divi or
  * any other theme:
@@ -248,15 +248,16 @@ if ( ! function_exists( 'sywat_register_assets' ) ) {
         wp_register_style( 'sywat-public',  $css . 'sywat-public.css',  array( 'sywat-core' ), $v );
 
         wp_register_script( 'sywat-modal-manager', $js . 'sywat-modal-manager.js', array(), $v, true );
+        wp_register_script( 'sywat-nav',           $js . 'sywat-nav.js',           array(), $v, true );
         wp_add_inline_script( 'sywat-modal-manager', 'window.ajaxurl = window.ajaxurl || ' . wp_json_encode( admin_url( 'admin-ajax.php' ) ) . ';', 'before' );
     }
 }
 add_action( 'wp_enqueue_scripts', 'sywat_register_assets', 5 );
 
 /**
- * Enqueue the shared stylesheets and modal manager. Safe to call more than
- * once; also called from shortcode output as a fallback when the shortcode
- * sits somewhere the page scan cannot see (Theme Builder, widgets).
+ * Enqueue the shared stylesheets, modal manager, and navigation controller.
+ * Safe to call more than once; also called from shortcode output as a fallback
+ * when the shortcode sits somewhere the page scan cannot see (Theme Builder, widgets).
  */
 if ( ! function_exists( 'sywat_enqueue_frontend_assets' ) ) {
     function sywat_enqueue_frontend_assets() {
@@ -270,6 +271,7 @@ if ( ! function_exists( 'sywat_enqueue_frontend_assets' ) ) {
             wp_enqueue_style( $h );
         }
         wp_enqueue_script( 'sywat-modal-manager' );
+        wp_enqueue_script( 'sywat-nav' );
     }
 }
 
@@ -277,13 +279,14 @@ add_action( 'wp_enqueue_scripts', function () {
     if ( sywat_is_plugin_page() ) {
         sywat_enqueue_frontend_assets();
     } elseif ( sywat_is_app_mode() && ! sywat_is_builder_request() ) {
-        // App mode: the SYWAT top bar is on every page, so its styles are too.
+        // App mode: the SYWAT top bar is on every page, so its styles and nav script are too.
         if ( ! wp_style_is( 'sywat-core', 'registered' ) ) {
             sywat_register_assets();
         }
         foreach ( array( 'sywat-core', 'sywat-buttons', 'sywat-tables', 'sywat-toolbar', 'sywat-modals', 'sywat-public' ) as $h ) {
             wp_enqueue_style( $h );
         }
+        wp_enqueue_script( 'sywat-nav' );
     }
 }, 99 );
 
