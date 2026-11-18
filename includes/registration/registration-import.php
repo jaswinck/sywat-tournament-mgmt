@@ -5,7 +5,7 @@
  * Description: Handles tournament-aware 8-column .xlsx template downloads on template_redirect and processes strict 8-column roster imports (with distance-neutral 3-tier Category / Rate selection: Cub, Youth, Adult) using hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.4
+ * Version: 7.4.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -453,7 +453,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
 
             // Category / Rate validation: Cub, Youth, or Adult
-            $cat_token = strtolower( preg_replace( '/[^a-z0-9]/', '', $category_raw ) );
+            $cat_token = strtolower( preg_replace( '/[^a-z0-9]/i', '', $category_raw ) );
             if ( ! isset( $category_map[ $cat_token ] ) ) {
                 $errors[] = 'Row ' . $row_num . ": Invalid Category / Rate ('{$category_raw}'). Must be 'Cub', 'Youth', or 'Adult'.";
                 $dist_val = '20yd';
