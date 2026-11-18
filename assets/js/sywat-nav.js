@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Responsive Navigation & Workflow Tab Controller
  * Path: assets/js/sywat-nav.js
- * Description: Manages the mobile authentication header drawer toggle, tap-to-expand accordion dropdowns, outside-click dismissal, and horizontal auto-centering for the active workflow tab inside .sywat-nav-tabs.
- * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based state (.is-open), delegated event listeners, namespaced under window.SYWAT.nav.
- * Version: 1.0.0
+ * Description: Manages the mobile authentication header drawer toggle, tap-to-expand accordion dropdowns, outside-click dismissal, and single-bar mobile dropdown behavior for .sywat-nav-tabs workflow bars.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based state (.is-open, .has-mobile-dropdown), delegated event listeners, namespaced under window.SYWAT.nav.
+ * Version: 1.1.0
  */
 
 (function() {
@@ -62,6 +62,29 @@
     }
 
     /**
+     * Close all open workflow tab dropdowns (.sywat-nav-tabs.is-open).
+     *
+     * @param {ParentNode} [root=document]
+     * @param {Element|null} [exceptTrack=null]
+     * @return {void}
+     */
+    function closeWorkflowTabMenus(root, exceptTrack) {
+        const scope = root || document;
+        const openTracks = scope.querySelectorAll('.sywat-nav-tabs.is-open');
+
+        openTracks.forEach(function(track) {
+            if (exceptTrack && track === exceptTrack) {
+                return;
+            }
+            track.classList.remove('is-open');
+            const toggle = track.querySelector('.sywat-nav-tabs-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    /**
      * Toggle the mobile header navigation drawer for the clicked header bar.
      *
      * @param {Element} toggleBtn
@@ -83,6 +106,7 @@
         const willOpen = !drawer.classList.contains('is-open');
         if (willOpen) {
             closeAuthDrawers(document);
+            closeWorkflowTabMenus(document, null);
             drawer.classList.add('is-open');
             toggleBtn.classList.add('is-open');
             toggleBtn.setAttribute('aria-expanded', 'true');
@@ -123,28 +147,89 @@
     }
 
     /**
-     * Center the active workflow tab horizontally inside scrollable .sywat-nav-tabs strips.
-     * Uses horizontal scrollLeft math so the outer page never shifts vertically.
+     * Toggle the single-bar mobile workflow tab dropdown (.sywat-nav-tabs).
+     *
+     * @param {Element} toggleBtn
+     * @return {void}
+     */
+    function toggleWorkflowTabMenu(toggleBtn) {
+        if (!toggleBtn) {
+            return;
+        }
+        const track = toggleBtn.closest('.sywat-nav-tabs');
+        if (!track) {
+            return;
+        }
+
+        const willOpen = !track.classList.contains('is-open');
+        closeWorkflowTabMenus(document, willOpen ? track : null);
+
+        if (willOpen) {
+            closeAuthDrawers(document);
+            track.classList.add('is-open');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            track.classList.remove('is-open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    /**
+     * Enhance .sywat-nav-tabs bars with an accessible single-row mobile dropdown toggle
+     * displaying the active workflow tab label and icon. Idempotent.
      *
      * @return {void}
      */
-    function centerActiveWorkflowTabs() {
+    function initWorkflowTabDropdowns() {
         const tabTracks = document.querySelectorAll('.sywat-nav-tabs');
-        tabTracks.forEach(function(track) {
-            const activeTab = track.querySelector('.sywat-tab-item.active');
-            if (!activeTab) {
+
+        tabTracks.forEach(function(track, index) {
+            const items = track.querySelectorAll('.sywat-tab-item');
+            if (items.length < 2) {
                 return;
             }
-            if (track.scrollWidth <= track.clientWidth) {
+
+            if (!track.id) {
+                track.id = 'sywat_nav_tabs_' + (index + 1);
+            }
+
+            track.classList.add('has-mobile-dropdown');
+
+            if (track.querySelector('.sywat-nav-tabs-toggle')) {
                 return;
             }
-            const targetScroll = activeTab.offsetLeft - (track.clientWidth / 2) + (activeTab.offsetWidth / 2);
-            track.scrollLeft = Math.max(0, targetScroll);
+
+            const activeTab = track.querySelector('.sywat-tab-item.active') || items[0];
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'sywat-nav-tabs-toggle';
+            toggleBtn.setAttribute('data-sywat-action', 'toggle-nav-tabs');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            toggleBtn.setAttribute('aria-controls', track.id);
+            toggleBtn.setAttribute('aria-label', 'Switch section: ' + activeTab.textContent.trim());
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'sywat-nav-tabs-toggle-label';
+            activeTab.classList.forEach(function(cls) {
+                if (cls.indexOf('sywat-tab-icon-') === 0) {
+                    labelSpan.classList.add(cls);
+                }
+            });
+            labelSpan.textContent = activeTab.textContent.trim();
+
+            const caretSpan = document.createElement('span');
+            caretSpan.className = 'sywat-nav-tabs-caret';
+            caretSpan.setAttribute('aria-hidden', 'true');
+            caretSpan.textContent = '▼';
+
+            toggleBtn.appendChild(labelSpan);
+            toggleBtn.appendChild(caretSpan);
+            track.insertBefore(toggleBtn, track.firstChild);
         });
     }
 
     /**
-     * Delegated click handler for header drawer & dropdown controls.
+     * Delegated click handler for header drawer, dropdown & workflow tab controls.
      */
     document.addEventListener('click', function(event) {
         const target = event.target;
@@ -166,6 +251,17 @@
             return;
         }
 
+        const navTabsToggle = target.closest('[data-sywat-action="toggle-nav-tabs"]');
+        if (navTabsToggle) {
+            event.preventDefault();
+            toggleWorkflowTabMenu(navTabsToggle);
+            return;
+        }
+
+        if (!target.closest('.sywat-nav-tabs')) {
+            closeWorkflowTabMenus(document, null);
+        }
+
         if (!target.closest('.sywat-auth-bar')) {
             closeAuthDrawers(document);
             closeAuthDropdowns(document, null);
@@ -179,7 +275,7 @@
     });
 
     /**
-     * Reset mobile drawer/accordion open states when resizing back to desktop width.
+     * Reset mobile drawer/accordion/tab-dropdown open states when resizing back to desktop width.
      */
     let resizeRafPending = false;
     window.addEventListener('resize', function() {
@@ -192,21 +288,21 @@
             if (window.innerWidth > MOBILE_BREAKPOINT) {
                 closeAuthDrawers(document);
                 closeAuthDropdowns(document, null);
-            } else {
-                centerActiveWorkflowTabs();
+                closeWorkflowTabMenus(document, null);
             }
         });
     });
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', centerActiveWorkflowTabs);
+        document.addEventListener('DOMContentLoaded', initWorkflowTabDropdowns);
     } else {
-        centerActiveWorkflowTabs();
+        initWorkflowTabDropdowns();
     }
 
     window.SYWAT.nav = {
         closeAuthDrawers: closeAuthDrawers,
         closeAuthDropdowns: closeAuthDropdowns,
-        centerActiveWorkflowTabs: centerActiveWorkflowTabs
+        closeWorkflowTabMenus: closeWorkflowTabMenus,
+        initWorkflowTabDropdowns: initWorkflowTabDropdowns
     };
 })();
