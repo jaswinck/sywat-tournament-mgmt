@@ -2,10 +2,10 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
- * Description: Renders master navigation header for logged-in and public users (including role-gated Tournament Portal / Check-In & Scores links, Head of Household user profile dropdown, and Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
- * Compliance: Zero output at include time, zero inline style attributes, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
+ * Description: Renders master navigation header for logged-in and public users with responsive mobile hamburger drawer & accessible dropdown toggles (including role-gated Tournament Portal / Check-In & Scores links, Head of Household user profile dropdown, and Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Compliance: Zero output at include time, zero inline style attributes, zero inline event handlers, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 5.9.3
+ * Version: 6.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -40,135 +40,149 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
         ?>
         <div class="sywat-auth-bar">
             <div class="sywat-auth-bar-inner">
-                
+
                 <!-- Left: Brand Logo & Title -->
                 <div class="sywat-auth-brand-wrapper">
                     <?php if ( ! empty( $logo_url ) ) : ?>
                         <img src="<?php echo esc_url( $logo_url ); ?>" alt="TFAA Logo" class="sywat-auth-logo sywat-auth-logo-sm">
                     <?php endif; ?>
-                    
+
                     <span class="sywat-auth-brand-title">
                         TFAA Archery
                     </span>
                 </div>
 
-                <!-- Center: Primary App Navigation Links -->
-                <nav class="sywat-auth-nav-track">
-                    
-                    <!-- 1. Tournaments & Schedule Dropdown (Public & Staff) -->
-                    <div class="sywat-auth-dropdown">
-                        <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
-                            🎯 Tournaments <span class="sywat-dropdown-caret">▼</span>
-                        </a>
-                        <div class="sywat-auth-dropdown-menu">
-                            <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>">
-                                📅 Season Schedule
-                            </a>
-                            <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>">
-                                🏆 Results &amp; Standings
-                            </a>
-                            <?php if ( $can_manage_tournaments ) : ?>
-                                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>">
-                                    🎯 Tournament Portal
+                <!-- Mobile Drawer Toggle Button (Visible <= 768px) -->
+                <button type="button" class="sywat-auth-menu-toggle" data-sywat-action="toggle-auth-drawer" aria-expanded="false" aria-controls="sywat_auth_drawer" aria-label="Toggle navigation menu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+
+                <!-- Collapsible Navigation & Account Drawer -->
+                <div class="sywat-auth-drawer" id="sywat_auth_drawer">
+
+                    <!-- Center: Primary App Navigation Links -->
+                    <nav class="sywat-auth-nav-track" aria-label="Primary Navigation">
+
+                        <!-- 1. Tournaments & Schedule Dropdown (Public & Staff) -->
+                        <div class="sywat-auth-dropdown">
+                            <button type="button" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" data-sywat-action="toggle-auth-dropdown" aria-expanded="false">
+                                🎯 Tournaments <span class="sywat-dropdown-caret" aria-hidden="true">▼</span>
+                            </button>
+                            <div class="sywat-auth-dropdown-menu">
+                                <a href="<?php echo esc_url( sywat_page_url( 'schedule' ) ); ?>">
+                                    📅 Season Schedule
                                 </a>
-                            <?php elseif ( $can_access_desk ) : ?>
-                                <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>">
-                                    📋 Check-In &amp; Scores
+                                <a href="<?php echo esc_url( sywat_page_url( 'results' ) ); ?>">
+                                    🏆 Results &amp; Standings
                                 </a>
-                            <?php elseif ( $can_edit_scores ) : ?>
-                                <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>">
-                                    ✏️ Enter Scores
-                                </a>
-                            <?php endif; ?>
+                                <?php if ( $can_manage_tournaments ) : ?>
+                                    <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>">
+                                        🎯 Tournament Portal
+                                    </a>
+                                <?php elseif ( $can_access_desk ) : ?>
+                                    <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>">
+                                        📋 Check-In &amp; Scores
+                                    </a>
+                                <?php elseif ( $can_edit_scores ) : ?>
+                                    <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>">
+                                        ✏️ Enter Scores
+                                    </a>
+                                <?php endif; ?>
+                            </div>
                         </div>
+
+                        <!-- 2. Administrative Dropdown (Global Admins & Webmasters Only) -->
+                        <?php if ( $can_manage_seasons ) : ?>
+                            <div class="sywat-auth-dropdown">
+                                <button type="button" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" data-sywat-action="toggle-auth-dropdown" aria-expanded="false">
+                                    ⚙️ Administration <span class="sywat-dropdown-caret" aria-hidden="true">▼</span>
+                                </button>
+                                <div class="sywat-auth-dropdown-menu">
+                                    <a href="<?php echo esc_url( sywat_page_url( 'member_directory' ) ); ?>">
+                                        👥 Member Directory
+                                    </a>
+                                    <a href="<?php echo esc_url( sywat_page_url( 'shooting_styles' ) ); ?>">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <circle cx="12" cy="12" r="6"></circle>
+                                            <circle cx="12" cy="12" r="2"></circle>
+                                        </svg>
+                                        Shooting Styles &amp; Rules
+                                    </a>
+                                    <a href="<?php echo esc_url( sywat_page_url( 'pricing' ) ); ?>">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                        </svg>
+                                        Pricing &amp; Round Formats
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- 3. Shops & Clubs Navigation Item (Dropdown for Authorized Shop/Season Staff, Direct Link for Members & Public) -->
+                        <?php if ( $can_manage_shops || $can_manage_seasons ) : ?>
+                            <div class="sywat-auth-dropdown">
+                                <button type="button" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" data-sywat-action="toggle-auth-dropdown" aria-expanded="false">
+                                    🎯 Shops &amp; Clubs <span class="sywat-dropdown-caret" aria-hidden="true">▼</span>
+                                </button>
+                                <div class="sywat-auth-dropdown-menu">
+                                    <?php if ( $can_manage_shops && ! $is_admin && ! empty( $user_shop_id ) ) : ?>
+                                        <a href="<?php echo esc_url( add_query_arg( 'edit_shop', rawurlencode( $user_shop_id ), sywat_page_url( 'manage_shops' ) ) ); ?>">
+                                            🎯 My Shop / Club Profile
+                                        </a>
+                                    <?php endif; ?>
+
+                                    <?php if ( $can_manage_seasons ) : ?>
+                                        <a href="<?php echo esc_url( sywat_page_url( 'manage_shops' ) ); ?>">
+                                            ⚙️ Shops &amp; Clubs Management
+                                        </a>
+                                    <?php endif; ?>
+
+                                    <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>">
+                                        🌐 View Public Directory
+                                    </a>
+                                </div>
+                            </div>
+                        <?php else : ?>
+                            <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link">
+                                🎯 Shops &amp; Clubs
+                            </a>
+                        <?php endif; ?>
+                    </nav>
+
+                    <!-- Right: Account Profile Dropdown or Sign In Link -->
+                    <div class="sywat-auth-user-controls">
+                        <?php if ( $is_logged_in ) : ?>
+                            <div class="sywat-auth-dropdown">
+                                <button type="button" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" data-sywat-action="toggle-auth-dropdown" aria-expanded="false">
+                                    👤 <strong><?php echo esc_html( $current_user->display_name ); ?></strong> <span class="sywat-dropdown-caret" aria-hidden="true">▼</span>
+                                </button>
+                                <div class="sywat-auth-dropdown-menu">
+                                    <a href="<?php echo esc_url( add_query_arg( array( 'tab' => 'members', 'subtab' => 'profile' ), sywat_page_url( 'member_directory' ) ) ); ?>">
+                                        👤 My Profile &amp; Household
+                                    </a>
+                                </div>
+                            </div>
+
+                            <a href="<?php echo esc_url( wp_logout_url( sywat_page_url( 'login' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
+                                🚪 Log Out
+                            </a>
+                        <?php else : ?>
+                            <a href="<?php echo esc_url( sywat_page_url( 'login' ) ); ?>" class="sywat-btn sywat-btn-primary">
+                                🔑 Login
+                            </a>
+                        <?php endif; ?>
                     </div>
 
-                    <!-- 2. Administrative Dropdown (Global Admins & Webmasters Only) -->
-                    <?php if ( $can_manage_seasons ) : ?>
-                        <div class="sywat-auth-dropdown">
-                            <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
-                                ⚙️ Administration <span class="sywat-dropdown-caret">▼</span>
-                            </a>
-                            <div class="sywat-auth-dropdown-menu">
-                                <a href="<?php echo esc_url( sywat_page_url( 'member_directory' ) ); ?>">
-                                    👥 Member Directory
-                                </a>
-                                <a href="<?php echo esc_url( sywat_page_url( 'shooting_styles' ) ); ?>">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <circle cx="12" cy="12" r="6"></circle>
-                                        <circle cx="12" cy="12" r="2"></circle>
-                                    </svg>
-                                    Shooting Styles &amp; Rules
-                                </a>
-                                <a href="<?php echo esc_url( sywat_page_url( 'pricing' ) ); ?>">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                    </svg>
-                                    Pricing &amp; Round Formats
-                                </a>
-                            </div>
-                        </div>
-                    <?php endif; ?>
+                </div><!-- .sywat-auth-drawer -->
 
-                    <!-- 3. Shops & Clubs Navigation Item (Dropdown for Authorized Shop/Season Staff, Direct Link for Members & Public) -->
-                    <?php if ( $can_manage_shops || $can_manage_seasons ) : ?>
-                        <div class="sywat-auth-dropdown">
-                            <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link sywat-auth-dropdown-toggle">
-                                🎯 Shops & Clubs <span class="sywat-dropdown-caret">▼</span>
-                            </a>
-                            <div class="sywat-auth-dropdown-menu">
-                                <?php if ( $can_manage_shops && ! $is_admin && ! empty( $user_shop_id ) ) : ?>
-                                    <a href="<?php echo esc_url( add_query_arg( 'edit_shop', rawurlencode( $user_shop_id ), sywat_page_url( 'manage_shops' ) ) ); ?>">
-                                        🎯 My Shop / Club Profile
-                                    </a>
-                                <?php endif; ?>
-                                
-                                <?php if ( $can_manage_seasons ) : ?>
-                                    <a href="<?php echo esc_url( sywat_page_url( 'manage_shops' ) ); ?>">
-                                        ⚙️ Shops & Clubs Management
-                                    </a>
-                                <?php endif; ?>
-
-                                <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>">
-                                    🌐 View Public Directory
-                                </a>
-                            </div>
-                        </div>
-                    <?php else : ?>
-                        <a href="<?php echo esc_url( sywat_page_url( 'shops_public' ) ); ?>" class="sywat-auth-nav-link">
-                            🎯 Shops & Clubs
-                        </a>
-                    <?php endif; ?>
-                </nav>
-
-                <!-- Right: Account Profile Dropdown or Sign In Link -->
-                <div class="sywat-auth-user-controls">
-                    <?php if ( $is_logged_in ) : ?>
-                        <div class="sywat-auth-dropdown">
-                            <a href="#" class="sywat-auth-nav-link sywat-auth-dropdown-toggle" onclick="return false;">
-                                👤 <strong><?php echo esc_html( $current_user->display_name ); ?></strong> <span class="sywat-dropdown-caret">▼</span>
-                            </a>
-                            <div class="sywat-auth-dropdown-menu">
-                                <a href="<?php echo esc_url( add_query_arg( array( 'tab' => 'members', 'subtab' => 'profile' ), sywat_page_url( 'member_directory' ) ) ); ?>">
-                                    👤 My Profile &amp; Household
-                                </a>
-                            </div>
-                        </div>
-
-                        <a href="<?php echo esc_url( wp_logout_url( sywat_page_url( 'login' ) ) ); ?>" class="sywat-btn sywat-btn-danger">
-                            🚪 Log Out
-                        </a>
-                    <?php else : ?>
-                        <a href="<?php echo esc_url( sywat_page_url( 'login' ) ); ?>" class="sywat-btn sywat-btn-primary">
-                            🔑 Login
-                        </a>
-                    <?php endif; ?>
-                </div>
-
-            </div>
-        </div>
+            </div><!-- .sywat-auth-bar-inner -->
+        </div><!-- .sywat-auth-bar -->
         <?php
     }
 }
@@ -183,11 +197,11 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
     function sywat_render_login_screen() {
         $auth_error   = ! empty( $GLOBALS['sywat_auth_error'] ) ? $GLOBALS['sywat_auth_error'] : '';
         $auth_message = ! empty( $GLOBALS['sywat_auth_message'] ) ? $GLOBALS['sywat_auth_message'] : '';
-        
+
         $action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : 'login';
         $rp_key      = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
         $rp_login    = isset( $_GET['login'] ) ? sanitize_text_field( wp_unslash( $_GET['login'] ) ) : '';
-        
+
         // Leave empty unless explicitly supplied so sywat_get_post_login_redirect_url() applies role-based routing
         $redirect_to = ! empty( $_REQUEST['redirect_to'] )
             ? wp_validate_redirect( esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ), '' )
@@ -202,7 +216,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
         $logo_url      = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/images/logo.png' : '';
         ?>
         <div class="sywat-login-card">
-            
+
             <!-- Card Header -->
             <div class="sywat-login-card-header">
                 <?php if ( ! empty( $logo_url ) ) : ?>
@@ -213,7 +227,7 @@ if ( ! function_exists( 'sywat_render_login_screen' ) ) {
 
             <!-- Card Body -->
             <div class="sywat-login-card-body">
-                
+
                 <?php if ( ! empty( $auth_error ) ) : ?>
                     <div class="sywat-alert sywat-alert-danger">
                         ⚠️ <?php echo esc_html( $auth_error ); ?>
