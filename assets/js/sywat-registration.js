@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete tier mapping, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Description: Manages multi-archer phone intake rows with simplified distance-neutral 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete tier mapping, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.3.2
+ * Version: 7.3.3
  */
 
 (function() {
@@ -220,9 +220,9 @@
             : (roundInput ? roundInput.value : getDefaultProfileKey());
 
         const labelMap = {
-            cub:   'Cub (10yd)',
-            youth: 'Youth (20yd)',
-            adult: 'Adult (20yd)'
+            cub:   'Cub',
+            youth: 'Youth',
+            adult: 'Adult'
         };
 
         Array.from(tierSelect.options).forEach(opt => {
@@ -475,9 +475,9 @@
 
         const tierOptionsHtml = `
             <option value="" disabled selected hidden>Select Category *</option>
-            <option value="cub" data-distance="Cub" data-rate-tier="Youth" data-fee="${cubFee.toFixed(2)}">Cub (10yd) [$${cubFee.toFixed(2)}]</option>
-            <option value="youth" data-distance="20yd" data-rate-tier="Youth" data-fee="${youthFee.toFixed(2)}">Youth (20yd) [$${youthFee.toFixed(2)}]</option>
-            <option value="adult" data-distance="20yd" data-rate-tier="Adult" data-fee="${adultFee.toFixed(2)}">Adult (20yd) [$${adultFee.toFixed(2)}]</option>
+            <option value="cub" data-distance="Cub" data-rate-tier="Youth" data-fee="${cubFee.toFixed(2)}">Cub [$${cubFee.toFixed(2)}]</option>
+            <option value="youth" data-distance="20yd" data-rate-tier="Youth" data-fee="${youthFee.toFixed(2)}">Youth [$${youthFee.toFixed(2)}]</option>
+            <option value="adult" data-distance="20yd" data-rate-tier="Adult" data-fee="${adultFee.toFixed(2)}">Adult [$${adultFee.toFixed(2)}]</option>
         `;
 
         const rowDiv = document.createElement('div');
