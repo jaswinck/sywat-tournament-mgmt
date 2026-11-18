@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Renders the Phone & Group Intake form with dynamic Round Format selection (single or dual-round events such as Field + Field 50), database-driven age divisions & pricing profiles, Current Line Slot Usage table with clickable Waitlist badges/buttons, and the dedicated top-level Bulk Spreadsheet Import Modal (#sywat_import_modal).
+ * Description: Renders the Phone & Group Intake form with simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), dynamic Round Format selection (single or dual-round events such as Field + Field 50), Current Line Slot Usage table with clickable Waitlist badges/buttons, and the dedicated top-level Bulk Spreadsheet Import Modal (#sywat_import_modal).
  * Compliance: Zero output at include time, zero inline styles, delegated data-sywat-action modal triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -107,7 +107,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 }
 
 /**
- * Component 1: Phone & Multi-Archer Group Registration Intake Form
+ * Component 1: Phone & Multi-Archer Group Registration Intake Form (3-Tier Category / Rate)
  */
 if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
     function sywat_render_phone_intake_form( $selected_tournament, $available_lines ) {
@@ -143,52 +143,12 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
             $archers_data = array(
                 array(
                     'name'            => '',
+                    'rate_tier'       => '',
                     'distance'        => '20yd',
                     'division'        => '',
                     'pricing_profile' => $default_prof_key,
                     'line_idx'        => $current_default_line,
                 ),
-            );
-        }
-
-        // Load active database-configured age divisions (with safe NFAA fallback)
-        $division_options = array();
-        if ( function_exists( 'sywat_get_division_records' ) ) {
-            $div_records = sywat_get_division_records( false );
-            if ( is_array( $div_records ) ) {
-                foreach ( $div_records as $rec ) {
-                    if ( empty( $rec['label'] ) ) {
-                        continue;
-                    }
-                    $div_slug  = isset( $rec['slug'] ) ? $rec['slug'] : sanitize_title( $rec['label'] );
-                    $rate_tier = ( isset( $rec['rate_tier'] ) && $rec['rate_tier'] === 'Youth' ) ? 'Youth' : 'Adult';
-                    $distance  = ( isset( $rec['distance'] ) && $rec['distance'] === 'Cub' ) ? 'Cub' : '20yd';
-
-                    $div_fee = ( $rate_tier === 'Youth' ) ? $init_youth_rate : $init_adult_rate;
-                    if ( is_array( $default_prof ) && isset( $default_prof['division_overrides'][ $div_slug ] ) ) {
-                        $div_fee = floatval( $default_prof['division_overrides'][ $div_slug ] );
-                    }
-
-                    $division_options[] = array(
-                        'slug'      => $div_slug,
-                        'label'     => $rec['label'],
-                        'distance'  => $distance,
-                        'rate_tier' => $rate_tier,
-                        'fee'       => $div_fee,
-                    );
-                }
-            }
-        }
-
-        if ( empty( $division_options ) ) {
-            $division_options = array(
-                array( 'slug' => 'cub-8-11',            'label' => 'Cub (8 - 11)',           'distance' => 'Cub',  'rate_tier' => 'Youth', 'fee' => $init_youth_rate ),
-                array( 'slug' => 'youth-12-14',         'label' => 'Youth (12 - 14)',        'distance' => '20yd', 'rate_tier' => 'Youth', 'fee' => $init_youth_rate ),
-                array( 'slug' => 'young-adult-15-17',   'label' => 'Young Adult (15 - 17)',  'distance' => '20yd', 'rate_tier' => 'Youth', 'fee' => $init_youth_rate ),
-                array( 'slug' => 'adult-18-49',         'label' => 'Adult (18 - 49)',        'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => $init_adult_rate ),
-                array( 'slug' => 'senior-50-59',        'label' => 'Senior (50 - 59)',       'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => $init_adult_rate ),
-                array( 'slug' => 'silver-senior-60-69', 'label' => 'Silver Senior (60 - 69)','distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => $init_adult_rate ),
-                array( 'slug' => 'master-senior-70',    'label' => 'Master Senior (70+)',    'distance' => '20yd', 'rate_tier' => 'Adult', 'fee' => $init_adult_rate ),
             );
         }
 
@@ -249,8 +209,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                     <?php if ( $is_multi_round ) : ?>
                         <div class="sywat-col-archer-dist">Round Format *</div>
                     <?php endif; ?>
-                    <div class="sywat-col-archer-dist">Target Distance *</div>
-                    <div class="sywat-col-archer-div">Division *</div>
+                    <div class="sywat-col-archer-div">Category / Rate *</div>
                     <div class="sywat-col-archer-line">Line Override</div>
                     <div class="sywat-col-archer-action"></div>
                 </div>
@@ -265,9 +224,28 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                             if ( ! isset( $t_profiles[ $a_round ] ) ) {
                                 $a_round = $default_prof_key;
                             }
-                            if ( $a_div !== '' && function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
-                                $a_div = sywat_shooting_styles_normalize_division( $a_div );
+
+                            $a_tier = isset( $a['rate_tier'] ) ? strtolower( trim( sanitize_text_field( $a['rate_tier'] ) ) ) : '';
+                            if ( ! in_array( $a_tier, array( 'cub', 'youth', 'adult' ), true ) ) {
+                                if ( $a_dist === 'Cub' ) {
+                                    $a_tier = 'cub';
+                                } elseif ( $a_div !== '' ) {
+                                    $is_y_div = function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
+                                        ? ( sywat_shooting_styles_get_division_rate_tier( $a_div ) === 'Youth' )
+                                        : ( stripos( $a_div, 'Youth' ) !== false || stripos( $a_div, 'Young Adult' ) !== false );
+                                    $a_tier = $is_y_div ? 'youth' : 'adult';
+                                } else {
+                                    $a_tier = '';
+                                }
                             }
+
+                            $row_prof  = isset( $t_profiles[ $a_round ] ) ? $t_profiles[ $a_round ] : $default_prof;
+                            $row_youth = is_array( $row_prof ) && isset( $row_prof['youth_rate'] ) ? floatval( $row_prof['youth_rate'] ) : $init_youth_rate;
+                            $row_adult = is_array( $row_prof ) && isset( $row_prof['adult_rate'] ) ? floatval( $row_prof['adult_rate'] ) : $init_adult_rate;
+                            $row_cub   = ( is_array( $row_prof ) && isset( $row_prof['division_overrides']['cub-8-11'] ) && $row_prof['division_overrides']['cub-8-11'] !== '' )
+                                ? floatval( $row_prof['division_overrides']['cub-8-11'] )
+                                : $row_youth;
+
                             $a_line = isset( $a['line_idx'] ) ? sanitize_text_field( $a['line_idx'] ) : $current_default_line;
                         ?>
                         <div class="sywat-archer-input-row">
@@ -295,33 +273,36 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                                 <input type="hidden" name="archers[<?php echo $i; ?>][pricing_profile]" class="sywat-round-profile-input" value="<?php echo esc_attr( $default_prof_key ); ?>">
                             <?php endif; ?>
 
-                            <div class="sywat-field-group sywat-col-archer-dist">
-                                <select name="archers[<?php echo $i; ?>][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
-                                    <option value="20yd" <?php selected( $a_dist, '20yd' ); ?>>20yd</option>
-                                    <option value="Cub" <?php selected( $a_dist, 'Cub' ); ?>>Cub (10yd)</option>
-                                </select>
-                            </div>
-
                             <div class="sywat-field-group sywat-col-archer-div">
-                                <select name="archers[<?php echo $i; ?>][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
-                                    <option value="" disabled <?php selected( $a_div, '' ); ?> hidden>Select Division</option>
-                                    <?php foreach ( $division_options as $div_opt ) : ?>
-                                        <?php
-                                            $display_fee = function_exists( 'sywat_get_archer_individual_fee' )
-                                                ? sywat_get_archer_individual_fee( $selected_tournament, $div_opt['label'], $div_opt['distance'], '', $a_round, '' )
-                                                : floatval( $div_opt['fee'] );
-                                        ?>
-                                        <option
-                                            value="<?php echo esc_attr( $div_opt['label'] ); ?>"
-                                            data-slug="<?php echo esc_attr( $div_opt['slug'] ); ?>"
-                                            data-distance="<?php echo esc_attr( $div_opt['distance'] ); ?>"
-                                            data-rate-tier="<?php echo esc_attr( $div_opt['rate_tier'] ); ?>"
-                                            data-fee="<?php echo esc_attr( number_format( $display_fee, 2, '.', '' ) ); ?>"
-                                            <?php selected( $a_div, $div_opt['label'] ); ?>
-                                        >
-                                            <?php echo esc_html( $div_opt['label'] . ' [$' . number_format( $display_fee, 2 ) . ']' ); ?>
-                                        </option>
-                                    <?php endforeach; ?>
+                                <select name="archers[<?php echo $i; ?>][rate_tier]" class="sywat-rate-tier-select" required onchange="handleRateTierChange(this);">
+                                    <option value="" disabled <?php selected( $a_tier, '' ); ?> hidden>Select Category *</option>
+                                    <option
+                                        value="cub"
+                                        data-distance="Cub"
+                                        data-rate-tier="Youth"
+                                        data-fee="<?php echo esc_attr( number_format( $row_cub, 2, '.', '' ) ); ?>"
+                                        <?php selected( $a_tier, 'cub' ); ?>
+                                    >
+                                        <?php echo esc_html( 'Cub (10yd) [$' . number_format( $row_cub, 2 ) . ']' ); ?>
+                                    </option>
+                                    <option
+                                        value="youth"
+                                        data-distance="20yd"
+                                        data-rate-tier="Youth"
+                                        data-fee="<?php echo esc_attr( number_format( $row_youth, 2, '.', '' ) ); ?>"
+                                        <?php selected( $a_tier, 'youth' ); ?>
+                                    >
+                                        <?php echo esc_html( 'Youth (20yd) [$' . number_format( $row_youth, 2 ) . ']' ); ?>
+                                    </option>
+                                    <option
+                                        value="adult"
+                                        data-distance="20yd"
+                                        data-rate-tier="Adult"
+                                        data-fee="<?php echo esc_attr( number_format( $row_adult, 2, '.', '' ) ); ?>"
+                                        <?php selected( $a_tier, 'adult' ); ?>
+                                    >
+                                        <?php echo esc_html( 'Adult (20yd) [$' . number_format( $row_adult, 2 ) . ']' ); ?>
+                                    </option>
                                 </select>
                             </div>
 
@@ -347,11 +328,11 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
 
                     <div class="sywat-intake-summary">
                         <div class="sywat-intake-total-text">
-                            Group Total: <span id="sywat_group_total_disp" class="sywat-intake-total-val">$<?php echo esc_html( number_format( $init_adult_rate, 2 ) ); ?></span>
-                            <span id="sywat_family_cap_badge" class="sywat-family-badge">🟢 Family Cap Applied</span>
+                            Group Total: <span id="sywat_group_total_disp" class="sywat-intake-total-val">$0.00</span>
+                            <span id="sywat_family_cap_badge" class="sywat-family-badge sywat-hidden">🟢 Family Cap Applied</span>
                         </div>
                         <div class="sywat-intake-due-text">
-                            Balance Due at Desk: <strong id="sywat_balance_due_disp" class="sywat-intake-due-val">$<?php echo esc_html( number_format( $init_adult_rate, 2 ) ); ?></strong>
+                            Balance Due at Desk: <strong id="sywat_balance_due_disp" class="sywat-intake-due-val">$0.00</strong>
                         </div>
                     </div>
 
