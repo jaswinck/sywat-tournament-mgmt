@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.6.0
+   Version: 7.6.1
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -657,7 +657,8 @@
         background-color: #ffffff;
         border: 1px solid var(--sywat-border);
         border-radius: 8px;
-        padding: 10px 12px;
+        padding: 0;
+        overflow: hidden;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
@@ -669,7 +670,7 @@
         gap: 12px;
         width: 100%;
         box-sizing: border-box;
-        padding: 7px 0;
+        padding: 8px 14px;
         border-bottom: 1px solid var(--sywat-border-light);
         text-align: right;
     }
@@ -698,11 +699,11 @@
         justify-content: flex-start;
         gap: 4px;
         background-color: var(--sywat-surface-alt);
-        margin: -10px -12px 4px -12px;
-        width: calc(100% + 24px);
-        padding: 10px 12px;
+        margin: 0;
+        width: 100%;
+        padding: 10px 14px;
         border-bottom: 1px solid var(--sywat-border-light);
-        border-radius: 7px 7px 0 0;
+        border-radius: 0;
         text-align: left !important;
     }
 
@@ -717,7 +718,7 @@
         background-color: transparent;
         margin: 0;
         width: 100%;
-        padding: 16px 8px;
+        padding: 16px 14px;
         border-bottom: none;
     }
 
@@ -743,7 +744,7 @@
         align-items: stretch;
         justify-content: flex-start;
         gap: 6px;
-        padding: 10px 0 2px 0;
+        padding: 10px 14px 12px 14px;
         border-bottom: none;
         text-align: left !important;
     }
