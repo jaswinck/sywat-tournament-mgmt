@@ -525,7 +525,3 @@ if ( ! function_exists( 'sywat_find_member_record_by_name' ) ) {
         return null;
     }
 }
-
-        return $matched;
-    }
-}
