@@ -2,9 +2,9 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
- * Description: Renders the Registered Archer Roster modal with alphabetical active shooters, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
+ * Description: Renders the Registered Archer Roster modal with alphabetical active shooters, Type / Rate indicators, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -334,7 +334,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                 <thead>
                                     <tr>
                                         <th class="sywat-col-roster-name">Shooter Name</th>
-                                        <th class="sywat-col-roster-type sywat-col-center">Type / Payment</th>
+                                        <th class="sywat-col-roster-type sywat-col-center">Type / Rate</th>
                                         <th class="sywat-col-roster-line">Line</th>
                                         <th class="sywat-col-roster-dist sywat-col-center">Distance</th>
                                         <th class="sywat-col-roster-action sywat-col-center">Action</th>
