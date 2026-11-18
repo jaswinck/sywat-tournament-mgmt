@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Renders the Phone & Group Intake form with simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), dynamic Round Format selection (single or dual-round events such as Field + Field 50), Current Line Slot Usage table with clickable Waitlist badges/buttons, and the dedicated top-level Bulk Spreadsheet Import Modal (#sywat_import_modal).
+ * Description: Renders the Phone & Group Intake form with simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), dynamic Round Format selection (single or dual-round events such as Field + Field 50), Current Line Slot Usage table with clickable Waitlist badges/buttons, and the dedicated top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
  * Compliance: Zero output at include time, zero inline styles, delegated data-sywat-action modal triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -408,11 +408,11 @@ if ( ! function_exists( 'sywat_render_import_modal' ) ) {
                         </div>
 
                         <div class="sywat-alert sywat-alert-info">
-                            <p><strong>Standardized 9-Column Format (One Archer per Row):</strong></p>
+                            <p><strong>Standardized 8-Column Format (One Archer per Row):</strong></p>
                             <ul>
-                                <li><strong>Mandatory Columns:</strong> <code>Contact Name</code>, <code>Phone</code>, <code>Archer Name</code>, <code>Line Day</code> (Friday / Saturday / Sunday), <code>Line Time</code> (HH:MM AM/PM), <code>Distance</code> (10 yds / 20 yds), <code>Rate Tier</code> (Youth / Adult), and <code>Paid Status</code> (Paid / Unpaid).</li>
+                                <li><strong>Mandatory Columns:</strong> <code>Contact Name</code>, <code>Phone</code>, <code>Archer Name</code>, <code>Line Day</code> (Friday / Saturday / Sunday), <code>Line Time</code> (HH:MM AM/PM), <code>Category / Rate</code> (Cub (10yd) / Youth (20yd) / Adult (20yd)), and <code>Paid Status</code> (Paid / Unpaid).</li>
                                 <li><strong>Optional Column:</strong> <code>Email</code>.</li>
-                                <li><strong>Automatic Rules:</strong> <code>10 yds</code> always locks in the <strong>Youth</strong> rate. Households sharing a <strong>Phone</strong> (or Contact Name) on the same shooting line are grouped automatically to apply the per-line <strong>Family Cap</strong>. <code>Paid</code> sets <strong>$0.00</strong> due at check-in; <code>Unpaid</code> carries the calculated individual or capped Family balance to Check-In.</li>
+                                <li><strong>Automatic Rules:</strong> <code>Cub (10yd)</code> and <code>Youth (20yd)</code> bill at the <strong>Youth</strong> rate; <code>Adult (20yd)</code> bills at the <strong>Adult</strong> rate. Households sharing a <strong>Phone</strong> (or Contact Name) on the same shooting line are grouped automatically to apply the per-line <strong>Family Cap</strong>. <code>Paid</code> sets <strong>$0.00</strong> due at check-in; <code>Unpaid</code> carries the calculated individual or capped Family balance to Check-In.</li>
                             </ul>
 
                             <?php if ( ! empty( $configured_line_labels ) ) : ?>
