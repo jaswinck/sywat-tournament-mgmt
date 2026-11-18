@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.6.0
+   Version: 7.7.0
    ========================================================================== */
 
 :root {
@@ -309,6 +309,10 @@ body.sywat-hide-theme-chrome #page-container {
     z-index: 2;
 }
 
+.sywat-nav-tabs-toggle {
+    display: none;
+}
+
 .sywat-tab-item {
     display: inline-flex;
     align-items: center;
@@ -593,24 +597,108 @@ body.sywat-hide-theme-chrome #page-container {
 @media (max-width: 768px) {
     .sywat-wrap, .sywat-app { padding: 0 10px; }
 
-    .sywat-nav-tabs {
+    /* Single-Bar Mobile Workflow Dropdown */
+    .sywat-nav-tabs.has-mobile-dropdown {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 0;
+        gap: 0;
+        border-radius: 8px 8px 0 0;
+        overflow: hidden;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown .sywat-nav-tabs-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 14px;
+        margin: 0;
+        background-color: var(--sywat-navy);
+        color: #ffffff;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-align: left;
+        cursor: pointer;
+        box-sizing: border-box;
+        transition: background-color 0.15s ease;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown .sywat-nav-tabs-toggle:hover,
+    .sywat-nav-tabs.has-mobile-dropdown.is-open .sywat-nav-tabs-toggle {
+        background-color: var(--sywat-navy-soft);
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown .sywat-nav-tabs-toggle-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown .sywat-nav-tabs-caret {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--sywat-accent);
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown.is-open .sywat-nav-tabs-caret {
+        transform: rotate(180deg);
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown .sywat-tab-item {
+        display: none;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 11px 14px;
+        border-radius: 0;
+        border-top: 1px solid var(--sywat-navy-soft);
+        background-color: var(--sywat-navy-soft);
+        color: var(--sywat-border-light);
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown.is-open .sywat-tab-item {
+        display: flex;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown.is-open .sywat-tab-item:hover {
+        background-color: var(--sywat-navy);
+        color: #ffffff;
+    }
+
+    .sywat-nav-tabs.has-mobile-dropdown.is-open .sywat-tab-item.active {
+        background-color: var(--sywat-primary);
+        color: #ffffff;
+        box-shadow: none;
+    }
+
+    /* Fallback if JS is disabled or only 1 tab is rendered */
+    .sywat-nav-tabs:not(.has-mobile-dropdown) {
         display: flex;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
         overflow-x: auto;
-        overflow-y: hidden;
         white-space: nowrap;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        scroll-behavior: smooth;
     }
-    .sywat-nav-tabs::-webkit-scrollbar { display: none; }
 
-    .sywat-tab-item {
+    .sywat-nav-tabs:not(.has-mobile-dropdown) .sywat-tab-item {
         flex: 0 0 auto;
         white-space: nowrap;
-        padding: 10px 14px;
     }
 
     .sywat-nav-tabs + .sywat-card,
