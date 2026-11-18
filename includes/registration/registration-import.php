@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Description: Handles tournament-aware 8-column .xlsx template downloads on template_redirect and processes strict 8-column roster imports (with 3-tier Category / Rate selection: Cub 10yd, Youth 20yd, Adult 20yd) using hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.2
+ * Version: 7.4.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,7 +57,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 : 'Disabled',
         );
 
-        // Primary Output: Native .xlsx workbook with strict Excel Data Validation dropdowns
+        // Primary Output: Native 8-column .xlsx workbook with strict Excel Data Validation dropdowns
         if ( class_exists( 'ZipArchive' ) && function_exists( 'sywat_build_import_template_xlsx' ) ) {
             $tmp_file = wp_tempnam( 'sywat_template_' . $base_slug . '.xlsx' );
             if ( $tmp_file && sywat_build_import_template_xlsx( $tmp_file, $tourn_name, $tourn_data, $t_lines, $pricing_info ) ) {
@@ -82,7 +82,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
             }
         }
 
-        // Fallback Output: Standardized 9-column .csv if PHP ZipArchive is unavailable
+        // Fallback Output: Standardized 8-column .csv if PHP ZipArchive is unavailable
         while ( ob_get_level() > 0 ) {
             ob_end_clean();
         }
@@ -102,8 +102,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 'Archer Name',
                 'Line Day (Friday / Saturday / Sunday)',
                 'Line Time (HH:MM AM/PM)',
-                'Distance (10 yds / 20 yds)',
-                'Rate Tier (Youth / Adult)',
+                'Category / Rate (Cub (10yd) / Youth (20yd) / Adult (20yd))',
                 'Paid Status (Paid / Unpaid)',
             );
 
@@ -117,8 +116,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 'John Smith',
                 'Saturday',
                 '10:00 AM',
-                '20 yds',
-                'Adult',
+                'Adult (20yd)',
                 'Paid',
             ) );
             fclose( $output );
@@ -128,7 +126,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
 }
 
 /**
- * Validate, group, price, and persist shooters uploaded via the 9-column spreadsheet modal (.xlsx or .csv).
+ * Validate, group, price, and persist shooters uploaded via the 8-column spreadsheet modal (.xlsx or .csv).
  *
  * @param string $tourn_name       Selected tournament name (unslashed).
  * @param string $target_line_idx  Fallback line index (unused when spreadsheet specifies Line Day & Line Time).
@@ -208,7 +206,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Spreadsheet contains no data rows.</div>';
         }
 
-        // 3. Resolve Header Column Map (Supports both descriptive template headers and strict 0–8 index order)
+        // 3. Resolve Strict 8-Column Header Map (Columns A–H / index 0–7)
         $headers = array_map( 'trim', array_map( 'strtolower', $raw_rows[0] ) );
         $col_map = array(
             'contact'   => -1,
@@ -217,8 +215,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             'archer'    => -1,
             'line_day'  => -1,
             'line_time' => -1,
-            'distance'  => -1,
-            'tier'      => -1,
+            'category'  => -1,
             'paid'      => -1,
         );
 
@@ -235,16 +232,14 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 $col_map['line_day'] = $idx;
             } elseif ( strpos( $hdr, 'line time' ) !== false ) {
                 $col_map['line_time'] = $idx;
-            } elseif ( strpos( $hdr, 'distance' ) !== false ) {
-                $col_map['distance'] = $idx;
-            } elseif ( strpos( $hdr, 'tier' ) !== false ) {
-                $col_map['tier'] = $idx;
+            } elseif ( strpos( $hdr, 'category' ) !== false || strpos( $hdr, 'rate' ) !== false ) {
+                $col_map['category'] = $idx;
             } elseif ( strpos( $hdr, 'paid' ) !== false ) {
                 $col_map['paid'] = $idx;
             }
         }
 
-        if ( $col_map['archer'] === -1 || $col_map['line_day'] === -1 || $col_map['line_time'] === -1 ) {
+        if ( $col_map['archer'] === -1 || $col_map['line_day'] === -1 || $col_map['line_time'] === -1 || $col_map['category'] === -1 ) {
             $col_map = array(
                 'contact'   => 0,
                 'phone'     => 1,
@@ -252,9 +247,8 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 'archer'    => 3,
                 'line_day'  => 4,
                 'line_time' => 5,
-                'distance'  => 6,
-                'tier'      => 7,
-                'paid'      => 8,
+                'category'  => 6,
+                'paid'      => 7,
             );
         }
 
@@ -386,6 +380,19 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
         }
 
+        // O(1) Allowed Category / Rate Map
+        $category_map = array(
+            'cub10yd'    => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
+            'cub10yds'   => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
+            'cub'        => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
+            'youth20yd'  => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
+            'youth20yds' => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
+            'youth'      => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
+            'adult20yd'  => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
+            'adult20yds' => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
+            'adult'      => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
+        );
+
         // Pass 1: Pre-Flight Validation & Normalization
         $parsed_shooters = array();
         $errors          = array();
@@ -404,8 +411,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             $archer_name  = $safe_val( 'archer' );
             $line_day     = $safe_val( 'line_day' );
             $line_time    = $safe_val( 'line_time' );
-            $distance     = $safe_val( 'distance' );
-            $tier         = $safe_val( 'tier' );
+            $category_raw = $safe_val( 'category' );
             $paid_status  = $safe_val( 'paid' );
 
             // Skip blank pre-formatted template rows
@@ -413,7 +419,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 continue;
             }
 
-            if ( $contact_name === '' || $phone_raw === '' || $archer_name === '' || $line_day === '' || $line_time === '' || $distance === '' || $paid_status === '' ) {
+            if ( $contact_name === '' || $phone_raw === '' || $archer_name === '' || $line_day === '' || $line_time === '' || $category_raw === '' || $paid_status === '' ) {
                 $errors[] = 'Row ' . $row_num . ': Missing mandatory column data. All columns except Email are required.';
                 continue;
             }
@@ -446,23 +452,15 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 $errors[] = 'Row ' . $row_num . ": Invalid Line Time ('{$disp_time}'). Must be on a 30-minute increment between 7:00 AM and 10:00 PM.";
             }
 
-            // Distance & Rate Tier validation (10 yds locks Youth rate)
-            $dist_lower = strtolower( preg_replace( '/\s+/', '', $distance ) );
-            $is_cub     = false;
-            if ( in_array( $dist_lower, array( '10yds', '10yd', '10', 'cub' ), true ) ) {
-                $is_cub = true;
-            } elseif ( ! in_array( $dist_lower, array( '20yds', '20yd', '20' ), true ) ) {
-                $errors[] = 'Row ' . $row_num . ": Invalid Distance ('{$distance}'). Must be '10 yds' or '20 yds'.";
-            }
-
-            $tier_lower = strtolower( $tier );
-            if ( $is_cub ) {
-                $tier_val = 'Youth';
+            // Category / Rate validation: Cub (10yd), Youth (20yd), or Adult (20yd)
+            $cat_token = strtolower( preg_replace( '/[^a-z0-9]/', '', $category_raw ) );
+            if ( ! isset( $category_map[ $cat_token ] ) ) {
+                $errors[] = 'Row ' . $row_num . ": Invalid Category / Rate ('{$category_raw}'). Must be 'Cub (10yd)', 'Youth (20yd)', or 'Adult (20yd)'.";
+                $dist_val = '20yd';
+                $tier_val = 'Adult';
             } else {
-                if ( $tier_lower !== 'youth' && $tier_lower !== 'adult' ) {
-                    $errors[] = 'Row ' . $row_num . ": Invalid Rate Tier ('{$tier}'). Must be 'Youth' or 'Adult'.";
-                }
-                $tier_val = ( $tier_lower === 'youth' ) ? 'Youth' : 'Adult';
+                $dist_val = $category_map[ $cat_token ]['distance'];
+                $tier_val = $category_map[ $cat_token ]['rate_tier'];
             }
 
             // Paid Status validation (Paid or Unpaid)
@@ -497,7 +495,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 'archer_name'  => $archer_name,
                 'line_idx'     => $matched_idx,
                 'line_name'    => $matched_name,
-                'distance'     => $is_cub ? 'Cub' : '20yd',
+                'distance'     => $dist_val,
                 'rate_tier'    => $tier_val,
                 'is_paid'      => $is_paid,
                 'family_key'   => $family_key,
