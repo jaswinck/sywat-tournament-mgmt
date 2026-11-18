@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles tournament-aware 8-column .xlsx template downloads on template_redirect and processes strict 8-column roster imports (with 3-tier Category / Rate selection: Cub 10yd, Youth 20yd, Adult 20yd) using hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Description: Handles tournament-aware 8-column .xlsx template downloads on template_redirect and processes strict 8-column roster imports (with distance-neutral 3-tier Category / Rate selection: Cub, Youth, Adult) using hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.3
+ * Version: 7.4.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -102,7 +102,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 'Archer Name',
                 'Line Day (Friday / Saturday / Sunday)',
                 'Line Time (HH:MM AM/PM)',
-                'Category / Rate (Cub (10yd) / Youth (20yd) / Adult (20yd))',
+                'Category / Rate (Cub / Youth / Adult)',
                 'Paid Status (Paid / Unpaid)',
             );
 
@@ -116,7 +116,7 @@ if ( ! function_exists( 'sywat_handle_download_import_template' ) ) {
                 'John Smith',
                 'Saturday',
                 '10:00 AM',
-                'Adult (20yd)',
+                'Adult',
                 'Paid',
             ) );
             fclose( $output );
@@ -380,17 +380,17 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
         }
 
-        // O(1) Allowed Category / Rate Map
+        // O(1) Allowed Category / Rate Map (Cub / Youth / Adult)
         $category_map = array(
+            'cub'        => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
             'cub10yd'    => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
             'cub10yds'   => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
-            'cub'        => array( 'distance' => 'Cub',  'rate_tier' => 'Youth' ),
+            'youth'      => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
             'youth20yd'  => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
             'youth20yds' => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
-            'youth'      => array( 'distance' => '20yd', 'rate_tier' => 'Youth' ),
+            'adult'      => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
             'adult20yd'  => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
             'adult20yds' => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
-            'adult'      => array( 'distance' => '20yd', 'rate_tier' => 'Adult' ),
         );
 
         // Pass 1: Pre-Flight Validation & Normalization
@@ -452,10 +452,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 $errors[] = 'Row ' . $row_num . ": Invalid Line Time ('{$disp_time}'). Must be on a 30-minute increment between 7:00 AM and 10:00 PM.";
             }
 
-            // Category / Rate validation: Cub (10yd), Youth (20yd), or Adult (20yd)
+            // Category / Rate validation: Cub, Youth, or Adult
             $cat_token = strtolower( preg_replace( '/[^a-z0-9]/', '', $category_raw ) );
             if ( ! isset( $category_map[ $cat_token ] ) ) {
-                $errors[] = 'Row ' . $row_num . ": Invalid Category / Rate ('{$category_raw}'). Must be 'Cub (10yd)', 'Youth (20yd)', or 'Adult (20yd)'.";
+                $errors[] = 'Row ' . $row_num . ": Invalid Category / Rate ('{$category_raw}'). Must be 'Cub', 'Youth', or 'Adult'.";
                 $dist_val = '20yd';
                 $tier_val = 'Adult';
             } else {
