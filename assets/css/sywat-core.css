@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - System Core Foundations
    Path: assets/css/sywat-core.css
-   Version: 7.5.2
+   Version: 7.6.0
    ========================================================================== */
 
 :root {
@@ -592,8 +592,34 @@ body.sywat-hide-theme-chrome #page-container {
 /* Mobile Layout Helpers */
 @media (max-width: 768px) {
     .sywat-wrap, .sywat-app { padding: 0 10px; }
-    .sywat-nav-tabs { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+
+    .sywat-nav-tabs {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-behavior: smooth;
+    }
     .sywat-nav-tabs::-webkit-scrollbar { display: none; }
+
+    .sywat-tab-item {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 10px 14px;
+    }
+
+    .sywat-nav-tabs + .sywat-card,
+    .sywat-nav-tabs + .sywat-public-card,
+    .sywat-nav-tabs + div > .sywat-card,
+    .sywat-nav-tabs + div > .sywat-public-card {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+    }
 
     .sywat-card-header-bar,
     .sywat-table-header-bar {
