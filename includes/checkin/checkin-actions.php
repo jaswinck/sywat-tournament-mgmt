@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, First-Time/Lapsed Shooter promoter evaluation, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance, and archer edits/deletions with Family Cap reconciliation.
+ * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, First-Time/Lapsed Shooter promoter evaluation, server-side canonical name enforcement (Member DB + 18-month TFAA history) and First+Last same-line duplicate lockout, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance, and archer edits/deletions with Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -39,6 +39,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         $active_t_slug       = $data['active_t_slug'];
         $selected_tournament = $data['selected_tournament'];
         $selected_t_data     = ! empty( $data['selected_tournament_data'] ) ? $data['selected_tournament_data'] : $selected_tournament;
+        $tourn_start_date    = ( is_array( $selected_t_data ) && ! empty( $selected_t_data['start_date'] ) ) ? trim( (string) $selected_t_data['start_date'] ) : '';
         $closed_lines_key    = $data['closed_lines_key'];
         $registrations       = &$data['registrations'];
         $lines               = $data['lines'];
@@ -88,6 +89,78 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
 
             return $waitlist_notice;
         }
+
+        // Hoisted Name Key Normalizer, Official Name Enforcer & Same-Line Duplicate Guard
+        $build_name_keys = function( $raw_name ) {
+            if ( function_exists( 'sywat_normalize_archer_match_keys' ) ) {
+                return sywat_normalize_archer_match_keys( $raw_name );
+            }
+            $norm  = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', (string) $raw_name ) ) ) );
+            $parts = $norm !== '' ? explode( ' ', $norm ) : array();
+            return array(
+                'exact' => $norm,
+                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+            );
+        };
+
+        $canonicalize_archer_name = function( $raw_name, $email = '', $phone = '' ) use ( $tourn_start_date ) {
+            $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $raw_name ) );
+            if ( $clean_name === '' ) {
+                return '';
+            }
+            if ( function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
+                $resolved = sywat_resolve_archer_intake_profile(
+                    $clean_name,
+                    $tourn_start_date,
+                    array(
+                        'email' => $email,
+                        'phone' => $phone,
+                    )
+                );
+                if ( ! empty( $resolved['canonical_name'] ) ) {
+                    return trim( (string) $resolved['canonical_name'] );
+                }
+            }
+            return $clean_name;
+        };
+
+        $find_same_line_duplicate = function( $target_line_idx, $candidate_name, $exclude_reg_id = '' ) use ( &$registrations, $selected_tournament, $lines, $build_name_keys ) {
+            $cand_keys = $build_name_keys( $candidate_name );
+            if ( $cand_keys['exact'] === '' ) {
+                return '';
+            }
+            $target_line_str = (string) $target_line_idx;
+            $has_fl_pair     = ( $cand_keys['fl'] !== '' && strpos( $cand_keys['fl'], '___' ) !== false );
+
+            foreach ( $registrations as $other ) {
+                if ( ! is_array( $other ) || empty( $other['name'] ) ) {
+                    continue;
+                }
+                if ( $exclude_reg_id !== '' && isset( $other['id'] ) && (string) $other['id'] === (string) $exclude_reg_id ) {
+                    continue;
+                }
+                if ( ! isset( $other['tournament'] ) || strcasecmp( trim( (string) $other['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                    continue;
+                }
+                $o_status = isset( $other['status'] ) ? trim( (string) $other['status'] ) : '';
+                if ( strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+                $o_line = function_exists( 'sywat_desk_resolve_line_idx' )
+                    ? sywat_desk_resolve_line_idx( $other, $lines )
+                    : ( isset( $other['line_index'] ) ? (string) $other['line_index'] : '0' );
+                if ( (string) $o_line !== $target_line_str ) {
+                    continue;
+                }
+
+                $other_keys = $build_name_keys( $other['name'] );
+                if ( $other_keys['exact'] === $cand_keys['exact'] || ( $has_fl_pair && $other_keys['fl'] === $cand_keys['fl'] ) ) {
+                    return trim( (string) $other['name'] );
+                }
+            }
+
+            return '';
+        };
 
         $existing_families_by_line = isset( $data['existing_families_by_line'] ) ? $data['existing_families_by_line'] : array();
         $existing_families         = $data['existing_families'];
@@ -314,9 +387,9 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return '<div class="sywat-alert sywat-alert-success"><strong>Line reopened successfully.</strong> Walk-ins and check-ins are active again.</div>';
         }
 
-        // Add Walk-In (Fully Automated Fee, Promo & Household Family Cap Engine)
+        // Add Walk-In (Fully Automated Fee, Promo, Canonical Name Enforcement & Household Family Cap Engine)
         if ( $action === 'add_walkin' || $action === 'add_walkin_next' ) {
-            $name_val     = trim( sanitize_text_field( wp_unslash( $_POST['walkin_name'] ) ) );
+            $raw_name_val = trim( sanitize_text_field( wp_unslash( $_POST['walkin_name'] ) ) );
             $group_name   = isset( $_POST['walkin_group_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_name'] ) ) ) : '';
             $group_phone  = isset( $_POST['walkin_group_phone'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['walkin_group_phone'] ) ) ) : '';
             $line_idx     = sanitize_text_field( wp_unslash( $_POST['walkin_line_index'] ) );
@@ -332,28 +405,20 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $round_slug = $default_prof_key;
             }
 
-            if ( empty( $name_val ) ) {
+            if ( empty( $raw_name_val ) ) {
                 return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Walk-In Failed!</strong> Please enter an archer name.</div>';
             }
 
-            $is_duplicate = false;
-            if ( function_exists( 'sywat_is_archer_on_line' ) ) {
-                $is_duplicate = sywat_is_archer_on_line( $selected_tournament, $line_idx, $name_val, $registrations );
-            } else {
-                foreach ( $registrations as $r ) {
-                    if ( isset( $r['tournament'], $r['line_index'], $r['name'] ) &&
-                        strcasecmp( trim( $r['tournament'] ), trim( $selected_tournament ) ) === 0 &&
-                        (string) $r['line_index'] === (string) $line_idx &&
-                        strcasecmp( trim( $r['name'] ), trim( $name_val ) ) === 0 ) {
-                        $is_duplicate = true;
-                        break;
-                    }
-                }
+            // Enforce official Member DB / TFAA canonical name (e.g., "Mark E. Tanner" -> "Mark Tanner")
+            $name_val = $canonicalize_archer_name( $raw_name_val, '', $group_phone );
+            if ( $group_name !== '' ) {
+                $group_name = $canonicalize_archer_name( $group_name, '', $group_phone );
             }
 
-            if ( $is_duplicate ) {
-                $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js( $name_val ) . ' is already registered on this shooting line.\n(Signing up for a different line is allowed).';
-                return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html( $name_val ) . '</strong> is already registered on this shooting line. (Signing up for a different line is allowed).</div>' .
+            $existing_dup_name = $find_same_line_duplicate( $line_idx, $name_val );
+            if ( $existing_dup_name !== '' ) {
+                $alert_text = '⚠️ WALK-IN BLOCKED:\n\n' . esc_js( $name_val ) . ' is already registered on this shooting line' . ( strcasecmp( $existing_dup_name, $name_val ) !== 0 ? ' (as "' . esc_js( $existing_dup_name ) . '")' : '' ) . '.\n(Signing up for a different line is allowed).';
+                return '<div class="sywat-alert sywat-alert-danger">⚠️ Walk-In Blocked! <strong>' . esc_html( $name_val ) . '</strong> is already registered on this shooting line' . ( strcasecmp( $existing_dup_name, $name_val ) !== 0 ? ' (as <strong>' . esc_html( $existing_dup_name ) . '</strong>)' : '' ) . '. (Signing up for a different line is allowed).</div>' .
                        '<script ' . $script_optout_attrs . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
             }
 
@@ -582,7 +647,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html( $name_val ) . '</strong> registered and checked in successfully.' . $promo_note . ' Total Due: $' . number_format( $session_total, 2 ) . '</div>';
         }
 
-        // Check-In (Enforces household-wide unpaid family balance block and clears linked balances when verified)
+        // Check-In (Enforces household-wide unpaid family balance block, canonical name standardization, same-line duplicate guard & clears linked balances when verified)
         if ( $action === 'save_checkin' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -632,6 +697,24 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     }
                     return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance ($' . number_format( $effective_due, 2 ) . '). Please see event staff for payment and check the verification box.</div>';
                 } else {
+                    $raw_checkin_name = ! empty( $_POST['checkin_name'] )
+                        ? sanitize_text_field( wp_unslash( $_POST['checkin_name'] ) )
+                        : ( isset( $reg['name'] ) ? (string) $reg['name'] : '' );
+                    $resolved_name    = $canonicalize_archer_name(
+                        $raw_checkin_name,
+                        isset( $reg['email'] ) ? (string) $reg['email'] : '',
+                        isset( $reg['phone'] ) ? (string) $reg['phone'] : ''
+                    );
+
+                    $reg_line_idx = function_exists( 'sywat_desk_resolve_line_idx' )
+                        ? sywat_desk_resolve_line_idx( $reg, $lines )
+                        : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+
+                    $existing_dup_name = $find_same_line_duplicate( $reg_line_idx, $resolved_name, $target_id );
+                    if ( $existing_dup_name !== '' ) {
+                        return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Official shooter <strong>' . esc_html( $resolved_name ) . '</strong> already has a registration on this shooting line' . ( strcasecmp( $existing_dup_name, $resolved_name ) !== 0 ? ' (listed as <strong>' . esc_html( $existing_dup_name ) . '</strong>)' : '' ) . '. Please remove the duplicate row before completing check-in.</div>';
+                    }
+
                     $raw_division = sanitize_text_field( wp_unslash( $_POST['checkin_division'] ) );
                     $raw_style    = sanitize_text_field( wp_unslash( $_POST['checkin_style'] ) );
                     $pay_opt      = sanitize_text_field( wp_unslash( $_POST['checkin_pay_option'] ) );
@@ -652,8 +735,8 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     $style       = $resolved_sd['style'];
                     $distance    = $resolve_division_distance( $division );
 
-                    if ( ! empty( $_POST['checkin_name'] ) ) {
-                        $reg['name'] = sanitize_text_field( wp_unslash( $_POST['checkin_name'] ) );
+                    if ( $resolved_name !== '' ) {
+                        $reg['name'] = $resolved_name;
                     }
 
                     if ( $verified && $effective_due > 0 ) {
@@ -738,14 +821,19 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             }
         }
 
-        // Save Edit (With automatic fee recalculation on division change, group balance clearance & Family Cap reconciliation)
+        // Save Edit (With canonical name standardization, First+Last same-line duplicate check, automatic fee recalculation on division change, group balance clearance & Family Cap reconciliation)
         if ( $action === 'save_edit' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
             $reg       = get_option( $opt_key );
 
             if ( $reg ) {
-                $edit_name   = trim( sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) );
+                $raw_edit_name = trim( sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) );
+                $edit_name     = $canonicalize_archer_name(
+                    $raw_edit_name,
+                    isset( $reg['email'] ) ? (string) $reg['email'] : '',
+                    isset( $reg['phone'] ) ? (string) $reg['phone'] : ''
+                );
                 $line_idx    = sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) );
                 $orig_name   = isset( $reg['name'] ) ? trim( $reg['name'] ) : '';
                 $orig_line   = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
@@ -755,23 +843,10 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $orig_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
 
                 if ( strcasecmp( $orig_name, $edit_name ) !== 0 || (string) $orig_line !== (string) $line_idx ) {
-                    $dupe_found = false;
-                    foreach ( $registrations as $other ) {
-                        if ( isset( $other['id'] ) && $other['id'] === $target_id ) {
-                            continue;
-                        }
-                        if ( isset( $other['tournament'], $other['line_index'], $other['name'] ) &&
-                            strcasecmp( trim( $other['tournament'] ), trim( $selected_tournament ) ) === 0 &&
-                            (string) $other['line_index'] === (string) $line_idx &&
-                            strcasecmp( trim( $other['name'] ), trim( $edit_name ) ) === 0 ) {
-                            $dupe_found = true;
-                            break;
-                        }
-                    }
-
-                    if ( $dupe_found ) {
-                        $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js( $edit_name ) . ' is already registered on this shooting line.';
-                        return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html( $edit_name ) . '</strong> is already registered on this shooting line.</div>' .
+                    $existing_dup_name = $find_same_line_duplicate( $line_idx, $edit_name, $target_id );
+                    if ( $existing_dup_name !== '' ) {
+                        $alert_text = '⚠️ EDIT BLOCKED:\n\n' . esc_js( $edit_name ) . ' is already registered on this shooting line' . ( strcasecmp( $existing_dup_name, $edit_name ) !== 0 ? ' (as "' . esc_js( $existing_dup_name ) . '")' : '' ) . '.';
+                        return '<div class="sywat-alert sywat-alert-danger">⚠️ Edit Blocked! <strong>' . esc_html( $edit_name ) . '</strong> is already registered on this shooting line' . ( strcasecmp( $existing_dup_name, $edit_name ) !== 0 ? ' (as <strong>' . esc_html( $existing_dup_name ) . '</strong>)' : '' ) . '.</div>' .
                                '<script ' . $script_optout_attrs . '>document.addEventListener("DOMContentLoaded", function() { alert("' . $alert_text . '"); });</script>';
                     }
                 }
