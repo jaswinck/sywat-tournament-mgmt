@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows, round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, database-driven age division & distance synchronization, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Description: Manages multi-archer phone intake rows with simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete tier mapping, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 (function() {
@@ -172,73 +172,66 @@
     }
 
     /**
-     * Resolve individual entry fee for a specific round profile + division + distance.
+     * Resolve individual entry fee for a specific round profile + simplified tier ('cub' | 'youth' | 'adult').
      */
-    function getFeeForRow(profileSlug, divSlug, divLabel, distance) {
-        const prof = getProfile(profileSlug);
-        const divCfg = divLabel ? findDivisionConfig(divLabel) : null;
-        const resolvedSlug = divSlug || (divCfg && divCfg.slug ? divCfg.slug : '');
+    function getFeeForRow(profileSlug, tierVal) {
+        const tier = String(tierVal || '').trim().toLowerCase();
+        if (!tier) {
+            return 0;
+        }
 
+        const prof = getProfile(profileSlug);
         if (prof) {
             if (
-                resolvedSlug &&
+                tier === 'cub' &&
                 prof.division_overrides &&
-                typeof prof.division_overrides[resolvedSlug] !== 'undefined' &&
-                prof.division_overrides[resolvedSlug] !== ''
+                typeof prof.division_overrides['cub-8-11'] !== 'undefined' &&
+                prof.division_overrides['cub-8-11'] !== ''
             ) {
-                const ovVal = parseFloat(prof.division_overrides[resolvedSlug]);
-                if (!Number.isNaN(ovVal) && ovVal >= 0) {
-                    return ovVal;
+                const cubOv = parseFloat(prof.division_overrides['cub-8-11']);
+                if (!Number.isNaN(cubOv) && cubOv >= 0) {
+                    return cubOv;
                 }
             }
 
-            const isYouth = (distance === 'Cub') || (divCfg && divCfg.rate_tier === 'Youth');
+            const isYouth  = (tier === 'cub' || tier === 'youth');
             const tierRate = isYouth ? parseFloat(prof.youth_rate) : parseFloat(prof.adult_rate);
             if (!Number.isNaN(tierRate) && tierRate >= 0) {
                 return tierRate;
             }
         }
 
-        if (divCfg && typeof divCfg.fee !== 'undefined' && !Number.isNaN(parseFloat(divCfg.fee))) {
-            return parseFloat(divCfg.fee);
-        }
-
-        return (distance === 'Cub' || (divCfg && divCfg.rate_tier === 'Youth')) ? 25 : 30;
+        return (tier === 'cub' || tier === 'youth') ? 25 : 30;
     }
 
     /**
-     * Update division option labels and data-fee attributes on a single intake row
+     * Update Category / Rate option labels and data-fee attributes on a single intake row
      * whenever its Round Format selector changes (e.g., Field vs. Field 50).
      */
-    function updateRowDivisionOptionLabels(row) {
+    function updateRowRateTierOptionLabels(row) {
         if (!row) return;
         const roundSelect = row.querySelector('.sywat-round-profile-select');
         const roundInput  = row.querySelector('.sywat-round-profile-input');
-        const divSelect   = row.querySelector('.sywat-division-select');
-        if (!divSelect) return;
+        const tierSelect  = row.querySelector('.sywat-rate-tier-select');
+        if (!tierSelect) return;
 
         const roundSlug = roundSelect
             ? roundSelect.value
             : (roundInput ? roundInput.value : getDefaultProfileKey());
 
-        Array.from(divSelect.options).forEach(opt => {
-            if (!opt.value) return;
-            const optSlug = opt.getAttribute('data-slug') || '';
-            const optDist = opt.getAttribute('data-distance') || '20yd';
-            const fee     = getFeeForRow(roundSlug, optSlug, opt.value, optDist);
-            opt.setAttribute('data-fee', fee.toFixed(2));
-            opt.textContent = opt.value + ' [$' + fee.toFixed(2) + ']';
-        });
-    }
+        const labelMap = {
+            cub:   'Cub (10yd)',
+            youth: 'Youth (20yd)',
+            adult: 'Adult (20yd)'
+        };
 
-    function getDefaultCubDivisionLabel() {
-        const divisions = getDivisions();
-        for (let i = 0; i < divisions.length; i++) {
-            if (divisions[i].distance === 'Cub' && divisions[i].label) {
-                return divisions[i].label;
-            }
-        }
-        return 'Cub (8 - 11)';
+        Array.from(tierSelect.options).forEach(opt => {
+            const val = String(opt.value || '').toLowerCase();
+            if (!val || !labelMap[val]) return;
+            const fee = getFeeForRow(roundSlug, val);
+            opt.setAttribute('data-fee', fee.toFixed(2));
+            opt.textContent = labelMap[val] + ' [$' + fee.toFixed(2) + ']';
+        });
     }
 
     function escapeHtml(str) {
@@ -288,99 +281,56 @@
         window.checkAndFillPhone(archerInput.value);
     };
 
+    window.handleRateTierChange = function(tierSelect) {
+        if (!tierSelect) return;
+        tierSelect.dataset.userChosen = 'true';
+        window.recalculateGroupTotal();
+    };
+
     window.handleDivisionChange = function(divSelect) {
-        if (!divSelect) return;
-        divSelect.dataset.userChosen = 'true';
-
-        const row = divSelect.closest('.sywat-archer-input-row');
-        if (row) {
-            const distSelect = row.querySelector('.sywat-distance-select');
-            if (distSelect) {
-                const selectedDiv  = divSelect.value;
-                const selectedOpt  = divSelect.options[divSelect.selectedIndex];
-                const optDist      = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
-                const divCfg       = optDist ? null : findDivisionConfig(selectedDiv);
-                const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
-
-                if (resolvedDist === 'Cub' || (resolvedDist === '' && selectedDiv && selectedDiv.includes('Cub'))) {
-                    distSelect.value = 'Cub';
-                } else if (selectedDiv !== '') {
-                    distSelect.value = '20yd';
-                }
-            }
-        }
-
-        window.recalculateGroupTotal();
+        window.handleRateTierChange(divSelect);
     };
 
-    window.handleDistanceChange = function(distSelect) {
-        const row = distSelect.closest('.sywat-archer-input-row');
-        if (!row) return;
-        const divSelect = row.querySelector('.sywat-division-select');
-        if (!divSelect) return;
-
-        const defaultCubLabel = getDefaultCubDivisionLabel();
-
-        if (distSelect.value === 'Cub') {
-            divSelect.value = defaultCubLabel;
-            divSelect.dataset.userChosen = 'true';
-        } else if (distSelect.value === '20yd') {
-            const selectedOpt  = divSelect.options[divSelect.selectedIndex];
-            const optDist      = selectedOpt ? selectedOpt.getAttribute('data-distance') : '';
-            const divCfg       = optDist ? null : findDivisionConfig(divSelect.value);
-            const resolvedDist = optDist || (divCfg ? divCfg.distance : '');
-
-            if (resolvedDist === 'Cub' || divSelect.value === defaultCubLabel) {
-                divSelect.value = '';
-                delete divSelect.dataset.userChosen;
-            }
-        }
+    window.handleDistanceChange = function() {
         window.recalculateGroupTotal();
-    };
-
-    window.matchTfaaDivision = function(tfaaDiv, selectEl) {
-        if (!tfaaDiv || !selectEl) return;
-        const cleanTfaa = tfaaDiv.trim().toLowerCase();
-
-        // 1. Direct option value match
-        for (let opt of selectEl.options) {
-            if (opt.value && opt.value.trim().toLowerCase() === cleanTfaa) {
-                selectEl.value = opt.value;
-                window.handleDivisionChange(selectEl);
-                return;
-            }
-        }
-
-        // 2. Match via configured division aliases or export code
-        const matchedCfg = findDivisionConfig(tfaaDiv);
-        if (matchedCfg && matchedCfg.label) {
-            for (let opt of selectEl.options) {
-                if (opt.value && opt.value.trim().toLowerCase() === matchedCfg.label.trim().toLowerCase()) {
-                    selectEl.value = opt.value;
-                    window.handleDivisionChange(selectEl);
-                    return;
-                }
-            }
-        }
-
-        // 3. Base-name fuzzy fallback
-        const tfaaBaseName = cleanTfaa.split(' (')[0].trim();
-
-        for (let opt of selectEl.options) {
-            if (!opt.value) continue;
-            const optLower = opt.value.trim().toLowerCase();
-            const optBaseName = optLower.split(' (')[0].trim();
-
-            if (optBaseName === tfaaBaseName || optLower.includes(cleanTfaa) || cleanTfaa.includes(optBaseName)) {
-                selectEl.value = opt.value;
-                window.handleDivisionChange(selectEl);
-                return;
-            }
-        }
     };
 
     /**
-     * Registration Autocomplete: Auto-fills Name and Age Division ONLY.
+     * Map a historical TFAA division label/code to 'cub', 'youth', or 'adult' on the 3-tier selector.
+     */
+    window.matchTfaaRateTier = function(tfaaDiv, selectEl) {
+        if (!tfaaDiv || !selectEl) return;
+        const cleanTfaa = String(tfaaDiv).trim().toLowerCase();
+        if (!cleanTfaa) return;
+
+        let resolvedTier = '';
+        const matchedCfg = findDivisionConfig(tfaaDiv);
+        if (matchedCfg) {
+            if (matchedCfg.distance === 'Cub') {
+                resolvedTier = 'cub';
+            } else if (matchedCfg.rate_tier === 'Youth') {
+                resolvedTier = 'youth';
+            } else {
+                resolvedTier = 'adult';
+            }
+        } else if (/\bcub\b/i.test(cleanTfaa)) {
+            resolvedTier = 'cub';
+        } else if (/youth|young\s*adult/i.test(cleanTfaa)) {
+            resolvedTier = 'youth';
+        } else {
+            resolvedTier = 'adult';
+        }
+
+        selectEl.value = resolvedTier;
+        window.handleRateTierChange(selectEl);
+    };
+
+    window.matchTfaaDivision = function(tfaaDiv, selectEl) {
+        window.matchTfaaRateTier(tfaaDiv, selectEl);
+    };
+
+    /**
+     * Registration Autocomplete: Auto-fills Name and 3-tier Category / Rate ONLY.
      */
     window.handleTfaaAutocomplete = function(input) {
         const query = input.value.trim().toLowerCase();
@@ -391,7 +341,6 @@
             return;
         }
 
-        // Filter unique names for intake autocomplete
         const seenNames = new Set();
         const matches = [];
 
@@ -433,9 +382,9 @@
 
                 const row = input.closest('.sywat-archer-input-row');
                 if (row) {
-                    const divSelect = row.querySelector('.sywat-division-select');
-                    if (divSelect && m.division) {
-                        window.matchTfaaDivision(m.division, divSelect);
+                    const tierSelect = row.querySelector('.sywat-rate-tier-select');
+                    if (tierSelect && m.division) {
+                        window.matchTfaaRateTier(m.division, tierSelect);
                     }
                 }
                 window.checkAndFillPhone(m.name);
@@ -520,14 +469,16 @@
             roundControlHtml = `<input type="hidden" name="archers[${rowIndex}][pricing_profile]" class="sywat-round-profile-input" value="${escapeHtml(defProfKey)}">`;
         }
 
-        let divisionOptionsHtml = '<option value="" disabled selected hidden>Select Division</option>';
-        getDivisions().forEach(d => {
-            const dist     = d.distance === 'Cub' ? 'Cub' : '20yd';
-            const rateTier = d.rate_tier === 'Youth' ? 'Youth' : 'Adult';
-            const divSlug  = d.slug || '';
-            const fee      = getFeeForRow(defProfKey, divSlug, d.label, dist);
-            divisionOptionsHtml += `<option value="${escapeHtml(d.label)}" data-slug="${escapeHtml(divSlug)}" data-distance="${escapeHtml(dist)}" data-rate-tier="${escapeHtml(rateTier)}" data-fee="${fee.toFixed(2)}">${escapeHtml(d.label)} [$${fee.toFixed(2)}]</option>`;
-        });
+        const cubFee   = getFeeForRow(defProfKey, 'cub');
+        const youthFee = getFeeForRow(defProfKey, 'youth');
+        const adultFee = getFeeForRow(defProfKey, 'adult');
+
+        const tierOptionsHtml = `
+            <option value="" disabled selected hidden>Select Category *</option>
+            <option value="cub" data-distance="Cub" data-rate-tier="Youth" data-fee="${cubFee.toFixed(2)}">Cub (10yd) [$${cubFee.toFixed(2)}]</option>
+            <option value="youth" data-distance="20yd" data-rate-tier="Youth" data-fee="${youthFee.toFixed(2)}">Youth (20yd) [$${youthFee.toFixed(2)}]</option>
+            <option value="adult" data-distance="20yd" data-rate-tier="Adult" data-fee="${adultFee.toFixed(2)}">Adult (20yd) [$${adultFee.toFixed(2)}]</option>
+        `;
 
         const rowDiv = document.createElement('div');
         rowDiv.className = 'sywat-archer-input-row';
@@ -539,16 +490,9 @@
 
             ${roundControlHtml}
 
-            <div class="sywat-field-group sywat-col-archer-dist">
-                <select name="archers[${rowIndex}][distance]" class="sywat-distance-select" onchange="handleDistanceChange(this)">
-                    <option value="20yd" selected>20yd</option>
-                    <option value="Cub">Cub (10yd)</option>
-                </select>
-            </div>
-
             <div class="sywat-field-group sywat-col-archer-div">
-                <select name="archers[${rowIndex}][division]" class="sywat-division-select" onchange="handleDivisionChange(this);">
-                    ${divisionOptionsHtml}
+                <select name="archers[${rowIndex}][rate_tier]" class="sywat-rate-tier-select" required onchange="handleRateTierChange(this);">
+                    ${tierOptionsHtml}
                 </select>
             </div>
 
@@ -600,8 +544,7 @@
             const nameInput   = row.querySelector('input[type="text"]');
             const roundSelect = row.querySelector('.sywat-round-profile-select');
             const roundInput  = row.querySelector('.sywat-round-profile-input');
-            const distSelect  = row.querySelector('.sywat-distance-select');
-            const divSelect   = row.querySelector('.sywat-division-select');
+            const tierSelect  = row.querySelector('.sywat-rate-tier-select');
             const lineSelect  = row.querySelector('.sywat-line-override-select');
 
             if (nameInput && nameInput.value.trim() !== '') {
@@ -611,10 +554,7 @@
                     ? roundSelect.value
                     : (roundInput ? roundInput.value : defSlug);
                 const lIdx      = lineSelect ? lineSelect.value : '0';
-                const dist      = distSelect ? distSelect.value : '20yd';
-                const div       = divSelect ? divSelect.value : '';
-                const selectedOpt = (divSelect && divSelect.selectedIndex >= 0) ? divSelect.options[divSelect.selectedIndex] : null;
-                const divSlug   = selectedOpt ? (selectedOpt.getAttribute('data-slug') || '') : '';
+                const tierVal   = tierSelect ? tierSelect.value : '';
 
                 let isPromoFree = false;
                 if (!claimedPromoNames[normName] && isArcherPromoEligible(rawName, roundSlug)) {
@@ -623,11 +563,11 @@
                     promoAppliedCount++;
                 }
 
-                const archerFee = isPromoFree ? 0 : getFeeForRow(roundSlug, divSlug, div, dist);
+                const archerFee = isPromoFree ? 0 : getFeeForRow(roundSlug, tierVal);
                 const profRec   = getProfile(roundSlug);
                 const capBucket = useTournWideCap ? 'tournament' : String(lIdx);
 
-                if (!isPromoFree) {
+                if (!isPromoFree && tierVal !== '') {
                     if (!bucketMap[capBucket]) {
                         bucketMap[capBucket] = {
                             count: 0,
@@ -731,7 +671,7 @@
     document.addEventListener('change', function(e) {
         if (e.target && e.target.classList && e.target.classList.contains('sywat-round-profile-select')) {
             const row = e.target.closest('.sywat-archer-input-row');
-            updateRowDivisionOptionLabels(row);
+            updateRowRateTierOptionLabels(row);
             window.recalculateGroupTotal();
         }
     });
@@ -775,7 +715,7 @@
             }
         }
         document.querySelectorAll('.sywat-archer-input-row').forEach(row => {
-            updateRowDivisionOptionLabels(row);
+            updateRowRateTierOptionLabels(row);
         });
         window.recalculateGroupTotal();
         window.initAutoDismissAlerts();
