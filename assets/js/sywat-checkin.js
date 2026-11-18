@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-checkin.js
  * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.3
+ * Version: 7.3.4
  */
 
 (function() {
@@ -139,8 +139,8 @@
             if (tfaaHits.length > 0) {
                 for (let j = 0; j < tfaaHits.length; j++) {
                     const th     = tfaaHits[j];
-                    const divStr = (m.division || th.division || '').trim();
-                    const genStr = (m.gender || th.gender || '').trim();
+                    const divStr = (th.division || m.division || '').trim();
+                    const genStr = (th.gender || m.gender || '').trim();
                     const styStr = (th.style || m.style || '').trim();
                     const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
 
@@ -1062,6 +1062,7 @@
                 if (canonicalOfficial && cleanDeskName(canonicalOfficial) !== cleanDeskName(typedName)) {
                     nameInput.dataset.normalizedFrom = typedName;
                     nameInput.value = canonicalOfficial;
+                    preserveExisting = false; // Aggressively overwrite dropdowns if we successfully auto-corrected the name
                 }
             }
         }
