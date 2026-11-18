@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-checkin.js
  * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.2
+ * Version: 7.3.3
  */
 
 (function() {
@@ -139,7 +139,7 @@
             if (tfaaHits.length > 0) {
                 for (let j = 0; j < tfaaHits.length; j++) {
                     const th     = tfaaHits[j];
-                    const divStr = (th.division || m.division || '').trim();
+                    const divStr = (m.division || th.division || '').trim();
                     const genStr = (m.gender || th.gender || '').trim();
                     const styStr = (th.style || m.style || '').trim();
                     const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
@@ -898,7 +898,7 @@
             const cDivCfg = findDeskDivisionConfig(cat.division);
 
             if (cat.style) {
-                const shortSty = (cStyCfg && cStyCfg.code) ? cStyCfg.code : cat.style.split(' – ')[0].split(' - ')[0];
+                const shortSty = (cStyCfg && cStyCfg.code) ? cStyCfg.code : cat.style.split(/\s+[\u2013\u2014-]\s+/)[0];
                 if (!knownStyles.includes(shortSty)) knownStyles.push(shortSty);
             }
 
@@ -913,7 +913,7 @@
             const divMatch = !cDiv
                 || (cDivCfg && uDivCfg && cDivCfg.label === uDivCfg.label)
                 || (cDiv === uDiv)
-                || (cDiv && uDiv && (cDiv.includes(uDiv.split(' (')[0].trim()) || uDiv.includes(cDiv.split(' (')[0].trim())));
+                || (cDiv && uDiv && (cDiv.includes(uDiv.split(/\s*\(/)[0].trim()) || uDiv.includes(cDiv.split(/\s*\(/)[0].trim())));
 
             const genMatch = !cGen
                 || (cGen === uGen)
@@ -941,7 +941,7 @@
             if (cat.style || cat.division) {
                 const divShort = (cDivCfg && cDivCfg.code) ? cDivCfg.code : (cat.division ? cat.division.split(' ')[0] : '');
                 const genShort = cat.gender ? (cat.gender.toLowerCase().startsWith('f') ? 'F' : 'M') : '';
-                const styShort = (cStyCfg && cStyCfg.code) ? cStyCfg.code : (cat.style ? cat.style.split(' – ')[0].split(' - ')[0] : 'Member');
+                const styShort = (cStyCfg && cStyCfg.code) ? cStyCfg.code : (cat.style ? cat.style.split(/\s+[\u2013\u2014-]\s+/)[0] : 'Member');
 
                 const pillBtn = document.createElement('button');
                 pillBtn.type = 'button';
@@ -1037,16 +1037,25 @@
         }
 
         const tfaaMatches = findTfaaMatch(typedName);
+        let distinctStylesCount = 0;
 
-        // Automatic Canonical Name Enforcement:
-        // If an incoming variant (e.g., "Mark E. Tanner") unambiguously matches a single canonical person
-        // ("Mark Tanner") in the Member Database or 18-Month TFAA History, snap to the official name automatically.
+        // Automatic Canonical Name Enforcement & Distinct Style Counting
         if (tfaaMatches && tfaaMatches.length > 0) {
             const distinctNames = new Set();
+            const styleCodes    = new Set();
+
             tfaaMatches.forEach(function(m) {
                 const cName = (m.full_name || m.name || '').trim();
                 if (cName) distinctNames.add(cleanDeskName(cName));
+                
+                if (m.style) {
+                    const sCfg = findDeskStyleConfig(m.style);
+                    const code = (sCfg && sCfg.code) ? sCfg.code : m.style.split(/\s+[\u2013\u2014-]\s+/)[0].trim();
+                    styleCodes.add(code.replace(/[^a-z0-9]/gi, '').toLowerCase());
+                }
             });
+
+            distinctStylesCount = styleCodes.size;
 
             if (distinctNames.size === 1) {
                 const canonicalOfficial = (tfaaMatches[0].full_name || tfaaMatches[0].name || '').trim();
@@ -1069,7 +1078,9 @@
 
             const canSetDiv   = divEl && historyRecord.division && (!preserveExisting || !divEl.value || divEl.value === 'No Show');
             const canSetGen   = genEl && historyRecord.gender && (!preserveExisting || !genEl.value || genEl.value === 'No Show');
-            const canSetStyle = styleEl && historyRecord.style && (!preserveExisting || !styleEl.value || styleEl.value === 'No Show');
+            
+            // Only auto-fill the style if the archer has exactly ONE known distinct style to prevent masking multi-style options (e.g. Alexis Barker)
+            const canSetStyle = styleEl && historyRecord.style && (distinctStylesCount <= 1) && (!preserveExisting || !styleEl.value || styleEl.value === 'No Show');
 
             if (canSetDiv) matchDeskTfaaSelect(historyRecord.division, divEl);
             if (canSetGen) matchDeskTfaaSelect(historyRecord.gender, genEl);
