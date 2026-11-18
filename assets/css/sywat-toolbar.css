@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Toolbars, Auth Header & Inline Filter Controls
    Path: assets/css/sywat-toolbar.css
-   Version: 7.0.0
+   Version: 7.0.1
    ========================================================================== */
 
 /* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
@@ -276,15 +276,21 @@
         width: 100%;
     }
 
-    .sywat-auth-nav-link,
-    .sywat-auth-bar button.sywat-auth-dropdown-toggle {
+    .sywat-auth-bar .sywat-auth-drawer .sywat-auth-nav-link,
+    .sywat-auth-bar .sywat-auth-drawer button.sywat-auth-dropdown-toggle {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-start;
         align-items: center;
+        gap: 6px;
         width: 100%;
         padding: 10px 12px;
         box-sizing: border-box;
         text-align: left;
+    }
+
+    .sywat-auth-bar .sywat-auth-drawer .sywat-dropdown-caret {
+        margin-left: auto;
+        flex-shrink: 0;
     }
 
     .sywat-auth-dropdown-menu {
@@ -315,6 +321,8 @@
     }
 
     .sywat-auth-dropdown-menu a {
+        justify-content: flex-start;
+        text-align: left;
         padding: 10px 14px;
         white-space: normal;
     }
