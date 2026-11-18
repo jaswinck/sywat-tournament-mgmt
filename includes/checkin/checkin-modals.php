@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Modals
  * Path: includes/checkin/checkin-modals.php
- * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with live unpaid balance targets, multi-round format selection, First-Time/Lapsed Shooter Promotional Free Entry support, database-driven shooting styles, age divisions & pricing profiles, retired-record preservation, and household-wide unpaid family balance enforcement.
+ * Description: Renders Check-In, Edit Archer, and Add Walk-In modals with live unpaid balance targets, Rate tier selection, multi-round format selection, First-Time/Lapsed Shooter Promotional Free Entry support, database-driven shooting styles, age divisions & pricing profiles, retired-record preservation, and household-wide unpaid family balance enforcement.
  * Compliance: Pure view layer — zero DB writes, zero inline style/script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -344,7 +344,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label>Paid Option:</label>
+                            <label for="checkin_pay_option">Rate:</label>
                             <select name="checkin_pay_option" id="checkin_pay_option" required onchange="toggleFamilyBox('checkin')">
                                 <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>>Individual</option>
                                 <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>>Family</option>
@@ -560,7 +560,7 @@ if ( ! function_exists( 'sywat_desk_render_modals' ) ) {
                         </div>
 
                         <div class="sywat-field-group">
-                            <label>Paid Option:</label>
+                            <label for="edit_pay_option">Rate:</label>
                             <select name="edit_pay_option" id="edit_pay_option" required onchange="toggleFamilyBox('edit')">
                                 <option value="Individual" <?php selected( $curr_edit_pay_opt, 'Individual' ); ?>>Individual</option>
                                 <option value="Family" <?php selected( $curr_edit_pay_opt, 'Family' ); ?>>Family</option>
