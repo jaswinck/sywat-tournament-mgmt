@@ -5,7 +5,7 @@
  * Description: Host vs. TFAA 50/50 fee split math, dynamic pricing/round profile fee classes, household family cap calculations (honoring paid families even when not all family members check in), First-Time/Lapsed Shooter promoter tracking, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
  * Compliance: Pure library/renderer — zero direct SQL queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -818,7 +818,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                 <th style="width: 15%;">Division</th>
                                 <th style="width: 6%;">Gender</th>
                                 <th style="width: 18%;">Style</th>
-                                <th style="width: 14%;">Paid</th>
+                                <th style="width: 14%;">Rate</th>
                                 <th style="width: 6%; text-align: center;">Score</th>
                                 <th style="width: 6%; text-align: center;">X Count</th>
                             </tr>
