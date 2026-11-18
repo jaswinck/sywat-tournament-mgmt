@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.5.2
+   Version: 7.6.0
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -621,9 +621,169 @@
 .sywat-modal-repeater-table th:nth-child(5), .sywat-modal-repeater-table td:nth-child(5) { width: 16% !important; text-align: center !important; } /* Action */
 
 @media (max-width: 768px) {
-    /* Keep table totally locked even on mobile */
+    /* Keep modal repeater table totally locked even on mobile */
     .sywat-modal-body .sywat-table-responsive { overflow-x: hidden !important; }
     .sywat-modal-repeater-table { table-layout: fixed !important; }
+
+    /* Opt-In Stacked Mobile Card Layout (.sywat-table-mobile-cards) */
+    .sywat-table-responsive:has(.sywat-table-mobile-cards) {
+        overflow-x: visible;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table.sywat-table-mobile-cards,
+    .sywat-table.sywat-table-mobile-cards {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        border-collapse: separate;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards thead {
+        display: none;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody tr {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        box-sizing: border-box;
+        background-color: #ffffff;
+        border: 1px solid var(--sywat-border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody td {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--sywat-border-light);
+        text-align: right;
+    }
+
+    /* Reset fixed desktop column width utilities inside mobile cards */
+    .sywat-table.sywat-table-mobile-cards td[class*="sywat-col-"] {
+        width: 100%;
+        text-align: right !important;
+    }
+
+    .sywat-table.sywat-table-mobile-cards tbody td[data-label]::before {
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--sywat-text-muted);
+        text-align: left;
+        flex-shrink: 0;
+    }
+
+    /* First Cell: Shooter Identity Card Header */
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody td:first-child {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 4px;
+        background-color: var(--sywat-surface-alt);
+        margin: -10px -12px 4px -12px;
+        width: calc(100% + 24px);
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--sywat-border-light);
+        border-radius: 7px 7px 0 0;
+        text-align: left !important;
+    }
+
+    .sywat-table.sywat-table-mobile-cards tbody td:first-child::before {
+        display: none;
+    }
+
+    /* Empty-state row spanning all columns */
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody td[colspan] {
+        justify-content: center;
+        text-align: center !important;
+        background-color: transparent;
+        margin: 0;
+        width: 100%;
+        padding: 16px 8px;
+        border-bottom: none;
+    }
+
+    .sywat-table.sywat-table-mobile-cards tbody td[colspan]::before {
+        display: none;
+    }
+
+    /* Score Entry Inputs inside Mobile Cards */
+    .sywat-table.sywat-table-mobile-cards tbody td input[type="number"],
+    .sywat-table.sywat-table-mobile-cards tbody td input[type="text"],
+    .sywat-table.sywat-table-mobile-cards tbody td select {
+        width: auto;
+        min-width: 96px;
+        max-width: 160px;
+        height: 38px;
+        min-height: 38px;
+        text-align: center;
+    }
+
+    /* Last Cell: Full-Width Touch Action Bar */
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody td:last-child {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 6px;
+        padding: 10px 0 2px 0;
+        border-bottom: none;
+        text-align: left !important;
+    }
+
+    .sywat-table.sywat-table-mobile-cards tbody td:last-child::before {
+        display: none;
+    }
+
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
+        justify-content: stretch !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+    }
+
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions form,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical form,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions > .sywat-btn,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical > .sywat-btn,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical > .sywat-badge {
+        flex: 1 1 120px !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+    }
+
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions .sywat-btn,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical .sywat-btn,
+    .sywat-table.sywat-table-mobile-cards .sywat-table-actions-vertical .sywat-badge {
+        width: 100% !important;
+        max-width: none !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        font-size: 13px !important;
+    }
 }
 
 /* Print Engine & Invoice Layout */
@@ -643,8 +803,13 @@
 
 @media print {
     .sywat-table-responsive { overflow: visible !important; }
-    .sywat-table { width: 100% !important; min-width: 0 !important; border-collapse: collapse !important; page-break-inside: auto !important; }
-    .sywat-table tr { page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: auto !important; }
+    .sywat-table,
+    .sywat-table.sywat-table-mobile-cards { display: table !important; width: 100% !important; min-width: 0 !important; border-collapse: collapse !important; page-break-inside: auto !important; }
+    .sywat-table.sywat-table-mobile-cards thead { display: table-header-group !important; }
+    .sywat-table.sywat-table-mobile-cards tbody { display: table-row-group !important; }
+    .sywat-table.sywat-table-mobile-cards tr { display: table-row !important; page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: auto !important; }
+    .sywat-table.sywat-table-mobile-cards td { display: table-cell !important; width: auto !important; border-bottom: 1px solid #f0f0f1 !important; padding: 8px 10px !important; }
+    .sywat-table.sywat-table-mobile-cards td::before { content: none !important; }
     .sywat-table thead { display: table-header-group !important; }
     .invoice-header-val, .invoice-fee-table th, .blue-shade { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
