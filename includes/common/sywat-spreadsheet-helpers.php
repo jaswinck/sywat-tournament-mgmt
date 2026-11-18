@@ -2,10 +2,10 @@
 /**
  * Shared Common Helper: Native .xlsx Spreadsheet Builder & Parser
  * Path: includes/common/sywat-spreadsheet-helpers.php
- * Description: Provides pure, zero-dependency OpenXML (.xlsx) template generation with Excel Data Validation dropdowns and hardened .xlsx worksheet parsing using PHP ZipArchive and SimpleXML.
+ * Description: Provides pure, zero-dependency OpenXML (.xlsx) 8-column template generation with Excel Data Validation dropdowns (including distance-neutral 3-tier Category / Rate selection: Cub, Youth, Adult) and hardened .xlsx worksheet parsing using PHP ZipArchive and SimpleXML.
  * Compliance: Pure helper layer — zero database queries, zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Return the standardized 9-column header labels for bulk registration spreadsheets.
+ * Return the standardized 8-column header labels for bulk registration spreadsheets.
  *
- * @return array Ordered list of 9 column header strings (Columns A–I).
+ * @return array Ordered list of 8 column header strings (Columns A–H).
  */
 if ( ! function_exists( 'sywat_get_import_template_headers' ) ) {
     function sywat_get_import_template_headers() {
@@ -26,8 +26,7 @@ if ( ! function_exists( 'sywat_get_import_template_headers' ) ) {
             'Archer Name',
             'Line Day (Friday / Saturday / Sunday)',
             'Line Time (HH:MM AM/PM)',
-            'Distance (10 yds / 20 yds)',
-            'Rate Tier (Youth / Adult)',
+            'Category / Rate (Cub / Youth / Adult)',
             'Paid Status (Paid / Unpaid)',
         );
     }
@@ -58,10 +57,10 @@ if ( ! function_exists( 'sywat_get_standard_import_time_slots' ) ) {
 
 /**
  * Normalize any time string or Excel day-fraction into a canonical alphanumeric key
- * (e.g., "09:00 AM", "9:00 AM", "9AM", "09:00:00" -> "9am"; "6:30 PM", "18:30" -> "630pm").
+ * (e.g., "09:00 AM", "9:00 AM", "9AM", "09:00:00" -> "900am"; "6:30 PM", "18:30" -> "630pm").
  *
  * @param string $raw_time Raw time string from spreadsheet or tournament line config.
- * @return string          Canonical lowercase alphanumeric time token (e.g., "10am", "630pm").
+ * @return string          Canonical lowercase alphanumeric time token (e.g., "1000am", "630pm").
  */
 if ( ! function_exists( 'sywat_normalize_import_line_time' ) ) {
     function sywat_normalize_import_line_time( $raw_time ) {
@@ -91,14 +90,14 @@ if ( ! function_exists( 'sywat_normalize_import_line_time' ) ) {
         // Handle HH:MM:SS AM/PM (e.g., "10:00:00 AM" -> "10:00 AM")
         $val = preg_replace( '/(\d{1,2}:\d{2}):\d{2}\s*(AM|PM)/i', '$1 $2', $val );
 
-        // Strip leading zero on hour ("09:00 AM" -> "9:00 AM", "09AM" -> "9AM")
-        $val = preg_replace( '/\b0(\d)(?::(\d{2}))?\s*(AM|PM)\b/i', '$1:$2 $3', $val );
-        $val = str_replace( ': ', ' ', $val );
+        $compact = strtolower( preg_replace( '/[^a-z0-9]/i', '', $val ) );
+        if ( preg_match( '/^0*(\d{1,2})(\d{2})?(am|pm)$/', $compact, $tm ) ) {
+            $hr   = (string) intval( $tm[1] );
+            $mins = ( isset( $tm[2] ) && $tm[2] !== '' ) ? $tm[2] : '00';
+            return $hr . $mins . $tm[3];
+        }
 
-        // Strip ":00" minutes ("10:00 AM" -> "10 AM")
-        $val = preg_replace( '/\b(\d{1,2}):00\s*(AM|PM)\b/i', '$1 $2', $val );
-
-        return strtolower( preg_replace( '/[^a-z0-9]/i', '', $val ) );
+        return $compact;
     }
 }
 
@@ -138,7 +137,7 @@ if ( ! function_exists( 'sywat_format_template_line_time' ) ) {
 }
 
 /**
- * Convert an Excel column letter reference (e.g., "A", "I", "AA") to a 0-based column index.
+ * Convert an Excel column letter reference (e.g., "A", "H", "AA") to a 0-based column index.
  *
  * @param string $col_letters Uppercase or lowercase column letters.
  * @return int                0-based column index.
@@ -156,14 +155,13 @@ if ( ! function_exists( 'sywat_xlsx_col_letter_to_index' ) ) {
 }
 
 /**
- * Build a native .xlsx workbook with strict Excel Data Validation dropdowns:
+ * Build a native 8-column .xlsx workbook with strict Excel Data Validation dropdowns:
  * - Col A (Contact Name), Col C (Email), Col D (Archer Name): Unrestricted text
  * - Col B (Phone): Formatted as explicit Text (@) with 10-digit prompt
  * - Col E (Line Day): Strict Stop dropdown -> Friday, Saturday, Sunday
  * - Col F (Line Time): Strict Stop dropdown -> 30-min increments 7:00 AM–10:00 PM ('Tournament Info'!$G$2:$G$32)
- * - Col G (Distance): Strict Stop dropdown -> 10 yds, 20 yds
- * - Col H (Rate Tier): Strict Stop dropdown -> Youth, Adult
- * - Col I (Paid Status): Strict Stop dropdown -> Paid, Unpaid
+ * - Col G (Category / Rate): Strict Stop dropdown -> Cub, Youth, Adult
+ * - Col H (Paid Status): Strict Stop dropdown -> Paid, Unpaid
  * - Sheet 2 ("Tournament Info"): Active tournament lines, capacities, rates, Family Cap info, and G2:G32 time slots.
  *
  * @param string $filepath       Destination file path for the generated .xlsx archive.
@@ -322,9 +320,9 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
             . '</cellXfs>'
             . '</styleSheet>';
 
-        // 6. Build Sheet 1: Roster Import
+        // 6. Build Sheet 1: Roster Import (8 Columns: A–H)
         $headers     = sywat_get_import_template_headers();
-        $col_letters = array( 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I' );
+        $col_letters = array( 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' );
 
         $sheet1_rows_xml = '<row r="1" ht="24" customHeight="1">';
         foreach ( $headers as $c_idx => $h_text ) {
@@ -342,9 +340,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
             . '<c r="D2" t="s"><v>' . $add_ss( 'John Smith' ) . '</v></c>'
             . '<c r="E2" t="s"><v>' . $add_ss( $first_day ) . '</v></c>'
             . '<c r="F2" s="3" t="s"><v>' . $add_ss( $first_time ) . '</v></c>'
-            . '<c r="G2" t="s"><v>' . $add_ss( '20 yds' ) . '</v></c>'
-            . '<c r="H2" t="s"><v>' . $add_ss( 'Adult' ) . '</v></c>'
-            . '<c r="I2" t="s"><v>' . $add_ss( 'Paid' ) . '</v></c>'
+            . '<c r="G2" t="s"><v>' . $add_ss( 'Adult' ) . '</v></c>'
+            . '<c r="H2" t="s"><v>' . $add_ss( 'Paid' ) . '</v></c>'
             . '</row>';
 
         // Rows 3..250: Pre-format Phone (Col B -> Text @) and Line Time (Col F -> Time Display)
@@ -359,9 +356,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
         // - Col B: Phone 10-digit length guidance (warning)
         // - Col E: Line Day strict dropdown (stop) -> Friday, Saturday, Sunday
         // - Col F: Line Time strict dropdown (stop) -> 30-min increments 7:00 AM–10:00 PM ('Tournament Info'!$G$2:$G$32)
-        // - Col G: Distance strict dropdown (stop) -> 10 yds, 20 yds
-        // - Col H: Rate Tier strict dropdown (stop) -> Youth, Adult
-        // - Col I: Paid Status strict dropdown (stop) -> Paid, Unpaid
+        // - Col G: Category / Rate strict dropdown (stop) -> Cub, Youth, Adult
+        // - Col H: Paid Status strict dropdown (stop) -> Paid, Unpaid
         $last_time_row = count( $time_slots ) + 1;
         $dv_items      = array();
 
@@ -381,19 +377,14 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
             . ' sqref="F2:F250"><formula1>\'Tournament Info\'!$G$2:$G$' . $last_time_row . '</formula1></dataValidation>';
 
         $dv_items[] = '<dataValidation type="list" errorStyle="stop" allowBlank="1" showInputMessage="1" showErrorMessage="1"'
-            . ' promptTitle="Target Distance" prompt="Select 10 yds (Cubs — always Youth rate) or 20 yds."'
-            . ' errorTitle="Invalid Distance" error="Please select either 10 yds or 20 yds."'
-            . ' sqref="G2:G250"><formula1>"10 yds,20 yds"</formula1></dataValidation>';
-
-        $dv_items[] = '<dataValidation type="list" errorStyle="stop" allowBlank="1" showInputMessage="1" showErrorMessage="1"'
-            . ' promptTitle="Rate Tier" prompt="Select Youth or Adult. Note: 10 yds automatically locks in the Youth rate."'
-            . ' errorTitle="Invalid Rate Tier" error="Please select either Youth or Adult."'
-            . ' sqref="H2:H250"><formula1>"Youth,Adult"</formula1></dataValidation>';
+            . ' promptTitle="Category / Rate" prompt="Select Cub, Youth, or Adult from the dropdown."'
+            . ' errorTitle="Invalid Category / Rate" error="Please select Cub, Youth, or Adult from the dropdown list."'
+            . ' sqref="G2:G250"><formula1>"Cub,Youth,Adult"</formula1></dataValidation>';
 
         $dv_items[] = '<dataValidation type="list" errorStyle="stop" allowBlank="1" showInputMessage="1" showErrorMessage="1"'
             . ' promptTitle="Paid Status" prompt="Select Paid ($0.00 due at check-in) or Unpaid (carries balance to Check-In)."'
             . ' errorTitle="Invalid Paid Status" error="Please select either Paid or Unpaid."'
-            . ' sqref="I2:I250"><formula1>"Paid,Unpaid"</formula1></dataValidation>';
+            . ' sqref="H2:H250"><formula1>"Paid,Unpaid"</formula1></dataValidation>';
 
         $sheet1_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -405,9 +396,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
             . '<col min="4" max="4" width="24" customWidth="1"/>'
             . '<col min="5" max="5" width="34" customWidth="1"/>'
             . '<col min="6" max="6" width="24" customWidth="1"/>'
-            . '<col min="7" max="7" width="26" customWidth="1"/>'
-            . '<col min="8" max="8" width="24" customWidth="1"/>'
-            . '<col min="9" max="9" width="26" customWidth="1"/>'
+            . '<col min="7" max="7" width="34" customWidth="1"/>'
+            . '<col min="8" max="8" width="26" customWidth="1"/>'
             . '</cols>'
             . '<sheetData>' . $sheet1_rows_xml . '</sheetData>'
             . '<dataValidations count="' . count( $dv_items ) . '">' . implode( '', $dv_items ) . '</dataValidations>'
@@ -419,8 +409,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
         $meta_pairs = array(
             array( 'Tournament Name', $tourn_name !== '' ? $tourn_name : 'General Template', 'Replace Example Row 2 on the Roster Import tab before uploading.' ),
             array( 'Start Date', $tourn_date_disp, 'Used to calculate NFAA age divisions for archers in the Member Directory.' ),
-            array( 'Adult Rate (20 yds)', '$' . $adult_rate, 'Applied when Distance = 20 yds and Rate Tier = Adult.' ),
-            array( 'Youth Rate (10 yds & 20 yds)', '$' . $youth_rate, '10 yds always bills at Youth rate; 20 yds uses Rate Tier (Youth vs. Adult).' ),
+            array( 'Adult Rate', '$' . $adult_rate, 'Applied when Category / Rate = Adult.' ),
+            array( 'Cub & Youth Rate', '$' . $youth_rate, 'Applied when Category / Rate = Cub or Youth.' ),
             array( 'Household Family Cap', $family_cap, 'Automatically calculated per line using matching Phone (or Contact Name).' ),
         );
 
@@ -441,8 +431,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
         $left_rows[ $r_num ] = '<c r="A' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Configured Line Name' ) . '</v></c>'
             . '<c r="B' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Line Day (Col E)' ) . '</v></c>'
             . '<c r="C' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Line Time (Col F)' ) . '</v></c>'
-            . '<c r="D' . $r_num . '" s="1" t="s"><v>' . $add_ss( '20yd Max Cap' ) . '</v></c>'
-            . '<c r="E' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Cub (10yd) Max Cap' ) . '</v></c>';
+            . '<c r="D' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Standard Max Cap' ) . '</v></c>'
+            . '<c r="E' . $r_num . '" s="1" t="s"><v>' . $add_ss( 'Cub Max Cap' ) . '</v></c>';
         $r_num++;
 
         foreach ( $line_info_rows as $li ) {
@@ -481,8 +471,8 @@ if ( ! function_exists( 'sywat_build_import_template_xlsx' ) ) {
             . '<col min="1" max="1" width="28" customWidth="1"/>'
             . '<col min="2" max="2" width="24" customWidth="1"/>'
             . '<col min="3" max="3" width="56" customWidth="1"/>'
-            . '<col min="4" max="4" width="16" customWidth="1"/>'
-            . '<col min="5" max="5" width="20" customWidth="1"/>'
+            . '<col min="4" max="4" width="18" customWidth="1"/>'
+            . '<col min="5" max="5" width="16" customWidth="1"/>'
             . '<col min="6" max="6" width="4" customWidth="1"/>'
             . '<col min="7" max="7" width="24" customWidth="1"/>'
             . '</cols>'
