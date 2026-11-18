@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical official archer name enforcement (Member DB + 18-month TFAA history) and First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -266,7 +266,20 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
         $closed_lines_raw = get_option( 'sywat_closed_lines_' . $t_slug, array() );
         $closed_lines_map = is_array( $closed_lines_raw ) ? array_flip( array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) ) : array();
 
-        // O(1) Duplicate & Active Line Occupancy Maps
+        $has_match_keys_fn = function_exists( 'sywat_normalize_archer_match_keys' );
+        $build_match_keys  = function( $raw_name ) use ( $has_match_keys_fn ) {
+            if ( $has_match_keys_fn ) {
+                return sywat_normalize_archer_match_keys( $raw_name );
+            }
+            $norm  = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', (string) $raw_name ) ) ) );
+            $parts = $norm !== '' ? explode( ' ', $norm ) : array();
+            return array(
+                'exact' => $norm,
+                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+            );
+        };
+
+        // O(1) Duplicate & Active Line Occupancy Maps (indexed by both Exact and First+Last keys)
         $dup_lookup       = array();
         $line_dist_counts = array();
         if ( is_array( $registrations ) ) {
@@ -283,9 +296,14 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 }
                 $ex_line = trim( (string) $ex['line_index'] );
                 $ex_dist = isset( $ex['distance'] ) ? trim( (string) $ex['distance'] ) : '20yd';
-                $dup_key = $ex_line . '|' . strtolower( $ex_dist ) . '|' . strtolower( trim( (string) $ex['name'] ) );
+                $ex_keys = $build_match_keys( $ex['name'] );
 
-                $dup_lookup[ $dup_key ] = true;
+                if ( $ex_keys['exact'] !== '' ) {
+                    $dup_lookup[ $ex_line . '|' . strtolower( $ex_dist ) . '|ex|' . $ex_keys['exact'] ] = true;
+                }
+                if ( $ex_keys['fl'] !== '' && strpos( $ex_keys['fl'], '___' ) !== false ) {
+                    $dup_lookup[ $ex_line . '|' . strtolower( $ex_dist ) . '|fl|' . $ex_keys['fl'] ] = true;
+                }
 
                 if ( strcasecmp( $ex_status, 'Waitlist' ) !== 0 ) {
                     if ( ! isset( $line_dist_counts[ $ex_line ][ $ex_dist ] ) ) {
@@ -480,7 +498,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Import aborted due to formatting errors.</div>';
         }
 
-        // Pass 2: Memoized Profile/Fee Resolution & Atomic Transactional Persistence
+        // Pass 2: Memoized Canonical Profile/Fee Resolution & Atomic Transactional Persistence
         $imported_count   = 0;
         $waitlisted_count = 0;
         $skipped_dup      = 0;
@@ -497,24 +515,37 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
 
         try {
             foreach ( $parsed_shooters as $s ) {
-                $line_idx = $s['line_idx'];
-                $dist_val = $s['distance'];
-                $tier_val = $s['rate_tier'];
-                $name_key = strtolower( trim( $s['archer_name'] ) );
-                $dup_key  = $line_idx . '|' . strtolower( $dist_val ) . '|' . $name_key;
+                $line_idx    = $s['line_idx'];
+                $dist_val    = $s['distance'];
+                $tier_val    = $s['rate_tier'];
+                $profile_key = strtolower( trim( $s['archer_name'] ) ) . '|' . strtolower( trim( $s['email'] ) ) . '|' . preg_replace( '/\D+/', '', $s['phone'] );
 
-                if ( isset( $dup_lookup[ $dup_key ] ) ) {
+                // Memoized Member Directory + 18-Month TFAA canonical resolution
+                if ( ! isset( $profile_cache[ $profile_key ] ) ) {
+                    $profile_cache[ $profile_key ] = $has_resolve_fn
+                        ? sywat_resolve_archer_intake_profile(
+                            $s['archer_name'],
+                            $tourn_date,
+                            array(
+                                'email' => $s['email'],
+                                'phone' => $s['phone'],
+                            )
+                        )
+                        : array();
+                }
+                $resolved       = $profile_cache[ $profile_key ];
+                $canonical_name = ! empty( $resolved['canonical_name'] ) ? trim( (string) $resolved['canonical_name'] ) : $s['archer_name'];
+                $cand_keys      = $build_match_keys( $canonical_name );
+
+                $ex_dup_key = $line_idx . '|' . strtolower( $dist_val ) . '|ex|' . $cand_keys['exact'];
+                $fl_dup_key = ( $cand_keys['fl'] !== '' && strpos( $cand_keys['fl'], '___' ) !== false )
+                    ? ( $line_idx . '|' . strtolower( $dist_val ) . '|fl|' . $cand_keys['fl'] )
+                    : '';
+
+                if ( isset( $dup_lookup[ $ex_dup_key ] ) || ( $fl_dup_key !== '' && isset( $dup_lookup[ $fl_dup_key ] ) ) ) {
                     $skipped_dup++;
                     continue;
                 }
-
-                // Memoized Member Directory lookup (runs at most once per unique archer name)
-                if ( ! isset( $profile_cache[ $name_key ] ) ) {
-                    $profile_cache[ $name_key ] = $has_resolve_fn
-                        ? sywat_resolve_archer_intake_profile( $s['archer_name'], $tourn_date )
-                        : array();
-                }
-                $resolved = $profile_cache[ $name_key ];
 
                 $final_div = ! empty( $resolved['division'] )
                     ? $resolved['division']
@@ -534,17 +565,17 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 }
 
                 // O(1) Line Capacity & Closed-Line Check
-                $l_meta         = $line_meta_by_idx[ $line_idx ];
-                $current_count  = isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ? $line_dist_counts[ $line_idx ][ $dist_val ] : 0;
-                $max_capacity   = ( $dist_val === 'Cub' ) ? $l_meta['cap_Cub'] : $l_meta['cap_20yd'];
-                $is_waitlist    = ( $l_meta['is_closed'] || $current_count >= $max_capacity );
+                $l_meta        = $line_meta_by_idx[ $line_idx ];
+                $current_count = isset( $line_dist_counts[ $line_idx ][ $dist_val ] ) ? $line_dist_counts[ $line_idx ][ $dist_val ] : 0;
+                $max_capacity  = ( $dist_val === 'Cub' ) ? $l_meta['cap_Cub'] : $l_meta['cap_20yd'];
+                $is_waitlist   = ( $l_meta['is_closed'] || $current_count >= $max_capacity );
 
                 $new_reg = array(
                     'id'              => uniqid( 'reg_' ),
                     'tournament'      => $tourn_name,
                     'line_index'      => $line_idx,
                     'line_name'       => $s['line_name'],
-                    'name'            => $s['archer_name'],
+                    'name'            => $canonical_name,
                     'phone'           => $s['phone'],
                     'email'           => $s['email'],
                     'distance'        => $dist_val,
@@ -568,7 +599,10 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     $registrations[] = $new_reg;
                 }
 
-                $dup_lookup[ $dup_key ] = true;
+                $dup_lookup[ $ex_dup_key ] = true;
+                if ( $fl_dup_key !== '' ) {
+                    $dup_lookup[ $fl_dup_key ] = true;
+                }
 
                 if ( $is_waitlist ) {
                     $waitlisted_count++;
