@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-checkin.js
  * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 (function() {
@@ -846,22 +846,9 @@
     function updateNameToOfficial(prefix, officialName) {
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (nameInput && officialName) {
-            delete nameInput.dataset.skipAutoNormalize;
             nameInput.value = officialName;
             autoFillOnNameChange(prefix, false);
         }
-    }
-
-    function keepEnteredName(prefix) {
-        const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
-        if (!nameInput) return;
-        const rawOriginal = nameInput.dataset.normalizedFrom || '';
-        nameInput.dataset.skipAutoNormalize = '1';
-        delete nameInput.dataset.normalizedFrom;
-        if (rawOriginal) {
-            nameInput.value = rawOriginal;
-        }
-        evaluateTfaaStatus(prefix);
     }
 
     function evaluateTfaaStatus(prefix) {
@@ -928,11 +915,13 @@
 
             const genMatch = (cGen === uGen) || (cGen && uGen && cGen.charAt(0) === uGen.charAt(0));
 
-            const cStylePrefix = cSty.split(' –')[0].split(' -')[0].trim();
-            const uStylePrefix = uSty.split(' –')[0].split(' -')[0].trim();
+            const cStylePrefix = cSty.split(' – ')[0].split(' - ')[0].trim();
+            const uStylePrefix = uSty.split(' – ')[0].split(' - ')[0].trim();
+            const cStyleClean  = cStylePrefix.replace(/[^a-z0-9]/g, '');
+            const uStyleClean  = uStylePrefix.replace(/[^a-z0-9]/g, '');
             const styleMatch   = (cStyCfg && uStyCfg && cStyCfg.label === uStyCfg.label)
                 || (cSty === uSty)
-                || (cStylePrefix === uStylePrefix)
+                || (cStyleClean.length >= 2 && cStyleClean === uStyleClean)
                 || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
             if (divMatch && genMatch && (styleMatch || !cSty)) {
@@ -981,10 +970,10 @@
         const exactNameMatchRecord = tfaaMatches.find(function(m) {
             return cleanDeskName(m.full_name || m.name) === cleanTyped;
         });
-        const officialName  = exactNameMatchRecord ? (exactNameMatchRecord.full_name || exactNameMatchRecord.name) : (tfaaMatches[0].full_name || tfaaMatches[0].name || '');
-        const cleanOfficial = cleanDeskName(officialName);
-        const isNameMatch   = (cleanTyped === cleanOfficial);
-        const hasMemberSrc  = tfaaMatches.some(function(m) { return m.source === 'member_db'; });
+        const officialName   = exactNameMatchRecord ? (exactNameMatchRecord.full_name || exactNameMatchRecord.name) : (tfaaMatches[0].full_name || tfaaMatches[0].name || '');
+        const cleanOfficial  = cleanDeskName(officialName);
+        const isNameMatch    = (cleanTyped === cleanOfficial);
+        const hasMemberSrc   = tfaaMatches.some(function(m) { return m.source === 'member_db'; });
         const normalizedFrom = nameInput.dataset.normalizedFrom || '';
 
         let badgeText = '';
@@ -1007,8 +996,7 @@
         }
 
         if (isNameMatch && normalizedFrom && cleanDeskName(normalizedFrom) !== cleanTyped) {
-            badgeText += '<br><span class="sywat-badge-subtext">↳ Auto-matched official name from "<strong>' + escapeHtmlDesk(normalizedFrom) + '</strong>"</span>';
-            badgeText += '<button type="button" class="sywat-btn-use-official" onclick="keepEnteredName(\'' + prefix + '\')">↩ Keep "' + escapeHtmlDesk(normalizedFrom) + '"</button>';
+            badgeText += '<br><span class="sywat-badge-subtext">↳ Standardized from "<strong>' + escapeHtmlDesk(normalizedFrom) + '</strong>"</span>';
         } else if (!isNameMatch && officialName !== '') {
             badgeText += '<br><span class="sywat-badge-subtext">↳ Official Member Name: <strong>' + escapeHtmlDesk(officialName) + '</strong></span>';
             badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
@@ -1024,7 +1012,6 @@
         const typedName = nameInput.value.trim();
         if (!typedName) {
             delete nameInput.dataset.normalizedFrom;
-            delete nameInput.dataset.skipAutoNormalize;
             if (prefix === 'walkin') {
                 const divEl   = document.getElementById('walkin_division');
                 const genEl   = document.getElementById('walkin_gender');
@@ -1043,7 +1030,7 @@
         // Automatic Canonical Name Enforcement:
         // If an incoming variant (e.g., "Mark E. Tanner") unambiguously matches a single canonical person
         // ("Mark Tanner") in the Member Database or 18-Month TFAA History, snap to the official name automatically.
-        if (tfaaMatches && tfaaMatches.length > 0 && nameInput.dataset.skipAutoNormalize !== '1') {
+        if (tfaaMatches && tfaaMatches.length > 0) {
             const distinctNames = new Set();
             tfaaMatches.forEach(function(m) {
                 const cName = (m.full_name || m.name || '').trim();
@@ -1103,7 +1090,6 @@
         if (nameInput) {
             nameInput.value = '';
             delete nameInput.dataset.normalizedFrom;
-            delete nameInput.dataset.skipAutoNormalize;
         }
 
         const roundSel = document.getElementById('walkin_pricing_profile');
@@ -1274,7 +1260,6 @@
 
         if (archerNameInput) {
             if (!archerNameInput.value || archerNameInput.value === prevVal) {
-                delete archerNameInput.dataset.skipAutoNormalize;
                 delete archerNameInput.dataset.normalizedFrom;
                 archerNameInput.value = input.value;
                 autoFillOnNameChange('walkin', false);
@@ -1319,7 +1304,6 @@
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         evaluateTfaaStatus: evaluateTfaaStatus,
-        keepEnteredName: keepEnteredName,
         isWalkinPromoEligible: isWalkinPromoEligible,
         openWalkinModal: openWalkinModal,
         closeWalkinModal: closeWalkinModal,
@@ -1332,7 +1316,6 @@
     window.toggleUnpaidBanner         = toggleUnpaidBanner;
     window.loadTfaaCategory           = loadTfaaCategory;
     window.updateNameToOfficial       = updateNameToOfficial;
-    window.keepEnteredName            = keepEnteredName;
     window.evaluateTfaaStatus         = evaluateTfaaStatus;
     window.closeWalkinModal           = closeWalkinModal;
     window.openWalkinModal            = openWalkinModal;
@@ -1366,7 +1349,6 @@
         const walkinInput = document.getElementById('walkin_name_input');
         if (walkinInput) {
             walkinInput.addEventListener('input', function() {
-                delete this.dataset.skipAutoNormalize;
                 delete this.dataset.normalizedFrom;
                 autoFillOnNameChange('walkin', false);
             });
@@ -1389,7 +1371,6 @@
         const checkinArcherNameEl = document.getElementById('checkin_archer_name');
         if (checkinArcherNameEl) {
             checkinArcherNameEl.addEventListener('input', function() {
-                delete this.dataset.skipAutoNormalize;
                 delete this.dataset.normalizedFrom;
                 autoFillOnNameChange('checkin', false);
             });
