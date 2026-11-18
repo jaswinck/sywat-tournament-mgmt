@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical official archer name enforcement (Member DB + 18-month TFAA history) and First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -547,11 +547,18 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     continue;
                 }
 
-                $final_div = ! empty( $resolved['division'] )
-                    ? $resolved['division']
-                    : ( $dist_val === 'Cub' ? 'Cub (8 - 11)' : ( $tier_val === 'Youth' ? 'Youth (12 - 14)' : 'Adult (18 - 49)' ) );
-                if ( $has_norm_div_fn ) {
-                    $final_div = sywat_shooting_styles_normalize_division( $final_div );
+                // Use verified division from Member Directory / 18-Month TFAA history when it matches
+                // the imported distance & rate tier; leave blank ('') for unmatched shooters so Check-In
+                // resolves or prompts cleanly instead of guessing a default division.
+                $final_div = '';
+                if ( ! empty( $resolved['division'] ) ) {
+                    $res_dist_ok = empty( $resolved['distance'] ) || $resolved['distance'] === $dist_val;
+                    $res_tier_ok = empty( $resolved['rate_tier'] ) || $resolved['rate_tier'] === $tier_val;
+                    if ( $res_dist_ok && $res_tier_ok ) {
+                        $final_div = $has_norm_div_fn
+                            ? sywat_shooting_styles_normalize_division( $resolved['division'] )
+                            : trim( (string) $resolved['division'] );
+                    }
                 }
 
                 // Memoized Fee Calculation (runs at most once per unique division + distance + tier)
@@ -585,6 +592,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                     'pricing_profile' => $default_prof_key,
                     'is_promo_free'   => false,
                     'paid'            => $is_waitlist ? 'Waitlist' : $tier_val,
+                    'rate_type'       => $tier_val,
                     'booking_id'      => '',
                     'family_id'       => $s['family_key'],
                     'balance_due'     => $is_waitlist ? 0.00 : $shooter_due,
