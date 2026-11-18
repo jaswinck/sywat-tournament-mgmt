@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Modal Views
  * Path: includes/roster/roster-modals.php
- * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, multi-round format selection, database-driven division/style/pricing controls, Promotional Free Entry support, and line-scoped family group assignment.
+ * Description: Renders the Edit Archer Registration modal with Registration Status (Pre-Reg vs. Waitlist) synchronization, multi-round format selection, database-driven division/style/rate controls, Promotional Free Entry support, and line-scoped family group assignment.
  * Compliance: Pure view layer — zero DB writes, zero inline style/script attributes, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -141,7 +141,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                 <div class="sywat-modal-header">
                     <div>
                         <h3>✏️ Edit Archer Registration</h3>
-                        <div class="sywat-subtitle">Update registration status, round format, division, shooting line, or payment category details.</div>
+                        <div class="sywat-subtitle">Update registration status, round format, division, shooting line, or rate details.</div>
                     </div>
                     <button type="button" class="sywat-modal-close" aria-label="Close Edit Archer Modal" data-sywat-action="close-edit-archer-modal">&times;</button>
                 </div>
@@ -359,7 +359,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                                 </div>
 
                                 <div class="sywat-field-group">
-                                    <label for="edit_pay_option">Paid Option</label>
+                                    <label for="edit_pay_option">Rate</label>
                                     <select name="edit_pay_option" id="edit_pay_option" required data-sywat-action="roster-edit-pay-change">
                                         <option value="Individual" <?php selected( $curr_pay_opt, 'Individual' ); ?>><?php echo esc_html( $ind_rate_label ); ?></option>
                                         <option value="Family" <?php selected( $curr_pay_opt, 'Family' ); ?>><?php echo esc_html( $fam_rate_label ); ?></option>
@@ -392,7 +392,7 @@ if ( ! function_exists( 'sywat_render_edit_archer_modal' ) ) {
                             </div>
 
                             <div class="sywat-calculated-status-box">
-                                <span class="sywat-calculated-status-label">Calculated Paid Status:</span>
+                                <span class="sywat-calculated-status-label">Calculated Rate:</span>
                                 <span id="edit_paid_status_display" class="sywat-calculated-status-value"><?php echo esc_html( $default_paid_label ); ?></span>
                             </div>
                         </div>
