@@ -1,15 +1,17 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, TFAA multi-style profile pills, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 (function() {
     'use strict';
 
     window.SYWAT = window.SYWAT || {};
+
+    let cachedUnifiedShooters = null;
 
     function escapeHtmlDesk(str) {
         if (!str) return '';
@@ -23,6 +25,193 @@
     function cleanDeskName(str) {
         if (!str) return '';
         return String(str).replace(/[\s\u00a0]+/g, ' ').trim().toLowerCase();
+    }
+
+    /**
+     * Build normalized exact and First+Last (+ generational suffix) keys for smart archer name matching.
+     * Folds middle initials/names (e.g., "Mark E. Tanner" -> "mark___tanner") while preserving
+     * generational suffixes (Jr, Sr, II, III, IV) so parent and child records never collide.
+     */
+    function buildDeskNameMatchKeys(rawName) {
+        if (!rawName) {
+            return { exact: '', fl: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
+        }
+
+        let cleaned = String(rawName)
+            .replace(/\[.*?\]|\(.*?\)/g, '')
+            .replace(/[.,"\u00a0]/g, ' ')
+            .replace(/[^a-zA-Z0-9\s'-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+
+        if (!cleaned) {
+            return { exact: '', fl: '', suffix: '', tokenCount: 0, lastTokenLen: 0 };
+        }
+
+        const tokens = cleaned.split(' ');
+        const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th'];
+        let suffix = '';
+
+        if (tokens.length > 2 && suffixes.indexOf(tokens[tokens.length - 1]) !== -1) {
+            suffix = tokens.pop();
+        }
+
+        const coreExact = tokens.join(' ');
+        const exactKey  = suffix ? (coreExact + ' ' + suffix) : coreExact;
+        let flKey       = (tokens.length >= 2) ? (tokens[0] + '___' + tokens[tokens.length - 1]) : coreExact;
+
+        if (suffix && flKey) {
+            flKey += '___' + suffix;
+        }
+
+        const lastTok = tokens.length > 0 ? tokens[tokens.length - 1] : '';
+
+        return {
+            exact: exactKey,
+            fl: flKey,
+            suffix: suffix,
+            tokenCount: tokens.length,
+            lastTokenLen: lastTok.length
+        };
+    }
+
+    /**
+     * Build and cache a unified shooter array combining Member Database records
+     * (window.sywatDeskMembers) and 18-month TFAA historical standings (window.sywatDeskTfaaShooters).
+     */
+    function getUnifiedDeskShooterIndex() {
+        if (Array.isArray(cachedUnifiedShooters)) {
+            return cachedUnifiedShooters;
+        }
+
+        const tfaaRaw = [];
+        if (Array.isArray(window.sywatDeskTfaaShooters)) {
+            tfaaRaw.push.apply(tfaaRaw, window.sywatDeskTfaaShooters);
+        }
+        if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
+            tfaaRaw.push.apply(tfaaRaw, sywatTfaaShooters);
+        }
+        if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
+            tfaaRaw.push.apply(tfaaRaw, window.sywatRegData.tfaaShooters);
+        }
+        if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
+            tfaaRaw.push.apply(tfaaRaw, window.sywatDeskData.tfaaShooters);
+        }
+
+        const memberRaw = Array.isArray(window.sywatDeskMembers) ? window.sywatDeskMembers : [];
+
+        // Map TFAA entries by exact & First+Last keys to enrich Member Directory profiles with known styles
+        const tfaaByExact = Object.create(null);
+        const tfaaByFl    = Object.create(null);
+
+        for (let i = 0; i < tfaaRaw.length; i++) {
+            const t = tfaaRaw[i];
+            if (!t) continue;
+            const tName = (t.full_name || t.name || '').trim();
+            if (!tName) continue;
+            const tKeys = buildDeskNameMatchKeys(tName);
+            if (tKeys.exact) {
+                if (!tfaaByExact[tKeys.exact]) tfaaByExact[tKeys.exact] = [];
+                tfaaByExact[tKeys.exact].push(t);
+            }
+            if (tKeys.fl) {
+                if (!tfaaByFl[tKeys.fl]) tfaaByFl[tKeys.fl] = [];
+                tfaaByFl[tKeys.fl].push(t);
+            }
+        }
+
+        const unified = [];
+        const seen    = new Set();
+
+        // 1. Add Member Directory profiles first (authoritative official names, DOB divisions, gender, phone)
+        for (let i = 0; i < memberRaw.length; i++) {
+            const m = memberRaw[i];
+            if (!m) continue;
+            const mName = (m.full_name || m.name || '').trim();
+            if (!mName) continue;
+
+            const mKeys     = buildDeskNameMatchKeys(mName);
+            const tfaaHits  = (mKeys.exact && tfaaByExact[mKeys.exact])
+                ? tfaaByExact[mKeys.exact]
+                : ((mKeys.fl && tfaaByFl[mKeys.fl]) ? tfaaByFl[mKeys.fl] : []);
+
+            if (tfaaHits.length > 0) {
+                for (let j = 0; j < tfaaHits.length; j++) {
+                    const th     = tfaaHits[j];
+                    const divStr = (m.division || th.division || '').trim();
+                    const genStr = (m.gender || th.gender || '').trim();
+                    const styStr = (th.style || m.style || '').trim();
+                    const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
+
+                    if (!seen.has(dedup)) {
+                        seen.add(dedup);
+                        unified.push({
+                            name: mName,
+                            full_name: mName,
+                            division: divStr,
+                            gender: genStr,
+                            style: styStr,
+                            phone: m.phone || th.phone || '',
+                            source: 'member_db',
+                            keys: mKeys
+                        });
+                    }
+                }
+            } else {
+                const divStr = (m.division || '').trim();
+                const genStr = (m.gender || '').trim();
+                const dedup  = (mKeys.exact + '___' + divStr + '______' + genStr).toLowerCase();
+
+                if (!seen.has(dedup)) {
+                    seen.add(dedup);
+                    unified.push({
+                        name: mName,
+                        full_name: mName,
+                        division: divStr,
+                        gender: genStr,
+                        style: '',
+                        phone: m.phone || '',
+                        source: 'member_db',
+                        keys: mKeys
+                    });
+                }
+            }
+        }
+
+        // 2. Add 18-month TFAA historical shooter profiles
+        for (let i = 0; i < tfaaRaw.length; i++) {
+            const s = tfaaRaw[i];
+            if (!s) continue;
+            const sName  = (s.full_name || s.name || '').trim();
+            const divStr = (s.division || '').trim();
+            const styStr = (s.style || '').trim();
+            const genStr = (s.gender || '').trim();
+
+            if (!sName || !styStr || styStr.toLowerCase() === 'no show' || !divStr || divStr.toLowerCase() === 'no show') {
+                continue;
+            }
+
+            const sKeys = buildDeskNameMatchKeys(sName);
+            const dedup = (sKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
+
+            if (!seen.has(dedup)) {
+                seen.add(dedup);
+                unified.push({
+                    name: sName,
+                    full_name: sName,
+                    division: divStr,
+                    gender: genStr,
+                    style: styStr,
+                    phone: s.phone || s.phone_number || '',
+                    source: 'tfaa_history',
+                    keys: sKeys
+                });
+            }
+        }
+
+        cachedUnifiedShooters = unified;
+        return unified;
     }
 
     /**
@@ -85,7 +274,11 @@
             return null;
         }
 
-        if (rule.ineligible && Object.prototype.hasOwnProperty.call(rule.ineligible, cleanName)) {
+        const qKeys = buildDeskNameMatchKeys(typedName);
+        if (rule.ineligible && (
+            Object.prototype.hasOwnProperty.call(rule.ineligible, cleanName) ||
+            (qKeys.exact && Object.prototype.hasOwnProperty.call(rule.ineligible, qKeys.exact))
+        )) {
             return null;
         }
 
@@ -328,74 +521,49 @@
     }
 
     /**
-     * Universal Shooter Match Engine querying 18-month historical results dataset and desk caches.
-     * Enforces strict profile completeness (must have valid Name, Division, and Style).
+     * Smart Shooter Match Engine querying BOTH the Member Database and 18-Month TFAA History.
+     * Supports exact match, First+Last (+ suffix) middle-initial folding ("Mark E. Tanner" -> "Mark Tanner"),
+     * and optional substring matching when allowPartial is true (for autocomplete dropdowns).
      */
-    function getAllTfaaMatches(typedName) {
+    function getAllTfaaMatches(typedName, allowPartial) {
         if (!typedName) return [];
         const clean = cleanDeskName(typedName);
         if (!clean || clean.length < 2) return [];
 
-        let rawMatches = [];
+        const qKeys        = buildDeskNameMatchKeys(typedName);
+        const unifiedIndex = getUnifiedDeskShooterIndex();
+        const matches      = [];
 
-        let shooterArray = [];
-        if (Array.isArray(window.sywatDeskTfaaShooters)) {
-            shooterArray = shooterArray.concat(window.sywatDeskTfaaShooters);
-        }
-        if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
-            shooterArray = shooterArray.concat(sywatTfaaShooters);
-        }
-        if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
-            shooterArray = shooterArray.concat(window.sywatRegData.tfaaShooters);
-        }
-        if (window.sywatDeskData && Array.isArray(window.sywatDeskData.tfaaShooters)) {
-            shooterArray = shooterArray.concat(window.sywatDeskData.tfaaShooters);
-        }
+        for (let i = 0; i < unifiedIndex.length; i++) {
+            const s     = unifiedIndex[i];
+            const sName = cleanDeskName(s.name);
+            const sKeys = s.keys || buildDeskNameMatchKeys(s.name);
 
-        if (shooterArray.length > 0) {
-            const arrMatches = shooterArray.filter(function(s) {
-                const sName = cleanDeskName(s.name || s.full_name || '');
-                return sName && (sName.includes(clean) || clean.includes(sName));
-            });
-            rawMatches = rawMatches.concat(arrMatches);
-        }
+            const isExactMatch = (qKeys.exact && sKeys.exact === qKeys.exact);
+            const isFlMatch    = (qKeys.tokenCount >= 2 && qKeys.lastTokenLen >= 2 && qKeys.fl && sKeys.fl === qKeys.fl);
+            const isPartial    = allowPartial && (sName.includes(clean) || clean.includes(sName));
 
-        const seen = new Set();
-        const uniqueMatches = [];
-
-        for (let i = 0; i < rawMatches.length; i++) {
-            const m = rawMatches[i];
-            if (!m) continue;
-            const nameStr = (m.full_name || m.name || '').trim();
-            const divStr  = (m.division || '').trim();
-            const styStr  = (m.style || '').trim();
-            const genStr  = (m.gender || '').trim();
-
-            if (!nameStr || !styStr || styStr.toLowerCase() === 'no show' || !divStr || divStr.toLowerCase() === 'no show') {
-                continue;
-            }
-
-            const dedupKey = (cleanDeskName(nameStr) + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
-            if (!seen.has(dedupKey)) {
-                seen.add(dedupKey);
-                uniqueMatches.push({
-                    name: nameStr,
-                    full_name: nameStr,
-                    division: divStr,
-                    gender: genStr,
-                    style: styStr,
-                    phone: m.phone || m.phone_number || ''
+            if (isExactMatch || isFlMatch || isPartial) {
+                matches.push({
+                    name: s.name,
+                    full_name: s.name,
+                    division: s.division || '',
+                    gender: s.gender || '',
+                    style: s.style || '',
+                    phone: s.phone || '',
+                    source: s.source || 'tfaa_history',
+                    matchRank: isExactMatch ? 3 : (isFlMatch ? 2 : 1)
                 });
             }
         }
 
-        // Sort: Exact name matches first, then Pro styles prioritized
-        uniqueMatches.sort(function(a, b) {
-            const aName  = cleanDeskName(a.name);
-            const bName  = cleanDeskName(b.name);
-            const aExact = (aName === clean) ? 1 : 0;
-            const bExact = (bName === clean) ? 1 : 0;
-            if (aExact !== bExact) return bExact - aExact;
+        // Sort: Exact name matches first, then First+Last canonical matches, then Member DB & Pro styles
+        matches.sort(function(a, b) {
+            if (a.matchRank !== b.matchRank) return b.matchRank - a.matchRank;
+
+            const aMember = (a.source === 'member_db') ? 1 : 0;
+            const bMember = (b.source === 'member_db') ? 1 : 0;
+            if (aMember !== bMember) return bMember - aMember;
 
             const aCfg = findDeskStyleConfig(a.style);
             const bCfg = findDeskStyleConfig(b.style);
@@ -404,11 +572,11 @@
             return bPro - aPro;
         });
 
-        return uniqueMatches;
+        return matches;
     }
 
     function findTfaaMatch(typedName) {
-        const matches = getAllTfaaMatches(typedName);
+        const matches = getAllTfaaMatches(typedName, false);
         return matches.length > 0 ? matches : null;
     }
 
@@ -419,10 +587,9 @@
 
         if (window.sywatHistory.exact[clean]) return window.sywatHistory.exact[clean];
 
-        const parts = clean.split(' ');
-        if (parts.length > 1) {
-            const flKey = parts[0] + '___' + parts[parts.length - 1];
-            if (window.sywatHistory.fl && window.sywatHistory.fl[flKey]) return window.sywatHistory.fl[flKey];
+        const qKeys = buildDeskNameMatchKeys(typedName);
+        if (qKeys.tokenCount >= 2 && qKeys.fl && window.sywatHistory.fl && window.sywatHistory.fl[qKeys.fl]) {
+            return window.sywatHistory.fl[qKeys.fl];
         }
         return null;
     }
@@ -553,7 +720,7 @@
 
         if (query.length < 2) return;
 
-        const matches = getAllTfaaMatches(query).slice(0, 8);
+        const matches = getAllTfaaMatches(query, true).slice(0, 8);
         if (matches.length === 0) return;
 
         const parent = input.parentElement;
@@ -573,6 +740,8 @@
                 const styleCfg = findDeskStyleConfig(m.style);
                 const shortSty = (styleCfg && styleCfg.code) ? styleCfg.code : m.style.split(' – ')[0].split(' - ')[0];
                 badgeText += badgeText ? ' (' + shortSty + ')' : shortSty;
+            } else if (m.source === 'member_db') {
+                badgeText += badgeText ? ' (Member)' : 'Member';
             }
 
             item.innerHTML = '<strong>' + escapeHtmlDesk(m.name) + '</strong> <span class="sywat-tfaa-item-badge">' + escapeHtmlDesk(badgeText) + '</span>';
@@ -584,6 +753,7 @@
 
                 input.value = m.name;
                 input.setAttribute('data-prev-val', m.name);
+                delete input.dataset.normalizedFrom;
                 closeAllDeskTfaaAutocompletes();
 
                 const form = input.closest('form');
@@ -657,6 +827,7 @@
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (nameInput && officialName) {
             nameInput.value = officialName;
+            delete nameInput.dataset.normalizedFrom;
         }
 
         const divEl   = document.getElementById(prefix + '_division');
@@ -675,9 +846,22 @@
     function updateNameToOfficial(prefix, officialName) {
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (nameInput && officialName) {
+            delete nameInput.dataset.skipAutoNormalize;
             nameInput.value = officialName;
             autoFillOnNameChange(prefix, false);
         }
+    }
+
+    function keepEnteredName(prefix) {
+        const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
+        if (!nameInput) return;
+        const rawOriginal = nameInput.dataset.normalizedFrom || '';
+        nameInput.dataset.skipAutoNormalize = '1';
+        delete nameInput.dataset.normalizedFrom;
+        if (rawOriginal) {
+            nameInput.value = rawOriginal;
+        }
+        evaluateTfaaStatus(prefix);
     }
 
     function evaluateTfaaStatus(prefix) {
@@ -702,7 +886,7 @@
 
         if (!tfaaMatches || !Array.isArray(tfaaMatches) || tfaaMatches.length === 0) {
             badgeEl.className = 'sywat-badge-none';
-            badgeEl.innerHTML = '⚪ No History Found (18-Mo Window)' + promoBannerHtml;
+            badgeEl.innerHTML = '⚪ No History Found (Member DB / 18-Mo Window)' + promoBannerHtml;
             return;
         }
 
@@ -751,35 +935,37 @@
                 || (cStylePrefix === uStylePrefix)
                 || (cSty && uSty && (uSty.includes(cSty) || cSty.includes(uStylePrefix)));
 
-            if (divMatch && genMatch && styleMatch) {
+            if (divMatch && genMatch && (styleMatch || !cSty)) {
                 if (!hasMultipleMatches || cleanDeskName(catName) === cleanTyped) {
                     isCategoryMatch = true;
                 }
             }
 
-            const divShort = (cDivCfg && cDivCfg.code) ? cDivCfg.code : (cat.division ? cat.division.split(' ')[0] : '');
-            const genShort = cat.gender ? (cat.gender.toLowerCase().startsWith('f') ? 'F' : 'M') : '';
-            const styShort = (cStyCfg && cStyCfg.code) ? cStyCfg.code : (cat.style ? cat.style.split(' – ')[0].split(' - ')[0] : '');
+            if (cat.style || cat.division) {
+                const divShort = (cDivCfg && cDivCfg.code) ? cDivCfg.code : (cat.division ? cat.division.split(' ')[0] : '');
+                const genShort = cat.gender ? (cat.gender.toLowerCase().startsWith('f') ? 'F' : 'M') : '';
+                const styShort = (cStyCfg && cStyCfg.code) ? cStyCfg.code : (cat.style ? cat.style.split(' – ')[0].split(' - ')[0] : 'Member');
 
-            const pillBtn = document.createElement('button');
-            pillBtn.type = 'button';
-            pillBtn.className = 'sywat-btn-pill';
+                const pillBtn = document.createElement('button');
+                pillBtn.type = 'button';
+                pillBtn.className = 'sywat-btn-pill';
 
-            let pillLabel = '';
-            if (hasMultipleMatches && catName) {
-                pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(catName) + '</strong> (' + escapeHtmlDesk(styShort + ' ' + divShort + ' ' + genShort) + ')';
-            } else {
-                pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(styShort) + '</strong> (' + escapeHtmlDesk(divShort + ' ' + genShort) + ')';
+                let pillLabel = '';
+                if (hasMultipleMatches && catName) {
+                    pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(catName) + '</strong> (' + escapeHtmlDesk((styShort + ' ' + divShort + ' ' + genShort).trim()) + ')';
+                } else {
+                    pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(styShort) + '</strong> (' + escapeHtmlDesk((divShort + ' ' + genShort).trim()) + ')';
+                }
+                pillBtn.innerHTML = pillLabel;
+
+                pillBtn.onclick = function() {
+                    loadTfaaCategory(prefix, cat.division, cat.gender, cat.style, catName);
+                };
+                buttonContainer.appendChild(pillBtn);
             }
-            pillBtn.innerHTML = pillLabel;
-
-            pillBtn.onclick = function() {
-                loadTfaaCategory(prefix, cat.division, cat.gender, cat.style, catName);
-            };
-            buttonContainer.appendChild(pillBtn);
         });
 
-        if (hasMultipleMatches) {
+        if (hasMultipleMatches && buttonContainer.children.length > 0) {
             const alertBox = document.createElement('div');
             alertBox.className = 'sywat-multi-style-alert';
 
@@ -798,14 +984,20 @@
         const officialName  = exactNameMatchRecord ? (exactNameMatchRecord.full_name || exactNameMatchRecord.name) : (tfaaMatches[0].full_name || tfaaMatches[0].name || '');
         const cleanOfficial = cleanDeskName(officialName);
         const isNameMatch   = (cleanTyped === cleanOfficial);
+        const hasMemberSrc  = tfaaMatches.some(function(m) { return m.source === 'member_db'; });
+        const normalizedFrom = nameInput.dataset.normalizedFrom || '';
 
         let badgeText = '';
-        if (isCategoryMatch && isNameMatch) {
+        if (isNameMatch && knownStyles.length > 0 && isCategoryMatch) {
             badgeEl.className = 'sywat-badge-verified';
             badgeText = '🟢 TFAA Validated: ' + escapeHtmlDesk(knownStyles.join(', '));
+        } else if (isNameMatch && hasMemberSrc && knownStyles.length === 0) {
+            badgeEl.className = 'sywat-badge-verified';
+            badgeText = '🟢 Official Member Record: <strong>' + escapeHtmlDesk(officialName) + '</strong>';
         } else if (!isNameMatch && officialName !== '') {
             badgeEl.className = 'sywat-badge-known';
-            badgeText = '⚠️ Name Mismatch (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
+            const styleSummary = knownStyles.length > 0 ? ' (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')' : '';
+            badgeText = '⚠️ Name Mismatch' + styleSummary;
         } else if (!currStyle || currStyle.toLowerCase() === 'no show') {
             badgeEl.className = 'sywat-badge-known';
             badgeText = '🔵 Member Profile Available (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
@@ -814,7 +1006,10 @@
             badgeText = '⚠️ Style Mismatch (Known Styles: ' + escapeHtmlDesk(knownStyles.join(', ')) + ')';
         }
 
-        if (!isNameMatch && officialName !== '') {
+        if (isNameMatch && normalizedFrom && cleanDeskName(normalizedFrom) !== cleanTyped) {
+            badgeText += '<br><span class="sywat-badge-subtext">↳ Auto-matched official name from "<strong>' + escapeHtmlDesk(normalizedFrom) + '</strong>"</span>';
+            badgeText += '<button type="button" class="sywat-btn-use-official" onclick="keepEnteredName(\'' + prefix + '\')">↩ Keep "' + escapeHtmlDesk(normalizedFrom) + '"</button>';
+        } else if (!isNameMatch && officialName !== '') {
             badgeText += '<br><span class="sywat-badge-subtext">↳ Official Member Name: <strong>' + escapeHtmlDesk(officialName) + '</strong></span>';
             badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
         }
@@ -828,6 +1023,8 @@
 
         const typedName = nameInput.value.trim();
         if (!typedName) {
+            delete nameInput.dataset.normalizedFrom;
+            delete nameInput.dataset.skipAutoNormalize;
             if (prefix === 'walkin') {
                 const divEl   = document.getElementById('walkin_division');
                 const genEl   = document.getElementById('walkin_gender');
@@ -842,9 +1039,30 @@
         }
 
         const tfaaMatches = findTfaaMatch(typedName);
-        const historyRecord = (tfaaMatches && tfaaMatches.length > 0)
+
+        // Automatic Canonical Name Enforcement:
+        // If an incoming variant (e.g., "Mark E. Tanner") unambiguously matches a single canonical person
+        // ("Mark Tanner") in the Member Database or 18-Month TFAA History, snap to the official name automatically.
+        if (tfaaMatches && tfaaMatches.length > 0 && nameInput.dataset.skipAutoNormalize !== '1') {
+            const distinctNames = new Set();
+            tfaaMatches.forEach(function(m) {
+                const cName = (m.full_name || m.name || '').trim();
+                if (cName) distinctNames.add(cleanDeskName(cName));
+            });
+
+            if (distinctNames.size === 1) {
+                const canonicalOfficial = (tfaaMatches[0].full_name || tfaaMatches[0].name || '').trim();
+                if (canonicalOfficial && cleanDeskName(canonicalOfficial) !== cleanDeskName(typedName)) {
+                    nameInput.dataset.normalizedFrom = typedName;
+                    nameInput.value = canonicalOfficial;
+                }
+            }
+        }
+
+        const effectiveTyped = nameInput.value.trim();
+        const historyRecord  = (tfaaMatches && tfaaMatches.length > 0)
             ? tfaaMatches[0]
-            : findShopHistoryMatch(typedName);
+            : findShopHistoryMatch(effectiveTyped);
 
         if (historyRecord) {
             const divEl   = document.getElementById(prefix + '_division');
@@ -882,7 +1100,11 @@
         if (phoneInput) phoneInput.value = '';
 
         const nameInput = document.getElementById('walkin_name_input');
-        if (nameInput) nameInput.value = '';
+        if (nameInput) {
+            nameInput.value = '';
+            delete nameInput.dataset.normalizedFrom;
+            delete nameInput.dataset.skipAutoNormalize;
+        }
 
         const roundSel = document.getElementById('walkin_pricing_profile');
         if (roundSel && roundSel.tagName === 'SELECT') roundSel.selectedIndex = 0;
@@ -1052,6 +1274,8 @@
 
         if (archerNameInput) {
             if (!archerNameInput.value || archerNameInput.value === prevVal) {
+                delete archerNameInput.dataset.skipAutoNormalize;
+                delete archerNameInput.dataset.normalizedFrom;
                 archerNameInput.value = input.value;
                 autoFillOnNameChange('walkin', false);
             }
@@ -1095,6 +1319,7 @@
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         evaluateTfaaStatus: evaluateTfaaStatus,
+        keepEnteredName: keepEnteredName,
         isWalkinPromoEligible: isWalkinPromoEligible,
         openWalkinModal: openWalkinModal,
         closeWalkinModal: closeWalkinModal,
@@ -1107,6 +1332,7 @@
     window.toggleUnpaidBanner         = toggleUnpaidBanner;
     window.loadTfaaCategory           = loadTfaaCategory;
     window.updateNameToOfficial       = updateNameToOfficial;
+    window.keepEnteredName            = keepEnteredName;
     window.evaluateTfaaStatus         = evaluateTfaaStatus;
     window.closeWalkinModal           = closeWalkinModal;
     window.openWalkinModal            = openWalkinModal;
@@ -1140,6 +1366,8 @@
         const walkinInput = document.getElementById('walkin_name_input');
         if (walkinInput) {
             walkinInput.addEventListener('input', function() {
+                delete this.dataset.skipAutoNormalize;
+                delete this.dataset.normalizedFrom;
                 autoFillOnNameChange('walkin', false);
             });
         }
@@ -1161,6 +1389,8 @@
         const checkinArcherNameEl = document.getElementById('checkin_archer_name');
         if (checkinArcherNameEl) {
             checkinArcherNameEl.addEventListener('input', function() {
+                delete this.dataset.skipAutoNormalize;
+                delete this.dataset.normalizedFrom;
                 autoFillOnNameChange('checkin', false);
             });
             autoFillOnNameChange('checkin', true);
