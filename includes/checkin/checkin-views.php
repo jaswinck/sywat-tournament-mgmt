@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with responsive mobile card labels, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -411,7 +411,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
 
             <?php if ( ! empty( $active_checkins ) ) : ?>
                 <div class="sywat-table-responsive">
-                    <table class="sywat-table">
+                    <table class="sywat-table sywat-table-mobile-cards">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -519,21 +519,21 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="sywat-col-center">
+                                    <td class="sywat-col-center" data-label="Type">
                                         <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $reg_type ); ?></span>
                                     </td>
-                                    <td><?php echo esc_html( $reg_line_name ); ?></td>
-                                    <td><?php echo esc_html( $div_disp ); ?></td>
-                                    <td class="sywat-col-center"><?php echo esc_html( $gender_disp ); ?></td>
-                                    <td><?php echo esc_html( $style_disp ); ?></td>
-                                    <td class="sywat-col-paid">
+                                    <td data-label="Line"><?php echo esc_html( $reg_line_name ); ?></td>
+                                    <td data-label="Division"><?php echo esc_html( $div_disp ); ?></td>
+                                    <td class="sywat-col-center" data-label="Gender"><?php echo esc_html( $gender_disp ); ?></td>
+                                    <td data-label="Style"><?php echo esc_html( $style_disp ); ?></td>
+                                    <td class="sywat-col-paid" data-label="Paid Status">
                                         <?php if ( $is_promo_free ) : ?>
                                             <span class="sywat-badge sywat-badge-open">Promo ($0.00)</span>
                                         <?php else : ?>
                                             <?php echo esc_html( $paid_disp ); ?>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="sywat-col-center"><?php echo esc_html( $dist_disp ); ?></td>
+                                    <td class="sywat-col-center" data-label="Distance"><?php echo esc_html( $dist_disp ); ?></td>
                                     <td class="sywat-col-center">
                                         <div class="sywat-table-actions-vertical">
                                             <?php if ( $is_line_closed ) : ?>
