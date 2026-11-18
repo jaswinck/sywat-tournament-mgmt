@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Bulk Spreadsheet Import & Template Download Handler (.xlsx, .csv)
  * Path: includes/registration/registration-import.php
- * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
+ * Description: Handles tournament-aware .xlsx template downloads on template_redirect and processes strict 9-column roster imports with hoisted O(1) lookups, canonical shorthand/full line-time matching, canonical official archer name & verified division resolution (Member DB + 18-month TFAA history) without guessing divisions for unmatched shooters, First+Last duplicate prevention, 10yd Youth pricing locks, deterministic household grouping, Paid/Unpaid Check-In mapping, Waitlist overflow, and atomic MySQL transaction batching.
  * Compliance: Pure action/import layer — delegates OpenXML/ZIP operations to sywat-spreadsheet-helpers.php, zero output at include time, zero inline styles, O(1) hashtable lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.1
+ * Version: 7.4.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -314,6 +314,20 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
         }
 
+        // Canonical time normalizer: unifies '10AM', '10:00 AM', '06:30 PM', '6:30PM' -> '1000am', '630pm'
+        $has_norm_time_fn     = function_exists( 'sywat_normalize_import_line_time' );
+        $canonical_time_token = function( $raw_time ) use ( $has_norm_time_fn ) {
+            $base = $has_norm_time_fn
+                ? (string) sywat_normalize_import_line_time( $raw_time )
+                : strtolower( preg_replace( '/[^a-z0-9]/i', '', (string) $raw_time ) );
+            if ( preg_match( '/^0*(\d{1,2})(\d{2})?(am|pm)$/', $base, $m ) ) {
+                $hr   = (string) intval( $m[1] );
+                $mins = ( isset( $m[2] ) && $m[2] !== '' ) ? $m[2] : '00';
+                return $hr . $mins . $m[3];
+            }
+            return $base;
+        };
+
         // O(1) Allowed Line Day Map (Friday, Saturday, Sunday)
         $allowed_days_map = array(
             'friday'   => 'Friday',
@@ -325,7 +339,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
         $valid_time_tokens = array();
         $standard_slots    = function_exists( 'sywat_get_standard_import_time_slots' ) ? sywat_get_standard_import_time_slots() : array();
         foreach ( $standard_slots as $slot_label ) {
-            $tok = function_exists( 'sywat_normalize_import_line_time' ) ? sywat_normalize_import_line_time( $slot_label ) : strtolower( preg_replace( '/[^a-z0-9]/i', '', $slot_label ) );
+            $tok = $canonical_time_token( $slot_label );
             if ( $tok !== '' ) {
                 $valid_time_tokens[ $tok ] = $slot_label;
             }
@@ -354,16 +368,20 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
                 );
 
                 if ( $day !== '' && $time !== '' ) {
-                    $t_tok = function_exists( 'sywat_normalize_import_line_time' ) ? sywat_normalize_import_line_time( $time ) : strtolower( preg_replace( '/[^a-z0-9]/i', '', $time ) );
+                    $t_tok = $canonical_time_token( $time );
                     $key1  = strtolower( preg_replace( '/[^a-z0-9]/i', '', $day ) ) . $t_tok;
                     $line_token_to_idx[ $key1 ] = $idx_str;
                 }
                 if ( $l_name !== '' ) {
-                    $norm_lbl = preg_replace( '/\b0(\d)(?::(\d{2}))?\s*(AM|PM)\b/i', '$1:$2 $3', $l_name );
-                    $norm_lbl = str_replace( ': ', ' ', $norm_lbl );
-                    $norm_lbl = preg_replace( '/\b(\d{1,2}):00\s*(AM|PM)\b/i', '$1 $2', $norm_lbl );
-                    $key2     = strtolower( preg_replace( '/[^a-z0-9]/i', '', $norm_lbl ) );
-                    $line_token_to_idx[ $key2 ] = $idx_str;
+                    if ( preg_match( '/^(friday|saturday|sunday)\s+(.+)$/i', $l_name, $lm ) ) {
+                        $d_tok  = strtolower( $lm[1] );
+                        $t_tok2 = $canonical_time_token( $lm[2] );
+                        $line_token_to_idx[ $d_tok . $t_tok2 ] = $idx_str;
+                    }
+                    $raw_lbl_tok = strtolower( preg_replace( '/[^a-z0-9]/i', '', $l_name ) );
+                    if ( $raw_lbl_tok !== '' ) {
+                        $line_token_to_idx[ $raw_lbl_tok ] = $idx_str;
+                    }
                 }
             }
         }
@@ -421,9 +439,7 @@ if ( ! function_exists( 'sywat_handle_import_shooters' ) ) {
             }
 
             // Line Time validation (30-minute increments 7:00 AM–10:00 PM + configured on active tournament)
-            $time_token = function_exists( 'sywat_normalize_import_line_time' )
-                ? sywat_normalize_import_line_time( $line_time )
-                : strtolower( preg_replace( '/[^a-z0-9]/i', '', $line_time ) );
+            $time_token = $canonical_time_token( $line_time );
             $disp_time  = function_exists( 'sywat_format_template_line_time' ) ? sywat_format_template_line_time( $line_time ) : $line_time;
 
             if ( ! empty( $valid_time_tokens ) && ! isset( $valid_time_tokens[ $time_token ] ) ) {
