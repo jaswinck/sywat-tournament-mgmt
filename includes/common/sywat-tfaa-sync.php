@@ -2,9 +2,9 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Deduplicated Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-configured shooting styles and age divisions.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-configured shooting styles, age divisions, and smart First+Last (+ suffix) middle-initial name matching to prevent duplicate registrations.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -171,7 +171,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
- * Core Universal TFAA Event Score Sync Engine with Deduplication
+ * Core Universal TFAA Event Score Sync Engine with Deduplication & Smart First+Last Matching
  *
  * @param string $t_name Tournament Title/Key Name.
  * @return array Result payload array containing success boolean, count, and notice message.
@@ -232,11 +232,11 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $plain_text  = wp_strip_all_tags( $clean_html );
         $raw_lines   = explode( "\n", $plain_text );
 
-        $has_div_dist    = function_exists( 'sywat_shooting_styles_get_division_distance' );
-        $has_div_tier    = function_exists( 'sywat_shooting_styles_get_division_rate_tier' );
-        $has_norm_div    = function_exists( 'sywat_shooting_styles_normalize_division' );
-        $has_norm_style  = function_exists( 'sywat_shooting_styles_normalize_style' );
-        $has_style_find  = function_exists( 'sywat_find_shooting_style' );
+        $has_div_dist   = function_exists( 'sywat_shooting_styles_get_division_distance' );
+        $has_div_tier   = function_exists( 'sywat_shooting_styles_get_division_rate_tier' );
+        $has_norm_div   = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_norm_style = function_exists( 'sywat_shooting_styles_normalize_style' );
+        $has_style_find = function_exists( 'sywat_find_shooting_style' );
 
         $parsed_entries = array();
         $curr_div       = '';
@@ -352,11 +352,26 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
         }
 
+        // Hoist normalizers and pre-compute registration match metadata outside entry loop
+        $has_match_keys = function_exists( 'sywat_normalize_archer_match_keys' );
+
         $normalize_str = function( $str ) {
             $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', (string) $str );
             $n = preg_replace( '/[^a-zA-Z0-9\s]/', '', $n );
             $n = preg_replace( '/\s+/', ' ', $n );
             return strtolower( trim( $n ) );
+        };
+
+        $get_match_keys = function( $raw_name ) use ( $has_match_keys, $normalize_str ) {
+            if ( $has_match_keys ) {
+                return sywat_normalize_archer_match_keys( $raw_name );
+            }
+            $norm  = $normalize_str( $raw_name );
+            $parts = $norm !== '' ? explode( ' ', $norm ) : array();
+            return array(
+                'exact' => $norm,
+                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+            );
         };
 
         $normalize_div_key = function( $div_str ) use ( $has_norm_div, $normalize_str ) {
@@ -374,6 +389,19 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
             return $normalize_str( $raw );
         };
+
+        $reg_meta = array();
+        foreach ( $registrations as $r_id => $r ) {
+            $raw_r_name = isset( $r['name'] ) ? $r['name'] : '';
+            $reg_meta[ $r_id ] = array(
+                'norm_name'  => $normalize_str( $raw_r_name ),
+                'keys'       => $get_match_keys( $raw_r_name ),
+                'norm_div'   => $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' ),
+                'norm_style' => $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' ),
+                'is_guest'   => ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' ),
+                'line_index' => isset( $r['line_index'] ) ? (string) $r['line_index'] : '',
+            );
+        }
 
         $claimed_reg_ids = array();
         $primary_styles  = array();
@@ -397,6 +425,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         foreach ( $parsed_entries as $entry ) {
             $norm_name      = $normalize_str( $entry['clean_name'] );
+            $entry_keys     = $get_match_keys( $entry['clean_name'] );
+            $has_fl_pair    = ( $entry_keys['fl'] !== '' && strpos( $entry_keys['fl'], '___' ) !== false );
             $norm_div       = $normalize_div_key( $entry['division'] );
             $norm_style     = $normalize_style_key( $entry['style'] );
             $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
@@ -410,75 +440,61 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $final_style = ! empty( $primary_styles[ $norm_name ] ) ? $primary_styles[ $norm_name ] : 'Guest';
             }
 
-            // Find best matching existing registration for this entry
-            $matched_reg_id = null;
+            // Find best matching existing registration (exact name passes first, then First+Last middle-initial folding)
+            $find_unclaimed_reg = function( $use_fl_fallback ) use ( &$claimed_reg_ids, $reg_meta, $norm_name, $entry_keys, $has_fl_pair, $norm_div, $norm_style, $entry_is_guest ) {
+                $name_matches = function( $meta ) use ( $use_fl_fallback, $norm_name, $entry_keys, $has_fl_pair ) {
+                    if ( ! $use_fl_fallback ) {
+                        return ( $meta['norm_name'] === $norm_name || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] ) );
+                    }
+                    return ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
+                };
 
-            // Pass 1: Match Name + Division + Style + Guest Status
-            foreach ( $registrations as $r_id => $r ) {
-                if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
-                    continue;
-                }
-
-                $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                $r_div      = $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' );
-                $r_style    = $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' );
-                $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
-
-                if ( $r_name === $norm_name && $r_div === $norm_div && $r_style === $norm_style && $r_is_guest === $entry_is_guest ) {
-                    $matched_reg_id = $r_id;
-                    break;
-                }
-            }
-
-            // Pass 2: Match Name + Division + Guest Status
-            if ( ! $matched_reg_id ) {
-                foreach ( $registrations as $r_id => $r ) {
+                // Pass 1: Match Name + Division + Style + Guest Status
+                foreach ( $reg_meta as $r_id => $meta ) {
                     if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
                         continue;
                     }
-
-                    $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                    $r_div      = $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' );
-                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
-
-                    if ( $r_name === $norm_name && $r_div === $norm_div && $r_is_guest === $entry_is_guest ) {
-                        $matched_reg_id = $r_id;
-                        break;
+                    if ( $name_matches( $meta ) && $meta['norm_div'] === $norm_div && $meta['norm_style'] === $norm_style && $meta['is_guest'] === $entry_is_guest ) {
+                        return $r_id;
                     }
                 }
-            }
 
-            // Pass 3: Match Name + Guest Status (Incomplete pre-regs)
-            if ( ! $matched_reg_id ) {
-                foreach ( $registrations as $r_id => $r ) {
+                // Pass 2: Match Name + Division + Guest Status
+                foreach ( $reg_meta as $r_id => $meta ) {
                     if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
                         continue;
                     }
-
-                    $r_name     = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-                    $r_is_guest = ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' );
-
-                    if ( $r_name === $norm_name && $r_is_guest === $entry_is_guest ) {
-                        $matched_reg_id = $r_id;
-                        break;
+                    if ( $name_matches( $meta ) && $meta['norm_div'] === $norm_div && $meta['is_guest'] === $entry_is_guest ) {
+                        return $r_id;
                     }
                 }
-            }
 
-            // Pass 4: Fallback Name Match
-            if ( ! $matched_reg_id ) {
-                foreach ( $registrations as $r_id => $r ) {
+                // Pass 3: Match Name + Guest Status (Incomplete pre-regs)
+                foreach ( $reg_meta as $r_id => $meta ) {
                     if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
                         continue;
                     }
-
-                    $r_name = $normalize_str( isset( $r['name'] ) ? $r['name'] : '' );
-
-                    if ( $r_name === $norm_name ) {
-                        $matched_reg_id = $r_id;
-                        break;
+                    if ( $name_matches( $meta ) && $meta['is_guest'] === $entry_is_guest ) {
+                        return $r_id;
                     }
                 }
+
+                // Pass 4: Fallback Name Match
+                foreach ( $reg_meta as $r_id => $meta ) {
+                    if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
+                        continue;
+                    }
+                    if ( $name_matches( $meta ) ) {
+                        return $r_id;
+                    }
+                }
+
+                return null;
+            };
+
+            $matched_reg_id = $find_unclaimed_reg( false );
+            if ( ! $matched_reg_id && $has_fl_pair ) {
+                $matched_reg_id = $find_unclaimed_reg( true );
             }
 
             if ( $matched_reg_id ) {
@@ -526,11 +542,12 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 // CREATE NEW REGISTRATION (Only if no match exists)
                 $assigned_line_idx = $line_0_idx;
                 $occupied          = array();
-                foreach ( $registrations as $r ) {
-                    if ( $normalize_str( isset( $r['name'] ) ? $r['name'] : '' ) === $norm_name ) {
-                        if ( isset( $r['line_index'] ) ) {
-                            $occupied[] = (string) $r['line_index'];
-                        }
+                foreach ( $reg_meta as $meta ) {
+                    $is_same_archer = ( $meta['norm_name'] === $norm_name )
+                        || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] )
+                        || ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
+                    if ( $is_same_archer && $meta['line_index'] !== '' ) {
+                        $occupied[] = $meta['line_index'];
                     }
                 }
 
@@ -574,6 +591,14 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
                 $registrations[ $target_id ]   = $new_reg;
                 $claimed_reg_ids[ $target_id ] = true;
+                $reg_meta[ $target_id ]        = array(
+                    'norm_name'  => $norm_name,
+                    'keys'       => $entry_keys,
+                    'norm_div'   => $norm_div,
+                    'norm_style' => $norm_style,
+                    'is_guest'   => $entry_is_guest,
+                    'line_index' => (string) $assigned_line_idx,
+                );
 
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
                 $master_regs[ $target_id ] = $new_reg;
