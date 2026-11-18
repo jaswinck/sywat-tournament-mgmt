@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with responsive mobile card labels, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with responsive mobile card labels, Rate column, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -420,7 +420,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                 <th>Division</th>
                                 <th class="sywat-col-center">Gender</th>
                                 <th>Style</th>
-                                <th>Paid Status</th>
+                                <th>Rate</th>
                                 <th class="sywat-col-center">Distance</th>
                                 <th class="sywat-col-center">Actions</th>
                             </tr>
@@ -526,7 +526,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     <td data-label="Division"><?php echo esc_html( $div_disp ); ?></td>
                                     <td class="sywat-col-center" data-label="Gender"><?php echo esc_html( $gender_disp ); ?></td>
                                     <td data-label="Style"><?php echo esc_html( $style_disp ); ?></td>
-                                    <td class="sywat-col-paid" data-label="Paid Status">
+                                    <td class="sywat-col-paid" data-label="Rate">
                                         <?php if ( $is_promo_free ) : ?>
                                             <span class="sywat-badge sywat-badge-open">Promo ($0.00)</span>
                                         <?php else : ?>
