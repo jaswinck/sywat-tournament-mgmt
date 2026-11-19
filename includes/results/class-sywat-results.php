@@ -2,18 +2,19 @@
 /**
  * Sub-Module: Results & Standings Loader Shell
  * Path: includes/results/class-sywat-results.php
- * Description: Main loader binding public shortcode [sywat_results] with Tournament Results as the primary/default tab and Season Standings as the secondary tab.
+ * Description: Main loader binding public shortcode [sywat_results] with Tournament Results as the primary/default tab and Season Standings as the secondary tab, loading separated helper, data, and view sub-modules.
  * Compliance: Output-buffered shortcode handler, zero HTML emitted at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 3.7.0
+ * Version: 3.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Include Sub-Module Files
+// Include Sub-Module Files (Helpers -> Data -> Views)
 require_once plugin_dir_path( __FILE__ ) . 'results-helpers.php';
+require_once plugin_dir_path( __FILE__ ) . 'results-data.php';
 require_once plugin_dir_path( __FILE__ ) . 'results-standings.php';
 require_once plugin_dir_path( __FILE__ ) . 'results-tournaments.php';
 
@@ -24,6 +25,11 @@ if ( shortcode_exists( 'sywat_results' ) ) {
 
 add_shortcode( 'sywat_results', 'render_sywat_public_results_portal' );
 
+/**
+ * Renders the public [sywat_results] portal with Tournament Results and Season Standings tabs.
+ *
+ * @return string Buffered HTML output.
+ */
 function render_sywat_public_results_portal() {
     ob_start();
 
