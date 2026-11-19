@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Data Retrieval & Calculation Engines
  * Path: includes/members/members-data.php
- * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk scalar SQL pre-fetching with transient caching for 10,000+ record scalability, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers), O(1) member record lookup by exact and First+Last name/contact, hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
- * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate.
+ * Description: Centralized data layer for the Member Management sub-module. Handles WP_User queries, bulk scalar SQL pre-fetching with transient caching for 10,000+ record scalability, O(1) in-memory hashtable index generation, unified flat archer dataset generation (combining primary WP_User accounts, household dependent sub-profiles, and unassigned pool archers) with hoisted "LastName, FirstName" surname sort keys while preserving canonical "FirstName LastName" display_name values, O(1) member record lookup by exact and First+Last name/contact, hierarchy-sorted board member retrieval (merging position meta and officer role accounts), and pure statistical calculation engines for TFAA membership counts.
+ * Compliance: Zero HTML layout output. Pure data arrays and scalar return values. Adheres to Dual Data & Helper File Separation Mandate. Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.2.0
+ * Version: 6.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -186,14 +186,16 @@ if ( ! function_exists( 'sywat_get_bulk_member_directory_records' ) ) {
 
 if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
     /**
-     * Build unified flat array of ALL archers (Heads of Household, Dependents, and Unassigned Pool Archers).
+     * Build unified flat array of ALL archers (Heads of Household, Dependents, and Unassigned Pool Archers),
+     * sorted alphabetically by Surname ("LastName, FirstName") while preserving canonical 'display_name' ("FirstName LastName").
      *
      * @return array Standardized list of archer associative arrays.
      */
     function sywat_get_all_flat_archers() {
         global $wpdb;
-        $all_archers   = array();
-        $head_name_map = array();
+        $all_archers      = array();
+        $head_name_map    = array();
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         // 1. Primary WP_User Accounts (Heads of Household)
         $primary_users = sywat_get_all_tfaa_members();
@@ -212,6 +214,7 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
                     'first_name'      => get_user_meta( $uid, 'first_name', true ) ? get_user_meta( $uid, 'first_name', true ) : $pu->first_name,
                     'last_name'       => get_user_meta( $uid, 'last_name', true ) ? get_user_meta( $uid, 'last_name', true ) : $pu->last_name,
                     'display_name'    => $pu->display_name,
+                    'sort_name'       => $has_lf_formatter ? sywat_format_name_last_first( $pu->display_name ) : $pu->display_name,
                     'email'           => $pu->user_email,
                     'phone'           => get_user_meta( $uid, 'sywat_phone', true ),
                     'gender'          => get_user_meta( $uid, 'sywat_gender', true ),
@@ -262,6 +265,7 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
                             'first_name'      => $fn,
                             'last_name'       => $ln,
                             'display_name'    => $name,
+                            'sort_name'       => $has_lf_formatter ? sywat_format_name_last_first( $name ) : $name,
                             'email'           => isset( $d['email'] ) ? $d['email'] : '',
                             'phone'           => isset( $d['phone'] ) ? $d['phone'] : '',
                             'gender'          => isset( $d['gender'] ) ? $d['gender'] : 'unassigned',
@@ -296,6 +300,7 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
                     'first_name'      => $fn,
                     'last_name'       => $ln,
                     'display_name'    => $name,
+                    'sort_name'       => $has_lf_formatter ? sywat_format_name_last_first( $name ) : $name,
                     'email'           => isset( $u_item['email'] ) ? $u_item['email'] : '',
                     'phone'           => isset( $u_item['phone'] ) ? $u_item['phone'] : '',
                     'gender'          => isset( $u_item['gender'] ) ? $u_item['gender'] : 'unassigned',
@@ -311,9 +316,11 @@ if ( ! function_exists( 'sywat_get_all_flat_archers' ) ) {
             }
         }
 
-        // Sort alphabetically by Display Name
+        // Sort alphabetically by Surname ("LastName, FirstName")
         usort( $all_archers, function( $a, $b ) {
-            return strcasecmp( $a['display_name'], $b['display_name'] );
+            $sort_a = isset( $a['sort_name'] ) ? $a['sort_name'] : $a['display_name'];
+            $sort_b = isset( $b['sort_name'] ) ? $b['sort_name'] : $b['display_name'];
+            return strcasecmp( $sort_a, $sort_b );
         } );
 
         return $all_archers;
