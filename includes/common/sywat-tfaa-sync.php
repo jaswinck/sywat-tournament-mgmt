@@ -1,11 +1,11 @@
 <?php
 /**
- * Shared Module: TFAA Event Score Scraper & Deduplicated Sync Engine
+ * Shared Module: TFAA Event Score Scraper & Verbatim Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-configured shooting styles, age divisions, First+Last (+ suffix) middle-initial & given-name alias matching (via sywat-archer-identity-helpers.php), same-card surname-typo reconciliation, and automatic pruning of stale TFAA-origin records when the system of record updates or removes entries.
- * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity helpers, hoisted match metadata, omitted closing PHP tag.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updating any matching local pre-registrations unconditionally with TFAA's current name/division/gender/style/score, and importing all TFAA entries verbatim.
+ * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity & style helpers, hoisted match metadata, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 8.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -185,8 +185,11 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
- * Core Universal TFAA Event Score Sync Engine with Deduplication, Given-Name Alias &
- * Same-Card Surname-Typo Reconciliation, and Orphan TFAA-Record Pruning.
+ * Core Universal TFAA Event Score Verbatim Sync Engine.
+ * Fetches the authoritative TFAA results page, purges prior TFAA-imported rows for the
+ * tournament once valid entries are parsed, updates any matching local pre-registrations
+ * unconditionally with TFAA's current name/division/gender/style/score, and inserts all
+ * remaining TFAA entries verbatim.
  *
  * @param string $t_name Tournament Title/Key Name.
  * @return array         Result payload array containing success boolean, count, and notice message.
@@ -271,7 +274,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 continue;
             }
 
-            // 1. Archer Match First
+            // 1. Archer Row Match
             if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 if ( empty( $curr_div ) || empty( $curr_style ) ) {
                     continue;
@@ -317,7 +320,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 continue;
             }
 
-            // 2. Division Check
+            // 2. Division / Gender Heading Check
             $div_check = sywat_parse_tfaa_div_gen( $line );
             if ( ! empty( $div_check['division'] ) ) {
                 $curr_div    = $div_check['division'];
@@ -326,7 +329,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 continue;
             }
 
-            // 3. Style Check
+            // 3. Shooting Style Heading Check
             $style_check = sywat_parse_tfaa_style( $line );
             if ( ! empty( $style_check ) ) {
                 $curr_style = $style_check;
@@ -353,23 +356,56 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $line_0_idx = ! empty( $t_lines ) ? (string) key( $t_lines ) : '0';
         sywat_auto_expand_line_capacity( $t_data, $line_0_idx, $cnt_20yd, $cnt_cub, $t_name );
 
-        // FETCH ALL LIVE REGISTRATIONS DIRECTLY FROM WP_OPTIONS
-        $registrations = array();
-        $db_results    = $wpdb->get_results( $wpdb->prepare(
+        // Load existing tournament records
+        $local_regs = array();
+        $db_results = $wpdb->get_results( $wpdb->prepare(
             "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
             $wpdb->esc_like( 'sywat_t_' . $t_slug . '_' ) . '%'
         ) );
 
-        foreach ( $db_results as $row ) {
-            $reg_data = maybe_unserialize( $row->option_value );
-            if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
-                $registrations[ $reg_data['id'] ] = $reg_data;
+        $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
+        if ( ! is_array( $master_regs ) ) {
+            $master_regs = array();
+        }
+
+        $scores = get_option( 'sywat_scores_' . $t_slug, array() );
+        if ( ! is_array( $scores ) ) {
+            $scores = array();
+        }
+
+        $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
+        if ( ! is_array( $gender_cache ) ) {
+            $gender_cache = array();
+        }
+
+        // Purge all prior TFAA-imported rows for this tournament so TFAA remains a 1:1 verbatim system of record,
+        // while keeping genuine local shop/online pre-registrations intact for matching below.
+        $stats_purged = 0;
+        if ( is_array( $db_results ) ) {
+            foreach ( $db_results as $row ) {
+                $reg_data = maybe_unserialize( $row->option_value );
+                if ( ! is_array( $reg_data ) ) {
+                    delete_option( $row->option_name );
+                    continue;
+                }
+
+                $r_id           = isset( $reg_data['id'] ) ? (string) $reg_data['id'] : str_replace( 'sywat_t_' . $t_slug . '_', '', (string) $row->option_name );
+                $is_tfaa_origin = ( strpos( $r_id, 'reg_seq_' ) === 0 || ! empty( $reg_data['tfaa_origin'] ) );
+
+                if ( $is_tfaa_origin ) {
+                    delete_option( $row->option_name );
+                    wp_cache_delete( $row->option_name, 'options' );
+                    unset( $master_regs[ $r_id ] );
+                    unset( $scores[ $r_id ] );
+                    $stats_purged++;
+                } else {
+                    $local_regs[ $r_id ] = $reg_data;
+                }
             }
         }
 
-        // Hoist normalizers and pre-compute registration match metadata outside entry loop
+        // Hoist normalizers outside entry loop
         $has_match_keys = function_exists( 'sywat_normalize_archer_match_keys' );
-        $has_alias_fn   = function_exists( 'sywat_are_given_names_compatible' );
 
         $normalize_str = function( $str ) {
             $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', (string) $str );
@@ -385,13 +421,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm  = $normalize_str( $raw_name );
             $parts = $norm !== '' ? explode( ' ', $norm ) : array();
             return array(
-                'exact'       => $norm,
-                'fl'          => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
-                'first'       => ! empty( $parts ) ? reset( $parts ) : '',
-                'last'        => count( $parts ) > 1 ? end( $parts ) : ( ! empty( $parts ) ? reset( $parts ) : '' ),
-                'suffix'      => '',
-                'token_count' => count( $parts ),
-                'last_len'    => count( $parts ) > 1 ? strlen( end( $parts ) ) : 0,
+                'exact' => $norm,
+                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
             );
         };
 
@@ -411,50 +442,40 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return $normalize_str( $raw );
         };
 
-        $reg_meta = array();
-        foreach ( $registrations as $r_id => $r ) {
+        // Pre-compute match metadata for any remaining local shop/online pre-registrations
+        $local_meta         = array();
+        $occupied_by_archer = array();
+
+        foreach ( $local_regs as $r_id => $r ) {
             $raw_r_name = isset( $r['name'] ) ? $r['name'] : '';
-            $reg_meta[ $r_id ] = array(
-                'norm_name'      => $normalize_str( $raw_r_name ),
-                'keys'           => $get_match_keys( $raw_r_name ),
-                'norm_div'       => $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' ),
-                'norm_gender'    => strtolower( trim( isset( $r['gender'] ) ? (string) $r['gender'] : '' ) ),
-                'norm_style'     => $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' ),
-                'is_guest'       => ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' ),
-                'line_index'     => isset( $r['line_index'] ) ? (string) $r['line_index'] : '',
-                'score'          => isset( $r['score'] ) ? intval( $r['score'] ) : 0,
-                'x_count'        => isset( $r['x_count'] ) ? intval( $r['x_count'] ) : 0,
-                'is_tfaa_origin' => ( strpos( (string) $r_id, 'reg_seq_' ) === 0 || ! empty( $r['tfaa_origin'] ) ),
+            $r_keys     = $get_match_keys( $raw_r_name );
+            $archer_sig = ! empty( $r_keys['fl'] ) ? $r_keys['fl'] : $normalize_str( $raw_r_name );
+            $l_idx_str  = isset( $r['line_index'] ) ? (string) $r['line_index'] : '';
+
+            if ( $archer_sig !== '' && $l_idx_str !== '' ) {
+                $occupied_by_archer[ $archer_sig ][] = $l_idx_str;
+            }
+
+            $local_meta[ $r_id ] = array(
+                'norm_name'  => $normalize_str( $raw_r_name ),
+                'keys'       => $r_keys,
+                'norm_div'   => $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' ),
+                'norm_style' => $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' ),
+                'is_guest'   => ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' ),
             );
         }
 
-        $claimed_reg_ids = array();
-        $primary_styles  = array();
-        $stats_updated   = 0;
-        $stats_created   = 0;
-        $stats_pruned    = 0;
-
-        $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
-        if ( ! is_array( $master_regs ) ) {
-            $master_regs = array();
-        }
-
-        $scores = get_option( 'sywat_scores_' . $t_slug, array() );
-        if ( ! is_array( $scores ) ) {
-            $scores = array();
-        }
-
-        $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
-        if ( ! is_array( $gender_cache ) ) {
-            $gender_cache = array();
-        }
+        $claimed_local_ids = array();
+        $primary_styles    = array();
+        $stats_updated     = 0;
+        $stats_created     = 0;
 
         foreach ( $parsed_entries as $entry ) {
             $norm_name      = $normalize_str( $entry['clean_name'] );
             $entry_keys     = $get_match_keys( $entry['clean_name'] );
             $has_fl_pair    = ( $entry_keys['fl'] !== '' && strpos( $entry_keys['fl'], '___' ) !== false );
+            $archer_sig     = ! empty( $entry_keys['fl'] ) ? $entry_keys['fl'] : $norm_name;
             $norm_div       = $normalize_div_key( $entry['division'] );
-            $norm_gender    = strtolower( trim( (string) $entry['gender'] ) );
             $norm_style     = $normalize_style_key( $entry['style'] );
             $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
 
@@ -467,154 +488,51 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $final_style = ! empty( $primary_styles[ $norm_name ] ) ? $primary_styles[ $norm_name ] : 'Guest';
             }
 
-            // Tiered matching:
-            // 'exact'      => exact normalized name
-            // 'fl'         => First + Last + Suffix (middle-initial folding)
-            // 'alias'      => Given-name alias/stem match on identical Last + Suffix ("Chris Clark" <-> "Christopher Clark")
-            // 'typo_score' => 1-char surname correction on identical Division+Gender+Style+Score+Xs ("Kevin Danferd" <-> "Kevin Danford")
-            $find_unclaimed_reg = function( $match_mode ) use (
-                &$claimed_reg_ids,
-                $reg_meta,
-                $norm_name,
-                $entry_keys,
-                $has_fl_pair,
-                $has_alias_fn,
-                $norm_div,
-                $norm_gender,
-                $norm_style,
-                $entry_is_guest,
-                $entry
-            ) {
-                $name_matches = function( $meta ) use ( $match_mode, $norm_name, $entry_keys, $has_fl_pair, $has_alias_fn, $norm_div, $norm_gender, $norm_style, $entry_is_guest, $entry ) {
-                    if ( $match_mode === 'exact' ) {
-                        return ( $meta['norm_name'] === $norm_name || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] ) );
-                    }
-                    if ( $match_mode === 'fl' ) {
-                        return ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
-                    }
-                    if ( $match_mode === 'alias' ) {
-                        if ( ! $has_alias_fn || ! $has_fl_pair ) {
-                            return false;
+            // Match against any unclaimed local shop/online pre-registration
+            $matched_reg_id = null;
+            if ( ! empty( $local_meta ) ) {
+                $match_passes = array( 'exact_cat', 'exact_name', 'fl_cat', 'fl_name' );
+                foreach ( $match_passes as $pass ) {
+                    foreach ( $local_meta as $r_id => $meta ) {
+                        if ( isset( $claimed_local_ids[ $r_id ] ) ) {
+                            continue;
                         }
-                        $m_keys = $meta['keys'];
-                        if ( $m_keys['last'] === '' || $m_keys['last'] !== $entry_keys['last'] || $m_keys['suffix'] !== $entry_keys['suffix'] ) {
-                            return false;
-                        }
-                        return sywat_are_given_names_compatible( $m_keys['first'], $entry_keys['first'] );
-                    }
-                    if ( $match_mode === 'typo_score' ) {
-                        if ( intval( $entry['score'] ) <= 0 || $meta['score'] !== intval( $entry['score'] ) || $meta['x_count'] !== intval( $entry['xs'] ) ) {
-                            return false;
-                        }
-                        if ( $meta['norm_div'] !== $norm_div || $meta['norm_gender'] !== $norm_gender || $meta['norm_style'] !== $norm_style || $meta['is_guest'] !== $entry_is_guest ) {
-                            return false;
-                        }
-                        $m_keys = $meta['keys'];
-                        if ( $m_keys['suffix'] !== $entry_keys['suffix'] ) {
-                            return false;
-                        }
-                        $first_ok = ( $m_keys['first'] !== '' && $m_keys['first'] === $entry_keys['first'] )
-                            || ( $has_alias_fn && sywat_are_given_names_compatible( $m_keys['first'], $entry_keys['first'] ) );
-                        if ( ! $first_ok ) {
-                            return false;
-                        }
-                        $m_last = $m_keys['last'];
-                        $e_last = $entry_keys['last'];
-                        return ( strlen( $m_last ) >= 5 && strlen( $e_last ) >= 5 && $m_last !== $e_last && levenshtein( $m_last, $e_last ) === 1 );
-                    }
-                    return false;
-                };
+                        $is_exact = ( $meta['norm_name'] === $norm_name || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] ) );
+                        $is_fl    = ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
+                        $same_cat = ( $meta['norm_div'] === $norm_div && $meta['norm_style'] === $norm_style && $meta['is_guest'] === $entry_is_guest );
 
-                // Pass 1: Match Name + Division + Style + Guest Status
-                foreach ( $reg_meta as $r_id => $meta ) {
-                    if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
-                        continue;
-                    }
-                    if ( $name_matches( $meta ) && $meta['norm_div'] === $norm_div && $meta['norm_style'] === $norm_style && $meta['is_guest'] === $entry_is_guest ) {
-                        return $r_id;
+                        if ( ( $pass === 'exact_cat' && $is_exact && $same_cat )
+                            || ( $pass === 'exact_name' && $is_exact )
+                            || ( $pass === 'fl_cat' && $is_fl && $same_cat )
+                            || ( $pass === 'fl_name' && $is_fl )
+                        ) {
+                            $matched_reg_id = $r_id;
+                            break 2;
+                        }
                     }
                 }
-
-                // For fuzzy alias and 1-char surname typo modes, require Division + Style + Guest match above
-                if ( $match_mode === 'alias' || $match_mode === 'typo_score' ) {
-                    return null;
-                }
-
-                // Pass 2: Match Name + Division + Guest Status
-                foreach ( $reg_meta as $r_id => $meta ) {
-                    if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
-                        continue;
-                    }
-                    if ( $name_matches( $meta ) && $meta['norm_div'] === $norm_div && $meta['is_guest'] === $entry_is_guest ) {
-                        return $r_id;
-                    }
-                }
-
-                // Pass 3: Match Name + Guest Status (Incomplete pre-regs)
-                foreach ( $reg_meta as $r_id => $meta ) {
-                    if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
-                        continue;
-                    }
-                    if ( $name_matches( $meta ) && $meta['is_guest'] === $entry_is_guest ) {
-                        return $r_id;
-                    }
-                }
-
-                // Pass 4: Fallback Name Match
-                foreach ( $reg_meta as $r_id => $meta ) {
-                    if ( isset( $claimed_reg_ids[ $r_id ] ) ) {
-                        continue;
-                    }
-                    if ( $name_matches( $meta ) ) {
-                        return $r_id;
-                    }
-                }
-
-                return null;
-            };
-
-            $matched_reg_id = $find_unclaimed_reg( 'exact' );
-            if ( ! $matched_reg_id && $has_fl_pair ) {
-                $matched_reg_id = $find_unclaimed_reg( 'fl' );
-            }
-            if ( ! $matched_reg_id && $has_fl_pair && $has_alias_fn ) {
-                $matched_reg_id = $find_unclaimed_reg( 'alias' );
-            }
-            if ( ! $matched_reg_id && $has_fl_pair ) {
-                $matched_reg_id = $find_unclaimed_reg( 'typo_score' );
             }
 
             if ( $matched_reg_id ) {
-                // UPDATE EXISTING REGISTRATION RECORD WITH AUTHORITATIVE TFAA SPELLING & SCORE
-                $claimed_reg_ids[ $matched_reg_id ] = true;
-                $reg                                = $registrations[ $matched_reg_id ];
+                // OVERWRITE MATCHING LOCAL RECORD UNCONDITIONALLY WITH TFAA AUTHORITATIVE DATA
+                $claimed_local_ids[ $matched_reg_id ] = true;
+                $reg                                  = $local_regs[ $matched_reg_id ];
 
                 $reg['checked_in'] = 1;
                 $reg['name']       = $entry['clean_name'];
+                $reg['division']   = $entry['division'];
+                $reg['gender']     = $entry['gender'];
+                $reg['style']      = $final_style;
+                $reg['distance']   = $entry['distance'];
                 $reg['score']      = $entry['score'];
                 $reg['x_count']    = $entry['xs'];
 
                 if ( $entry_is_guest ) {
                     $reg['type'] = 'Guest';
+                } elseif ( isset( $reg['type'] ) && $reg['type'] === 'Guest' ) {
+                    $reg['type'] = 'Walk-In';
                 }
 
-                if ( empty( $reg['division'] ) || $reg['division'] === '—' ) {
-                    $reg['division'] = $entry['division'];
-                } elseif ( $has_norm_div && strcasecmp( $reg['division'], 'No Show' ) !== 0 ) {
-                    $reg['division'] = sywat_shooting_styles_normalize_division( $reg['division'] );
-                }
-
-                if ( empty( $reg['gender'] ) || $reg['gender'] === '—' ) {
-                    $reg['gender'] = $entry['gender'];
-                }
-
-                if ( empty( $reg['style'] ) || $reg['style'] === '—' ) {
-                    $reg['style'] = $final_style;
-                } elseif ( $has_norm_style && strcasecmp( $reg['style'], 'No Show' ) !== 0 && strcasecmp( $reg['style'], 'Guest' ) !== 0 ) {
-                    $reg['style'] = sywat_shooting_styles_normalize_style( $reg['style'] );
-                }
-
-                $registrations[ $matched_reg_id ] = $reg;
                 update_option( 'sywat_t_' . $t_slug . '_' . $matched_reg_id, $reg, false );
                 $master_regs[ $matched_reg_id ] = $reg;
 
@@ -626,17 +544,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
                 $stats_updated++;
             } else {
-                // CREATE NEW TFAA-ORIGIN REGISTRATION (Only if no match exists)
+                // INSERT VERBATIM TFAA SCORE RECORD
                 $assigned_line_idx = $line_0_idx;
-                $occupied          = array();
-                foreach ( $reg_meta as $meta ) {
-                    $is_same_archer = ( $meta['norm_name'] === $norm_name )
-                        || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] )
-                        || ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
-                    if ( $is_same_archer && $meta['line_index'] !== '' ) {
-                        $occupied[] = $meta['line_index'];
-                    }
-                }
+                $occupied          = isset( $occupied_by_archer[ $archer_sig ] ) ? $occupied_by_archer[ $archer_sig ] : array();
 
                 if ( ! empty( $t_lines ) ) {
                     foreach ( $t_lines as $l_idx => $l_data ) {
@@ -645,6 +555,10 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                             break;
                         }
                     }
+                }
+
+                if ( $archer_sig !== '' ) {
+                    $occupied_by_archer[ $archer_sig ][] = $assigned_line_idx;
                 }
 
                 $line_name = isset( $t_lines[ $assigned_line_idx ]['name'] ) ? $t_lines[ $assigned_line_idx ]['name'] : 'Line ' . ( intval( $assigned_line_idx ) + 1 );
@@ -677,21 +591,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'created_at'  => current_time( 'mysql' ),
                 );
 
-                $registrations[ $target_id ]   = $new_reg;
-                $claimed_reg_ids[ $target_id ] = true;
-                $reg_meta[ $target_id ]        = array(
-                    'norm_name'      => $norm_name,
-                    'keys'           => $entry_keys,
-                    'norm_div'       => $norm_div,
-                    'norm_gender'    => $norm_gender,
-                    'norm_style'     => $norm_style,
-                    'is_guest'       => $entry_is_guest,
-                    'line_index'     => (string) $assigned_line_idx,
-                    'score'          => intval( $entry['score'] ),
-                    'x_count'        => intval( $entry['xs'] ),
-                    'is_tfaa_origin' => true,
-                );
-
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
                 $master_regs[ $target_id ] = $new_reg;
 
@@ -709,29 +608,17 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
         }
 
-        // Prune stale unclaimed TFAA-origin records that were renamed, merged, or removed on TFAA
-        // while leaving genuine local shop/online registrations untouched.
-        foreach ( $reg_meta as $r_id => $meta ) {
-            if ( ! isset( $claimed_reg_ids[ $r_id ] ) && ! empty( $meta['is_tfaa_origin'] ) ) {
-                delete_option( 'sywat_t_' . $t_slug . '_' . $r_id );
-                wp_cache_delete( 'sywat_t_' . $t_slug . '_' . $r_id, 'options' );
-                unset( $master_regs[ $r_id ] );
-                unset( $scores[ $r_id ] );
-                $stats_pruned++;
-            }
-        }
-
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_scores_' . $t_slug, $scores, false );
         update_option( 'sywat_shooter_genders_cache', $gender_cache, false );
         delete_transient( 'sywat_history_profiles_cache' );
 
-        $pruned_note = ( $stats_pruned > 0 ) ? " and retired {$stats_pruned} stale TFAA records" : '';
+        $purged_note = ( $stats_purged > 0 ) ? "Replaced {$stats_purged} prior TFAA records; " : '';
 
         return array(
             'success' => true,
             'count'   => ( $stats_updated + $stats_created ),
-            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated/verified {$stats_updated} existing records, created {$stats_created} new sequential records{$pruned_note}).",
+            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers verbatim from TFAA! ({$purged_note}updated {$stats_updated} local records and imported {$stats_created} TFAA records).",
         );
     }
 }
