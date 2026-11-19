@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (with single-query season batching, Guest-entry exclusion, unified tfaa_id <-> normalized First+Last (+ suffix) deduplication, given-name alias merging via sywat_are_given_names_compatible(), and surname tie-breaker sorting).
- * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, single-pass computational hoisting, omitted closing PHP tag.
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), and surname tie-breaker sorting).
+ * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -119,8 +119,7 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps, preserving registration 'type' (e.g., 'Guest'), and computing
- * hoisted "LastName, FirstName" display labels while preserving canonical 'name' keys.
+ * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest').
  * Defaults blank/unset score fields to 0 so every roster entry is included.
  *
  * @param string $t_name Tournament title.
@@ -130,11 +129,10 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     function sywat_get_tournament_scores( $t_name ) {
         global $wpdb;
 
-        $t_slug           = sanitize_title( $t_name );
-        $scores           = array();
-        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
-        $has_div_res      = function_exists( 'sywat_results_resolve_division_record' );
-        $has_style_res    = function_exists( 'sywat_results_resolve_style_record' );
+        $t_slug        = sanitize_title( $t_name );
+        $scores        = array();
+        $has_div_res   = function_exists( 'sywat_results_resolve_division_record' );
+        $has_style_res = function_exists( 'sywat_results_resolve_style_record' );
 
         $results = $wpdb->get_results( $wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
@@ -159,21 +157,19 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                 $style_rec  = $has_style_res ? sywat_results_resolve_style_record( $raw_style ) : null;
                 $norm_style = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : $raw_style;
 
-                $raw_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
-                $disp_name = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
+                $raw_name = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
 
                 $scores[] = array(
-                    'id'           => isset( $reg['id'] ) ? $reg['id'] : '',
-                    'name'         => $raw_name,
-                    'display_name' => $disp_name,
-                    'tfaa_id'      => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
-                    'type'         => isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '',
-                    'division'     => $norm_div,
-                    'gender'       => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
-                    'style'        => $norm_style,
-                    'score'        => $score_val,
-                    'x_count'      => $x_val,
-                    'tournament'   => $t_name,
+                    'id'         => isset( $reg['id'] ) ? $reg['id'] : '',
+                    'name'       => $raw_name,
+                    'tfaa_id'    => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
+                    'type'       => isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '',
+                    'division'   => $norm_div,
+                    'gender'     => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
+                    'style'      => $norm_style,
+                    'score'      => $score_val,
+                    'x_count'    => $x_val,
+                    'tournament' => $t_name,
                 );
             }
         }
@@ -187,11 +183,11 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
  * batched SQL query across all published tournaments in the season.
  * EXCLUDES all Guest entries (type === 'Guest', style === 'Guest', or '[Guest]' tags),
  * score-0 cards, and secondary re-entries entirely.
- * Unifies tfaa_id and normalized First+Last (+ suffix) keys so identical archers with
- * or without tfaa_id metadata merge into a single row, merges given-name alias variants
- * (e.g., "Chris Clark" <-> "Christopher Clark") across separate tournaments within the
- * same category via sywat_are_given_names_compatible(), enforces 'scores_published',
- * and orders tied total scores & X-counts alphabetically by "LastName, FirstName".
+ * Resolves each archer's canonical O(1) identity key in a single pass via
+ * sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map() so
+ * identical archers with differing/missing tfaa_ids ("Keven Danferd") and unambiguous
+ * given-name variants ("Chris Clark" <-> "Christopher Clark") merge cleanly, enforces
+ * 'scores_published', and orders tied total scores & X-counts alphabetically by surname.
  *
  * @param string $season_slug Target season slug.
  * @return array              Associative array with 'season', 'best_n', and 'groups'.
@@ -203,9 +199,8 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $seasons          = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
         $season           = isset( $seasons[ $season_slug ] ) ? $seasons[ $season_slug ] : null;
         $best_n           = ( $season && isset( $season['best_n_count'] ) ) ? intval( $season['best_n_count'] ) : 3;
-        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
         $has_match_keys   = function_exists( 'sywat_normalize_archer_match_keys' );
-        $has_alias_fn     = function_exists( 'sywat_are_given_names_compatible' );
+        $alias_map        = function_exists( 'sywat_get_given_name_alias_map' ) ? sywat_get_given_name_alias_map() : array();
         $has_div_res      = function_exists( 'sywat_results_resolve_division_record' );
         $has_style_res    = function_exists( 'sywat_results_resolve_style_record' );
         $has_heading_fn   = function_exists( 'sywat_format_div_gen_heading' );
@@ -255,11 +250,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $sql     = "SELECT option_name, option_value FROM {$wpdb->options} WHERE " . implode( ' OR ', $like_clauses );
         $results = $wpdb->get_results( $wpdb->prepare( $sql, $like_params ) );
 
-        $raw_parsed_rows = array();
-        $fl_to_ids       = array();
-        $id_to_best_fl   = array();
-        $id_to_best_len  = array();
-
+        $scores_by_tourn = array();
         if ( is_array( $results ) ) {
             foreach ( $results as $row ) {
                 $reg = maybe_unserialize( $row->option_value );
@@ -313,6 +304,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                     continue;
                 }
 
+                // Single-pass O(1) canonical identity key (folds middle initials, suffix periods, and unambiguous given-name aliases)
                 $name_keys = $has_match_keys
                     ? sywat_normalize_archer_match_keys( $raw_name )
                     : array(
@@ -324,62 +316,36 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                         'token_count' => 1,
                     );
 
-                if ( ! empty( $name_keys['fl'] ) ) {
-                    $base_fl = 'fl_' . $name_keys['fl'];
-                } elseif ( ! empty( $name_keys['exact'] ) ) {
-                    $base_fl = 'ex_' . $name_keys['exact'];
+                $first_tok = isset( $name_keys['first'] ) ? $name_keys['first'] : '';
+                $last_tok  = isset( $name_keys['last'] ) ? $name_keys['last'] : '';
+                $sfx_tok   = isset( $name_keys['suffix'] ) ? $name_keys['suffix'] : '';
+
+                if ( $first_tok !== '' && $last_tok !== '' && $name_keys['token_count'] >= 2 ) {
+                    $canon_first = ( isset( $alias_map[ $first_tok ] ) && count( $alias_map[ $first_tok ] ) === 1 )
+                        ? $alias_map[ $first_tok ][0]
+                        : $first_tok;
+                    $archer_key  = 'fl_' . $canon_first . '___' . $last_tok . ( $sfx_tok !== '' ? '___' . $sfx_tok : '' );
+                } elseif ( ! empty( $name_keys['fl'] ) ) {
+                    $archer_key = 'fl_' . $name_keys['fl'];
                 } else {
-                    $base_fl = 'name_' . strtolower( $raw_name );
+                    $archer_key = 'ex_' . $name_keys['exact'];
                 }
 
-                $tfaa_id  = isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '';
-                $id_lower = strtolower( $tfaa_id );
-
-                if ( $id_lower !== '' ) {
-                    $fl_to_ids[ $base_fl ][ $id_lower ] = true;
-                    $first_len                          = isset( $name_keys['first'] ) ? strlen( $name_keys['first'] ) : strlen( $raw_name );
-                    if ( ! isset( $id_to_best_fl[ $id_lower ] ) || $first_len > $id_to_best_len[ $id_lower ] ) {
-                        $id_to_best_fl[ $id_lower ]  = $base_fl;
-                        $id_to_best_len[ $id_lower ] = $first_len;
-                    }
-                }
-
-                $disp_name = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
-
-                $raw_parsed_rows[] = array(
-                    'id'           => isset( $reg['id'] ) ? $reg['id'] : '',
-                    'name'         => $raw_name,
-                    'display_name' => $disp_name,
-                    'tfaa_id'      => $tfaa_id,
-                    'id_lower'     => $id_lower,
-                    'base_fl'      => $base_fl,
-                    'name_keys'    => $name_keys,
-                    'type'         => $raw_type,
-                    'division'     => $norm_div,
-                    'gender'       => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
-                    'style'        => $norm_sty,
-                    'score'        => $score_val,
-                    'x_count'      => $x_val,
-                    'tournament'   => $resolved_tourn,
+                $scores_by_tourn[ $resolved_tourn ][] = array(
+                    'id'         => isset( $reg['id'] ) ? $reg['id'] : '',
+                    'name'       => $raw_name,
+                    'tfaa_id'    => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
+                    'archer_key' => $archer_key,
+                    'name_keys'  => $name_keys,
+                    'type'       => $raw_type,
+                    'division'   => $norm_div,
+                    'gender'     => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
+                    'style'      => $norm_sty,
+                    'score'      => $score_val,
+                    'x_count'    => $x_val,
+                    'tournament' => $resolved_tourn,
                 );
             }
-        }
-
-        // Assign unified archer_key linking tfaa_id and normalized First+Last (+ suffix) keys
-        $scores_by_tourn = array();
-        foreach ( $raw_parsed_rows as $item ) {
-            $canon_fl = ( $item['id_lower'] !== '' && isset( $id_to_best_fl[ $item['id_lower'] ] ) )
-                ? $id_to_best_fl[ $item['id_lower'] ]
-                : $item['base_fl'];
-
-            // Only split identical First+Last names when two genuinely distinct non-empty tfaa_ids exist
-            if ( $item['id_lower'] !== '' && isset( $fl_to_ids[ $canon_fl ] ) && count( $fl_to_ids[ $canon_fl ] ) > 1 ) {
-                $item['archer_key'] = $canon_fl . '___id_' . $item['id_lower'];
-            } else {
-                $item['archer_key'] = $canon_fl;
-            }
-
-            $scores_by_tourn[ $item['tournament'] ][] = $item;
         }
 
         $groups = array();
@@ -429,39 +395,30 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 }
 
                 if ( ! isset( $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] ) ) {
-                    $disp_name = ! empty( $s['display_name'] )
-                        ? $s['display_name']
-                        : ( $has_lf_formatter ? sywat_format_name_last_first( $s['name'] ) : $s['name'] );
-
                     $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] = array(
                         'name'             => $s['name'],
-                        'display_name'     => $disp_name,
                         'tfaa_id'          => $s['tfaa_id'],
                         'name_keys'        => $s['name_keys'],
                         'division'         => $s['division'],
                         'gender'           => $s['gender'],
                         'style'            => $s['style'],
-                        'tournaments'      => array(),
                         'qualifier_scores' => array(),
                         'state_score'      => null,
                     );
                 } else {
-                    // Prefer fuller canonical name (e.g. "Christopher Clark" over "Chris Clark") and populate tfaa_id if missing
+                    // Prefer fuller given name (e.g., "Christopher Clark" over "Chris Clark") and retain non-empty tfaa_id
                     $existing_ref =& $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ];
                     $curr_first   = isset( $existing_ref['name_keys']['first'] ) ? $existing_ref['name_keys']['first'] : '';
                     $new_first    = isset( $s['name_keys']['first'] ) ? $s['name_keys']['first'] : '';
                     if ( strlen( $new_first ) > strlen( $curr_first ) ) {
-                        $existing_ref['name']         = $s['name'];
-                        $existing_ref['display_name'] = $s['display_name'];
-                        $existing_ref['name_keys']    = $s['name_keys'];
+                        $existing_ref['name']      = $s['name'];
+                        $existing_ref['name_keys'] = $s['name_keys'];
                     }
                     if ( empty( $existing_ref['tfaa_id'] ) && ! empty( $s['tfaa_id'] ) ) {
                         $existing_ref['tfaa_id'] = $s['tfaa_id'];
                     }
                     unset( $existing_ref );
                 }
-
-                $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ]['tournaments'][ $t_name ] = true;
 
                 if ( $is_state_tourn ) {
                     $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ]['state_score'] = $s;
@@ -495,95 +452,6 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             } );
 
             foreach ( $group['styles'] as $st_key => &$archers ) {
-                // Merge given-name alias variants (e.g. "Chris Clark" <-> "Christopher Clark") across disjoint tournaments
-                if ( $has_alias_fn && count( $archers ) > 1 ) {
-                    $by_surname = array();
-                    foreach ( $archers as $a_key => $a_rec ) {
-                        $nk     = isset( $a_rec['name_keys'] ) ? $a_rec['name_keys'] : array();
-                        $f_tok  = isset( $nk['first'] ) ? $nk['first'] : '';
-                        $l_tok  = isset( $nk['last'] ) ? $nk['last'] : '';
-                        $sx_tok = isset( $nk['suffix'] ) ? $nk['suffix'] : '';
-                        if ( $f_tok !== '' && $l_tok !== '' ) {
-                            $by_surname[ $l_tok . '___' . $sx_tok ][] = $a_key;
-                        }
-                    }
-
-                    foreach ( $by_surname as $surname_sig => $cand_keys ) {
-                        if ( count( $cand_keys ) < 2 ) {
-                            continue;
-                        }
-
-                        // Prefer fuller canonical first name (e.g. "Christopher" before "Chris") as primary target
-                        usort( $cand_keys, function( $kA, $kB ) use ( $archers ) {
-                            $fA = isset( $archers[ $kA ]['name_keys']['first'] ) ? strlen( $archers[ $kA ]['name_keys']['first'] ) : 0;
-                            $fB = isset( $archers[ $kB ]['name_keys']['first'] ) ? strlen( $archers[ $kB ]['name_keys']['first'] ) : 0;
-                            if ( $fA !== $fB ) {
-                                return $fB - $fA;
-                            }
-                            $idA = ! empty( $archers[ $kA ]['tfaa_id'] ) ? 1 : 0;
-                            $idB = ! empty( $archers[ $kB ]['tfaa_id'] ) ? 1 : 0;
-                            if ( $idA !== $idB ) {
-                                return $idB - $idA;
-                            }
-                            return strcmp( $kA, $kB );
-                        } );
-
-                        $total_cands = count( $cand_keys );
-                        for ( $i = 0; $i < $total_cands; $i++ ) {
-                            $primary_key = $cand_keys[ $i ];
-                            if ( ! isset( $archers[ $primary_key ] ) ) {
-                                continue;
-                            }
-
-                            for ( $j = $i + 1; $j < $total_cands; $j++ ) {
-                                $alias_key = $cand_keys[ $j ];
-                                if ( ! isset( $archers[ $alias_key ] ) ) {
-                                    continue;
-                                }
-
-                                $p_first = $archers[ $primary_key ]['name_keys']['first'];
-                                $a_first = $archers[ $alias_key ]['name_keys']['first'];
-
-                                if ( $p_first === $a_first || ! sywat_are_given_names_compatible( $p_first, $a_first ) ) {
-                                    continue;
-                                }
-
-                                // Do not merge if both records carry distinct non-empty tfaa_ids
-                                $p_id = strtolower( trim( (string) $archers[ $primary_key ]['tfaa_id'] ) );
-                                $a_id = strtolower( trim( (string) $archers[ $alias_key ]['tfaa_id'] ) );
-                                if ( $p_id !== '' && $a_id !== '' && $p_id !== $a_id ) {
-                                    continue;
-                                }
-
-                                // Do not merge if both names competed in the exact same tournament
-                                $overlap = array_intersect_key(
-                                    $archers[ $primary_key ]['tournaments'],
-                                    $archers[ $alias_key ]['tournaments']
-                                );
-                                if ( ! empty( $overlap ) ) {
-                                    continue;
-                                }
-
-                                // Merge alias bucket into primary bucket
-                                foreach ( $archers[ $alias_key ]['qualifier_scores'] as $qs ) {
-                                    $archers[ $primary_key ]['qualifier_scores'][] = $qs;
-                                }
-                                if ( null === $archers[ $primary_key ]['state_score'] && null !== $archers[ $alias_key ]['state_score'] ) {
-                                    $archers[ $primary_key ]['state_score'] = $archers[ $alias_key ]['state_score'];
-                                }
-                                if ( empty( $archers[ $primary_key ]['tfaa_id'] ) && ! empty( $archers[ $alias_key ]['tfaa_id'] ) ) {
-                                    $archers[ $primary_key ]['tfaa_id'] = $archers[ $alias_key ]['tfaa_id'];
-                                }
-                                foreach ( $archers[ $alias_key ]['tournaments'] as $t_seen => $flag ) {
-                                    $archers[ $primary_key ]['tournaments'][ $t_seen ] = true;
-                                }
-
-                                unset( $archers[ $alias_key ] );
-                            }
-                        }
-                    }
-                }
-
                 $processed = array();
 
                 foreach ( $archers as $a_key => $a ) {
@@ -608,9 +476,16 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                         $total_x_count += $ks['x_count'];
                     }
 
+                    $nk          = $a['name_keys'];
+                    $surname_key = trim(
+                        ( isset( $nk['last'] ) ? $nk['last'] : '' ) . ' ' .
+                        ( isset( $nk['suffix'] ) ? $nk['suffix'] : '' ) . ', ' .
+                        ( isset( $nk['first'] ) ? $nk['first'] : $a['name'] )
+                    );
+
                     $processed[] = array(
                         'name'          => $a['name'],
-                        'display_name'  => $a['display_name'],
+                        'surname_key'   => $surname_key,
                         'tfaa_id'       => $a['tfaa_id'],
                         'division'      => $a['division'],
                         'gender'        => $a['gender'],
@@ -627,7 +502,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 usort( $processed, function( $x, $y ) {
                     if ( $x['total_score'] === $y['total_score'] ) {
                         if ( $x['total_x_count'] === $y['total_x_count'] ) {
-                            return strcasecmp( $x['display_name'], $y['display_name'] );
+                            return strcasecmp( $x['surname_key'], $y['surname_key'] );
                         }
                         return $y['total_x_count'] - $x['total_x_count'];
                     }
