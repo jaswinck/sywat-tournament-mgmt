@@ -2,22 +2,41 @@
 /**
  * View Template: Admin Manage Shop Staff
  * Path: includes/shops/views/view-shop-staff.php
+ * Description: Renders linked and available shop staff accounts formatted and sorted by surname ("LastName, FirstName") while preserving canonical display_name values in confirmation dialogs.
+ * Compliance: Pure view template — zero direct SQL queries, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 5.0.0
+ * Version: 5.1.0
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
-$linked_staff = array();
-$unlinked_staff = array();
+$has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
+$linked_staff     = array();
+$unlinked_staff   = array();
+
 foreach ( $eligible_users as $u ) {
-    $u_shop = get_user_meta( $u->ID, 'sywat_shop_id', true );
+    $u_shop    = get_user_meta( $u->ID, 'sywat_shop_id', true );
+    $disp_name = $has_lf_formatter ? sywat_format_name_last_first( $u->display_name ) : $u->display_name;
+    $entry     = array(
+        'user'      => $u,
+        'disp_name' => $disp_name,
+    );
+
     if ( $u_shop === $managing_shop['id'] ) {
-        $linked_staff[] = $u;
+        $linked_staff[] = $entry;
     } else {
-        $unlinked_staff[] = $u;
+        $unlinked_staff[] = $entry;
     }
 }
+
+$sort_by_surname = function( $a, $b ) {
+    return strcasecmp( $a['disp_name'], $b['disp_name'] );
+};
+
+usort( $linked_staff, $sort_by_surname );
+usort( $unlinked_staff, $sort_by_surname );
 ?>
 
 <div class="sywat-card no-print">
@@ -45,13 +64,14 @@ foreach ( $eligible_users as $u ) {
                 <div class="sywat-field-group" style="flex:1; min-width:250px;">
                     <label>Select Available Staff User</label>
                     <select name="staff_user_id" required>
-                        <?php foreach ( $unlinked_staff as $un_user ): ?>
+                        <?php foreach ( $unlinked_staff as $un_item ): ?>
                             <?php 
-                                $curr_s_id = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
+                                $un_user     = $un_item['user'];
+                                $curr_s_id   = get_user_meta( $un_user->ID, 'sywat_shop_id', true );
                                 $curr_s_name = isset( $all_shops[$curr_s_id]['name'] ) ? $all_shops[$curr_s_id]['name'] : 'Unassigned';
                             ?>
                             <option value="<?php echo esc_attr( $un_user->ID ); ?>">
-                                <?php echo esc_html( $un_user->display_name ); ?> (Currently: <?php echo esc_html( $curr_s_name ); ?>)
+                                <?php echo esc_html( $un_item['disp_name'] ); ?> (Currently: <?php echo esc_html( $curr_s_name ); ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -77,9 +97,10 @@ foreach ( $eligible_users as $u ) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ( $linked_staff as $ls_user ): ?>
+                    <?php foreach ( $linked_staff as $ls_item ): ?>
+                        <?php $ls_user = $ls_item['user']; ?>
                         <tr>
-                            <td><strong style="color:#0f172a;"><?php echo esc_html( $ls_user->display_name ); ?></strong></td>
+                            <td><strong style="color:#0f172a;"><?php echo esc_html( $ls_item['disp_name'] ); ?></strong></td>
                             <td><?php echo esc_html( $ls_user->user_login ); ?></td>
                             <td><?php echo esc_html( $ls_user->user_email ); ?></td>
                             <td class="sywat-col-right">
