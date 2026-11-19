@@ -2,23 +2,30 @@
 /**
  * Sub-Module: Member & Board Helper Functions
  * Path: includes/members/members-helpers.php
- * Description: Pure formatting utilities, smart archer name-key normalization, internal System ID generation, NFAA ID resolution, DOB age division calculators, canonical intake shooter profile resolver (combining Member Directory DOB calculation and official display name resolution with O(1)-indexed shop/TFAA history), NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter (optimized with O(N) computational hoisting to eliminate N+1 query bottlenecks), board position to WordPress role mapping dictionary (including complete Field Governor district mappings), and household sub-profile management utilities with robust dual key/property system ID resolution.
- * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php.
+ * Description: Pure formatting utilities, internal System ID generation, NFAA ID resolution, DOB age division calculators, NFAA expiration status matchers (with Shop / Club dual-role detection and role-based validation guardrails), gender options dictionary, US state resolution, accommodations maps, board hierarchy sorter (optimized with O(N) computational hoisting to eliminate N+1 query bottlenecks), board position to WordPress role mapping dictionary (including complete Field Governor district mappings), household sub-profile management utilities with robust dual key/property system ID resolution, and backward-compatible delegation to the shared Archer Identity Engine (includes/common/sywat-archer-identity-helpers.php).
+ * Compliance: Zero HTML output. Returns standardized data arrays and clean scalar values. Data retrieval queries isolated to members-data.php. Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 6.5.1
+ * Version: 6.5.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Ensure the shared Archer Identity Engine is loaded prior to defining fallback wrappers
+if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) && defined( 'SYWAT_PLUGIN_DIR' ) ) {
+    $sywat_identity_helper = SYWAT_PLUGIN_DIR . 'includes/common/sywat-archer-identity-helpers.php';
+    if ( file_exists( $sywat_identity_helper ) ) {
+        require_once $sywat_identity_helper;
+    }
+}
+
 /**
- * Build normalized exact and First+Last (+ generational suffix) keys for smart archer name matching.
- * Strips bracketed/parenthesized tags, periods, and middle initials/names (e.g., "Mark E. Tanner" -> "mark___tanner")
- * while preserving generational suffixes (Jr, Sr, II, III, IV) so parent/child records never collide.
+ * Fallback wrapper for sywat_normalize_archer_match_keys() when loaded outside the main plugin bootstrap.
+ * Primary implementation resides in includes/common/sywat-archer-identity-helpers.php.
  *
  * @param string $raw_name Raw archer name input.
- * @return array           Associative array with 'exact', 'fl', and 'suffix' keys.
+ * @return array           Associative array with 'exact', 'fl', 'first', 'last', 'suffix', 'token_count', and 'last_len'.
  */
 if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
     function sywat_normalize_archer_match_keys( $raw_name ) {
@@ -29,9 +36,13 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
 
         if ( $cleaned === '' ) {
             return array(
-                'exact'  => '',
-                'fl'     => '',
-                'suffix' => '',
+                'exact'       => '',
+                'fl'          => '',
+                'first'       => '',
+                'last'        => '',
+                'suffix'      => '',
+                'token_count' => 0,
+                'last_len'    => 0,
             );
         }
 
@@ -45,16 +56,22 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
 
         $core_exact = implode( ' ', $tokens );
         $exact_key  = $suffix !== '' ? ( $core_exact . ' ' . $suffix ) : $core_exact;
-        $fl_key     = ( count( $tokens ) >= 2 ) ? ( reset( $tokens ) . '___' . end( $tokens ) ) : $core_exact;
+        $first_tok  = isset( $tokens[0] ) ? $tokens[0] : '';
+        $last_tok   = count( $tokens ) > 1 ? end( $tokens ) : $first_tok;
+        $fl_key     = ( count( $tokens ) >= 2 ) ? ( $first_tok . '___' . $last_tok ) : $core_exact;
 
         if ( $suffix !== '' && $fl_key !== '' ) {
             $fl_key .= '___' . $suffix;
         }
 
         return array(
-            'exact'  => $exact_key,
-            'fl'     => $fl_key,
-            'suffix' => $suffix,
+            'exact'       => $exact_key,
+            'fl'          => $fl_key,
+            'first'       => $first_tok,
+            'last'        => $last_tok,
+            'suffix'      => $suffix,
+            'token_count' => count( $tokens ),
+            'last_len'    => strlen( $last_tok ),
         );
     }
 }
@@ -873,7 +890,7 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
         update_user_meta( $new_user_id, 'sywat_phone', $dep['phone'] );
         update_user_meta( $new_user_id, 'sywat_address_1', $dep['address_1'] );
         update_user_meta( $new_user_id, 'sywat_address_2', $dep['address_2'] );
-        update_user_meta( $new_user_id, 'sywat_city', $dep['city'] );
+        update_user_id ? update_user_meta( $new_user_id, 'sywat_city', $dep['city'] ) : null;
         update_user_meta( $new_user_id, 'sywat_state', $dep['state'] );
         update_user_meta( $new_user_id, 'sywat_zip', $dep['zip'] );
 
@@ -884,11 +901,8 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
 }
 
 /**
- * Pure helper resolving an archer's canonical official name, age division, distance, rate tier,
- * gender, shooting style, contact details, and household ID for registration/import intake.
- * Delegates Member Directory lookup to sywat_find_member_record_by_name() (members-data.php),
- * calculates exact tournament-date age division via sywat_get_eligible_age_division(), and falls
- * back to request-cached O(1) shop registration and 18-month TFAA standings hashtables with zero SQL queries.
+ * Fallback wrapper for sywat_resolve_archer_intake_profile() when loaded outside the main plugin bootstrap.
+ * Primary implementation resides in includes/common/sywat-archer-identity-helpers.php.
  *
  * @param string $archer_name     Archer full name.
  * @param string $tournament_date Optional YYYY-MM-DD tournament start date.
@@ -897,10 +911,8 @@ if ( ! function_exists( 'sywat_promote_dependent_to_primary' ) ) {
  */
 if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
     function sywat_resolve_archer_intake_profile( $archer_name, $tournament_date = '', $contact_hints = array() ) {
-        static $indexed_sources = null;
-
         $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $archer_name ) );
-        $profile    = array(
+        return array(
             'canonical_name' => $clean_name,
             'was_normalized' => false,
             'matched'        => false,
@@ -915,179 +927,5 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
             'family_id'      => '',
             'system_id'      => '',
         );
-
-        if ( $clean_name === '' ) {
-            return $profile;
-        }
-
-        $match_keys = sywat_normalize_archer_match_keys( $clean_name );
-        $norm_name  = $match_keys['exact'];
-        $fl_key     = $match_keys['fl'];
-
-        $apply_division = function( $raw_div ) use ( &$profile ) {
-            $norm_div = function_exists( 'sywat_shooting_styles_normalize_division' )
-                ? sywat_shooting_styles_normalize_division( $raw_div )
-                : trim( (string) $raw_div );
-            if ( $norm_div === '' || strcasecmp( $norm_div, 'No Show' ) === 0 ) {
-                return;
-            }
-            $dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
-                ? sywat_shooting_styles_get_division_distance( $norm_div )
-                : ( stripos( $norm_div, 'Cub' ) !== false ? 'Cub' : '20yd' );
-            $tier = ( $dist === 'Cub' )
-                ? 'Youth'
-                : ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
-                    ? sywat_shooting_styles_get_division_rate_tier( $norm_div )
-                    : ( stripos( $norm_div, 'Youth' ) !== false ? 'Youth' : 'Adult' ) );
-
-            $profile['division']  = $norm_div;
-            $profile['distance']  = $dist;
-            $profile['rate_tier'] = $tier;
-        };
-
-        // 1. Member Directory lookup via data layer + exact DOB age division & canonical name resolution
-        $member         = function_exists( 'sywat_find_member_record_by_name' )
-            ? sywat_find_member_record_by_name( $clean_name, $profile['email'], $profile['phone'] )
-            : null;
-        $member_matched = false;
-
-        if ( is_array( $member ) ) {
-            $member_matched       = true;
-            $profile['matched']   = true;
-            $profile['source']    = 'member_directory';
-            $profile['system_id'] = isset( $member['system_id'] ) ? (string) $member['system_id'] : '';
-            $profile['family_id'] = ! empty( $member['head_user_id'] ) ? 'hh_' . intval( $member['head_user_id'] ) : '';
-
-            if ( ! empty( $member['display_name'] ) ) {
-                $official_member_name      = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $member['display_name'] ) );
-                $profile['canonical_name'] = $official_member_name;
-                $profile['was_normalized'] = ( strcasecmp( $clean_name, $official_member_name ) !== 0 );
-            }
-
-            if ( $profile['email'] === '' && ! empty( $member['email'] ) ) {
-                $profile['email'] = trim( (string) $member['email'] );
-            }
-            if ( $profile['phone'] === '' && ! empty( $member['phone'] ) ) {
-                $profile['phone'] = trim( (string) $member['phone'] );
-            }
-            $raw_gender = isset( $member['gender'] ) ? strtolower( trim( (string) $member['gender'] ) ) : '';
-            if ( $raw_gender === 'male' || $raw_gender === 'female' ) {
-                $profile['gender'] = ucfirst( $raw_gender );
-            }
-            if ( ! empty( $member['dob'] ) ) {
-                $apply_division( sywat_get_eligible_age_division( $member['dob'], $tournament_date ?: null ) );
-            }
-        }
-
-        // 2. Build request-cached O(1) hashtables for 18-month TFAA standings & shop history
-        if ( null === $indexed_sources ) {
-            $indexed_sources = array();
-            $raw_sources     = array(
-                'tfaa_standings' => get_option( 'sywat_tfaa_cache', array() ),
-                'shop_history'   => get_transient( 'sywat_history_profiles_cache' ),
-            );
-
-            foreach ( $raw_sources as $src_key => $bundle ) {
-                if ( ! is_array( $bundle ) || empty( $bundle ) ) {
-                    $indexed_sources[ $src_key ] = array(
-                        'exact' => array(),
-                        'fl'    => array(),
-                    );
-                    continue;
-                }
-
-                // Already indexed under 'exact' / 'fl' keys
-                if ( isset( $bundle['exact'] ) || isset( $bundle['fl'] ) ) {
-                    $indexed_sources[ $src_key ] = array(
-                        'exact' => isset( $bundle['exact'] ) && is_array( $bundle['exact'] ) ? $bundle['exact'] : array(),
-                        'fl'    => isset( $bundle['fl'] ) && is_array( $bundle['fl'] ) ? $bundle['fl'] : array(),
-                    );
-                    continue;
-                }
-
-                // Normalize flat shooter list (or 'shooters' wrapper) into O(1) hashtables
-                $records    = ( isset( $bundle['shooters'] ) && is_array( $bundle['shooters'] ) ) ? $bundle['shooters'] : $bundle;
-                $exact_map  = array();
-                $fl_map     = array();
-
-                foreach ( $records as $rec ) {
-                    if ( ! is_array( $rec ) ) {
-                        continue;
-                    }
-                    $r_name = isset( $rec['full_name'] ) ? trim( (string) $rec['full_name'] ) : ( isset( $rec['name'] ) ? trim( (string) $rec['name'] ) : '' );
-                    if ( $r_name === '' ) {
-                        continue;
-                    }
-                    $r_div = isset( $rec['division'] ) ? trim( (string) $rec['division'] ) : '';
-                    $r_sty = isset( $rec['style'] ) ? trim( (string) $rec['style'] ) : '';
-                    $r_gen = isset( $rec['gender'] ) ? trim( (string) $rec['gender'] ) : '';
-
-                    if ( strcasecmp( $r_div, 'No Show' ) === 0 ) {
-                        $r_div = '';
-                    }
-                    if ( strcasecmp( $r_sty, 'No Show' ) === 0 ) {
-                        $r_sty = '';
-                    }
-
-                    $normalized_rec = array(
-                        'full_name' => $r_name,
-                        'division'  => $r_div,
-                        'style'     => $r_sty,
-                        'gender'    => $r_gen,
-                    );
-
-                    $r_keys = sywat_normalize_archer_match_keys( $r_name );
-                    if ( $r_keys['exact'] !== '' ) {
-                        if ( ! isset( $exact_map[ $r_keys['exact'] ] ) || ( $exact_map[ $r_keys['exact'] ]['division'] === '' && $r_div !== '' ) ) {
-                            $exact_map[ $r_keys['exact'] ] = $normalized_rec;
-                        }
-                    }
-                    if ( $r_keys['fl'] !== '' ) {
-                        if ( ! isset( $fl_map[ $r_keys['fl'] ] ) || ( $fl_map[ $r_keys['fl'] ]['division'] === '' && $r_div !== '' ) ) {
-                            $fl_map[ $r_keys['fl'] ] = $normalized_rec;
-                        }
-                    }
-                }
-
-                $indexed_sources[ $src_key ] = array(
-                    'exact' => $exact_map,
-                    'fl'    => $fl_map,
-                );
-            }
-        }
-
-        // 3. Backfill missing division, style, gender, or canonical name from indexed history
-        foreach ( $indexed_sources as $src_key => $bundle ) {
-            if ( $profile['division'] !== '' && $profile['style'] !== '' && $profile['gender'] !== '' ) {
-                break;
-            }
-            $hit = isset( $bundle['exact'][ $norm_name ] )
-                ? $bundle['exact'][ $norm_name ]
-                : ( isset( $bundle['fl'][ $fl_key ] ) ? $bundle['fl'][ $fl_key ] : null );
-
-            if ( ! is_array( $hit ) ) {
-                continue;
-            }
-            if ( ! $profile['matched'] ) {
-                $profile['matched'] = true;
-                $profile['source']  = $src_key;
-            }
-            if ( ! $member_matched && ! $profile['was_normalized'] && ! empty( $hit['full_name'] ) ) {
-                $official_hist_name        = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $hit['full_name'] ) );
-                $profile['canonical_name'] = $official_hist_name;
-                $profile['was_normalized'] = ( strcasecmp( $clean_name, $official_hist_name ) !== 0 );
-            }
-            if ( $profile['division'] === '' && ! empty( $hit['division'] ) ) {
-                $apply_division( $hit['division'] );
-            }
-            if ( $profile['style'] === '' && ! empty( $hit['style'] ) ) {
-                $profile['style'] = trim( (string) $hit['style'] );
-            }
-            if ( $profile['gender'] === '' && ! empty( $hit['gender'] ) ) {
-                $profile['gender'] = trim( (string) $hit['gender'] );
-            }
-        }
-
-        return $profile;
     }
 }
