@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
- * Description: Provides O(1) cached lookup maps, historical shooter queries, category formatting, database-driven sort weights, and multi-tournament season standings aggregation.
+ * Description: Provides O(1) cached lookup maps, historical shooter queries, category formatting, database-driven sort weights, hoisted "LastName, FirstName" display name formatting, and multi-tournament season standings aggregation with surname tie-breaker sorting.
+ * Compliance: Pure helper layer — zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -464,14 +465,16 @@ if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps so season standings merge across tournaments cleanly.
+ * labels via O(1) lookup maps and computing hoisted "LastName, FirstName" display labels
+ * while preserving canonical 'name' keys for cross-tournament deduplication.
  * Defaults blank/unset score fields to 0 so every roster entry is included.
  */
 if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     function sywat_get_tournament_scores( $t_name ) {
         global $wpdb;
-        $t_slug = sanitize_title( $t_name );
-        $scores = array();
+        $t_slug           = sanitize_title( $t_name );
+        $scores           = array();
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         $results = $wpdb->get_results( $wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
@@ -484,24 +487,28 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                 $score_val = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
                 $x_val     = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
 
-                $raw_div = isset( $reg['division'] ) && trim( (string) $reg['division'] ) !== '' ? trim( (string) $reg['division'] ) : 'Adult (18 - 49)';
-                $div_rec = sywat_results_resolve_division_record( $raw_div );
+                $raw_div  = isset( $reg['division'] ) && trim( (string) $reg['division'] ) !== '' ? trim( (string) $reg['division'] ) : 'Adult (18 - 49)';
+                $div_rec  = sywat_results_resolve_division_record( $raw_div );
                 $norm_div = ( $div_rec && ! empty( $div_rec['label'] ) ) ? $div_rec['label'] : $raw_div;
 
-                $raw_style = isset( $reg['style'] ) && trim( (string) $reg['style'] ) !== '' ? trim( (string) $reg['style'] ) : 'FS – Freestyle';
-                $style_rec = sywat_results_resolve_style_record( $raw_style );
+                $raw_style  = isset( $reg['style'] ) && trim( (string) $reg['style'] ) !== '' ? trim( (string) $reg['style'] ) : 'FS – Freestyle';
+                $style_rec  = sywat_results_resolve_style_record( $raw_style );
                 $norm_style = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : $raw_style;
 
+                $raw_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
+                $disp_name = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
+
                 $scores[] = array(
-                    'id'         => isset( $reg['id'] ) ? $reg['id'] : '',
-                    'name'       => isset( $reg['name'] ) ? trim( $reg['name'] ) : 'Archer',
-                    'tfaa_id'    => isset( $reg['tfaa_id'] ) ? trim( $reg['tfaa_id'] ) : '',
-                    'division'   => $norm_div,
-                    'gender'     => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
-                    'style'      => $norm_style,
-                    'score'      => $score_val,
-                    'x_count'    => $x_val,
-                    'tournament' => $t_name,
+                    'id'           => isset( $reg['id'] ) ? $reg['id'] : '',
+                    'name'         => $raw_name,
+                    'display_name' => $disp_name,
+                    'tfaa_id'      => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
+                    'division'     => $norm_div,
+                    'gender'       => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
+                    'style'        => $norm_style,
+                    'score'        => $score_val,
+                    'x_count'      => $x_val,
+                    'tournament'   => $t_name,
                 );
             }
         }
@@ -514,12 +521,14 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
  * Aggregates season standings grouped by Division + Gender -> Style
  * EXCLUDES all Guest scores, score-0 cards, and secondary re-entries entirely.
  * ENFORCES 'scores_published' gate so unpublished scores remain hidden.
+ * Orders tied total scores & X-counts alphabetically by "LastName, FirstName".
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
     function sywat_aggregate_season_standings( $season_slug ) {
-        $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
-        $season  = isset( $seasons[ $season_slug ] ) ? $seasons[ $season_slug ] : null;
-        $best_n  = ( $season && isset( $season['best_n_count'] ) ) ? intval( $season['best_n_count'] ) : 3;
+        $seasons          = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
+        $season           = isset( $seasons[ $season_slug ] ) ? $seasons[ $season_slug ] : null;
+        $best_n           = ( $season && isset( $season['best_n_count'] ) ) ? intval( $season['best_n_count'] ) : 3;
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         $all_tournaments      = get_option( 'sywat_tournaments_list', array() );
         $matching_tournaments = array();
@@ -586,8 +595,13 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 }
 
                 if ( ! isset( $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] ) ) {
+                    $disp_name = ! empty( $s['display_name'] )
+                        ? $s['display_name']
+                        : ( $has_lf_formatter ? sywat_format_name_last_first( $s['name'] ) : $s['name'] );
+
                     $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] = array(
                         'name'             => $s['name'],
+                        'display_name'     => $disp_name,
                         'tfaa_id'          => $s['tfaa_id'],
                         'division'         => $s['division'],
                         'gender'           => $s['gender'],
@@ -655,6 +669,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
 
                     $processed[] = array(
                         'name'          => $a['name'],
+                        'display_name'  => $a['display_name'],
                         'tfaa_id'       => $a['tfaa_id'],
                         'division'      => $a['division'],
                         'gender'        => $a['gender'],
@@ -670,6 +685,9 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
 
                 usort( $processed, function( $x, $y ) {
                     if ( $x['total_score'] === $y['total_score'] ) {
+                        if ( $x['total_x_count'] === $y['total_x_count'] ) {
+                            return strcasecmp( $x['display_name'], $y['display_name'] );
+                        }
                         return $y['total_x_count'] - $x['total_x_count'];
                     }
                     return $y['total_score'] - $x['total_score'];
