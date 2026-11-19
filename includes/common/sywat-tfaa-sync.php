@@ -2,9 +2,10 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Deduplicated Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-configured shooting styles, age divisions, and smart First+Last (+ suffix) middle-initial name matching to prevent duplicate registrations.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and registration reconciliation engine integrated with database-configured shooting styles, age divisions, First+Last (+ suffix) middle-initial & given-name alias matching (via sywat-archer-identity-helpers.php), same-card surname-typo reconciliation, and automatic pruning of stale TFAA-origin records when the system of record updates or removes entries.
+ * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity helpers, hoisted match metadata, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,6 +14,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Auto-expands physical line capacity if imported TFAA batch exceeds current limits.
+ *
+ * @param array  $t_data   Tournament configuration array (passed by reference).
+ * @param string $line_idx Target line index key.
+ * @param int    $req_20yd Required 20-yard capacity.
+ * @param int    $req_cub  Required Cub capacity.
+ * @param string $t_name   Tournament title.
+ * @return void
  */
 if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
     function sywat_auto_expand_line_capacity( &$t_data, $line_idx, $req_20yd, $req_cub, $t_name ) {
@@ -46,6 +54,9 @@ if ( ! function_exists( 'sywat_auto_expand_line_capacity' ) ) {
 
 /**
  * TFAA Parser Helper: Database-Driven Division & Gender Resolution
+ *
+ * @param string $text Candidate heading text from TFAA results HTML.
+ * @return array       Associative array with 'division' and 'gender' strings.
  */
 if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
     function sywat_parse_tfaa_div_gen( $text ) {
@@ -107,6 +118,9 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
 
 /**
  * TFAA Parser Helper: Database-Driven Shooting Style Resolution
+ *
+ * @param string $text Candidate style heading text from TFAA results HTML.
+ * @return string      Normalized style label or 'Guest'.
  */
 if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
     function sywat_parse_tfaa_style( $text ) {
@@ -171,10 +185,11 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 }
 
 /**
- * Core Universal TFAA Event Score Sync Engine with Deduplication & Smart First+Last Matching
+ * Core Universal TFAA Event Score Sync Engine with Deduplication, Given-Name Alias &
+ * Same-Card Surname-Typo Reconciliation, and Orphan TFAA-Record Pruning.
  *
  * @param string $t_name Tournament Title/Key Name.
- * @return array Result payload array containing success boolean, count, and notice message.
+ * @return array         Result payload array containing success boolean, count, and notice message.
  */
 if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
     function sywat_sync_tfaa_event_scores( $t_name ) {
@@ -354,6 +369,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         // Hoist normalizers and pre-compute registration match metadata outside entry loop
         $has_match_keys = function_exists( 'sywat_normalize_archer_match_keys' );
+        $has_alias_fn   = function_exists( 'sywat_are_given_names_compatible' );
 
         $normalize_str = function( $str ) {
             $n = preg_replace( '/\[.*?\]|\(.*?\)/', '', (string) $str );
@@ -369,8 +385,13 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm  = $normalize_str( $raw_name );
             $parts = $norm !== '' ? explode( ' ', $norm ) : array();
             return array(
-                'exact' => $norm,
-                'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+                'exact'       => $norm,
+                'fl'          => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+                'first'       => ! empty( $parts ) ? reset( $parts ) : '',
+                'last'        => count( $parts ) > 1 ? end( $parts ) : ( ! empty( $parts ) ? reset( $parts ) : '' ),
+                'suffix'      => '',
+                'token_count' => count( $parts ),
+                'last_len'    => count( $parts ) > 1 ? strlen( end( $parts ) ) : 0,
             );
         };
 
@@ -394,12 +415,16 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         foreach ( $registrations as $r_id => $r ) {
             $raw_r_name = isset( $r['name'] ) ? $r['name'] : '';
             $reg_meta[ $r_id ] = array(
-                'norm_name'  => $normalize_str( $raw_r_name ),
-                'keys'       => $get_match_keys( $raw_r_name ),
-                'norm_div'   => $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' ),
-                'norm_style' => $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' ),
-                'is_guest'   => ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' ),
-                'line_index' => isset( $r['line_index'] ) ? (string) $r['line_index'] : '',
+                'norm_name'      => $normalize_str( $raw_r_name ),
+                'keys'           => $get_match_keys( $raw_r_name ),
+                'norm_div'       => $normalize_div_key( isset( $r['division'] ) ? $r['division'] : '' ),
+                'norm_gender'    => strtolower( trim( isset( $r['gender'] ) ? (string) $r['gender'] : '' ) ),
+                'norm_style'     => $normalize_style_key( isset( $r['style'] ) ? $r['style'] : '' ),
+                'is_guest'       => ( isset( $r['type'] ) && $r['type'] === 'Guest' ) || ( isset( $r['style'] ) && $r['style'] === 'Guest' ),
+                'line_index'     => isset( $r['line_index'] ) ? (string) $r['line_index'] : '',
+                'score'          => isset( $r['score'] ) ? intval( $r['score'] ) : 0,
+                'x_count'        => isset( $r['x_count'] ) ? intval( $r['x_count'] ) : 0,
+                'is_tfaa_origin' => ( strpos( (string) $r_id, 'reg_seq_' ) === 0 || ! empty( $r['tfaa_origin'] ) ),
             );
         }
 
@@ -407,6 +432,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $primary_styles  = array();
         $stats_updated   = 0;
         $stats_created   = 0;
+        $stats_pruned    = 0;
 
         $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
         if ( ! is_array( $master_regs ) ) {
@@ -428,6 +454,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $entry_keys     = $get_match_keys( $entry['clean_name'] );
             $has_fl_pair    = ( $entry_keys['fl'] !== '' && strpos( $entry_keys['fl'], '___' ) !== false );
             $norm_div       = $normalize_div_key( $entry['division'] );
+            $norm_gender    = strtolower( trim( (string) $entry['gender'] ) );
             $norm_style     = $normalize_style_key( $entry['style'] );
             $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
 
@@ -440,13 +467,62 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $final_style = ! empty( $primary_styles[ $norm_name ] ) ? $primary_styles[ $norm_name ] : 'Guest';
             }
 
-            // Find best matching existing registration (exact name passes first, then First+Last middle-initial folding)
-            $find_unclaimed_reg = function( $use_fl_fallback ) use ( &$claimed_reg_ids, $reg_meta, $norm_name, $entry_keys, $has_fl_pair, $norm_div, $norm_style, $entry_is_guest ) {
-                $name_matches = function( $meta ) use ( $use_fl_fallback, $norm_name, $entry_keys, $has_fl_pair ) {
-                    if ( ! $use_fl_fallback ) {
+            // Tiered matching:
+            // 'exact'      => exact normalized name
+            // 'fl'         => First + Last + Suffix (middle-initial folding)
+            // 'alias'      => Given-name alias/stem match on identical Last + Suffix ("Chris Clark" <-> "Christopher Clark")
+            // 'typo_score' => 1-char surname correction on identical Division+Gender+Style+Score+Xs ("Kevin Danferd" <-> "Kevin Danford")
+            $find_unclaimed_reg = function( $match_mode ) use (
+                &$claimed_reg_ids,
+                $reg_meta,
+                $norm_name,
+                $entry_keys,
+                $has_fl_pair,
+                $has_alias_fn,
+                $norm_div,
+                $norm_gender,
+                $norm_style,
+                $entry_is_guest,
+                $entry
+            ) {
+                $name_matches = function( $meta ) use ( $match_mode, $norm_name, $entry_keys, $has_fl_pair, $has_alias_fn, $norm_div, $norm_gender, $norm_style, $entry_is_guest, $entry ) {
+                    if ( $match_mode === 'exact' ) {
                         return ( $meta['norm_name'] === $norm_name || ( $entry_keys['exact'] !== '' && $meta['keys']['exact'] === $entry_keys['exact'] ) );
                     }
-                    return ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
+                    if ( $match_mode === 'fl' ) {
+                        return ( $has_fl_pair && isset( $meta['keys']['fl'] ) && $meta['keys']['fl'] === $entry_keys['fl'] );
+                    }
+                    if ( $match_mode === 'alias' ) {
+                        if ( ! $has_alias_fn || ! $has_fl_pair ) {
+                            return false;
+                        }
+                        $m_keys = $meta['keys'];
+                        if ( $m_keys['last'] === '' || $m_keys['last'] !== $entry_keys['last'] || $m_keys['suffix'] !== $entry_keys['suffix'] ) {
+                            return false;
+                        }
+                        return sywat_are_given_names_compatible( $m_keys['first'], $entry_keys['first'] );
+                    }
+                    if ( $match_mode === 'typo_score' ) {
+                        if ( intval( $entry['score'] ) <= 0 || $meta['score'] !== intval( $entry['score'] ) || $meta['x_count'] !== intval( $entry['xs'] ) ) {
+                            return false;
+                        }
+                        if ( $meta['norm_div'] !== $norm_div || $meta['norm_gender'] !== $norm_gender || $meta['norm_style'] !== $norm_style || $meta['is_guest'] !== $entry_is_guest ) {
+                            return false;
+                        }
+                        $m_keys = $meta['keys'];
+                        if ( $m_keys['suffix'] !== $entry_keys['suffix'] ) {
+                            return false;
+                        }
+                        $first_ok = ( $m_keys['first'] !== '' && $m_keys['first'] === $entry_keys['first'] )
+                            || ( $has_alias_fn && sywat_are_given_names_compatible( $m_keys['first'], $entry_keys['first'] ) );
+                        if ( ! $first_ok ) {
+                            return false;
+                        }
+                        $m_last = $m_keys['last'];
+                        $e_last = $entry_keys['last'];
+                        return ( strlen( $m_last ) >= 5 && strlen( $e_last ) >= 5 && $m_last !== $e_last && levenshtein( $m_last, $e_last ) === 1 );
+                    }
+                    return false;
                 };
 
                 // Pass 1: Match Name + Division + Style + Guest Status
@@ -457,6 +533,11 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     if ( $name_matches( $meta ) && $meta['norm_div'] === $norm_div && $meta['norm_style'] === $norm_style && $meta['is_guest'] === $entry_is_guest ) {
                         return $r_id;
                     }
+                }
+
+                // For fuzzy alias and 1-char surname typo modes, require Division + Style + Guest match above
+                if ( $match_mode === 'alias' || $match_mode === 'typo_score' ) {
+                    return null;
                 }
 
                 // Pass 2: Match Name + Division + Guest Status
@@ -492,13 +573,19 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 return null;
             };
 
-            $matched_reg_id = $find_unclaimed_reg( false );
+            $matched_reg_id = $find_unclaimed_reg( 'exact' );
             if ( ! $matched_reg_id && $has_fl_pair ) {
-                $matched_reg_id = $find_unclaimed_reg( true );
+                $matched_reg_id = $find_unclaimed_reg( 'fl' );
+            }
+            if ( ! $matched_reg_id && $has_fl_pair && $has_alias_fn ) {
+                $matched_reg_id = $find_unclaimed_reg( 'alias' );
+            }
+            if ( ! $matched_reg_id && $has_fl_pair ) {
+                $matched_reg_id = $find_unclaimed_reg( 'typo_score' );
             }
 
             if ( $matched_reg_id ) {
-                // UPDATE EXISTING REGISTRATION RECORD
+                // UPDATE EXISTING REGISTRATION RECORD WITH AUTHORITATIVE TFAA SPELLING & SCORE
                 $claimed_reg_ids[ $matched_reg_id ] = true;
                 $reg                                = $registrations[ $matched_reg_id ];
 
@@ -539,7 +626,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
                 $stats_updated++;
             } else {
-                // CREATE NEW REGISTRATION (Only if no match exists)
+                // CREATE NEW TFAA-ORIGIN REGISTRATION (Only if no match exists)
                 $assigned_line_idx = $line_0_idx;
                 $occupied          = array();
                 foreach ( $reg_meta as $meta ) {
@@ -586,18 +673,23 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'checked_in'  => 1,
                     'score'       => $entry['score'],
                     'x_count'     => $entry['xs'],
+                    'tfaa_origin' => 1,
                     'created_at'  => current_time( 'mysql' ),
                 );
 
                 $registrations[ $target_id ]   = $new_reg;
                 $claimed_reg_ids[ $target_id ] = true;
                 $reg_meta[ $target_id ]        = array(
-                    'norm_name'  => $norm_name,
-                    'keys'       => $entry_keys,
-                    'norm_div'   => $norm_div,
-                    'norm_style' => $norm_style,
-                    'is_guest'   => $entry_is_guest,
-                    'line_index' => (string) $assigned_line_idx,
+                    'norm_name'      => $norm_name,
+                    'keys'           => $entry_keys,
+                    'norm_div'       => $norm_div,
+                    'norm_gender'    => $norm_gender,
+                    'norm_style'     => $norm_style,
+                    'is_guest'       => $entry_is_guest,
+                    'line_index'     => (string) $assigned_line_idx,
+                    'score'          => intval( $entry['score'] ),
+                    'x_count'        => intval( $entry['xs'] ),
+                    'is_tfaa_origin' => true,
                 );
 
                 update_option( 'sywat_t_' . $t_slug . '_' . $target_id, $new_reg, false );
@@ -617,15 +709,29 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             }
         }
 
+        // Prune stale unclaimed TFAA-origin records that were renamed, merged, or removed on TFAA
+        // while leaving genuine local shop/online registrations untouched.
+        foreach ( $reg_meta as $r_id => $meta ) {
+            if ( ! isset( $claimed_reg_ids[ $r_id ] ) && ! empty( $meta['is_tfaa_origin'] ) ) {
+                delete_option( 'sywat_t_' . $t_slug . '_' . $r_id );
+                wp_cache_delete( 'sywat_t_' . $t_slug . '_' . $r_id, 'options' );
+                unset( $master_regs[ $r_id ] );
+                unset( $scores[ $r_id ] );
+                $stats_pruned++;
+            }
+        }
+
         update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
         update_option( 'sywat_scores_' . $t_slug, $scores, false );
         update_option( 'sywat_shooter_genders_cache', $gender_cache, false );
         delete_transient( 'sywat_history_profiles_cache' );
 
+        $pruned_note = ( $stats_pruned > 0 ) ? " and retired {$stats_pruned} stale TFAA records" : '';
+
         return array(
             'success' => true,
             'count'   => ( $stats_updated + $stats_created ),
-            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated/verified {$stats_updated} existing records and created {$stats_created} new sequential records).",
+            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers from TFAA! (Updated/verified {$stats_updated} existing records, created {$stats_created} new sequential records{$pruned_note}).",
         );
     }
 }
