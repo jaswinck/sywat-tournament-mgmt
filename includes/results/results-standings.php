@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
- * Description: Renders the public multi-tournament Season Standings leaderboards with database-ordered division & style filters and live search.
+ * Description: Renders the public multi-tournament Season Standings leaderboards with archer names formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), database-ordered division & style filters, and clean UTF-8 typography.
+ * Compliance: Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -28,9 +29,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             $selected_season_slug = isset( $active_s['slug'] ) ? $active_s['slug'] : key( $seasons );
         }
 
-        $season_data = sywat_aggregate_season_standings( $selected_season_slug );
-        $best_n      = $season_data['best_n'];
-        $groups      = $season_data['groups'];
+        $season_data      = sywat_aggregate_season_standings( $selected_season_slug );
+        $best_n           = $season_data['best_n'];
+        $groups           = $season_data['groups'];
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         $all_divisions         = array();
         $all_styles            = array();
@@ -194,12 +196,17 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                                                 }
                                                 $prev_tot_score = $tot_s;
                                                 $prev_tot_x     = $tot_x;
+
+                                                $disp_archer_name = ! empty( $a['display_name'] )
+                                                    ? $a['display_name']
+                                                    : ( $has_lf_formatter ? sywat_format_name_last_first( $a['name'] ) : $a['name'] );
+                                                $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $a['name'] ) );
                                             ?>
-                                                <tr class="sywat-standings-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                <tr class="sywat-standings-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                                     <td class="sywat-col-center">
                                                         <strong><?php echo $current_rank; ?></strong>
                                                     </td>
-                                                    <td><strong><?php echo esc_html( $a['name'] ); ?></strong></td>
+                                                    <td><strong><?php echo esc_html( $disp_archer_name ); ?></strong></td>
                                                     <td class="sywat-col-center"><?php echo sywat_format_score_cell( $a['score_1'] ); ?></td>
                                                     <td class="sywat-col-center"><?php echo sywat_format_score_cell( $a['score_2'] ); ?></td>
                                                     <td class="sywat-col-center"><?php echo sywat_format_score_cell( $a['score_3'] ); ?></td>
