@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Scores Engine CSV Export Processor
  * Path: includes/scores/scores-export.php
- * Description: Generates and streams standard CSV score reports for locked lines, resolving scores and TFAA division/style export codes from database configuration and tagging guest/duplicate scores.
+ * Description: Generates and streams standard CSV score reports for locked lines, formatting archer names as "LastName, FirstName" via the shared identity formatter (preserving generational suffixes), resolving scores and TFAA division/style export codes from database configuration, and tagging guest/duplicate scores.
+ * Compliance: Pure export processor — zero output at include time, template_redirect hook before theme headers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -80,20 +81,25 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
             $has_div_lookup   = function_exists( 'sywat_find_division' );
             $has_style_lookup = function_exists( 'sywat_find_shooting_style' );
+            $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
             $processed_items = array();
             foreach ( $export_regs as $reg ) {
                 $reg_id = isset( $reg['id'] ) ? $reg['id'] : '';
 
-                // 1. Archer Name (Lastname, Firstname)
-                $full_name  = trim( isset( $reg['name'] ) ? $reg['name'] : '' );
-                $name_parts = preg_split( '/\s+/', $full_name );
-                if ( count( $name_parts ) > 1 ) {
-                    $last_name      = array_pop( $name_parts );
-                    $first_name     = implode( ' ', $name_parts );
-                    $formatted_name = $last_name . ', ' . $first_name;
+                // 1. Archer Name (Lastname, Firstname — preserving generational suffixes via shared formatter)
+                $full_name = trim( isset( $reg['name'] ) ? $reg['name'] : '' );
+                if ( $has_lf_formatter ) {
+                    $formatted_name = sywat_format_name_last_first( $full_name );
                 } else {
-                    $formatted_name = $full_name;
+                    $name_parts = preg_split( '/\s+/', $full_name );
+                    if ( count( $name_parts ) > 1 ) {
+                        $last_name      = array_pop( $name_parts );
+                        $first_name     = implode( ' ', $name_parts );
+                        $formatted_name = $last_name . ', ' . $first_name;
+                    } else {
+                        $formatted_name = $full_name;
+                    }
                 }
 
                 // 2. Score & 3. Xs (Prefer master scores map first)
@@ -202,7 +208,7 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
             // Group by exact Archer Name and Division/Style to flag duplicate "Guest" scores
             $groups = array();
             foreach ( $processed_items as $idx => $item ) {
-                $key            = strtolower( $item['formatted_name'] ) . '|||' . strtolower( $item['div_style'] );
+                $key              = strtolower( $item['formatted_name'] ) . '|||' . strtolower( $item['div_style'] );
                 $groups[ $key ][] = $idx;
             }
 
