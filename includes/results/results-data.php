@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -185,9 +185,10 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
  * score-0 cards, and secondary re-entries entirely.
  * Resolves each archer's canonical O(1) identity key in a single pass via
  * sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map() so
- * identical archers with differing/missing tfaa_ids ("Keven Danferd") and unambiguous
- * given-name variants ("Chris Clark" <-> "Christopher Clark") merge cleanly, enforces
- * 'scores_published', and orders tied total scores & X-counts alphabetically by surname.
+ * identical archers with differing/missing tfaa_ids and unambiguous given-name variants
+ * ("Chris Clark" <-> "Christopher Clark") merge cleanly, enforces 'scores_published',
+ * and breaks ties on Total Score + Total X-Count sequentially across Score 1 -> Score 2 ->
+ * Score 3 -> State (score then X-count descending) before falling back to surname order.
  *
  * @param string $season_slug Target season slug.
  * @return array              Associative array with 'season', 'best_n', and 'groups'.
@@ -500,13 +501,30 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 }
 
                 usort( $processed, function( $x, $y ) {
-                    if ( $x['total_score'] === $y['total_score'] ) {
-                        if ( $x['total_x_count'] === $y['total_x_count'] ) {
-                            return strcasecmp( $x['surname_key'], $y['surname_key'] );
-                        }
+                    if ( $x['total_score'] !== $y['total_score'] ) {
+                        return $y['total_score'] - $x['total_score'];
+                    }
+                    if ( $x['total_x_count'] !== $y['total_x_count'] ) {
                         return $y['total_x_count'] - $x['total_x_count'];
                     }
-                    return $y['total_score'] - $x['total_score'];
+
+                    // Sequential slot tie-breaker: Score 1 -> Score 2 -> Score 3 -> State (score, then X-count descending)
+                    $slots = array( 'score_1', 'score_2', 'score_3', 'state_score' );
+                    foreach ( $slots as $slot ) {
+                        $s_x = isset( $x[ $slot ]['score'] ) ? intval( $x[ $slot ]['score'] ) : 0;
+                        $s_y = isset( $y[ $slot ]['score'] ) ? intval( $y[ $slot ]['score'] ) : 0;
+                        if ( $s_x !== $s_y ) {
+                            return $s_y - $s_x;
+                        }
+
+                        $x_x = isset( $x[ $slot ]['x_count'] ) ? intval( $x[ $slot ]['x_count'] ) : 0;
+                        $x_y = isset( $y[ $slot ]['x_count'] ) ? intval( $y[ $slot ]['x_count'] ) : 0;
+                        if ( $x_x !== $x_y ) {
+                            return $x_y - $x_x;
+                        }
+                    }
+
+                    return strcasecmp( $x['surname_key'], $y['surname_key'] );
                 } );
 
                 $archers = $processed;
