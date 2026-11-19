@@ -1,11 +1,11 @@
 <?php
 /**
- * Sub-Module: Results & Standings Helpers
+ * Sub-Module: Results & Standings Formatting & Sort Helpers
  * Path: includes/results/results-helpers.php
- * Description: Provides O(1) cached lookup maps, historical shooter queries, category formatting, database-driven sort weights, hoisted "LastName, FirstName" display name formatting, Guest-entry exclusion, and multi-tournament season standings aggregation with normalized First+Last (+ suffix) archer deduplication and surname tie-breaker sorting.
- * Compliance: Pure helper layer — zero HTML echo, omitted closing PHP tag.
+ * Description: Pure helper layer providing O(1) static per-request lookup maps for Age Divisions and Shooting Styles, category heading formatters, and database-driven sort-weight calculators.
+ * Compliance: Pure helper layer — zero direct SQL queries, zero get_option() calls, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -199,112 +199,14 @@ if ( ! function_exists( 'sywat_results_resolve_style_record' ) ) {
 }
 
 /**
- * Fetches distinct historical archer profiles across Indoor and Outdoor cycles (18-Month Rolling Window).
- * Queries custom scores tables and tournament registration options, returning ONLY complete (Name, Division, Gender, Style) profiles.
- *
- * @return array List of shooter objects for JS localization.
- */
-if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
-    function sywat_get_historical_shooters() {
-        global $wpdb;
-
-        $shooters  = array();
-        $seen_keys = array();
-
-        // 1. Primary Query: Scores table (wp_sywat_scores) with 18-month rolling window
-        $scores_table = $wpdb->prefix . 'sywat_scores';
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$scores_table}'" ) === $scores_table ) {
-            $query = "
-                SELECT 
-                    TRIM(name) AS name,
-                    TRIM(name) AS full_name,
-                    TRIM(division) AS division,
-                    TRIM(gender) AS gender,
-                    TRIM(style) AS style,
-                    MAX(phone) AS phone,
-                    MAX(created_at) AS last_shot
-                FROM {$scores_table}
-                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 18 MONTH)
-                  AND name IS NOT NULL AND name != ''
-                  AND division IS NOT NULL AND division != '' AND division != 'No Show'
-                  AND style IS NOT NULL AND style != '' AND style != 'No Show'
-                GROUP BY LOWER(TRIM(name)), LOWER(TRIM(division)), LOWER(TRIM(gender)), LOWER(TRIM(style))
-                ORDER BY last_shot DESC
-            ";
-            $db_results = $wpdb->get_results( $query, ARRAY_A );
-            if ( is_array( $db_results ) ) {
-                foreach ( $db_results as $r ) {
-                    $div_rec   = sywat_results_resolve_division_record( $r['division'] );
-                    $style_rec = sywat_results_resolve_style_record( $r['style'] );
-                    $norm_div  = ( $div_rec && ! empty( $div_rec['label'] ) ) ? $div_rec['label'] : trim( $r['division'] );
-                    $norm_sty  = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : trim( $r['style'] );
-                    $norm_gen  = trim( $r['gender'] );
-
-                    $key = strtolower( trim( $r['name'] ) . '___' . $norm_div . '___' . $norm_gen . '___' . $norm_sty );
-                    if ( ! isset( $seen_keys[ $key ] ) ) {
-                        $seen_keys[ $key ] = true;
-                        $shooters[]        = array(
-                            'name'      => trim( $r['name'] ),
-                            'full_name' => trim( $r['full_name'] ),
-                            'division'  => $norm_div,
-                            'gender'    => $norm_gen,
-                            'style'     => $norm_sty,
-                            'phone'     => isset( $r['phone'] ) ? trim( $r['phone'] ) : '',
-                        );
-                    }
-                }
-            }
-        }
-
-        // 2. Secondary Query: Tournament options store (sywat_t_%)
-        $opt_results = $wpdb->get_results(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'"
-        );
-
-        if ( is_array( $opt_results ) ) {
-            foreach ( $opt_results as $row ) {
-                $reg = maybe_unserialize( $row->option_value );
-                if ( is_array( $reg ) && ! empty( $reg['name'] ) ) {
-                    $name     = trim( $reg['name'] );
-                    $division = isset( $reg['division'] ) ? trim( $reg['division'] ) : '';
-                    $gender   = isset( $reg['gender'] ) ? trim( $reg['gender'] ) : '';
-                    $style    = isset( $reg['style'] ) ? trim( $reg['style'] ) : '';
-                    $phone    = isset( $reg['phone'] ) ? trim( $reg['phone'] ) : '';
-
-                    // Require complete profiles only (must have name, division, and style)
-                    if ( empty( $name ) || empty( $style ) || empty( $division ) || strcasecmp( $division, 'No Show' ) === 0 || strcasecmp( $style, 'No Show' ) === 0 ) {
-                        continue;
-                    }
-
-                    $div_rec   = sywat_results_resolve_division_record( $division );
-                    $style_rec = sywat_results_resolve_style_record( $style );
-                    $norm_div  = ( $div_rec && ! empty( $div_rec['label'] ) ) ? $div_rec['label'] : $division;
-                    $norm_sty  = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : $style;
-
-                    $key = strtolower( $name . '___' . $norm_div . '___' . $gender . '___' . $norm_sty );
-                    if ( ! isset( $seen_keys[ $key ] ) ) {
-                        $seen_keys[ $key ] = true;
-                        $shooters[]        = array(
-                            'name'      => $name,
-                            'full_name' => $name,
-                            'division'  => $norm_div,
-                            'gender'    => $gender,
-                            'style'     => $norm_sty,
-                            'phone'     => $phone,
-                        );
-                    }
-                }
-            }
-        }
-
-        return $shooters;
-    }
-}
-
-/**
  * Cleanly formats Division, Gender, and Style into a single unified category header.
  * Example: Pro Adult (18 - 49) Male Freestyle
  * Example: Cub (8 - 11) Male Bowhunter Freestyle
+ *
+ * @param string $division Division string.
+ * @param string $gender   Gender string.
+ * @param string $style    Shooting style string.
+ * @return string          Formatted category header.
  */
 if ( ! function_exists( 'sywat_format_combined_category_header' ) ) {
     function sywat_format_combined_category_header( $division, $gender, $style ) {
@@ -341,6 +243,10 @@ if ( ! function_exists( 'sywat_format_combined_category_header' ) ) {
 /**
  * Calculates numeric sort weight for Division + Gender groupings using database sort_order.
  * Order: Configured Division sort_order * 10 + Gender Modifier (1=Pro Male, 2=Male, 3=Pro Female, 4=Female).
+ *
+ * @param string $div    Division string.
+ * @param string $gender Gender string.
+ * @return int           Numeric sort weight.
  */
 if ( ! function_exists( 'sywat_get_div_gen_sort_weight' ) ) {
     function sywat_get_div_gen_sort_weight( $div, $gender ) {
@@ -389,6 +295,9 @@ if ( ! function_exists( 'sywat_get_div_gen_sort_weight' ) ) {
 
 /**
  * Calculates numeric sort weight for Shooting Styles from database sort_order (with Guest & legacy fallbacks).
+ *
+ * @param string $style_name Shooting style string.
+ * @return int               Numeric sort weight.
  */
 if ( ! function_exists( 'sywat_get_style_sort_weight' ) ) {
     function sywat_get_style_sort_weight( $style_name ) {
@@ -447,6 +356,10 @@ if ( ! function_exists( 'sywat_get_style_sort_weight' ) ) {
 
 /**
  * Cleanly formats Division and Gender into a unified header title.
+ *
+ * @param string $division Division string.
+ * @param string $gender   Gender string.
+ * @return string          Formatted Division + Gender header.
  */
 if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
     function sywat_format_div_gen_heading( $division, $gender ) {
@@ -460,272 +373,5 @@ if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
             return $clean_div;
         }
         return trim( $clean_div . ' ' . $clean_gen );
-    }
-}
-
-/**
- * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps, preserving registration 'type' (e.g., 'Guest'), and computing
- * hoisted "LastName, FirstName" display labels while preserving canonical 'name' keys.
- * Defaults blank/unset score fields to 0 so every roster entry is included.
- */
-if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
-    function sywat_get_tournament_scores( $t_name ) {
-        global $wpdb;
-        $t_slug           = sanitize_title( $t_name );
-        $scores           = array();
-        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
-
-        $results = $wpdb->get_results( $wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-            $wpdb->esc_like( 'sywat_t_' . $t_slug . '_' ) . '%'
-        ) );
-
-        foreach ( $results as $row ) {
-            $reg = maybe_unserialize( $row->option_value );
-            if ( is_array( $reg ) ) {
-                $score_val = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
-                $x_val     = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
-
-                $raw_div  = isset( $reg['division'] ) && trim( (string) $reg['division'] ) !== '' ? trim( (string) $reg['division'] ) : 'Adult (18 - 49)';
-                $div_rec  = sywat_results_resolve_division_record( $raw_div );
-                $norm_div = ( $div_rec && ! empty( $div_rec['label'] ) ) ? $div_rec['label'] : $raw_div;
-
-                $raw_style  = isset( $reg['style'] ) && trim( (string) $reg['style'] ) !== '' ? trim( (string) $reg['style'] ) : 'FS – Freestyle';
-                $style_rec  = sywat_results_resolve_style_record( $raw_style );
-                $norm_style = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : $raw_style;
-
-                $raw_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
-                $disp_name = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
-
-                $scores[] = array(
-                    'id'           => isset( $reg['id'] ) ? $reg['id'] : '',
-                    'name'         => $raw_name,
-                    'display_name' => $disp_name,
-                    'tfaa_id'      => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
-                    'type'         => isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '',
-                    'division'     => $norm_div,
-                    'gender'       => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
-                    'style'        => $norm_style,
-                    'score'        => $score_val,
-                    'x_count'      => $x_val,
-                    'tournament'   => $t_name,
-                );
-            }
-        }
-
-        return $scores;
-    }
-}
-
-/**
- * Aggregates season standings grouped by Division + Gender -> Style
- * EXCLUDES all Guest entries (type === 'Guest', style === 'Guest', or '[Guest]' tags),
- * score-0 cards, and secondary re-entries entirely.
- * Deduplicates archers across events using normalized First+Last (+ suffix) keys so punctuation
- * and middle-initial variants merge cleanly, and enforces 'scores_published' gate.
- * Orders tied total scores & X-counts alphabetically by "LastName, FirstName".
- */
-if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
-    function sywat_aggregate_season_standings( $season_slug ) {
-        $seasons          = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
-        $season           = isset( $seasons[ $season_slug ] ) ? $seasons[ $season_slug ] : null;
-        $best_n           = ( $season && isset( $season['best_n_count'] ) ) ? intval( $season['best_n_count'] ) : 3;
-        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
-        $has_match_keys   = function_exists( 'sywat_normalize_archer_match_keys' );
-
-        $build_archer_key = function( $score_row ) use ( $has_match_keys ) {
-            if ( ! empty( $score_row['tfaa_id'] ) ) {
-                return 'id_' . strtolower( trim( (string) $score_row['tfaa_id'] ) );
-            }
-            $raw = isset( $score_row['name'] ) ? (string) $score_row['name'] : '';
-            if ( $has_match_keys ) {
-                $keys = sywat_normalize_archer_match_keys( $raw );
-                if ( ! empty( $keys['fl'] ) ) {
-                    return 'fl_' . $keys['fl'];
-                }
-                if ( ! empty( $keys['exact'] ) ) {
-                    return 'ex_' . $keys['exact'];
-                }
-            }
-            $fallback = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', $raw ) ) ) );
-            return 'name_' . $fallback;
-        };
-
-        $all_tournaments      = get_option( 'sywat_tournaments_list', array() );
-        $matching_tournaments = array();
-
-        foreach ( $all_tournaments as $t_name => $t_data ) {
-            $t_season     = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
-            $is_published = ! empty( $t_data['scores_published'] );
-
-            if ( $t_season === $season_slug && $is_published ) {
-                $matching_tournaments[] = $t_name;
-            }
-        }
-
-        $groups = array();
-
-        foreach ( $matching_tournaments as $t_name ) {
-            $raw_scores     = sywat_get_tournament_scores( $t_name );
-            $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
-
-            // Filter out Guests (including synced type === 'Guest' records) AND turned-in 0 scores
-            $official_scores = array_filter( $raw_scores, function( $s ) {
-                $st = strtolower( trim( $s['style'] ) );
-                $nm = strtolower( trim( $s['name'] ) );
-                $tp = isset( $s['type'] ) ? strtolower( trim( (string) $s['type'] ) ) : '';
-                $sc = intval( $s['score'] );
-                return ( $tp !== 'guest' && $st !== 'guest' && strpos( $nm, '[guest]' ) === false && $sc > 0 );
-            } );
-
-            $grouped_per_tournament = array();
-            foreach ( $official_scores as $s ) {
-                $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
-                $archer_key = $build_archer_key( $s );
-                $grouped_per_tournament[ $dgs_key ][ $archer_key ][] = $s;
-            }
-
-            $deduped_scores = array();
-            foreach ( $grouped_per_tournament as $dgs_key => $archers_map ) {
-                foreach ( $archers_map as $archer_key => $entries ) {
-                    usort( $entries, function( $p, $q ) {
-                        if ( $p['score'] === $q['score'] ) {
-                            return $q['x_count'] - $p['x_count'];
-                        }
-                        return $q['score'] - $p['score'];
-                    } );
-                    $deduped_scores[] = $entries[0];
-                }
-            }
-
-            foreach ( $deduped_scores as $s ) {
-                $div_gen_key = $s['division'] . '|||' . $s['gender'];
-                $style_key   = $s['style'];
-                $archer_key  = $build_archer_key( $s );
-
-                if ( ! isset( $groups[ $div_gen_key ] ) ) {
-                    $groups[ $div_gen_key ] = array(
-                        'division' => $s['division'],
-                        'gender'   => $s['gender'],
-                        'heading'  => sywat_format_div_gen_heading( $s['division'], $s['gender'] ),
-                        'styles'   => array(),
-                    );
-                }
-
-                if ( ! isset( $groups[ $div_gen_key ]['styles'][ $style_key ] ) ) {
-                    $groups[ $div_gen_key ]['styles'][ $style_key ] = array();
-                }
-
-                if ( ! isset( $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] ) ) {
-                    $disp_name = ! empty( $s['display_name'] )
-                        ? $s['display_name']
-                        : ( $has_lf_formatter ? sywat_format_name_last_first( $s['name'] ) : $s['name'] );
-
-                    $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ] = array(
-                        'name'             => $s['name'],
-                        'display_name'     => $disp_name,
-                        'tfaa_id'          => $s['tfaa_id'],
-                        'division'         => $s['division'],
-                        'gender'           => $s['gender'],
-                        'style'            => $s['style'],
-                        'qualifier_scores' => array(),
-                        'state_score'      => null,
-                    );
-                }
-
-                if ( $is_state_tourn ) {
-                    $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ]['state_score'] = $s;
-                } else {
-                    $groups[ $div_gen_key ]['styles'][ $style_key ][ $archer_key ]['qualifier_scores'][] = $s;
-                }
-            }
-        }
-
-        uksort( $groups, function( $keyA, $keyB ) {
-            list( $divA, $genA ) = explode( '|||', $keyA );
-            list( $divB, $genB ) = explode( '|||', $keyB );
-
-            $wA = sywat_get_div_gen_sort_weight( $divA, $genA );
-            $wB = sywat_get_div_gen_sort_weight( $divB, $genB );
-
-            if ( $wA !== $wB ) {
-                return $wA - $wB;
-            }
-            return strcasecmp( $keyA, $keyB );
-        } );
-
-        foreach ( $groups as $dg_key => &$group ) {
-            uksort( $group['styles'], function( $stA, $stB ) {
-                $wA = sywat_get_style_sort_weight( $stA );
-                $wB = sywat_get_style_sort_weight( $stB );
-                if ( $wA !== $wB ) {
-                    return $wA - $wB;
-                }
-                return strcasecmp( $stA, $stB );
-            } );
-
-            foreach ( $group['styles'] as $st_key => &$archers ) {
-                $processed = array();
-
-                foreach ( $archers as $a_key => $a ) {
-                    usort( $a['qualifier_scores'], function( $p, $q ) {
-                        if ( $p['score'] === $q['score'] ) {
-                            return $q['x_count'] - $p['x_count'];
-                        }
-                        return $q['score'] - $p['score'];
-                    } );
-
-                    $score_1 = isset( $a['qualifier_scores'][0] ) ? $a['qualifier_scores'][0] : null;
-                    $score_2 = isset( $a['qualifier_scores'][1] ) ? $a['qualifier_scores'][1] : null;
-                    $score_3 = isset( $a['qualifier_scores'][2] ) ? $a['qualifier_scores'][2] : null;
-                    $state_s = $a['state_score'];
-
-                    $total_score   = 0;
-                    $total_x_count = 0;
-
-                    $kept_list = array_filter( array( $score_1, $score_2, $score_3, $state_s ) );
-                    foreach ( $kept_list as $ks ) {
-                        $total_score   += $ks['score'];
-                        $total_x_count += $ks['x_count'];
-                    }
-
-                    $processed[] = array(
-                        'name'          => $a['name'],
-                        'display_name'  => $a['display_name'],
-                        'tfaa_id'       => $a['tfaa_id'],
-                        'division'      => $a['division'],
-                        'gender'        => $a['gender'],
-                        'style'         => $a['style'],
-                        'score_1'       => $score_1,
-                        'score_2'       => $score_2,
-                        'score_3'       => $score_3,
-                        'state_score'   => $state_s,
-                        'total_score'   => $total_score,
-                        'total_x_count' => $total_x_count,
-                    );
-                }
-
-                usort( $processed, function( $x, $y ) {
-                    if ( $x['total_score'] === $y['total_score'] ) {
-                        if ( $x['total_x_count'] === $y['total_x_count'] ) {
-                            return strcasecmp( $x['display_name'], $y['display_name'] );
-                        }
-                        return $y['total_x_count'] - $x['total_x_count'];
-                    }
-                    return $y['total_score'] - $x['total_score'];
-                } );
-
-                $archers = $processed;
-            }
-            unset( $archers );
-        }
-        unset( $group );
-
-        return array(
-            'season' => $season,
-            'best_n' => $best_n,
-            'groups' => $groups,
-        );
     }
 }
