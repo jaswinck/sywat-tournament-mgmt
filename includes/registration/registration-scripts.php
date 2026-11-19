@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Client Scripts Enqueuer
  * Path: includes/registration/registration-scripts.php
- * Description: Enqueues registration portal client scripts and localizes cached historical shooter data, phone numbers, database-configured age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility maps.
+ * Description: Enqueues registration portal client scripts and localizes the unified Member Directory + 18-Month TFAA shooter index, canonical given-name/nickname alias map, cached phone numbers, database-configured age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility maps.
  * Compliance: Pure script enqueuer — zero HTML echo, zero direct SQL queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -86,7 +86,7 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
 
         $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : array();
 
-        // Collect unique shooter names across registrations and historical TFAA cache
+        // Collect unique shooter names across registrations
         $candidate_names = array();
         if ( is_array( $registrations ) ) {
             foreach ( $registrations as $reg ) {
@@ -100,7 +100,7 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
         }
 
         foreach ( $t_profiles as $p_slug => $prof ) {
-            $is_active = $season_promo_on && ! empty( $prof['promo_enabled'] );
+            $is_active      = $season_promo_on && ! empty( $prof['promo_enabled'] );
             $ineligible_map = array();
 
             if ( $is_active && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
@@ -129,8 +129,9 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
 }
 
 /**
- * Enqueues registration portal client scripts and localizes cached historical shooter data,
- * phone numbers, active age divisions, tournament pricing profiles, and promo eligibility maps.
+ * Enqueues registration portal client scripts and localizes the unified Member Directory +
+ * 18-month TFAA shooter index, given-name alias map, phone numbers, active age divisions,
+ * tournament pricing profiles, and promo eligibility maps.
  *
  * @param string $selected_tournament Optional active tournament name.
  * @return void
@@ -140,9 +141,13 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
         $tournament_name = sywat_registration_resolve_script_tournament( $selected_tournament );
         $phone_cache     = get_option( 'sywat_shooter_phones_cache', array() );
 
-        // Fetch 18-month rolling window historical shooters
-        $js_tfaa_data = function_exists( 'sywat_get_historical_shooters' )
-            ? sywat_get_historical_shooters()
+        // Fetch unified Member Directory + 18-month TFAA rolling window historical shooters
+        $js_tfaa_data = function_exists( 'sywat_get_unified_js_shooter_index' )
+            ? sywat_get_unified_js_shooter_index()
+            : ( function_exists( 'sywat_get_historical_shooters' ) ? sywat_get_historical_shooters() : array() );
+
+        $given_name_aliases = function_exists( 'sywat_get_given_name_alias_map' )
+            ? sywat_get_given_name_alias_map()
             : array();
 
         // Resolve active Pricing & Round Profiles for this Tournament
@@ -188,25 +193,23 @@ if ( ! function_exists( 'sywat_render_registration_scripts' ) ) {
 
         $promo_rules = sywat_registration_build_promo_rules_payload( $tournament_name, $t_profiles );
 
-        // Determine script URL relative to plugin root
-        $js_url = defined( 'SYWAT_PLUGIN_URL' )
-            ? SYWAT_PLUGIN_URL . 'assets/js/sywat-registration.js'
-            : plugins_url( '../../assets/js/sywat-registration.js', __FILE__ );
+        // Build script URL from SYWAT_PLUGIN_URL and version from SYWAT_PLUGIN_VERSION
+        $js_url  = SYWAT_PLUGIN_URL . 'assets/js/sywat-registration.js';
+        $version = SYWAT_PLUGIN_VERSION;
 
-        $version = defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.1.0';
-
-        // Enqueue external JavaScript file
+        // Enqueue external JavaScript file in footer with zero jQuery dependency
         wp_enqueue_script( 'sywat-registration-js', $js_url, array(), $version, true );
 
-        // Localize database caches, pricing profiles, promo rules, and division rules to JS window object safely
+        // Localize unified shooter index, alias map, pricing profiles, promo rules, and division rules to JS safely
         wp_localize_script( 'sywat-registration-js', 'sywatRegData', array(
-            'tournamentName' => $tournament_name,
-            'defaultProfile' => $default_prof_key,
-            'profiles'       => $t_profiles,
-            'promoRules'     => $promo_rules,
-            'tfaaShooters'   => array_values( $js_tfaa_data ),
-            'phoneCache'     => is_array( $phone_cache ) ? $phone_cache : array(),
-            'divisions'      => $divisions_payload,
+            'tournamentName'   => $tournament_name,
+            'defaultProfile'   => $default_prof_key,
+            'profiles'         => $t_profiles,
+            'promoRules'       => $promo_rules,
+            'tfaaShooters'     => array_values( $js_tfaa_data ),
+            'givenNameAliases' => is_array( $given_name_aliases ) ? $given_name_aliases : array(),
+            'phoneCache'       => is_array( $phone_cache ) ? $phone_cache : array(),
+            'divisions'        => $divisions_payload,
         ) );
     }
 }
