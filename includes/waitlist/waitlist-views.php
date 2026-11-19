@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Waitlist Dedicated Management Modal & Trigger Views
  * Path: includes/waitlist/waitlist-views.php
- * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with uniform-height top filter/move toolbars, FIFO family-grouped queue table, dynamic Family Cap & round-format indicators, mobile-friendly stacked actions, and reusable clickable waitlist badges/buttons.
+ * Description: Renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) with uniform-height top filter/move toolbars, FIFO family-grouped queue table displaying archer names as "LastName, FirstName" with dual-format live search indexing ("Last, First" and "First Last"), dynamic Family Cap & round-format indicators, mobile-friendly stacked actions, and reusable clickable waitlist badges/buttons.
  * Compliance: Pure view layer — zero DB writes, zero inline scripts/styles, zero inline event attributes, accessible SVG + text controls, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 2.2.0
+ * Version: 2.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -173,8 +173,9 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
             sywat_enqueue_waitlist_scripts();
         }
 
-        $t_slug       = sanitize_title( $selected_tournament );
-        $closed_lines = get_option( 'sywat_closed_lines_' . $t_slug, array() );
+        $t_slug           = sanitize_title( $selected_tournament );
+        $closed_lines     = get_option( 'sywat_closed_lines_' . $t_slug, array() );
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         // Resolve active Pricing Profile(s) & Family Cap rules for the selected tournament
         $t_profiles    = function_exists( 'sywat_get_tournament_pricing_profiles' )
@@ -346,7 +347,7 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                             </div>
                         </div>
 
-                        <!-- Clean 4-Column Waitlist Queue Table -->
+                        <!-- Clean 4-Column Waitlist Queue Table (FIFO Arrival Order & Family Groupings Preserved) -->
                         <div class="sywat-table-responsive">
                             <table class="sywat-table sywat-waitlist-table">
                                 <thead>
@@ -375,7 +376,9 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                             $group_phone      = '';
                                             foreach ( $members as $gm ) {
                                                 if ( ! empty( $gm['name'] ) ) {
-                                                    $group_names_list[] = strtolower( trim( (string) $gm['name'] ) );
+                                                    $raw_gm_name        = trim( (string) $gm['name'] );
+                                                    $disp_gm_name       = $has_lf_formatter ? sywat_format_name_last_first( $raw_gm_name ) : $raw_gm_name;
+                                                    $group_names_list[] = strtolower( $disp_gm_name . ' ' . $raw_gm_name );
                                                 }
                                                 if ( $group_phone === '' && ! empty( $gm['phone'] ) ) {
                                                     $group_phone = trim( (string) $gm['phone'] );
@@ -453,17 +456,18 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
 
                                         <?php foreach ( $members as $m ) : ?>
                                             <?php
-                                                $reg_id         = (string) $m['id'];
-                                                $archer_name    = isset( $m['name'] ) ? $m['name'] : 'Archer';
-                                                $archer_phone   = isset( $m['phone'] ) ? trim( (string) $m['phone'] ) : '';
-                                                $m_dist         = isset( $m['resolved_dist'] ) ? $m['resolved_dist'] : '20yd';
-                                                $raw_div        = isset( $m['division'] ) ? trim( (string) $m['division'] ) : '';
-                                                $raw_style      = isset( $m['style'] ) ? trim( (string) $m['style'] ) : '';
-                                                $m_div          = ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 ) ? $raw_div : '';
-                                                $m_style        = ( $raw_style !== '' && strcasecmp( $raw_style, 'No Show' ) !== 0 ) ? $raw_style : '';
-                                                $m_created      = ! empty( $m['created_at'] ) ? $m['created_at'] : '';
-                                                $can_fit_member = ! empty( $m['can_fit_member'] );
-                                                $avail_for_dist = ( $m_dist === 'Cub' ) ? (int) $grp['open_cub'] : (int) $grp['open_20yd'];
+                                                $reg_id           = (string) $m['id'];
+                                                $archer_name      = isset( $m['name'] ) ? $m['name'] : 'Archer';
+                                                $disp_archer_name = $has_lf_formatter ? sywat_format_name_last_first( $archer_name ) : $archer_name;
+                                                $archer_phone     = isset( $m['phone'] ) ? trim( (string) $m['phone'] ) : '';
+                                                $m_dist           = isset( $m['resolved_dist'] ) ? $m['resolved_dist'] : '20yd';
+                                                $raw_div          = isset( $m['division'] ) ? trim( (string) $m['division'] ) : '';
+                                                $raw_style        = isset( $m['style'] ) ? trim( (string) $m['style'] ) : '';
+                                                $m_div            = ( $raw_div !== '' && strcasecmp( $raw_div, 'No Show' ) !== 0 ) ? $raw_div : '';
+                                                $m_style          = ( $raw_style !== '' && strcasecmp( $raw_style, 'No Show' ) !== 0 ) ? $raw_style : '';
+                                                $m_created        = ! empty( $m['created_at'] ) ? $m['created_at'] : '';
+                                                $can_fit_member   = ! empty( $m['can_fit_member'] );
+                                                $avail_for_dist   = ( $m_dist === 'Cub' ) ? (int) $grp['open_cub'] : (int) $grp['open_20yd'];
 
                                                 $m_round_slug  = ! empty( $m['pricing_profile'] ) ? sanitize_title( (string) $m['pricing_profile'] ) : '';
                                                 $m_round_label = '';
@@ -486,7 +490,8 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     ? sprintf( 'Promote %s (%s) from Waitlist to Pre-Reg on %s?', $archer_name, $m_dist, $src_line_name )
                                                     : sprintf( 'WARNING: %s currently has 0 open %s spots. Override line capacity and promote %s anyway?', $src_line_name, $m_dist, $archer_name );
 
-                                                $row_search_attr = trim( strtolower( $archer_name ) . ' ' . $group_search_attr );
+                                                $dual_name_tokens = strtolower( trim( $disp_archer_name . ' ' . $archer_name ) );
+                                                $row_search_attr  = trim( $dual_name_tokens . ' ' . $group_search_attr );
 
                                                 $edit_url = add_query_arg(
                                                     array(
@@ -499,7 +504,7 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     $manage_tourn_url
                                                 );
                                             ?>
-                                            <tr class="sywat-waitlist-row <?php echo $is_multi_group ? 'sywat-waitlist-member-subrow' : ''; ?>" data-name="<?php echo esc_attr( strtolower( $archer_name ) ); ?>" data-waitlist-search="<?php echo esc_attr( $row_search_attr ); ?>">
+                                            <tr class="sywat-waitlist-row <?php echo $is_multi_group ? 'sywat-waitlist-member-subrow' : ''; ?>" data-name="<?php echo esc_attr( $dual_name_tokens ); ?>" data-waitlist-search="<?php echo esc_attr( $row_search_attr ); ?>">
                                                 <td class="sywat-col-center">
                                                     <div class="sywat-waitlist-select-cell">
                                                         <input type="checkbox"
@@ -516,7 +521,7 @@ if ( ! function_exists( 'sywat_render_waitlist_modal' ) ) {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <strong><?php echo esc_html( $archer_name ); ?></strong>
+                                                    <strong><?php echo esc_html( $disp_archer_name ); ?></strong>
                                                     <?php if ( ! $is_multi_group && $active_fam_cnt > 0 ) : ?>
                                                         <div>
                                                             <span class="sywat-chip-family">Split Family: <?php echo intval( $active_fam_cnt ); ?> active on this line</span>
