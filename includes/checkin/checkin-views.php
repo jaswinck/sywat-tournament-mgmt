@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table with responsive mobile card labels, Rate column, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.1
+ * Version: 7.5.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -339,7 +339,8 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 }
 
 /**
- * Render Active Registered Archers table with Check-In, Edit, and household OWE badges.
+ * Render Active Registered Archers table with "LastName, FirstName" display, dual-format live search,
+ * Check-In, Edit, and household OWE badges.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -353,6 +354,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         $selected_line_idx   = $data['selected_line_idx'];
         $lines               = $data['lines'];
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
+        $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
 
         $t_profiles     = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
         $is_multi_round = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
@@ -432,6 +434,11 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $badge_class = ( $reg_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
                                     $balance_due = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
 
+                                    $disp_archer_name = ! empty( $reg['display_name'] )
+                                        ? $reg['display_name']
+                                        : ( $has_lf_formatter ? sywat_format_name_last_first( $reg['name'] ) : $reg['name'] );
+                                    $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $reg['name'] ) );
+
                                     // Clean Line Title Resolution
                                     $resolved_l_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
                                     $reg_line_name  = ( isset( $reg['line_name'] ) && ! empty( trim( $reg['line_name'] ) ) )
@@ -498,10 +505,10 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                         $is_true_family_cap = ( $effective_due >= $active_cap_amount );
                                     }
                                 ?>
-                                <tr class="sywat-archer-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
+                                <tr class="sywat-archer-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                     <td>
                                         <div class="sywat-archer-name">
-                                            <?php echo esc_html( $reg['name'] ); ?>
+                                            <?php echo esc_html( $disp_archer_name ); ?>
                                             <?php if ( $round_label !== '' ) : ?>
                                                 <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $round_label ); ?></span>
                                             <?php endif; ?>
