@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Renders the public tournament directory, single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
- * Compliance: Omitted closing PHP tag.
+ * Description: Renders the public tournament directory, single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, explicit Guest-entry routing (including synced type === 'Guest' records), normalized First+Last (+ suffix) archer deduplication, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
+ * Compliance: Zero inline style attributes, opt-out shielded legacy script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Action Handler: In-Page Quick Edit Archer Record
+ *
+ * @return void
  */
 if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
     function sywat_handle_results_quick_edit() {
@@ -117,6 +119,8 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
 
 /**
  * Render Public Tournament Directory Listing with Shop Search & Turnout Stats
+ *
+ * @return void
  */
 if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
     function sywat_render_public_tournament_directory() {
@@ -190,7 +194,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                         <thead>
                             <tr>
                                 <th>Tournament Date</th>
-                                <th>Tournament Name & Location</th>
+                                <th>Tournament Name &amp; Location</th>
                                 <th class="sywat-col-center">Shooters</th>
                                 <th class="sywat-col-right">Action</th>
                             </tr>
@@ -269,7 +273,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                 const shopMatch   = (shopFilter === 'all' || shop === shopFilter);
                 const searchMatch = (!searchFilter || name.includes(searchFilter) || shop.includes(searchFilter));
 
-                row.style.display = (shopMatch && searchMatch) ? '' : 'none';
+                row.classList.toggle('sywat-hidden', !(shopMatch && searchMatch));
             });
         }
 
@@ -287,46 +291,85 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
 
 /**
  * Render Single Tournament Results Breakdown
+ * Routes explicit Guest records (type === 'Guest', style === 'Guest', or '[Guest]' tags),
+ * 0-score cards, and secondary re-entries into the Guest category while deduplicating
+ * official entries via normalized First+Last (+ suffix) keys.
+ *
+ * @param string $tournament_name Target tournament name.
+ * @return void
  */
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
-        $raw_scores       = sywat_get_tournament_scores( $tournament_name );
+        $raw_scores       = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $tournament_name ) : array();
         $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
+        $has_match_keys   = function_exists( 'sywat_normalize_archer_match_keys' );
 
+        $build_archer_key = function( $score_row ) use ( $has_match_keys ) {
+            if ( ! empty( $score_row['tfaa_id'] ) ) {
+                return 'id_' . strtolower( trim( (string) $score_row['tfaa_id'] ) );
+            }
+            $raw = isset( $score_row['name'] ) ? (string) $score_row['name'] : '';
+            if ( $has_match_keys ) {
+                $keys = sywat_normalize_archer_match_keys( $raw );
+                if ( ! empty( $keys['fl'] ) ) {
+                    return 'fl_' . $keys['fl'];
+                }
+                if ( ! empty( $keys['exact'] ) ) {
+                    return 'ex_' . $keys['exact'];
+                }
+            }
+            $fallback = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', $raw ) ) ) );
+            return 'name_' . $fallback;
+        };
+
+        $format_guest_entry = function( $entry ) use ( $has_lf_formatter ) {
+            $guest_entry                   = $entry;
+            $guest_entry['original_style'] = ! empty( $entry['original_style'] ) ? $entry['original_style'] : $entry['style'];
+            $guest_entry['style']          = 'Guest';
+
+            $clean_raw_name = trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', (string) $entry['name'] ) );
+            $base_disp      = ! empty( $entry['display_name'] )
+                ? trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', (string) $entry['display_name'] ) )
+                : ( $has_lf_formatter ? sywat_format_name_last_first( $clean_raw_name ) : $clean_raw_name );
+
+            $guest_entry['name']         = $clean_raw_name . ' [Guest]';
+            $guest_entry['display_name'] = $base_disp . ' [Guest]';
+            return $guest_entry;
+        };
+
+        $processed_scores      = array();
         $grouped_by_archer_dgs = array();
+
         foreach ( $raw_scores as $s ) {
+            $raw_type  = isset( $s['type'] ) ? trim( (string) $s['type'] ) : '';
+            $raw_style = isset( $s['style'] ) ? trim( (string) $s['style'] ) : '';
+            $raw_name  = isset( $s['name'] ) ? trim( (string) $s['name'] ) : '';
+
+            // Explicit Guest entries (including synced type === 'Guest' records) route directly to Guest
+            if ( strcasecmp( $raw_type, 'Guest' ) === 0 || strcasecmp( $raw_style, 'Guest' ) === 0 || stripos( $raw_name, '[guest]' ) !== false ) {
+                $processed_scores[] = $format_guest_entry( $s );
+                continue;
+            }
+
             $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
-            $archer_key = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+            $archer_key = $build_archer_key( $s );
             $grouped_by_archer_dgs[ $dgs_key ][ $archer_key ][] = $s;
         }
 
-        $processed_scores = array();
-
         foreach ( $grouped_by_archer_dgs as $dgs_key => $archers_map ) {
             foreach ( $archers_map as $archer_key => $entries ) {
-                usort( $entries, function( $p, $q ) {
-                    if ( $p['score'] === $q['score'] ) {
-                        return $q['x_count'] - $p['x_count'];
-                    }
-                    return $q['score'] - $p['score'];
-                } );
+                if ( count( $entries ) > 1 ) {
+                    usort( $entries, function( $p, $q ) {
+                        if ( $p['score'] === $q['score'] ) {
+                            return $q['x_count'] - $p['x_count'];
+                        }
+                        return $q['score'] - $p['score'];
+                    } );
+                }
 
                 if ( intval( $entries[0]['score'] ) === 0 ) {
                     foreach ( $entries as $zero_entry ) {
-                        $guest_entry                   = $zero_entry;
-                        $guest_entry['original_style'] = $zero_entry['style'];
-                        $guest_entry['style']          = 'Guest';
-                        $base_disp                     = ! empty( $zero_entry['display_name'] )
-                            ? $zero_entry['display_name']
-                            : ( $has_lf_formatter ? sywat_format_name_last_first( $zero_entry['name'] ) : $zero_entry['name'] );
-
-                        if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
-                            $guest_entry['name'] .= ' [Guest]';
-                        }
-                        $guest_entry['display_name'] = ( strpos( $base_disp, '[Guest]' ) === false )
-                            ? ( $base_disp . ' [Guest]' )
-                            : $base_disp;
-                        $processed_scores[] = $guest_entry;
+                        $processed_scores[] = $format_guest_entry( $zero_entry );
                     }
                 } else {
                     $primary_entry                   = $entries[0];
@@ -337,20 +380,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     $processed_scores[]              = $primary_entry;
 
                     for ( $i = 1; $i < count( $entries ); $i++ ) {
-                        $guest_entry                   = $entries[ $i ];
-                        $guest_entry['original_style'] = $entries[ $i ]['style'];
-                        $guest_entry['style']          = 'Guest';
-                        $base_disp                     = ! empty( $entries[ $i ]['display_name'] )
-                            ? $entries[ $i ]['display_name']
-                            : ( $has_lf_formatter ? sywat_format_name_last_first( $entries[ $i ]['name'] ) : $entries[ $i ]['name'] );
-
-                        if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
-                            $guest_entry['name'] .= ' [Guest]';
-                        }
-                        $guest_entry['display_name'] = ( strpos( $base_disp, '[Guest]' ) === false )
-                            ? ( $base_disp . ' [Guest]' )
-                            : $base_disp;
-                        $processed_scores[] = $guest_entry;
+                        $processed_scores[] = $format_guest_entry( $entries[ $i ] );
                     }
                 }
             }
@@ -602,7 +632,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
                                                 $reg_id           = ! empty( $a['id'] ) ? $a['id'] : '';
                                                 $gender_val       = ! empty( $a['gender'] ) ? $a['gender'] : ( ! empty( $group_data['gender'] ) ? $group_data['gender'] : 'Male' );
-                                                $raw_edit_name    = preg_replace( '/\s*\[Guest\]\s*$/i', '', $a['name'] );
+                                                $raw_edit_name    = trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', $a['name'] ) );
                                                 $edit_style       = ! empty( $a['original_style'] ) ? $a['original_style'] : $a['style'];
                                                 $disp_archer_name = ! empty( $a['display_name'] )
                                                     ? $a['display_name']
@@ -798,23 +828,21 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                         totalCount++;
 
                         if (divMatch && genMatch && styleMatch && searchMatch) {
-                            row.style.display  = '';
+                            row.classList.remove('sywat-hidden');
                             blockHasVisibleRow = true;
                             visibleCount++;
                         } else {
-                            row.style.display = 'none';
+                            row.classList.add('sywat-hidden');
                         }
                     });
 
+                    block.classList.toggle('sywat-hidden', !blockHasVisibleRow);
                     if (blockHasVisibleRow) {
-                        block.style.display = '';
                         cardHasVisibleBlock = true;
-                    } else {
-                        block.style.display = 'none';
                     }
                 });
 
-                card.style.display = cardHasVisibleBlock ? '' : 'none';
+                card.classList.toggle('sywat-hidden', !cardHasVisibleBlock);
             });
 
             const counterEl = document.getElementById('sywat_tourn_counter');
