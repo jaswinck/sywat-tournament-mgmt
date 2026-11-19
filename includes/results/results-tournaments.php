@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Renders the public tournament directory, single-tournament category leaderboards, and staff Quick Edit modal wired to database-configured shooting styles and age divisions.
+ * Description: Renders the public tournament directory, single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
+ * Compliance: Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.0.0
+ * Version: 7.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -289,7 +290,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
  */
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
-        $raw_scores = sywat_get_tournament_scores( $tournament_name );
+        $raw_scores       = sywat_get_tournament_scores( $tournament_name );
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         $grouped_by_archer_dgs = array();
         foreach ( $raw_scores as $s ) {
@@ -314,23 +316,40 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                         $guest_entry                   = $zero_entry;
                         $guest_entry['original_style'] = $zero_entry['style'];
                         $guest_entry['style']          = 'Guest';
+                        $base_disp                     = ! empty( $zero_entry['display_name'] )
+                            ? $zero_entry['display_name']
+                            : ( $has_lf_formatter ? sywat_format_name_last_first( $zero_entry['name'] ) : $zero_entry['name'] );
+
                         if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
                             $guest_entry['name'] .= ' [Guest]';
                         }
+                        $guest_entry['display_name'] = ( strpos( $base_disp, '[Guest]' ) === false )
+                            ? ( $base_disp . ' [Guest]' )
+                            : $base_disp;
                         $processed_scores[] = $guest_entry;
                     }
                 } else {
                     $primary_entry                   = $entries[0];
                     $primary_entry['original_style'] = $entries[0]['style'];
+                    $primary_entry['display_name']   = ! empty( $entries[0]['display_name'] )
+                        ? $entries[0]['display_name']
+                        : ( $has_lf_formatter ? sywat_format_name_last_first( $entries[0]['name'] ) : $entries[0]['name'] );
                     $processed_scores[]              = $primary_entry;
 
                     for ( $i = 1; $i < count( $entries ); $i++ ) {
                         $guest_entry                   = $entries[ $i ];
                         $guest_entry['original_style'] = $entries[ $i ]['style'];
                         $guest_entry['style']          = 'Guest';
+                        $base_disp                     = ! empty( $entries[ $i ]['display_name'] )
+                            ? $entries[ $i ]['display_name']
+                            : ( $has_lf_formatter ? sywat_format_name_last_first( $entries[ $i ]['name'] ) : $entries[ $i ]['name'] );
+
                         if ( strpos( $guest_entry['name'], '[Guest]' ) === false ) {
                             $guest_entry['name'] .= ' [Guest]';
                         }
+                        $guest_entry['display_name'] = ( strpos( $base_disp, '[Guest]' ) === false )
+                            ? ( $base_disp . ' [Guest]' )
+                            : $base_disp;
                         $processed_scores[] = $guest_entry;
                     }
                 }
@@ -411,6 +430,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             foreach ( $group['styles'] as $st_key => &$archers ) {
                 usort( $archers, function( $a, $b ) {
                     if ( $a['score'] === $b['score'] ) {
+                        if ( $a['x_count'] === $b['x_count'] ) {
+                            $dispA = ! empty( $a['display_name'] ) ? $a['display_name'] : $a['name'];
+                            $dispB = ! empty( $b['display_name'] ) ? $b['display_name'] : $b['name'];
+                            return strcasecmp( $dispA, $dispB );
+                        }
                         return $b['x_count'] - $a['x_count'];
                     }
                     return $b['score'] - $a['score'];
@@ -576,16 +600,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                 $prev_score = $s_val;
                                                 $prev_x     = $x_val;
 
-                                                $reg_id        = ! empty( $a['id'] ) ? $a['id'] : '';
-                                                $gender_val    = ! empty( $a['gender'] ) ? $a['gender'] : ( ! empty( $group_data['gender'] ) ? $group_data['gender'] : 'Male' );
-                                                $raw_edit_name = preg_replace( '/\s*\[Guest\]\s*$/i', '', $a['name'] );
-                                                $edit_style    = ! empty( $a['original_style'] ) ? $a['original_style'] : $a['style'];
+                                                $reg_id           = ! empty( $a['id'] ) ? $a['id'] : '';
+                                                $gender_val       = ! empty( $a['gender'] ) ? $a['gender'] : ( ! empty( $group_data['gender'] ) ? $group_data['gender'] : 'Male' );
+                                                $raw_edit_name    = preg_replace( '/\s*\[Guest\]\s*$/i', '', $a['name'] );
+                                                $edit_style       = ! empty( $a['original_style'] ) ? $a['original_style'] : $a['style'];
+                                                $disp_archer_name = ! empty( $a['display_name'] )
+                                                    ? $a['display_name']
+                                                    : ( $has_lf_formatter ? sywat_format_name_last_first( $a['name'] ) : $a['name'] );
+                                                $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $a['name'] ) );
                                             ?>
-                                                <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( strtolower( $a['name'] ) ); ?>">
+                                                <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                                     <td class="sywat-col-center"><strong><?php echo $current_rank; ?></strong></td>
                                                     <td>
                                                         <div class="sywat-archer-cell-content">
-                                                            <strong><?php echo esc_html( $a['name'] ); ?></strong>
+                                                            <strong><?php echo esc_html( $disp_archer_name ); ?></strong>
                                                             <?php if ( $can_edit_scores && ! empty( $reg_id ) ) : ?>
                                                                 <button type="button"
                                                                         class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit sywat-btn-sm"
