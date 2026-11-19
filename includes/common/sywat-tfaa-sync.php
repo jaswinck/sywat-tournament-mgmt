@@ -2,10 +2,10 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Verbatim Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updating any matching local pre-registrations unconditionally with TFAA's current name/division/gender/style/score, and importing all TFAA entries verbatim.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Resolves parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)") prior to full-text lookup to prevent substring collisions, treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updates matching local pre-registrations unconditionally, and imports all TFAA entries verbatim.
  * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity & style helpers, hoisted match metadata, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.0.0
+ * Version: 8.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -118,6 +118,9 @@ if ( ! function_exists( 'sywat_parse_tfaa_div_gen' ) ) {
 
 /**
  * TFAA Parser Helper: Database-Driven Shooting Style Resolution
+ * Prioritizes explicit parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)")
+ * before full-heading substring lookups so "Modern Bowhunter Freestyle (MBH)" resolves to
+ * "MBH – Modern Bowhunter" rather than matching "Bowhunter Freestyle" (BHFS).
  *
  * @param string $text Candidate style heading text from TFAA results HTML.
  * @return string      Normalized style label or 'Guest'.
@@ -140,15 +143,35 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
         $style  = '';
         $is_pro = (bool) preg_match( '/\bpro\b/i', $clean_text );
 
+        $lookup_candidates = array();
+        if ( preg_match( '/\(([A-Za-z0-9\-]+)\)\s*$/', $clean_text, $code_match ) ) {
+            $paren_code = strtoupper( trim( $code_match[1] ) );
+            if ( $paren_code === 'FSLR' || $paren_code === 'FSL-R' ) {
+                $lookup_candidates[] = 'FSLR';
+                $lookup_candidates[] = 'FSL-R';
+            } else {
+                $lookup_candidates[] = $paren_code;
+            }
+        }
+
+        if ( stripos( $clean_text, 'Modern Bowhunter' ) !== false && ! in_array( 'MBH', $lookup_candidates, true ) ) {
+            $lookup_candidates[] = 'MBH';
+        }
+
+        $lookup_candidates[] = $clean_text;
+
         if ( function_exists( 'sywat_find_shooting_style' ) ) {
-            $style_rec = sywat_find_shooting_style( $clean_text );
-            if ( is_array( $style_rec ) && ! empty( $style_rec['label'] ) ) {
-                // If heading specifies "Pro" alongside standard Freestyle, prefer configured Pro style if available
-                if ( $is_pro && empty( $style_rec['is_pro'] ) && ( stripos( $style_rec['label'], 'FS –' ) === 0 || strcasecmp( isset( $style_rec['code'] ) ? $style_rec['code'] : '', 'FS' ) === 0 ) ) {
-                    $pro_rec = sywat_find_shooting_style( 'FS Pro' );
-                    $style   = ( is_array( $pro_rec ) && ! empty( $pro_rec['label'] ) ) ? $pro_rec['label'] : 'FS Pro – Freestyle Pro';
-                } else {
-                    $style = $style_rec['label'];
+            foreach ( $lookup_candidates as $cand ) {
+                $style_rec = sywat_find_shooting_style( $cand );
+                if ( is_array( $style_rec ) && ! empty( $style_rec['label'] ) ) {
+                    // If heading specifies "Pro" alongside standard Freestyle, prefer configured Pro style if available
+                    if ( $is_pro && empty( $style_rec['is_pro'] ) && ( stripos( $style_rec['label'], 'FS –' ) === 0 || strcasecmp( isset( $style_rec['code'] ) ? $style_rec['code'] : '', 'FS' ) === 0 ) ) {
+                        $pro_rec = sywat_find_shooting_style( 'FS Pro' );
+                        $style   = ( is_array( $pro_rec ) && ! empty( $pro_rec['label'] ) ) ? $pro_rec['label'] : 'FS Pro – Freestyle Pro';
+                    } else {
+                        $style = $style_rec['label'];
+                    }
+                    break;
                 }
             }
         }
