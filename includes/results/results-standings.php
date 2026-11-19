@@ -2,16 +2,22 @@
 /**
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
- * Description: Renders the public multi-tournament Season Standings leaderboards with archer names formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), database-ordered division & style filters, and encoding-safe HTML/JS entities.
- * Compliance: Omitted closing PHP tag.
+ * Description: Renders the public multi-tournament Season Standings leaderboards with archer names formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), database-ordered division & style filters, class-based visibility toggling, and encoding-safe HTML/JS entities.
+ * Compliance: Zero inline style attributes, zero element.style.* mutations, opt-out shielded legacy script block, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.1
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+/**
+ * Format an individual score and X-count cell for Season Standings tables.
+ *
+ * @param array|null $score_item Score record array containing 'score' and 'x_count', or null.
+ * @return string                Safe HTML markup for the score cell.
+ */
 if ( ! function_exists( 'sywat_format_score_cell' ) ) {
     function sywat_format_score_cell( $score_item ) {
         if ( ! is_array( $score_item ) || ! isset( $score_item['score'] ) ) {
@@ -21,6 +27,13 @@ if ( ! function_exists( 'sywat_format_score_cell' ) ) {
     }
 }
 
+/**
+ * Render the public multi-tournament Season Standings view with Division, Gender, Style,
+ * and live archer search filters.
+ *
+ * @param string $selected_season_slug Requested season slug (defaults to active season).
+ * @return void
+ */
 if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
     function sywat_render_public_season_standings( $selected_season_slug ) {
         $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
@@ -29,9 +42,12 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             $selected_season_slug = isset( $active_s['slug'] ) ? $active_s['slug'] : key( $seasons );
         }
 
-        $season_data      = sywat_aggregate_season_standings( $selected_season_slug );
-        $best_n           = $season_data['best_n'];
-        $groups           = $season_data['groups'];
+        $season_data = function_exists( 'sywat_aggregate_season_standings' )
+            ? sywat_aggregate_season_standings( $selected_season_slug )
+            : array( 'best_n' => 3, 'groups' => array() );
+
+        $best_n           = isset( $season_data['best_n'] ) ? intval( $season_data['best_n'] ) : 3;
+        $groups           = isset( $season_data['groups'] ) && is_array( $season_data['groups'] ) ? $season_data['groups'] : array();
         $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         $all_divisions         = array();
@@ -262,24 +278,22 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                         totalCount++;
 
-                        if (divMatch && genMatch && styleMatch && searchMatch) {
-                            row.style.display  = '';
+                        const isRowVisible = (divMatch && genMatch && styleMatch && searchMatch);
+                        row.classList.toggle('sywat-hidden', !isRowVisible);
+
+                        if (isRowVisible) {
                             blockHasVisibleRow = true;
                             visibleCount++;
-                        } else {
-                            row.style.display = 'none';
                         }
                     });
 
+                    block.classList.toggle('sywat-hidden', !blockHasVisibleRow);
                     if (blockHasVisibleRow) {
-                        block.style.display = '';
                         cardHasVisibleBlock = true;
-                    } else {
-                        block.style.display = 'none';
                     }
                 });
 
-                card.style.display = cardHasVisibleBlock ? '' : 'none';
+                card.classList.toggle('sywat-hidden', !cardHasVisibleBlock);
             });
 
             const counterEl = document.getElementById('sywat_standings_counter');
