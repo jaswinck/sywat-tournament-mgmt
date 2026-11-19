@@ -2,10 +2,10 @@
 /**
  * View Template: Public Member Online Tournament Registration Portal
  * Path: includes/registration/views/view-member-registration.php
- * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, selected tournament event details, live line capacity availability table, and household multi-archer / multi-line checkbox matrix form (with zero pre-checked defaults, per-line status badges, automatic age division/distance detection, line-by-line confirmation breakdown, and Season Schedule cancel/return navigation).
+ * Description: Pure view template for [sywat_member_register]. Renders sign-in prompt for guests, selected tournament event details, live line capacity availability table, and household multi-archer / multi-line checkbox matrix form displaying archer names as "LastName, FirstName" (with zero pre-checked defaults, per-line status badges, automatic age division/distance detection, line-by-line confirmation breakdown, and Season Schedule cancel/return navigation).
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, zero inline event handlers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.0
+ * Version: 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,6 +24,7 @@ $household            = isset( $view_data['household'] ) && is_array( $view_data
 $existing_member_regs = isset( $view_data['existing_member_regs'] ) && is_array( $view_data['existing_member_regs'] ) ? $view_data['existing_member_regs'] : array();
 $division_options     = isset( $view_data['division_options'] ) && is_array( $view_data['division_options'] ) ? $view_data['division_options'] : array();
 $submission_result    = isset( $view_data['submission_result'] ) && is_array( $view_data['submission_result'] ) ? $view_data['submission_result'] : null;
+$has_lf_formatter     = function_exists( 'sywat_format_name_last_first' );
 
 $icon_clipboard = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="sywat-icon"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14l2 2 4-4"></path></svg>';
 
@@ -106,8 +107,9 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                                 <?php endif; ?>
                                 <ul>
                                     <?php foreach ( $l_sum['registered'] as $reg_item ) : ?>
+                                        <?php $reg_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $reg_item['name'] ) : $reg_item['name']; ?>
                                         <li>
-                                            <strong><?php echo esc_html( $reg_item['name'] ); ?></strong> —
+                                            <strong><?php echo esc_html( $reg_disp_name ); ?></strong> —
                                             <?php echo esc_html( $reg_item['division'] ); ?> (<?php echo esc_html( $reg_item['distance'] ); ?>)
                                             <?php if ( ! empty( $reg_item['is_promo_free'] ) ) : ?>
                                                 <span class="sywat-badge sywat-badge-open sywat-ml-1">First-Time/Lapsed Promo ($0.00)</span>
@@ -132,8 +134,9 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                                 <strong><?php echo esc_html( $l_sum['line_name'] ); ?>:</strong>
                                 <ul>
                                     <?php foreach ( $l_sum['waitlisted'] as $wl_item ) : ?>
+                                        <?php $wl_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $wl_item['name'] ) : $wl_item['name']; ?>
                                         <li>
-                                            <strong><?php echo esc_html( $wl_item['name'] ); ?></strong> —
+                                            <strong><?php echo esc_html( $wl_disp_name ); ?></strong> —
                                             <?php echo esc_html( $wl_item['division'] ); ?> (<?php echo esc_html( $wl_item['distance'] ); ?>)
                                         </li>
                                     <?php endforeach; ?>
@@ -148,8 +151,9 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                         <strong>Registration Confirmed!</strong> Reserved spot(s) for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> on <strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>:
                         <ul>
                             <?php foreach ( $submission_result['registered'] as $reg_item ) : ?>
+                                <?php $reg_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $reg_item['name'] ) : $reg_item['name']; ?>
                                 <li>
-                                    <strong><?php echo esc_html( $reg_item['name'] ); ?></strong> —
+                                    <strong><?php echo esc_html( $reg_disp_name ); ?></strong> —
                                     <?php echo esc_html( $reg_item['division'] ); ?> (<?php echo esc_html( $reg_item['distance'] ); ?>)
                                     <?php if ( ! empty( $reg_item['is_promo_free'] ) ) : ?>
                                         <span class="sywat-badge sywat-badge-open sywat-ml-1">First-Time/Lapsed Promo ($0.00)</span>
@@ -171,8 +175,9 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                         <strong>Added to Shooting Line Waitlist:</strong> The selected line was at capacity for the target distance, so the following archer(s) were placed on the <strong>Waitlist</strong> for <strong><?php echo esc_html( $submission_result['tournament'] ); ?></strong> (<strong><?php echo esc_html( $submission_result['line_name'] ); ?></strong>) with <strong>$0.00</strong> due until a spot opens:
                         <ul>
                             <?php foreach ( $submission_result['waitlisted'] as $wl_item ) : ?>
+                                <?php $wl_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $wl_item['name'] ) : $wl_item['name']; ?>
                                 <li>
-                                    <strong><?php echo esc_html( $wl_item['name'] ); ?></strong> —
+                                    <strong><?php echo esc_html( $wl_disp_name ); ?></strong> —
                                     <?php echo esc_html( $wl_item['division'] ); ?> (<?php echo esc_html( $wl_item['distance'] ); ?>)
                                 </li>
                             <?php endforeach; ?>
@@ -346,7 +351,11 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                         <tbody>
                             <?php foreach ( $household as $m_key => $member ) : ?>
                                 <?php
-                                    $norm_name   = strtolower( trim( $member['name'] ) );
+                                    $norm_name        = strtolower( trim( $member['name'] ) );
+                                    $disp_member_name = ! empty( $member['display_name'] )
+                                        ? $member['display_name']
+                                        : ( $has_lf_formatter ? sywat_format_name_last_first( $member['name'] ) : $member['name'] );
+
                                     $member_regs = isset( $existing_member_regs[ $norm_name ] ) && is_array( $existing_member_regs[ $norm_name ] )
                                         ? $existing_member_regs[ $norm_name ]
                                         : array();
@@ -363,7 +372,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                                 ?>
                                 <tr>
                                     <td>
-                                        <strong><?php echo esc_html( $member['name'] ); ?></strong>
+                                        <strong><?php echo esc_html( $disp_member_name ); ?></strong>
                                         <div class="sywat-meta-subtext">
                                             <?php echo esc_html( $member['role_label'] ); ?>
                                             <?php if ( ! empty( $member['nfaa_number'] ) && $member['nfaa_number'] !== 'Unassigned' ) : ?>
@@ -415,7 +424,7 @@ $active_event = ( $selected_tournament !== '' && isset( $open_tournaments[ $sele
                                                 : ( isset( $by_line_name[ $norm_lbl ] ) ? $by_line_name[ $norm_lbl ] : null );
                                             $is_closed     = ! empty( $l_info['is_closed'] );
                                             $cell_cb_id    = 'sywat_mreg_cb_' . sanitize_key( $m_key ) . '_l' . sanitize_key( $l_idx_str );
-                                            $cell_aria     = $member['name'] . ' — ' . $l_info['label'];
+                                            $cell_aria     = $disp_member_name . ' — ' . $l_info['label'];
                                         ?>
                                         <td class="sywat-col-center">
                                             <?php if ( is_array( $existing_line ) ) : ?>
