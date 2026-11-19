@@ -2,10 +2,10 @@
 /**
  * Module: Financial Accounting & Invoice Engine
  * Path: includes/class-sywat-accounting.php
- * Description: Host vs. TFAA 50/50 fee split math, dynamic pricing/round profile fee classes, household family cap calculations (honoring paid families even when not all family members check in), First-Time/Lapsed Shooter promoter tracking, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI.
+ * Description: Host vs. TFAA 50/50 fee split math, dynamic pricing/round profile fee classes, household family cap calculations (honoring paid families even when not all family members check in), First-Time/Lapsed Shooter promoter tracking, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI with surname-sorted "LastName, FirstName" roster formatting.
  * Compliance: Pure library/renderer — zero direct SQL queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.1
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -735,7 +735,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
             return isset( $reg['tournament'] ) && strcasecmp( $reg['tournament'], $selected_tournament ) === 0;
         } ) );
 
-        $filtered_registrations = array_filter( $all_tourn_regs, function( $reg ) use ( $filter_line_idx, $available_lines ) {
+        $filtered_registrations = array_values( array_filter( $all_tourn_regs, function( $reg ) use ( $filter_line_idx, $available_lines ) {
             if ( $filter_line_idx !== 'all' ) {
                 $match_idx  = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $filter_line_idx;
                 $match_name = isset( $available_lines[ $filter_line_idx ]['name'] ) && isset( $reg['line_name'] ) && strcasecmp( trim( $reg['line_name'] ), trim( $available_lines[ $filter_line_idx ]['name'] ) ) === 0;
@@ -744,10 +744,19 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                 }
             }
             return true;
-        } );
+        } ) );
+
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
+        foreach ( $filtered_registrations as &$f_reg ) {
+            $raw_f_name            = isset( $f_reg['name'] ) ? trim( (string) $f_reg['name'] ) : '';
+            $f_reg['display_name'] = $has_lf_formatter ? sywat_format_name_last_first( $raw_f_name ) : $raw_f_name;
+        }
+        unset( $f_reg );
 
         usort( $filtered_registrations, function( $a, $b ) {
-            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
+            $disp_a = isset( $a['display_name'] ) ? trim( (string) $a['display_name'] ) : ( isset( $a['name'] ) ? trim( (string) $a['name'] ) : '' );
+            $disp_b = isset( $b['display_name'] ) ? trim( (string) $b['display_name'] ) : ( isset( $b['name'] ) ? trim( (string) $b['name'] ) : '' );
+            return strcasecmp( $disp_a, $disp_b );
         } );
 
         $acct = sywat_calculate_accounting_totals( $filtered_registrations, $selected_tournament );
@@ -826,6 +835,10 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                         <tbody>
                             <?php $num = 1; foreach ( $filtered_registrations as $reg ) : ?>
                                 <?php
+                                    $disp_archer_name = ! empty( $reg['display_name'] )
+                                        ? $reg['display_name']
+                                        : ( $has_lf_formatter ? sywat_format_name_last_first( $reg['name'] ) : $reg['name'] );
+
                                     $is_checked_in = ! empty( $reg['checked_in'] );
                                     $is_waitlist   = isset( $reg['status'] ) && strcasecmp( trim( $reg['status'] ), 'Waitlist' ) === 0;
                                     $raw_div       = ! empty( $reg['division'] ) ? $reg['division'] : '—';
@@ -912,7 +925,7 @@ if ( ! function_exists( 'sywat_render_print_modal' ) ) {
                                 <tr>
                                     <td><strong><?php echo $num++; ?></strong></td>
                                     <td>
-                                        <strong><?php echo esc_html( $reg['name'] ); ?></strong>
+                                        <strong><?php echo esc_html( $disp_archer_name ); ?></strong>
                                         <?php if ( $round_label !== '' ) : ?>
                                             <br><span style="font-size:8px; color:#1e3a8a; font-weight:600;">(<?php echo esc_html( $round_label ); ?>)</span>
                                         <?php endif; ?>
