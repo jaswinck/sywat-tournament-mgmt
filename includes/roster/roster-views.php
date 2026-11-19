@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
- * Description: Renders the Registered Archer Roster modal with alphabetical active shooters, Type / Rate indicators, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
+ * Description: Renders the Registered Archer Roster modal with surname-sorted active shooters formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), Type / Rate indicators, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.1
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -208,7 +209,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             }
         }
 
-        // Separate Active Shooters (sorted A–Z) from Waitlisted Archers (managed via dedicated Waitlist Modal)
+        // Separate Active Shooters (sorted by Surname "LastName, FirstName") from Waitlisted Archers (managed via dedicated Waitlist Modal)
+        $has_lf_formatter      = function_exists( 'sywat_format_name_last_first' );
         $active_registrations  = array();
         $filtered_waitlist_cnt = 0;
 
@@ -221,11 +223,15 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
                 continue;
             }
+            $raw_name              = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+            $reg['display_name']   = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
             $active_registrations[] = $reg;
         }
 
         usort( $active_registrations, function( $a, $b ) {
-            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
+            $disp_a = isset( $a['display_name'] ) ? trim( (string) $a['display_name'] ) : ( isset( $a['name'] ) ? trim( (string) $a['name'] ) : '' );
+            $disp_b = isset( $b['display_name'] ) ? trim( (string) $b['display_name'] ) : ( isset( $b['name'] ) ? trim( (string) $b['name'] ) : '' );
+            return strcasecmp( $disp_a, $disp_b );
         } );
 
         $waitlist_target_line = ( (string) $filter_line_idx !== '' ) ? (string) $filter_line_idx : 'all';
@@ -313,7 +319,7 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                         <?php endif; ?>
                     </div>
 
-                    <!-- Active Registered Archers Table (Sorted Alphabetically) -->
+                    <!-- Active Registered Archers Table (Sorted Alphabetically by Surname) -->
                     <div class="sywat-table-header-bar sywat-modal-section-header">
                         <h2>Active Roster (<?php echo intval( count( $active_registrations ) ); ?>)</h2>
                         <?php if ( $filtered_waitlist_cnt > 0 && ! empty( $waitlist_modal_url ) ) : ?>
@@ -346,6 +352,11 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             $reg_id      = isset( $reg['id'] ) ? $reg['id'] : '';
                                             $badge_type  = ! empty( $reg['is_walkin'] ) || ( isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ) ? 'Walk-In' : 'Pre-Reg';
                                             $badge_class = ( $badge_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
+
+                                            $disp_archer_name = ! empty( $reg['display_name'] )
+                                                ? $reg['display_name']
+                                                : ( $has_lf_formatter ? sywat_format_name_last_first( $reg['name'] ) : $reg['name'] );
+                                            $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $reg['name'] ) );
 
                                             $paid_status   = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
                                             $is_promo_free = ! empty( $reg['is_promo_free'] ) || strcasecmp( $paid_status, 'Promo (Free)' ) === 0 || stripos( $paid_status, 'Promo' ) === 0;
@@ -391,9 +402,9 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                                             }
                                             $edit_archer_url = add_query_arg( $edit_archer_args, $manage_base_url );
                                         ?>
-                                        <tr class="sywat-manage-row" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
+                                        <tr class="sywat-manage-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                             <td>
-                                                <strong><?php echo esc_html( $reg['name'] ); ?></strong>
+                                                <strong><?php echo esc_html( $disp_archer_name ); ?></strong>
                                                 <?php if ( $round_label !== '' ) : ?>
                                                     <span class="sywat-badge sywat-badge-prereg"><?php echo esc_html( $round_label ); ?></span>
                                                 <?php endif; ?>
