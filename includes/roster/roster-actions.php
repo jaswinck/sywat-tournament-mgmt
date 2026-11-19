@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Action Handlers (Edit, Remove & Line Purge)
  * Path: includes/roster/roster-actions.php
- * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
+ * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, canonical archer name enforcement across comma-inverted/middle-initial/alias inputs, First+Last same-line duplicate guard, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
  * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -151,10 +151,11 @@ if ( ! function_exists( 'sywat_roster_delete_record_storage' ) ) {
 
 /**
  * Action Handler: Save Edited Archer Registration from the Roster Modal.
- * Synchronizes Pre-Reg / Waitlist status, round/pricing profile selection, Promotional Free Entry status,
+ * Synchronizes Pre-Reg / Waitlist status, enforces canonical FirstName LastName formatting
+ * across comma-inverted/middle-initial/alias inputs, validates normalized First+Last duplicates
+ * on target lines, persists round/pricing profile selection and Promotional Free Entry status,
  * recalculates unpaid fees on division/round changes, enforces database-driven style & division rules,
- * enforces $0.00 balance due on Waitlist, validates duplicate names on target lines, and reconciles
- * dynamic Household Family Cap fees.
+ * enforces $0.00 balance due on Waitlist, and reconciles dynamic Household Family Cap fees.
  *
  * @param array $tournaments   Master tournaments array.
  * @param array $registrations Reference to registrations array.
@@ -188,8 +189,9 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Archer registration record could not be found.</div>';
         }
 
-        $t_entry = ( is_array( $tournaments ) && isset( $tournaments[ $tourn_name ] ) ) ? $tournaments[ $tourn_name ] : $tourn_name;
-        $t_lines = array();
+        $t_entry          = ( is_array( $tournaments ) && isset( $tournaments[ $tourn_name ] ) ) ? $tournaments[ $tourn_name ] : $tourn_name;
+        $tourn_start_date = ( is_array( $t_entry ) && ! empty( $t_entry['start_date'] ) ) ? trim( (string) $t_entry['start_date'] ) : '';
+        $t_lines          = array();
         if ( is_array( $t_entry ) ) {
             $t_lines = function_exists( 'sywat_get_tournament_lines' )
                 ? sywat_get_tournament_lines( $t_entry )
@@ -212,7 +214,35 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         $orig_round    = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
         $orig_due      = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.00;
 
-        $edit_name     = isset( $_POST['edit_name'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) : $orig_name;
+        $raw_edit_name = isset( $_POST['edit_name'] )
+            ? trim( preg_replace( '/[[:space:]]+/', ' ', sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) )
+            : $orig_name;
+
+        // Enforce canonical "FirstName LastName" storage across comma-inverted, middle-initial, and alias inputs
+        $edit_name = $raw_edit_name;
+        if ( $edit_name !== '' ) {
+            if ( strpos( $edit_name, ',' ) !== false ) {
+                $comma_parts = array_map( 'trim', explode( ',', $edit_name, 2 ) );
+                if ( count( $comma_parts ) === 2 && $comma_parts[0] !== '' && $comma_parts[1] !== '' ) {
+                    $edit_name = trim( preg_replace( '/[[:space:]]+/', ' ', $comma_parts[1] . ' ' . $comma_parts[0] ) );
+                }
+            }
+
+            if ( function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
+                $resolved_profile = sywat_resolve_archer_intake_profile(
+                    $edit_name,
+                    $tourn_start_date,
+                    array(
+                        'email' => isset( $reg['email'] ) ? (string) $reg['email'] : '',
+                        'phone' => isset( $reg['phone'] ) ? (string) $reg['phone'] : '',
+                    )
+                );
+                if ( is_array( $resolved_profile ) && ! empty( $resolved_profile['canonical_name'] ) ) {
+                    $edit_name = trim( (string) $resolved_profile['canonical_name'] );
+                }
+            }
+        }
+
         $new_line_idx  = isset( $_POST['edit_line_index'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) ) ) : $orig_line_idx;
         $raw_status    = isset( $_POST['edit_status'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_status'] ) ) ) : ( isset( $reg['status'] ) ? $reg['status'] : 'Pre-Reg' );
         $raw_division  = isset( $_POST['edit_division'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['edit_division'] ) ) ) : ( isset( $reg['division'] ) ? $reg['division'] : 'Adult (18 - 49)' );
@@ -246,8 +276,23 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $new_status = 'Pre-Reg';
         }
 
-        // Duplicate name-on-line guard for non-cancelled records
+        // Normalized exact & First+Last duplicate name-on-line guard for non-cancelled records
         if ( $new_status !== 'Cancelled' && is_array( $registrations ) ) {
+            $build_match_keys = function( $raw_val ) {
+                if ( function_exists( 'sywat_normalize_archer_match_keys' ) ) {
+                    return sywat_normalize_archer_match_keys( $raw_val );
+                }
+                $norm  = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', (string) $raw_val ) ) ) );
+                $parts = $norm !== '' ? explode( ' ', $norm ) : array();
+                return array(
+                    'exact' => $norm,
+                    'fl'    => ( count( $parts ) >= 2 ) ? ( reset( $parts ) . '___' . end( $parts ) ) : $norm,
+                );
+            };
+
+            $cand_keys   = $build_match_keys( $edit_name );
+            $has_fl_pair = ( $cand_keys['fl'] !== '' && strpos( $cand_keys['fl'], '___' ) !== false );
+
             foreach ( $registrations as $other ) {
                 if ( ! is_array( $other ) || ! isset( $other['id'], $other['tournament'] ) ) {
                     continue;
@@ -265,10 +310,18 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 }
 
                 $other_line = sywat_roster_resolve_line_idx( $other, $t_lines );
-                $other_name = isset( $other['name'] ) ? trim( (string) $other['name'] ) : '';
+                if ( $other_line !== $new_line_idx ) {
+                    continue;
+                }
 
-                if ( $other_line === $new_line_idx && strcasecmp( $other_name, $edit_name ) === 0 ) {
-                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Edit Blocked: <strong>' . esc_html( $edit_name ) . '</strong> is already registered on that shooting line.</div>';
+                $other_name = isset( $other['name'] ) ? trim( (string) $other['name'] ) : '';
+                $other_keys = $build_match_keys( $other_name );
+
+                if ( $other_keys['exact'] === $cand_keys['exact'] || ( $has_fl_pair && $other_keys['fl'] === $cand_keys['fl'] ) ) {
+                    $alias_note = ( strcasecmp( $other_name, $edit_name ) !== 0 )
+                        ? ' (as <strong>' . esc_html( $other_name ) . '</strong>)'
+                        : '';
+                    return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Edit Blocked: <strong>' . esc_html( $edit_name ) . '</strong> is already registered on that shooting line' . $alias_note . '.</div>';
                 }
             }
         }
