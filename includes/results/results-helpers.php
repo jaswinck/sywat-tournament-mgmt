@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Helpers
  * Path: includes/results/results-helpers.php
- * Description: Provides O(1) cached lookup maps, historical shooter queries, category formatting, database-driven sort weights, hoisted "LastName, FirstName" display name formatting, and multi-tournament season standings aggregation with surname tie-breaker sorting.
+ * Description: Provides O(1) cached lookup maps, historical shooter queries, category formatting, database-driven sort weights, hoisted "LastName, FirstName" display name formatting, Guest-entry exclusion, and multi-tournament season standings aggregation with normalized First+Last (+ suffix) archer deduplication and surname tie-breaker sorting.
  * Compliance: Pure helper layer — zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -465,8 +465,8 @@ if ( ! function_exists( 'sywat_format_div_gen_heading' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps and computing hoisted "LastName, FirstName" display labels
- * while preserving canonical 'name' keys for cross-tournament deduplication.
+ * labels via O(1) lookup maps, preserving registration 'type' (e.g., 'Guest'), and computing
+ * hoisted "LastName, FirstName" display labels while preserving canonical 'name' keys.
  * Defaults blank/unset score fields to 0 so every roster entry is included.
  */
 if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
@@ -503,6 +503,7 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                     'name'         => $raw_name,
                     'display_name' => $disp_name,
                     'tfaa_id'      => isset( $reg['tfaa_id'] ) ? trim( (string) $reg['tfaa_id'] ) : '',
+                    'type'         => isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '',
                     'division'     => $norm_div,
                     'gender'       => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
                     'style'        => $norm_style,
@@ -519,8 +520,10 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 
 /**
  * Aggregates season standings grouped by Division + Gender -> Style
- * EXCLUDES all Guest scores, score-0 cards, and secondary re-entries entirely.
- * ENFORCES 'scores_published' gate so unpublished scores remain hidden.
+ * EXCLUDES all Guest entries (type === 'Guest', style === 'Guest', or '[Guest]' tags),
+ * score-0 cards, and secondary re-entries entirely.
+ * Deduplicates archers across events using normalized First+Last (+ suffix) keys so punctuation
+ * and middle-initial variants merge cleanly, and enforces 'scores_published' gate.
  * Orders tied total scores & X-counts alphabetically by "LastName, FirstName".
  */
 if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
@@ -529,6 +532,25 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $season           = isset( $seasons[ $season_slug ] ) ? $seasons[ $season_slug ] : null;
         $best_n           = ( $season && isset( $season['best_n_count'] ) ) ? intval( $season['best_n_count'] ) : 3;
         $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
+        $has_match_keys   = function_exists( 'sywat_normalize_archer_match_keys' );
+
+        $build_archer_key = function( $score_row ) use ( $has_match_keys ) {
+            if ( ! empty( $score_row['tfaa_id'] ) ) {
+                return 'id_' . strtolower( trim( (string) $score_row['tfaa_id'] ) );
+            }
+            $raw = isset( $score_row['name'] ) ? (string) $score_row['name'] : '';
+            if ( $has_match_keys ) {
+                $keys = sywat_normalize_archer_match_keys( $raw );
+                if ( ! empty( $keys['fl'] ) ) {
+                    return 'fl_' . $keys['fl'];
+                }
+                if ( ! empty( $keys['exact'] ) ) {
+                    return 'ex_' . $keys['exact'];
+                }
+            }
+            $fallback = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( '.', ' ', $raw ) ) ) );
+            return 'name_' . $fallback;
+        };
 
         $all_tournaments      = get_option( 'sywat_tournaments_list', array() );
         $matching_tournaments = array();
@@ -548,18 +570,19 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             $raw_scores     = sywat_get_tournament_scores( $t_name );
             $is_state_tourn = ( stripos( $t_name, 'state' ) !== false );
 
-            // Filter out Guests AND turned-in 0 scores
+            // Filter out Guests (including synced type === 'Guest' records) AND turned-in 0 scores
             $official_scores = array_filter( $raw_scores, function( $s ) {
                 $st = strtolower( trim( $s['style'] ) );
                 $nm = strtolower( trim( $s['name'] ) );
+                $tp = isset( $s['type'] ) ? strtolower( trim( (string) $s['type'] ) ) : '';
                 $sc = intval( $s['score'] );
-                return ( $st !== 'guest' && strpos( $nm, '[guest]' ) === false && $sc > 0 );
+                return ( $tp !== 'guest' && $st !== 'guest' && strpos( $nm, '[guest]' ) === false && $sc > 0 );
             } );
 
             $grouped_per_tournament = array();
             foreach ( $official_scores as $s ) {
                 $dgs_key    = $s['division'] . '|||' . $s['gender'] . '|||' . $s['style'];
-                $archer_key = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+                $archer_key = $build_archer_key( $s );
                 $grouped_per_tournament[ $dgs_key ][ $archer_key ][] = $s;
             }
 
@@ -579,7 +602,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
             foreach ( $deduped_scores as $s ) {
                 $div_gen_key = $s['division'] . '|||' . $s['gender'];
                 $style_key   = $s['style'];
-                $archer_key  = ! empty( $s['tfaa_id'] ) ? 'id_' . strtolower( $s['tfaa_id'] ) : 'name_' . strtolower( $s['name'] );
+                $archer_key  = $build_archer_key( $s );
 
                 if ( ! isset( $groups[ $div_gen_key ] ) ) {
                     $groups[ $div_gen_key ] = array(
