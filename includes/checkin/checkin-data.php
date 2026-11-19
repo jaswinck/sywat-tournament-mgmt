@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Data Layer
  * Path: includes/checkin/checkin-data.php
- * Description: Fetches and prepares Check-In Desk state datasets, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with zero extra database queries per loop.
+ * Description: Fetches and prepares Check-In Desk state datasets, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, hoisted "LastName, FirstName" display labels with surname alphabetical sorting, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with zero extra database queries per loop.
  * Compliance: Pure data layer — zero HTML echo, zero POST mutations, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -634,11 +634,14 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         }
         $sywat_styles[] = 'No Show';
 
+        $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
         $tourn_registrations = array();
         foreach ( $registrations as $reg ) {
             $match_tourn = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
             $match_line  = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
             if ( $match_tourn && $match_line ) {
+                $raw_name              = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+                $reg['display_name']   = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
                 $tourn_registrations[] = $reg;
             }
         }
@@ -649,7 +652,9 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             if ( $line_a !== $line_b ) {
                 return $line_a <=> $line_b;
             }
-            return strcasecmp( isset( $a['name'] ) ? trim( $a['name'] ) : '', isset( $b['name'] ) ? trim( $b['name'] ) : '' );
+            $disp_a = isset( $a['display_name'] ) ? trim( (string) $a['display_name'] ) : ( isset( $a['name'] ) ? trim( (string) $a['name'] ) : '' );
+            $disp_b = isset( $b['display_name'] ) ? trim( (string) $b['display_name'] ) : ( isset( $b['name'] ) ? trim( (string) $b['name'] ) : '' );
+            return strcasecmp( $disp_a, $disp_b );
         } );
 
         $modal_target_id   = isset( $_POST['open_checkin_id'] ) ? sanitize_text_field( wp_unslash( $_POST['open_checkin_id'] ) ) : '';
