@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table with responsive mobile card labels and database-normalized division/style labels, and control toolbars.
+ * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table formatted and surname-sorted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels and database-normalized division/style labels, and control toolbars.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.6.0
+ * Version: 7.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -135,6 +135,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             $scores_map = array();
         }
 
+        $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
         $tourn_registrations = array();
         foreach ( $registrations as $reg ) {
             $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
@@ -142,6 +143,8 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             $is_checked_in = ! empty( $reg['checked_in'] );
 
             if ( $match_tourn && $match_line && $is_checked_in ) {
+                $raw_name              = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+                $reg['display_name']   = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
                 $tourn_registrations[] = $reg;
             }
         }
@@ -152,9 +155,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             if ( $line_a !== $line_b ) {
                 return $line_a <=> $line_b;
             }
-            $name_a = isset( $a['name'] ) ? trim( $a['name'] ) : '';
-            $name_b = isset( $b['name'] ) ? trim( $b['name'] ) : '';
-            return strcasecmp( $name_a, $name_b );
+            $disp_a = isset( $a['display_name'] ) ? trim( (string) $a['display_name'] ) : ( isset( $a['name'] ) ? trim( (string) $a['name'] ) : '' );
+            $disp_b = isset( $b['display_name'] ) ? trim( (string) $b['display_name'] ) : ( isset( $b['name'] ) ? trim( (string) $b['name'] ) : '' );
+            return strcasecmp( $disp_a, $disp_b );
         } );
 
         // Check active Volunteer Hub status across all host shops for dynamic return button
@@ -420,6 +423,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 $x_count    = isset( $scores_map[ $reg_id ]['xs'] )    ? intval( $scores_map[ $reg_id ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
                                                 $gender_str = ! empty( $reg['gender'] ) ? $reg['gender'] : '—';
 
+                                                $disp_archer_name = ! empty( $reg['display_name'] )
+                                                    ? $reg['display_name']
+                                                    : ( $has_lf_formatter ? sywat_format_name_last_first( $reg['name'] ) : $reg['name'] );
+                                                $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $reg['name'] ) );
+
                                                 $raw_div = ! empty( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
                                                 $div_str = ( $raw_div !== '' && $raw_div !== '—' && strcasecmp( $raw_div, 'No Show' ) !== 0 && $has_norm_division )
                                                     ? sywat_shooting_styles_normalize_division( $raw_div )
@@ -436,9 +444,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 $lidx      = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
                                                 $line_disp = isset( $lines[ $lidx ]['name'] ) ? $lines[ $lidx ]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
                                             ?>
-                                            <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr( $reg_id ); ?>" data-name="<?php echo esc_attr( strtolower( $reg['name'] ) ); ?>">
+                                            <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr( $reg_id ); ?>" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                                 <td class="sywat-col-center" data-label="#"><strong><?php echo $num++; ?></strong></td>
-                                                <td data-label="Archer Name"><strong><?php echo esc_html( $reg['name'] ); ?></strong></td>
+                                                <td data-label="Archer Name"><strong><?php echo esc_html( $disp_archer_name ); ?></strong></td>
                                                 <td data-label="Shooting Line"><?php echo esc_html( $line_disp ); ?></td>
                                                 <td class="sywat-col-center" data-label="Gender"><?php echo esc_html( $gender_str ); ?></td>
                                                 <td data-label="Division"><?php echo esc_html( $div_str ); ?></td>
