@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     7.4.0
+ * Version:     7.5.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '7.4.0' );
+define( 'SYWAT_PLUGIN_VERSION', '7.5.0' );
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -31,7 +31,7 @@ function sywat_archery_activate() {
 // Front-end integration layer: page detection, conditional asset loading,
 // cache exclusion, optimizer opt-outs, builder placeholders, display settings.
 // Assets now load only on pages that contain a SYWAT shortcode (never in wp-admin
-// or page-builder editors). jQuery is no longer required by any plugin script.
+// or page-builder editors). jQuery is not required by any plugin script.
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-frontend.php';
 
 // Load Shared Core Engines & Utilities
@@ -39,6 +39,7 @@ require_once SYWAT_PLUGIN_DIR . 'includes/shooting-styles/class-sywat-shooting-s
 if ( file_exists( SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php' ) ) {
     require_once SYWAT_PLUGIN_DIR . 'includes/pricing/class-sywat-pricing.php';               // Dynamic Pricing, Round Formats & Promoter Engine ([sywat_pricing])
 }
+require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-archer-identity-helpers.php';        // Unified Archer Identity & Historical Profile Resolution Engine
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-spreadsheet-helpers.php';            // Native .xlsx Template Builder & Spreadsheet Parser Helpers
 require_once SYWAT_PLUGIN_DIR . 'includes/common/sywat-tfaa-sync.php';
 
