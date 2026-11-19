@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member & Board Management Portal Views
  * Path: includes/members/members-views.php
- * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, 2-column CSS grid aligned household summary footer with 13px font sizing matching archer table names, slash-delimited contact info formatting, and 1-click household linking triggers.
- * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php.
+ * Description: High-density visual renderers for Member Directory, Board Management, Single-Dashboard Household Roster, and Self-Service Member Household Profile Portal formatted as "LastName, FirstName" with dual-format live search indexing ("Last, First" and "First Last") while preserving canonical "FirstName LastName" storage and modal inputs. Includes administrative batch import triggers, active/expired/unassigned status filters and statistics counters, protected test data reset triggers, Head of Household swapping, flat multi-account type archer directory table loop (Heads, Dependents, and Unassigned Archers), option B role sub-text and active board position label rendering under archer names, robust multi-key user resolution (WP User ID, NFAA ID, System ID), clean View Household navigation routing to the master household dashboard without modal popups, unified Change Household modal popups across both main directory and household dashboard tables, aligned Board Management table view, red unassigned badge formatting, text-overflow-protected status badge rendering, hierarchy-sorted board table rendering, 2-column CSS grid aligned household summary footer with 13px font sizing matching archer table names, slash-delimited contact info formatting, and 1-click household linking triggers.
+ * Compliance: Zero inline style attributes. Zero embedded form clutter. Styling driven by centralized SYWAT CSS classes. Delegates statistical metrics calculation engines to members-data.php and status evaluations/sorting to members-helpers.php. Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.2
+ * Version: 8.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -106,8 +106,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             'management', 'staff_shooter', 'staff-shooter', 'non-shooting-member', 'non_shooting_member',
         );
 
-        $accom_labels  = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
-        $gender_labels = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
+        $accom_labels     = function_exists( 'sywat_get_accommodations_list' ) ? sywat_get_accommodations_list() : array();
+        $gender_labels    = function_exists( 'sywat_get_gender_options' ) ? sywat_get_gender_options() : array( 'unassigned' => '-- Select Gender --', 'male' => 'Male', 'female' => 'Female' );
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
 
         // Fetch Flat Unified Archer Directory Dataset from members-data.php
         $all_archers = function_exists( 'sywat_get_all_flat_archers' ) ? sywat_get_all_flat_archers() : array();
@@ -121,17 +122,18 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
             <?php if ( $view === 'edit_member' && $edit_user_obj ): ?>
                 <!-- VIEW 1: SINGLE-DASHBOARD HOUSEHOLD MEMBER PROFILE VIEW -->
                 <?php 
-                    $e_nfaa_id   = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
-                    $e_phone     = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
-                    $e_gender    = get_user_meta( $edit_user_obj->ID, 'sywat_gender', true );
-                    $e_is_pro    = get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true );
-                    $e_dob       = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
-                    $e_accom     = get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true );
-                    $e_address_1 = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
-                    $e_address_2 = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
-                    $e_city      = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
-                    $e_state     = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
-                    $e_zip       = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
+                    $hoh_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $edit_user_obj->display_name ) : $edit_user_obj->display_name;
+                    $e_nfaa_id     = function_exists( 'sywat_get_user_nfaa_id' ) ? sywat_get_user_nfaa_id( $edit_user_obj->ID ) : 'Unassigned';
+                    $e_phone       = get_user_meta( $edit_user_obj->ID, 'sywat_phone', true );
+                    $e_gender      = get_user_meta( $edit_user_obj->ID, 'sywat_gender', true );
+                    $e_is_pro      = get_user_meta( $edit_user_obj->ID, 'sywat_is_pro', true );
+                    $e_dob         = get_user_meta( $edit_user_obj->ID, 'sywat_dob', true );
+                    $e_accom       = get_user_meta( $edit_user_obj->ID, 'sywat_accommodations', true );
+                    $e_address_1   = get_user_meta( $edit_user_obj->ID, 'sywat_address_1', true );
+                    $e_address_2   = get_user_meta( $edit_user_obj->ID, 'sywat_address_2', true );
+                    $e_city        = get_user_meta( $edit_user_obj->ID, 'sywat_city', true );
+                    $e_state       = get_user_meta( $edit_user_obj->ID, 'sywat_state', true );
+                    $e_zip         = get_user_meta( $edit_user_obj->ID, 'sywat_zip', true );
 
                     $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
                         ? sywat_get_member_nfaa_status( $edit_user_obj->ID ) 
@@ -162,7 +164,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                 <div class="sywat-card">
                     <div class="sywat-card-header-bar">
                         <div>
-                            <h2>🏠 Household Dashboard: <?php echo esc_html( $edit_user_obj->display_name ); ?></h2>
+                            <h2>🏠 Household Dashboard: <?php echo esc_html( $hoh_disp_name ); ?></h2>
                             <div class="sywat-subtitle">Managing family roster &amp; archer profiles stored under this household.</div>
                         </div>
                         <div class="sywat-header-inline-controls no-print">
@@ -189,7 +191,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <!-- ROW 1: HEAD OF HOUSEHOLD (PRIMARY ACCOUNT HOLDER) -->
                                 <tr>
                                     <td>
-                                        <strong><?php echo esc_html( $edit_user_obj->display_name ); ?></strong>
+                                        <strong><?php echo esc_html( $hoh_disp_name ); ?></strong>
                                         <?php if ( $e_is_pro === 'yes' ): ?>
                                             <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
                                         <?php endif; ?>
@@ -243,23 +245,24 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                 <?php if ( is_array( $linked_dependents ) ): ?>
                                     <?php foreach ( $linked_dependents as $dep_key => $dep ): ?>
                                         <?php 
-                                            $dep_fname  = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
-                                            $dep_lname  = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
-                                            $dep_dob    = isset( $dep['dob'] ) ? $dep['dob'] : '';
-                                            $dep_exp    = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
-                                            $dep_accom  = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
-                                            $dep_gender = isset( $dep['gender'] ) && isset( $gender_labels[strtolower( $dep['gender'] )] ) ? $gender_labels[strtolower( $dep['gender'] )] : '⚠️ Unassigned';
-                                            $dep_is_pro = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes';
-                                            $dep_nfaa   = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false, 'has_membership_role' => true );
-                                            $dep_div    = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
-                                            $dep_sys_id = ! empty( $dep['system_id'] ) ? $dep['system_id'] : $dep_key;
-                                            $dep_n_id   = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
-                                            $dep_name   = isset( $dep['display_name'] ) ? $dep['display_name'] : ( ! empty( $dep_fname ) ? trim( $dep_fname . ' ' . $dep_lname ) : 'Unnamed' );
-                                            $dep_first  = ! empty( $dep_fname ) ? $dep_fname : $dep_name;
+                                            $dep_fname     = isset( $dep['first_name'] ) ? $dep['first_name'] : '';
+                                            $dep_lname     = isset( $dep['last_name'] ) ? $dep['last_name'] : '';
+                                            $dep_dob       = isset( $dep['dob'] ) ? $dep['dob'] : '';
+                                            $dep_exp       = isset( $dep['nfaa_expiration'] ) ? $dep['nfaa_expiration'] : '';
+                                            $dep_accom     = isset( $dep['accommodations'] ) ? $dep['accommodations'] : 'none';
+                                            $dep_gender    = isset( $dep['gender'] ) && isset( $gender_labels[strtolower( $dep['gender'] )] ) ? $gender_labels[strtolower( $dep['gender'] )] : '⚠️ Unassigned';
+                                            $dep_is_pro    = isset( $dep['is_pro'] ) && $dep['is_pro'] === 'yes';
+                                            $dep_nfaa      = function_exists( 'sywat_get_member_nfaa_status' ) ? sywat_get_member_nfaa_status( $dep_exp ) : array( 'status' => 'Expired', 'badge_class' => 'sywat-badge-muted', 'system_account_label' => '', 'is_active' => false, 'has_membership_role' => true );
+                                            $dep_div       = ! empty( $dep_dob ) && function_exists( 'sywat_get_eligible_age_division' ) ? sywat_get_eligible_age_division( $dep_dob ) : 'Adult';
+                                            $dep_sys_id    = ! empty( $dep['system_id'] ) ? $dep['system_id'] : $dep_key;
+                                            $dep_n_id      = ! empty( $dep['nfaa_number'] ) ? $dep['nfaa_number'] : 'Unassigned';
+                                            $dep_name      = isset( $dep['display_name'] ) ? $dep['display_name'] : ( ! empty( $dep_fname ) ? trim( $dep_fname . ' ' . $dep_lname ) : 'Unnamed' );
+                                            $dep_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $dep_name ) : $dep_name;
+                                            $dep_first     = ! empty( $dep_fname ) ? $dep_fname : $dep_name;
                                         ?>
                                         <tr>
                                             <td>
-                                                <strong><?php echo esc_html( $dep_name ); ?></strong>
+                                                <strong><?php echo esc_html( $dep_disp_name ); ?></strong>
                                                 <?php if ( $dep_is_pro ): ?>
                                                     <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
                                                 <?php endif; ?>
@@ -391,9 +394,10 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                         <?php foreach ( $board_members as $bm ): ?>
                                             <?php 
                                                 if ( ! $bm instanceof WP_User ) continue;
-                                                $bm_phone   = get_user_meta( $bm->ID, 'sywat_phone', true );
-                                                $pos_labels = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $bm->ID ) : array();
-                                                $pos_search = implode( ' ', $pos_labels );
+                                                $bm_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $bm->display_name ) : $bm->display_name;
+                                                $bm_phone     = get_user_meta( $bm->ID, 'sywat_phone', true );
+                                                $pos_labels   = function_exists( 'sywat_get_user_board_position_labels' ) ? sywat_get_user_board_position_labels( $bm->ID ) : array();
+                                                $pos_search   = implode( ' ', $pos_labels );
 
                                                 // Format system roles sub-text for board members
                                                 $bm_roles_list = array();
@@ -404,9 +408,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                 }
                                                 $bm_roles_blob = implode( ', ', $bm_roles_list );
                                             ?>
-                                            <tr class="sywat-board-row" data-search="<?php echo esc_attr( strtolower( $bm->display_name . ' ' . $bm->user_login . ' ' . $bm->user_email . ' ' . $pos_search . ' ' . $bm_phone . ' ' . $bm_roles_blob ) ); ?>">
+                                            <tr class="sywat-board-row" data-search="<?php echo esc_attr( strtolower( $bm_disp_name . ' ' . $bm->display_name . ' ' . $bm->user_login . ' ' . $bm->user_email . ' ' . $pos_search . ' ' . $bm_phone . ' ' . $bm_roles_blob ) ); ?>">
                                                 <td>
-                                                    <strong><?php echo esc_html( $bm->display_name ); ?></strong>
+                                                    <strong><?php echo esc_html( $bm_disp_name ); ?></strong>
                                                     <div class="sywat-meta-subtext">👤 Login: <code><?php echo esc_html( $bm->user_login ); ?></code></div>
                                                     <?php if ( ! empty( $bm_roles_blob ) ): ?>
                                                         <div class="sywat-meta-subtext">👤 Roles: <strong><?php echo esc_html( $bm_roles_blob ); ?></strong></div>
@@ -537,29 +541,33 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                     <tbody>
                                         <?php foreach ( $all_archers as $arch ): ?>
                                             <?php 
-                                                $a_type     = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
+                                                $a_type      = isset( $arch['account_type'] ) ? $arch['account_type'] : 'head';
                                                 
                                                 // Safely fallback if user_id is missing/0 to use system_id or nfaa_number instead
-                                                $a_uid      = ! empty( $arch['user_id'] ) && intval( $arch['user_id'] ) > 0 
+                                                $a_uid       = ! empty( $arch['user_id'] ) && intval( $arch['user_id'] ) > 0 
                                                                 ? intval( $arch['user_id'] ) 
                                                                 : ( ! empty( $arch['system_id'] ) ? $arch['system_id'] : ( ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 0 ) );
                                                                 
-                                                $a_sys_id   = isset( $arch['system_id'] ) ? $arch['system_id'] : '';
-                                                $a_fname    = isset( $arch['first_name'] ) ? $arch['first_name'] : '';
-                                                $a_lname    = isset( $arch['last_name'] ) ? $arch['last_name'] : '';
-                                                $a_name     = isset( $arch['display_name'] ) ? $arch['display_name'] : trim( $a_fname . ' ' . $a_lname );
-                                                $a_email    = isset( $arch['email'] ) ? $arch['email'] : '';
-                                                $a_phone    = isset( $arch['phone'] ) ? $arch['phone'] : '';
-                                                $a_nfaa_n   = ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 'Unassigned';
-                                                $a_nfaa_e   = isset( $arch['nfaa_expiration'] ) ? $arch['nfaa_expiration'] : '';
-                                                $a_is_pro   = isset( $arch['is_pro'] ) && $arch['is_pro'] === 'yes';
+                                                $a_sys_id    = isset( $arch['system_id'] ) ? $arch['system_id'] : '';
+                                                $a_fname     = isset( $arch['first_name'] ) ? $arch['first_name'] : '';
+                                                $a_lname     = isset( $arch['last_name'] ) ? $arch['last_name'] : '';
+                                                $a_name      = isset( $arch['display_name'] ) ? $arch['display_name'] : trim( $a_fname . ' ' . $a_lname );
+                                                $a_disp_name = ! empty( $arch['sort_name'] ) ? $arch['sort_name'] : ( $has_lf_formatter ? sywat_format_name_last_first( $a_name ) : $a_name );
+                                                $a_email     = isset( $arch['email'] ) ? $arch['email'] : '';
+                                                $a_phone     = isset( $arch['phone'] ) ? $arch['phone'] : '';
+                                                $a_nfaa_n    = ! empty( $arch['nfaa_number'] ) ? $arch['nfaa_number'] : 'Unassigned';
+                                                $a_nfaa_e    = isset( $arch['nfaa_expiration'] ) ? $arch['nfaa_expiration'] : '';
+                                                $a_is_pro    = isset( $arch['is_pro'] ) && $arch['is_pro'] === 'yes';
                                                 
                                                 // Safely fallback head_user_id
-                                                $a_head_id  = ! empty( $arch['head_user_id'] ) && intval( $arch['head_user_id'] ) > 0 
+                                                $a_head_id   = ! empty( $arch['head_user_id'] ) && intval( $arch['head_user_id'] ) > 0 
                                                                 ? intval( $arch['head_user_id'] ) 
                                                                 : $a_uid;
                                                                 
-                                                $a_head_name= isset( $arch['head_name'] ) ? $arch['head_name'] : '';
+                                                $a_head_name = isset( $arch['head_name'] ) ? $arch['head_name'] : '';
+                                                $a_head_disp = ( $a_head_name !== '' && $a_head_name !== 'Unassigned Pool' && $has_lf_formatter )
+                                                    ? sywat_format_name_last_first( $a_head_name )
+                                                    : $a_head_name;
 
                                                 // Status evaluation
                                                 $nfaa_info = function_exists( 'sywat_get_member_nfaa_status' ) 
@@ -587,9 +595,9 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                     }
                                                 }
                                             ?>
-                                            <tr class="sywat-member-row" data-status="<?php echo esc_attr( $status_key . ' ' . $a_type ); ?>" data-search="<?php echo esc_attr( strtolower( $a_name . ' ' . $a_email . ' ' . $a_nfaa_n . ' ' . $a_phone . ' ' . $a_head_name . ' ' . $role_names_blob ) ); ?>">
+                                            <tr class="sywat-member-row" data-status="<?php echo esc_attr( $status_key . ' ' . $a_type ); ?>" data-search="<?php echo esc_attr( strtolower( $a_disp_name . ' ' . $a_name . ' ' . $a_email . ' ' . $a_nfaa_n . ' ' . $a_phone . ' ' . $a_head_disp . ' ' . $a_head_name . ' ' . $role_names_blob ) ); ?>">
                                                 <td>
-                                                    <strong><?php echo esc_html( $a_name ); ?></strong>
+                                                    <strong><?php echo esc_html( $a_disp_name ); ?></strong>
                                                     <?php if ( $a_is_pro ): ?>
                                                         <span class="sywat-badge sywat-badge-pro sywat-ml-1">⭐ Pro</span>
                                                     <?php endif; ?>
@@ -603,7 +611,7 @@ if ( ! function_exists( 'sywat_render_members_portal' ) ) {
                                                         <span class="sywat-badge sywat-badge-open">👑 Head of Household</span>
                                                     <?php elseif ( $a_type === 'dependent' ): ?>
                                                         <span class="sywat-badge sywat-badge-muted">🏠 Household Dependent</span>
-                                                        <div class="sywat-meta-subtext">Head: <strong><?php echo esc_html( $a_head_name ); ?></strong></div>
+                                                        <div class="sywat-meta-subtext">Head: <strong><?php echo esc_html( $a_head_disp ); ?></strong></div>
                                                     <?php else: ?>
                                                         <span class="sywat-badge sywat-badge-unassigned">📁 Unassigned Pool</span>
                                                     <?php endif; ?>
