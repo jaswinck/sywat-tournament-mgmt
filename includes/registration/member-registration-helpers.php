@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Member Self-Registration Formatting & Calculation Helpers
  * Path: includes/registration/member-registration-helpers.php
- * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters, open tournament display metadata, live per-line slot availability maps, per-archer/per-line existing registration status maps, and complete view payloads with zero database queries or HTML output.
+ * Description: Pure formatting and calculation helpers for the Member Online Registration portal ([sywat_member_register]). Resolves tournament-date NFAA age divisions, target distances (20yd vs. Cub), fee rate tiers, formatted household rosters with hoisted "LastName, FirstName" display_name labels while preserving canonical "FirstName LastName" name values, open tournament display metadata, live per-line slot availability maps, per-archer/per-line existing registration status maps, and complete view payloads with zero database queries or HTML output.
  * Compliance: Pure helper layer — zero SQL queries, zero get_option/get_user_meta calls, zero HTML output, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -54,7 +54,8 @@ if ( ! function_exists( 'sywat_member_reg_resolve_age_profile' ) ) {
 
 /**
  * Format raw Head of Household and linked dependent records into a unified roster map
- * keyed by 'head_{user_id}' and 'dep_{system_id}' with tournament-date age profiles.
+ * keyed by 'head_{user_id}' and 'dep_{system_id}' with tournament-date age profiles,
+ * attaching 'display_name' ("LastName, FirstName") while preserving canonical 'name' ("FirstName LastName").
  *
  * @param array  $raw_household Payload returned by sywat_member_reg_get_household_raw_data().
  * @param string $tourn_date    Optional tournament start date ('YYYY-MM-DD').
@@ -73,6 +74,9 @@ if ( ! function_exists( 'sywat_member_reg_format_household_roster' ) ) {
             return array();
         }
 
+        $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
+        $head_disp_name   = $has_lf_formatter ? sywat_format_name_last_first( $head_name ) : $head_name;
+
         $head_email  = isset( $head['email'] ) ? trim( (string) $head['email'] ) : '';
         $head_phone  = isset( $head['phone'] ) ? trim( (string) $head['phone'] ) : '';
         $head_dob    = isset( $head['dob'] ) ? trim( (string) $head['dob'] ) : '';
@@ -90,21 +94,22 @@ if ( ! function_exists( 'sywat_member_reg_format_household_roster' ) ) {
         $head_key = 'head_' . $head_uid;
 
         $roster[ $head_key ] = array(
-            'member_key'  => $head_key,
-            'role_label'  => 'Head of Household',
-            'is_head'     => true,
-            'user_id'     => $head_uid,
-            'system_id'   => $head_sys_id,
-            'nfaa_number' => $head_nfaa,
-            'name'        => $head_name,
-            'email'       => $head_email,
-            'phone'       => $head_phone,
-            'dob'         => $head_dob,
-            'gender'      => $head_gender !== '' ? $head_gender : ( isset( $head_hist['gender'] ) ? $head_hist['gender'] : '' ),
-            'style'       => isset( $head_hist['style'] ) ? $head_hist['style'] : '',
-            'division'    => $head_age['division'],
-            'distance'    => $head_age['distance'],
-            'rate_tier'   => $head_age['rate_tier'],
+            'member_key'   => $head_key,
+            'role_label'   => 'Head of Household',
+            'is_head'      => true,
+            'user_id'      => $head_uid,
+            'system_id'    => $head_sys_id,
+            'nfaa_number'  => $head_nfaa,
+            'name'         => $head_name,
+            'display_name' => $head_disp_name,
+            'email'        => $head_email,
+            'phone'        => $head_phone,
+            'dob'          => $head_dob,
+            'gender'       => $head_gender !== '' ? $head_gender : ( isset( $head_hist['gender'] ) ? $head_hist['gender'] : '' ),
+            'style'        => isset( $head_hist['style'] ) ? $head_hist['style'] : '',
+            'division'     => $head_age['division'],
+            'distance'     => $head_age['distance'],
+            'rate_tier'    => $head_age['rate_tier'],
         );
 
         $dependents = isset( $raw_household['dependents'] ) && is_array( $raw_household['dependents'] )
@@ -122,13 +127,14 @@ if ( ! function_exists( 'sywat_member_reg_format_household_roster' ) ) {
                 continue;
             }
 
-            $d_sys_id = ! empty( $dep['system_id'] ) ? sanitize_key( (string) $dep['system_id'] ) : 'idx_' . intval( $idx );
-            $d_dob    = isset( $dep['dob'] ) ? trim( (string) $dep['dob'] ) : '';
-            $d_g_raw  = isset( $dep['gender'] ) ? strtolower( trim( (string) $dep['gender'] ) ) : '';
-            $d_gender = ( $d_g_raw === 'male' || $d_g_raw === 'female' ) ? ucfirst( $d_g_raw ) : '';
-            $d_email  = ! empty( $dep['email'] ) ? trim( (string) $dep['email'] ) : $head_email;
-            $d_phone  = ! empty( $dep['phone'] ) ? trim( (string) $dep['phone'] ) : $head_phone;
-            $d_nfaa   = ! empty( $dep['nfaa_number'] ) ? trim( (string) $dep['nfaa_number'] ) : 'Unassigned';
+            $d_disp_name = $has_lf_formatter ? sywat_format_name_last_first( $d_name ) : $d_name;
+            $d_sys_id    = ! empty( $dep['system_id'] ) ? sanitize_key( (string) $dep['system_id'] ) : 'idx_' . intval( $idx );
+            $d_dob       = isset( $dep['dob'] ) ? trim( (string) $dep['dob'] ) : '';
+            $d_g_raw     = isset( $dep['gender'] ) ? strtolower( trim( (string) $dep['gender'] ) ) : '';
+            $d_gender    = ( $d_g_raw === 'male' || $d_g_raw === 'female' ) ? ucfirst( $d_g_raw ) : '';
+            $d_email     = ! empty( $dep['email'] ) ? trim( (string) $dep['email'] ) : $head_email;
+            $d_phone     = ! empty( $dep['phone'] ) ? trim( (string) $dep['phone'] ) : $head_phone;
+            $d_nfaa      = ! empty( $dep['nfaa_number'] ) ? trim( (string) $dep['nfaa_number'] ) : 'Unassigned';
 
             $d_age  = sywat_member_reg_resolve_age_profile( $d_dob, $tourn_date );
             $d_hist = function_exists( 'sywat_resolve_archer_intake_profile' )
@@ -137,21 +143,22 @@ if ( ! function_exists( 'sywat_member_reg_format_household_roster' ) ) {
 
             $dep_key = 'dep_' . $d_sys_id;
             $roster[ $dep_key ] = array(
-                'member_key'  => $dep_key,
-                'role_label'  => 'Family Member',
-                'is_head'     => false,
-                'user_id'     => isset( $dep['wp_user_id'] ) ? intval( $dep['wp_user_id'] ) : 0,
-                'system_id'   => $d_sys_id,
-                'nfaa_number' => $d_nfaa,
-                'name'        => $d_name,
-                'email'       => $d_email,
-                'phone'       => $d_phone,
-                'dob'         => $d_dob,
-                'gender'      => $d_gender !== '' ? $d_gender : ( isset( $d_hist['gender'] ) ? $d_hist['gender'] : '' ),
-                'style'       => isset( $d_hist['style'] ) ? $d_hist['style'] : '',
-                'division'    => $d_age['division'],
-                'distance'    => $d_age['distance'],
-                'rate_tier'   => $d_age['rate_tier'],
+                'member_key'   => $dep_key,
+                'role_label'   => 'Family Member',
+                'is_head'      => false,
+                'user_id'      => isset( $dep['wp_user_id'] ) ? intval( $dep['wp_user_id'] ) : 0,
+                'system_id'    => $d_sys_id,
+                'nfaa_number'  => $d_nfaa,
+                'name'         => $d_name,
+                'display_name' => $d_disp_name,
+                'email'        => $d_email,
+                'phone'        => $d_phone,
+                'dob'          => $d_dob,
+                'gender'       => $d_gender !== '' ? $d_gender : ( isset( $d_hist['gender'] ) ? $d_hist['gender'] : '' ),
+                'style'        => isset( $d_hist['style'] ) ? $d_hist['style'] : '',
+                'division'     => $d_age['division'],
+                'distance'     => $d_age['distance'],
+                'rate_tier'    => $d_age['rate_tier'],
             );
         }
 
