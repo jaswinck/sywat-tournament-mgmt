@@ -223,8 +223,8 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
                 continue;
             }
-            $raw_name              = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
-            $reg['display_name']   = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
+            $raw_name               = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+            $reg['display_name']    = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
             $active_registrations[] = $reg;
         }
 
