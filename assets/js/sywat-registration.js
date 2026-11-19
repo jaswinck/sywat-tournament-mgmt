@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with simplified distance-neutral 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), TFAA historical shooter autocomplete tier mapping, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Description: Manages multi-archer phone intake rows with simplified distance-neutral 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), unified Member Directory + 18-Month TFAA shooter autocomplete with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.3.3
+ * Version: 7.4.0
  */
 
 (function() {
@@ -73,6 +73,88 @@
             return sywatTfaaShooters;
         }
         return [];
+    }
+
+    function getGivenNameAliases() {
+        if (window.sywatRegData && typeof window.sywatRegData.givenNameAliases === 'object' && window.sywatRegData.givenNameAliases !== null) {
+            return window.sywatRegData.givenNameAliases;
+        }
+        return {};
+    }
+
+    /**
+     * Build normalized exact, First+Last (+ suffix), first-token, and last-token keys
+     * matching includes/common/sywat-archer-identity-helpers.php.
+     */
+    function buildRegNameMatchKeys(rawName) {
+        if (!rawName) {
+            return { exact: '', fl: '', first: '', last: '', suffix: '', tokenCount: 0, lastLen: 0 };
+        }
+        const cleaned = String(rawName)
+            .replace(/\[.*?\]|\(.*?\)/g, '')
+            .replace(/[.,"\u00a0]/g, ' ')
+            .replace(/[^a-zA-Z0-9\s'-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+
+        if (!cleaned) {
+            return { exact: '', fl: '', first: '', last: '', suffix: '', tokenCount: 0, lastLen: 0 };
+        }
+
+        const tokens   = cleaned.split(' ');
+        const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th'];
+        let suffix     = '';
+
+        if (tokens.length > 2 && suffixes.indexOf(tokens[tokens.length - 1]) !== -1) {
+            suffix = tokens.pop();
+        }
+
+        const coreExact = tokens.join(' ');
+        const exactKey  = suffix ? (coreExact + ' ' + suffix) : coreExact;
+        const firstTok  = tokens.length > 0 ? tokens[0] : '';
+        const lastTok   = tokens.length > 1 ? tokens[tokens.length - 1] : firstTok;
+        let flKey       = (tokens.length >= 2) ? (firstTok + '___' + lastTok) : coreExact;
+
+        if (suffix && flKey) {
+            flKey += '___' + suffix;
+        }
+
+        return {
+            exact: exactKey,
+            fl: flKey,
+            first: firstTok,
+            last: lastTok,
+            suffix: suffix,
+            tokenCount: tokens.length,
+            lastLen: lastTok.length
+        };
+    }
+
+    /**
+     * Check whether two given-name tokens are compatible via canonical nickname group or 3+ char stem.
+     */
+    function areRegGivenNamesCompatible(firstA, firstB) {
+        const a = String(firstA || '').trim().toLowerCase();
+        const b = String(firstB || '').trim().toLowerCase();
+        if (!a || !b) return false;
+        if (a === b) return true;
+
+        const aliases = getGivenNameAliases();
+        const rootsA  = Array.isArray(aliases[a]) ? aliases[a] : [];
+        const rootsB  = Array.isArray(aliases[b]) ? aliases[b] : [];
+        for (let i = 0; i < rootsA.length; i++) {
+            if (rootsB.indexOf(rootsA[i]) !== -1) {
+                return true;
+            }
+        }
+
+        if (a.length >= 3 && b.length >= 3) {
+            if (a.startsWith(b) || b.startsWith(a)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function getPhoneCache() {
@@ -330,7 +412,8 @@
     };
 
     /**
-     * Registration Autocomplete: Auto-fills Name and 3-tier Category / Rate ONLY.
+     * Registration Autocomplete: Ranks exact, middle-initial folded, given-name alias/stem
+     * ("Steven Bergh" -> "Steve Bergh"), and substring matches across the unified Member DB + TFAA index.
      */
     window.handleTfaaAutocomplete = function(input) {
         const query = input.value.trim().toLowerCase();
@@ -341,20 +424,39 @@
             return;
         }
 
+        const qKeys     = buildRegNameMatchKeys(query);
         const seenNames = new Set();
-        const matches = [];
+        const matches   = [];
 
         shooters.forEach(s => {
-            if (s.name && s.name.toLowerCase().includes(query)) {
-                const norm = s.name.trim().toLowerCase();
-                if (!seenNames.has(norm)) {
-                    seenNames.add(norm);
-                    matches.push(s);
-                }
+            if (!s || !s.name) return;
+            const norm = s.name.trim().toLowerCase();
+            if (seenNames.has(norm)) return;
+
+            const sKeys     = buildRegNameMatchKeys(s.name);
+            const isExact   = (qKeys.exact && sKeys.exact === qKeys.exact);
+            const isFl      = (qKeys.tokenCount >= 2 && qKeys.lastLen >= 2 && qKeys.fl && sKeys.fl === qKeys.fl);
+            const isAlias   = (!isExact && !isFl && qKeys.tokenCount >= 2 && sKeys.tokenCount >= 2 &&
+                               qKeys.last === sKeys.last && qKeys.suffix === sKeys.suffix &&
+                               areRegGivenNamesCompatible(qKeys.first, sKeys.first));
+            const isPartial = norm.includes(query);
+
+            if (isExact || isFl || isAlias || isPartial) {
+                seenNames.add(norm);
+                matches.push({
+                    name: s.name,
+                    division: s.division || '',
+                    rank: isExact ? 4 : (isFl ? 3 : (isAlias ? 2 : 1))
+                });
             }
         });
 
         if (matches.length === 0) return;
+
+        matches.sort(function(a, b) {
+            if (a.rank !== b.rank) return b.rank - a.rank;
+            return a.name.localeCompare(b.name);
+        });
 
         const parent = input.parentElement;
         if (getComputedStyle(parent).position === 'static') {
