@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Season Standings View
  * Path: includes/results/results-standings.php
- * Description: Renders the public multi-tournament Season Standings leaderboards with archer names formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), database-ordered division & style filters, and clean UTF-8 typography.
+ * Description: Renders the public multi-tournament Season Standings leaderboards with archer names formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), database-ordered division & style filters, and encoding-safe HTML/JS entities.
  * Compliance: Omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! function_exists( 'sywat_format_score_cell' ) ) {
     function sywat_format_score_cell( $score_item ) {
         if ( ! is_array( $score_item ) || ! isset( $score_item['score'] ) ) {
-            return '<span class="sywat-score-null">—</span>';
+            return '<span class="sywat-score-null">&mdash;</span>';
         }
         return '<strong>' . intval( $score_item['score'] ) . ' / ' . intval( $score_item['x_count'] ) . 'X</strong>';
     }
@@ -76,7 +76,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
             <!-- TOP CARD HEADER BAR: TITLE + SUBTITLE (LEFT) & CLEAN INLINE SEASON SELECTOR (RIGHT) -->
             <div class="sywat-card-header-bar">
                 <div>
-                    <h2>🏆 Season Standings</h2>
+                    <h2>&#127942; Season Standings</h2>
                     <div class="sywat-subtitle">
                         Leaderboards aggregated across Top <strong><?php echo intval( $best_n ); ?></strong> Qualifiers + State Championship.
                     </div>
@@ -141,7 +141,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
             <!-- DYNAMIC PARTICIPATION STAT BANNER -->
             <div id="sywat_standings_counter" class="sywat-counter-banner">
-                🎯 Total Season Shooters: <strong><?php echo intval( $total_season_shooters ); ?></strong>
+                &#127919; Total Season Shooters: <strong><?php echo intval( $total_season_shooters ); ?></strong>
             </div>
 
             <?php if ( empty( $groups ) ) : ?>
@@ -163,7 +163,7 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
                             ?>
                             <div class="sywat-style-block" data-style="<?php echo esc_attr( $style_slug ); ?>">
                                 <div class="sywat-single-category-header">
-                                    🎯 <?php echo esc_html( $combined_title ); ?>
+                                    &#127919; <?php echo esc_html( $combined_title ); ?>
                                 </div>
 
                                 <div class="sywat-table-responsive">
@@ -288,10 +288,10 @@ if ( ! function_exists( 'sywat_render_public_season_standings' ) ) {
 
                 if (!isFiltered || visibleCount === totalCount) {
                     counterEl.classList.remove('is-filtered');
-                    counterEl.innerHTML = '🎯 Total Season Shooters: <strong>' + totalCount + '</strong>';
+                    counterEl.innerHTML = '\uD83C\uDFAF Total Season Shooters: <strong>' + totalCount + '</strong>';
                 } else {
                     counterEl.classList.add('is-filtered');
-                    counterEl.innerHTML = '🎯 Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Season Shooters';
+                    counterEl.innerHTML = '\uD83C\uDFAF Displaying <strong>' + visibleCount + '</strong> of <strong>' + totalCount + '</strong> Season Shooters';
                 }
             }
         }
