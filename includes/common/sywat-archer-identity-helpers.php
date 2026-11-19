@@ -2,10 +2,10 @@
 /**
  * Shared Common Helper: Unified Archer Identity & Historical Profile Resolution Engine
  * Path: includes/common/sywat-archer-identity-helpers.php
- * Description: Single-source-of-truth identity normalization, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, and Check-In.
+ * Description: Single-source-of-truth identity normalization (supporting both "First Last" and "Last, First" inputs), idempotent "LastName, FirstName" display & surname-sort formatting, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, Check-In, and Results.
  * Compliance: Pure helper layer — zero HTML echo, zero direct SQL queries (delegates Member Directory lookup to sywat_get_bulk_member_directory_records()), O(1) request-cached hashtables, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,15 +15,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Build normalized exact, First+Last (+ generational suffix), first-token, and last-token keys
  * for smart archer name matching.
- * Strips bracketed/parenthesized tags, periods, and middle initials/names (e.g., "Mark E. Tanner" -> "mark___tanner")
- * while preserving generational suffixes (Jr, Sr, II, III, IV) so parent/child records never collide.
+ * Accepts both "First [Middle] Last [Suffix]" and "Last [Suffix], First [Middle]" inputs,
+ * strips bracketed/parenthesized tags, periods, and middle initials/names (e.g., "Mark E. Tanner" -> "mark___tanner"),
+ * and preserves generational suffixes (Jr, Sr, II, III, IV) so parent/child records never collide.
  *
  * @param string $raw_name Raw archer name input.
  * @return array           Associative array with 'exact', 'fl', 'first', 'last', 'suffix', 'token_count', and 'last_len'.
  */
 if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
     function sywat_normalize_archer_match_keys( $raw_name ) {
-        $cleaned = preg_replace( '/\[.*?\]|\(.*?\)/', '', (string) $raw_name );
+        $cleaned  = preg_replace( '/\[.*?\]|\(.*?\)/', '', (string) $raw_name );
+        $suffixes = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
+
+        // Bidirectional comma support: normalize "Last [Suffix], First [Middle]" -> "First [Middle] Last [Suffix]"
+        if ( strpos( $cleaned, ',' ) !== false ) {
+            $comma_parts = explode( ',', $cleaned, 2 );
+            $left_part   = trim( str_replace( array( '.', '"', "\xC2\xA0" ), ' ', $comma_parts[0] ) );
+            $right_part  = trim( str_replace( array( '.', '"', "\xC2\xA0" ), ' ', $comma_parts[1] ) );
+
+            if ( $left_part !== '' && $right_part !== '' ) {
+                $right_norm = strtolower( preg_replace( '/[[:space:]]+/', ' ', $right_part ) );
+                if ( in_array( $right_norm, $suffixes, true ) ) {
+                    // Handles "John Smith, Jr." -> "John Smith Jr"
+                    $cleaned = $left_part . ' ' . $right_part;
+                } else {
+                    // Handles "Bergh, Steve" -> "Steve Bergh" and "Smith Jr, John" -> "John Smith Jr"
+                    $cleaned = $right_part . ' ' . $left_part;
+                }
+            }
+        }
+
         $cleaned = str_replace( array( '.', ',', '"', "\xC2\xA0" ), ' ', $cleaned );
         $cleaned = preg_replace( '/[^a-zA-Z0-9\s\'-]/', ' ', $cleaned );
         $cleaned = strtolower( trim( preg_replace( '/[[:space:]]+/', ' ', $cleaned ) ) );
@@ -40,9 +61,8 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
             );
         }
 
-        $tokens   = explode( ' ', $cleaned );
-        $suffixes = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
-        $suffix   = '';
+        $tokens = explode( ' ', $cleaned );
+        $suffix = '';
 
         if ( count( $tokens ) > 2 && in_array( end( $tokens ), $suffixes, true ) ) {
             $suffix = array_pop( $tokens );
@@ -67,6 +87,89 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
             'token_count' => count( $tokens ),
             'last_len'    => strlen( $last_tok ),
         );
+    }
+}
+
+/**
+ * Format an archer's display name into "LastName [Suffix], FirstName [Middle]" for visual display
+ * and alphabetical surname sorting while leaving underlying stored records untouched.
+ *
+ * Examples:
+ * - "Steve Bergh"       -> "Bergh, Steve"
+ * - "Louis Woojin Shin" -> "Shin, Louis Woojin"
+ * - "Mark E. Tanner"    -> "Tanner, Mark E."
+ * - "John Smith Jr"     -> "Smith Jr, John"
+ * - "Bergh, Steve"      -> "Bergh, Steve" (idempotent)
+ *
+ * @param string $raw_name Stored archer name.
+ * @return string          Formatted "LastName, FirstName" string.
+ */
+if ( ! function_exists( 'sywat_format_name_last_first' ) ) {
+    function sywat_format_name_last_first( $raw_name ) {
+        $trimmed = trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( "\xC2\xA0", ' ', (string) $raw_name ) ) );
+        if ( $trimmed === '' ) {
+            return '';
+        }
+
+        // Preserve non-person placeholders and status sentinels unchanged
+        $sentinels = array( '—', '-', 'n/a', 'no show', 'unassigned', 'unknown', 'tbd' );
+        if ( in_array( strtolower( $trimmed ), $sentinels, true ) ) {
+            return $trimmed;
+        }
+
+        // Detach any trailing bracketed/parenthesized tag so it remains at the end of the formatted string
+        $base         = $trimmed;
+        $trailing_tag = '';
+        if ( preg_match( '/^(.*?)(\s*(?:\[[^\]]*\]|\([^\)]*\))\s*)$/', $trimmed, $tag_matches ) ) {
+            $candidate_base = trim( $tag_matches[1] );
+            if ( $candidate_base !== '' ) {
+                $base         = $candidate_base;
+                $trailing_tag = ' ' . trim( $tag_matches[2] );
+            }
+        }
+
+        $suffixes = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
+
+        // Handle strings that already contain a comma
+        if ( strpos( $base, ',' ) !== false ) {
+            $comma_parts = explode( ',', $base, 2 );
+            $left        = trim( $comma_parts[0] );
+            $right       = trim( $comma_parts[1] );
+            $right_norm  = rtrim( strtolower( $right ), '.' );
+
+            // Convert "First Last, Jr." -> "Last Jr., First"
+            if ( $left !== '' && in_array( $right_norm, $suffixes, true ) ) {
+                $left_tokens = explode( ' ', $left );
+                if ( count( $left_tokens ) >= 2 ) {
+                    $surname    = array_pop( $left_tokens ) . ' ' . $right;
+                    $first_part = implode( ' ', $left_tokens );
+                    return $surname . ', ' . $first_part . $trailing_tag;
+                }
+            }
+
+            // Already formatted as "Last, First"
+            return $base . $trailing_tag;
+        }
+
+        $tokens = explode( ' ', $base );
+        if ( count( $tokens ) < 2 ) {
+            return $base . $trailing_tag;
+        }
+
+        $last_token_norm = rtrim( strtolower( end( $tokens ) ), '.' );
+        if ( count( $tokens ) > 2 && in_array( $last_token_norm, $suffixes, true ) ) {
+            $suffix    = array_pop( $tokens );
+            $last_name = array_pop( $tokens ) . ' ' . $suffix;
+        } else {
+            $last_name = array_pop( $tokens );
+        }
+
+        $first_and_middle = implode( ' ', $tokens );
+        if ( $first_and_middle === '' ) {
+            return $last_name . $trailing_tag;
+        }
+
+        return $last_name . ', ' . $first_and_middle . $trailing_tag;
     }
 }
 
