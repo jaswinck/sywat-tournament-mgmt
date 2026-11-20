@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Renders the public tournament directory with accurate host location resolution (preventing unmatched TFAA imports from defaulting to Cinnamon Creek Ranch), URL-encoded tournament action links (preserving "&" in names such as "Fort Grard Guns & Archery - 1"), single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, explicit Guest-entry routing, normalized First+Last (+ suffix) archer deduplication, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
- * Compliance: Zero inline style attributes, opt-out shielded legacy script blocks, class-based visibility toggling, omitted closing PHP tag.
+ * Description: Pure presentation and quick-edit controller for the public tournament directory and single-tournament category leaderboards. Delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
+ * Compliance: Pure View layer — zero hardcoded shop/division/style lists, zero inline style attributes, zero element.style.* mutations, opt-out shielded script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.1
+ * Version: 7.2.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -28,7 +28,7 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
                 return;
             }
 
-            $tourn_name  = isset( $_POST['tournament_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) ) : '';
+            $tourn_name  = isset( $_POST['tournament_name'] ) ? trim( html_entity_decode( sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) : '';
             $reg_id      = isset( $_POST['reg_id'] ) ? sanitize_text_field( wp_unslash( $_POST['reg_id'] ) ) : '';
             $active_slug = sanitize_title( $tourn_name );
             $opt_key     = 'sywat_t_' . $active_slug . '_' . $reg_id;
@@ -70,7 +70,7 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
                     if ( function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
                         $reg['distance'] = sywat_shooting_styles_get_division_distance( $division );
                     } else {
-                        $reg['distance'] = ( $division === 'Cub (8 - 11)' ) ? 'Cub' : '20yd';
+                        $reg['distance'] = ( stripos( $division, 'Cub' ) !== false ) ? 'Cub' : '20yd';
                     }
 
                     // Keep Individual Youth/Adult paid tier in sync if not Family, Field Governor, or Waitlist
@@ -118,52 +118,7 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
 }
 
 /**
- * Resolve the display host/range location for a tournament in the public directory
- * without falsely defaulting unmatched TFAA-synced shoots to Cinnamon Creek Ranch.
- *
- * @param string $t_name        Tournament title.
- * @param array  $t_data        Tournament configuration array.
- * @param array  $all_shops     Configured shops keyed by shop_id.
- * @param array  $shop_name_map Lowercase shop name => canonical shop name map.
- * @return string               Resolved host/range location label.
- */
-if ( ! function_exists( 'sywat_resolve_tournament_directory_location' ) ) {
-    function sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops, $shop_name_map ) {
-        $explicit_shop_id = ( is_array( $t_data ) && ! empty( $t_data['shop_id'] ) ) ? trim( (string) $t_data['shop_id'] ) : '';
-        if ( $explicit_shop_id !== '' && isset( $all_shops[ $explicit_shop_id ]['name'] ) ) {
-            return trim( (string) $all_shops[ $explicit_shop_id ]['name'] );
-        }
-
-        $explicit_loc = '';
-        if ( is_array( $t_data ) ) {
-            foreach ( array( 'location', 'venue', 'host_name' ) as $loc_key ) {
-                if ( ! empty( $t_data[ $loc_key ] ) ) {
-                    $explicit_loc = trim( (string) $t_data[ $loc_key ] );
-                    break;
-                }
-            }
-        }
-        if ( $explicit_loc !== '' ) {
-            $loc_lower = strtolower( $explicit_loc );
-            return isset( $shop_name_map[ $loc_lower ] ) ? $shop_name_map[ $loc_lower ] : $explicit_loc;
-        }
-
-        // Derive clean host name from tournament title by stripping trailing "- 1" / "- 2" event numbers
-        $derived = trim( preg_replace( '/\s*(?:-|–|—)\s*\d+\s*$/', '', (string) $t_name ) );
-        if ( $derived !== '' ) {
-            $derived_lower = strtolower( $derived );
-            if ( isset( $shop_name_map[ $derived_lower ] ) ) {
-                return $shop_name_map[ $derived_lower ];
-            }
-            return $derived;
-        }
-
-        return 'Cinnamon Creek Ranch';
-    }
-}
-
-/**
- * Render Public Tournament Directory Listing with Shop Search & Turnout Stats
+ * Render Public Tournament Directory Listing with Host Location Filter & Turnout Stats
  *
  * @return void
  */
@@ -174,22 +129,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
             $tournaments = array();
         }
 
-        $all_shops     = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
-        $shop_name_map = array();
-        if ( is_array( $all_shops ) ) {
-            foreach ( $all_shops as $s_id => $s_rec ) {
-                if ( ! empty( $s_rec['name'] ) ) {
-                    $clean_s_name                                   = trim( (string) $s_rec['name'] );
-                    $shop_name_map[ strtolower( $clean_s_name ) ]   = $clean_s_name;
-                }
-            }
-        }
-
+        $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        $has_loc_resolver   = function_exists( 'sywat_resolve_tournament_directory_location' );
         $filter_shops       = array();
         $resolved_locations = array();
 
         foreach ( $tournaments as $t_name => $t_data ) {
-            $loc_label                     = sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops, $shop_name_map );
+            $loc_label = $has_loc_resolver
+                ? sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops )
+                : trim( preg_replace( '/\s*(?:-|–|—)\s*\d+\s*$/', '', (string) $t_name ) );
+
             $resolved_locations[ $t_name ] = $loc_label;
             if ( $loc_label !== '' ) {
                 $filter_shops[ strtolower( $loc_label ) ] = $loc_label;
@@ -266,7 +215,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                         $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
                                     }
 
-                                    $t_shop_name = isset( $resolved_locations[ $t_name ] ) ? $resolved_locations[ $t_name ] : 'Cinnamon Creek Ranch';
+                                    $t_shop_name = isset( $resolved_locations[ $t_name ] ) ? $resolved_locations[ $t_name ] : '';
 
                                     $raw_scores   = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
                                     $scores_count = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
@@ -284,7 +233,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                     </td>
                                     <td>
                                         <strong><?php echo esc_html( $t_name ); ?></strong>
-                                        <div class="sywat-shop-location">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                        <?php if ( $t_shop_name !== '' ) : ?>
+                                            <div class="sywat-shop-location">📍 <?php echo esc_html( $t_shop_name ); ?></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="sywat-col-center">
                                         <span class="sywat-badge <?php echo ( $scores_count > 0 ) ? 'sywat-badge-open' : 'sywat-badge-prereg'; ?>">
@@ -547,7 +498,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         $can_edit_scores     = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
         $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
 
-        // Load active database divisions & styles for staff Quick Edit modal
+        // Load active database divisions & styles strictly from DB helpers for staff Quick Edit modal
         $quick_edit_divisions = array();
         $quick_edit_styles    = array();
         if ( $can_edit_scores ) {
@@ -561,16 +512,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     }
                 }
             }
-            if ( empty( $quick_edit_divisions ) ) {
-                $quick_edit_divisions = array(
-                    'Cub (8 - 11)',
-                    'Youth (12 - 14)',
-                    'Young Adult (15 - 17)',
-                    'Adult (18 - 49)',
-                    'Senior (50 - 59)',
-                    'Silver Senior (60 - 69)',
-                    'Master Senior (70+)',
-                );
+            if ( empty( $quick_edit_divisions ) && ! empty( $groups ) ) {
+                foreach ( $groups as $g_item ) {
+                    if ( ! empty( $g_item['division'] ) && ! in_array( $g_item['division'], $quick_edit_divisions, true ) ) {
+                        $quick_edit_divisions[] = $g_item['division'];
+                    }
+                }
             }
 
             if ( function_exists( 'sywat_get_shooting_styles' ) ) {
@@ -583,21 +530,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     }
                 }
             }
-            if ( empty( $quick_edit_styles ) ) {
-                $quick_edit_styles = array(
-                    'FS – Freestyle',
-                    'FS Pro – Freestyle Pro',
-                    'FSL – Freestyle Limited',
-                    'FSLR – Freestyle Limited Recurve (or Olympic Recurve)',
-                    'BHFS – Bowhunter Freestyle',
-                    'MBH – Modern Bowhunter',
-                    'BB – Barebow',
-                    'BBC – Barebow Compound',
-                    'BBR – Barebow Recurve',
-                    'TRAD – Traditional',
-                    'LB – Longbow',
-                    'Genesis',
-                );
+            if ( empty( $quick_edit_styles ) && ! empty( $all_styles ) ) {
+                $quick_edit_styles = array_values( $all_styles );
             }
         }
         ?>
