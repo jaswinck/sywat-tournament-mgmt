@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
- * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation, TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
+ * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation (excluding archived "_hist_" migration records), TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
  * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.3
+ * Version: 8.1.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -106,14 +106,15 @@ if ( ! function_exists( 'sywat_get_registrations' ) ) {
 }
 
 /**
- * Retrieves all individual archer registration records across all tournaments directly from wp_options.
+ * Retrieves all individual archer registration records across active tournaments directly from wp_options,
+ * excluding archived "_hist_" historical migration rows.
  */
 if ( ! function_exists( 'sywat_get_all_registrations' ) ) {
     function sywat_get_all_registrations() {
         global $wpdb;
 
         $registrations = array();
-        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'" );
 
         if ( is_array( $results ) ) {
             foreach ( $results as $row ) {
@@ -700,8 +701,9 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
 /**
  * Master Data Retrieval Engine for Admin Portal & Views.
- * Automatically reconciles any registration records whose tournament slug matches a configured
- * tournament whose display punctuation/spacing was normalized (e.g., space vs. hyphen).
+ * Automatically reconciles any active registration records whose tournament slug matches a configured
+ * tournament whose display punctuation/spacing was normalized (e.g., space vs. hyphen),
+ * while excluding archived "_hist_" historical migration rows from full-table scans.
  */
 if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
     function sywat_get_master_portal_data() {
@@ -735,7 +737,7 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         }
 
         $registrations = array();
-        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'" );
 
         if ( is_array( $results ) ) {
             foreach ( $results as $row ) {
