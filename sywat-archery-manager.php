@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     7.6.3
+ * Version:     7.7.0
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '7.6.3' );
+define( 'SYWAT_PLUGIN_VERSION', '7.7.0' );
+
+// Toggleable Historical TFAA Importer Module (set to false once historical migration is complete)
+if ( ! defined( 'SYWAT_ENABLE_HISTORY_IMPORTER' ) ) {
+    define( 'SYWAT_ENABLE_HISTORY_IMPORTER', true );
+}
 
 // Load Central Roles & Permissions Management Sub-Module First
 require_once SYWAT_PLUGIN_DIR . 'includes/core/class-sywat-permissions.php';
@@ -61,3 +66,10 @@ require_once SYWAT_PLUGIN_DIR . 'includes/checkin/class-sywat-checkin.php';     
 require_once SYWAT_PLUGIN_DIR . 'includes/scores/class-sywat-scores.php';         // Batch Score Entry App ([sywat_scores])
 require_once SYWAT_PLUGIN_DIR . 'includes/schedule/class-sywat-schedule.php';    // Public Season Schedule ([sywat_schedule])
 require_once SYWAT_PLUGIN_DIR . 'includes/results/class-sywat-results.php';      // Public Standings & Results ([sywat_results])
+
+// Load Toggleable Historical TFAA Importer Sub-Module ([sywat_history_import])
+if ( defined( 'SYWAT_ENABLE_HISTORY_IMPORTER' ) && SYWAT_ENABLE_HISTORY_IMPORTER ) {
+    if ( file_exists( SYWAT_PLUGIN_DIR . 'includes/history/class-sywat-history-importer.php' ) ) {
+        require_once SYWAT_PLUGIN_DIR . 'includes/history/class-sywat-history-importer.php';
+    }
+}
