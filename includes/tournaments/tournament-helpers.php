@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Configuration Helpers, Formatters & Parsing Engines
  * Path: includes/tournaments/tournament-helpers.php
- * Description: Pure scalar/array formatting helpers, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, public online registration window gatekeepers, TFAA name matchers, and spreadsheet parsers.
- * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, O(N) hoisted sort key pre-computation, omitted closing PHP tag.
+ * Description: Pure scalar/array formatting helpers, canonical shooting line label resolver, standardized 30-minute AM/PM line time option builders, chronological tournament & line comparators, public online registration window gatekeepers, TFAA name matchers, and spreadsheet parsers.
+ * Compliance: Zero HTML output at include time, zero database queries inside formatting helpers, O(N) hoisted sort key pre-computation, key-preserved line normalization, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.0
+ * Version: 7.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -402,7 +402,7 @@ if ( ! function_exists( 'sywat_match_tfaa_tournament_name' ) ) {
             $str = preg_replace( '/(?:[\s\-\#]+)(\d+)\s*$/i', '', $str );
             $str = strtolower( $str );
             $str = str_replace( array( '&', '-', '_', '/', ',', '.', '\'' ), ' ', $str );
-            
+
             $noise  = array( 'archery', 'club', 'guns', 'outdoors', 'shop', 'shops', 'pro', 'academy', 'range', 'center', 'and' );
             $words  = explode( ' ', $str );
             $tokens = array();
@@ -773,22 +773,80 @@ if ( ! function_exists( 'sywat_format_tournament_dates' ) ) {
 }
 
 /**
+ * Canonical Shooting Line Display Label Resolver (Single Source of Truth).
+ * Resolves a line slot's human-readable title from explicit 'name', split 'day'/'time' fields,
+ * or 1-based positional fallback ("Line 1", "Line 2", ...) while normalizing legacy 6AM/6:00 tokens.
+ *
+ * @param array|string $line Line slot configuration array or raw label string.
+ * @param int|string   $idx  Zero-based line array index key used for numbered fallback.
+ * @return string            Normalized, non-empty line display label.
+ */
+if ( ! function_exists( 'sywat_resolve_tournament_line_label' ) ) {
+    function sywat_resolve_tournament_line_label( $line, $idx = 0 ) {
+        $label = '';
+
+        if ( is_array( $line ) ) {
+            if ( isset( $line['name'] ) && trim( (string) $line['name'] ) !== '' ) {
+                $label = trim( (string) $line['name'] );
+            } else {
+                $day_str  = isset( $line['day'] ) ? trim( (string) $line['day'] ) : '';
+                $time_raw = isset( $line['time'] )
+                    ? trim( (string) $line['time'] )
+                    : ( isset( $line['start_time'] ) ? trim( (string) $line['start_time'] ) : '' );
+                $time_str = ( $time_raw !== '' ) ? sywat_format_line_time_token( $time_raw ) : '';
+                $label    = trim( $day_str . ' ' . $time_str );
+            }
+        } elseif ( is_string( $line ) && trim( $line ) !== '' ) {
+            $label = trim( $line );
+        }
+
+        if ( $label === '' ) {
+            $line_num = is_numeric( $idx ) ? ( intval( $idx ) + 1 ) : 1;
+            return 'Line ' . $line_num;
+        }
+
+        // Normalize legacy 6AM/6:00AM -> 6PM and ":00 AM/PM" -> "AM/PM"
+        $label = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $label );
+        $label = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $label );
+        $label = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $label );
+
+        return $label;
+    }
+}
+
+/**
  * Retrieves tournament shooting lines sorted chronologically (Friday -> Saturday -> Sunday, then by time)
- * while preserving each line's original array index key (uasort) so stored registration line_index mappings remain intact.
+ * with guaranteed populated 'name' labels via sywat_resolve_tournament_line_label(), while preserving
+ * each line's original array index key (uasort) so stored registration line_index mappings remain intact.
  *
  * @param array $t_data Tournament configuration array or raw lines array.
- * @return array Key-preserved, chronologically sorted line slots.
+ * @return array Key-preserved, label-normalized, chronologically sorted line slots.
  */
 if ( ! function_exists( 'sywat_get_tournament_lines' ) ) {
     function sywat_get_tournament_lines( $t_data ) {
         if ( ! is_array( $t_data ) ) {
             return array();
         }
-        $lines = ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) ? $t_data['lines'] : $t_data;
-        if ( count( $lines ) > 1 ) {
-            uasort( $lines, 'sywat_compare_tournament_lines' );
+
+        $raw_lines  = ( isset( $t_data['lines'] ) && is_array( $t_data['lines'] ) ) ? $t_data['lines'] : $t_data;
+        $normalized = array();
+
+        foreach ( $raw_lines as $idx => $line ) {
+            if ( is_array( $line ) ) {
+                $line['name']       = sywat_resolve_tournament_line_label( $line, $idx );
+                $normalized[ $idx ] = $line;
+            } elseif ( is_string( $line ) && trim( $line ) !== '' ) {
+                $normalized[ $idx ] = array(
+                    'name' => sywat_resolve_tournament_line_label( $line, $idx ),
+                );
+            }
         }
-        return $lines;
+
+        if ( count( $normalized ) > 1 ) {
+            uasort( $normalized, 'sywat_compare_tournament_lines' );
+        }
+
+        return $normalized;
     }
 }
 
