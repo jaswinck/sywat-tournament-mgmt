@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine CSV Export Processor
  * Path: includes/scores/scores-export.php
- * Description: Generates and streams standard CSV score reports for locked lines, formatting archer names as "LastName, FirstName" via the shared identity formatter (preserving generational suffixes), resolving scores and TFAA division/style export codes from database configuration, and tagging guest/duplicate scores.
+ * Description: Generates and streams standard CSV score reports for locked lines, formatting archer names as "LastName, FirstName" via the shared identity formatter (preserving generational suffixes), resolving scores, X counts, incomplete round flags ("is_inc" -> "Incomplete (Y)"), and TFAA division/style export codes from database configuration, and tagging guest/duplicate scores.
  * Compliance: Pure export processor — zero output at include time, template_redirect hook before theme headers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.1.0
+ * Version: 7.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,6 +17,8 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
     /**
      * Intercepts POST requests for CSV export, formats score data, and streams downloadable CSV file.
+     *
+     * @return void
      */
     function sywat_process_csv_export() {
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'export_csv' ) {
@@ -102,9 +104,10 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                     }
                 }
 
-                // 2. Score & 3. Xs (Prefer master scores map first)
+                // 2. Score, 3. Xs & Incomplete Flag (Prefer master scores map first)
                 $score_val   = isset( $scores_map[ $reg_id ]['score'] ) ? intval( $scores_map[ $reg_id ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
                 $x_count_val = isset( $scores_map[ $reg_id ]['xs'] )    ? intval( $scores_map[ $reg_id ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                $is_inc_flag = isset( $scores_map[ $reg_id ]['is_inc'] ) ? ! empty( $scores_map[ $reg_id ]['is_inc'] ) : ! empty( $reg['is_inc'] );
 
                 // 4. Database-Driven Division & Shooting Style Export Code Mapping
                 $div_raw    = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
@@ -200,7 +203,7 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
                     'x_count'        => $x_count_val,
                     'div_style'      => $div_style_str,
                     'guest'          => '',
-                    'incomplete'     => ( $score_val === 0 && $x_count_val === 0 ) ? 'Y' : '',
+                    'incomplete'     => ( $is_inc_flag || ( $score_val === 0 && $x_count_val === 0 ) ) ? 'Y' : '',
                     'base_prefix'    => ( $is_pro ? 'P' : '' ) . $div_code . $gender_code,
                 );
             }
