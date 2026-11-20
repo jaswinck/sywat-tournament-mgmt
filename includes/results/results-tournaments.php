@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Pure presentation and quick-edit controller for the public tournament directory and single-tournament category leaderboards. Delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
+ * Description: Pure presentation and quick-edit controller for the public tournament directory and single-tournament category leaderboards. Delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
  * Compliance: Pure View layer — zero hardcoded shop/division/style lists, zero inline style attributes, zero element.style.* mutations, opt-out shielded script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.2
+ * Version: 7.2.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -299,8 +299,10 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
 /**
  * Render Single Tournament Results Breakdown
  * Routes explicit Guest records (type === 'Guest', style === 'Guest', or '[Guest]' tags),
- * 0-score cards, and secondary re-entries into the Guest category while deduplicating
- * official entries via normalized First+Last (+ suffix) keys.
+ * completed-round 0-score cards, and secondary re-entries into the Guest category while
+ * preserving incomplete ("[INC]") rounds in their primary division/style with "[INC]"
+ * displayed next to the archer's name and deduplicating official entries via normalized
+ * First+Last (+ suffix) keys.
  *
  * @param string $tournament_name Target tournament name.
  * @return void
@@ -348,9 +350,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             $guest_entry['original_style'] = ! empty( $entry['original_style'] ) ? $entry['original_style'] : $entry['style'];
             $guest_entry['style']          = 'Guest';
 
-            $clean_raw_name = trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', (string) $entry['name'] ) );
+            $clean_raw_name = trim( preg_replace( '/\s*\[(?:Guest|INC)\]\s*/i', ' ', (string) $entry['name'] ) );
             $base_disp      = ! empty( $entry['display_name'] )
-                ? trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', (string) $entry['display_name'] ) )
+                ? trim( preg_replace( '/\s*\[(?:Guest|INC)\]\s*/i', ' ', (string) $entry['display_name'] ) )
                 : ( $has_lf_formatter ? sywat_format_name_last_first( $clean_raw_name ) : $clean_raw_name );
 
             $guest_entry['name']         = $clean_raw_name . ' [Guest]';
@@ -388,17 +390,24 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                     } );
                 }
 
-                if ( intval( $entries[0]['score'] ) === 0 ) {
+                $primary_is_inc = ! empty( $entries[0]['is_inc'] ) || stripos( (string) $entries[0]['name'], '[inc]' ) !== false;
+
+                if ( intval( $entries[0]['score'] ) === 0 && ! $primary_is_inc ) {
                     foreach ( $entries as $zero_entry ) {
                         $processed_scores[] = $format_guest_entry( $zero_entry );
                     }
                 } else {
                     $primary_entry                   = $entries[0];
+                    $primary_entry['is_inc']         = $primary_is_inc ? 1 : 0;
                     $primary_entry['original_style'] = $entries[0]['style'];
-                    $primary_entry['display_name']   = ! empty( $entries[0]['display_name'] )
-                        ? $entries[0]['display_name']
-                        : ( $has_lf_formatter ? sywat_format_name_last_first( $entries[0]['name'] ) : $entries[0]['name'] );
-                    $processed_scores[]              = $primary_entry;
+
+                    $clean_primary_raw = trim( preg_replace( '/\s*\[INC\]\s*/i', ' ', (string) $entries[0]['name'] ) );
+                    $base_disp         = ! empty( $entries[0]['display_name'] )
+                        ? trim( preg_replace( '/\s*\[INC\]\s*/i', ' ', (string) $entries[0]['display_name'] ) )
+                        : ( $has_lf_formatter ? sywat_format_name_last_first( $clean_primary_raw ) : $clean_primary_raw );
+
+                    $primary_entry['display_name'] = $primary_is_inc ? ( $base_disp . ' [INC]' ) : $base_disp;
+                    $processed_scores[]            = $primary_entry;
 
                     for ( $i = 1; $i < count( $entries ); $i++ ) {
                         $processed_scores[] = $format_guest_entry( $entries[ $i ] );
@@ -636,11 +645,14 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
                                                 $reg_id           = ! empty( $a['id'] ) ? $a['id'] : '';
                                                 $gender_val       = ! empty( $a['gender'] ) ? $a['gender'] : ( ! empty( $group_data['gender'] ) ? $group_data['gender'] : 'Male' );
-                                                $raw_edit_name    = trim( preg_replace( '/\s*\[Guest\]\s*/i', ' ', $a['name'] ) );
+                                                $raw_edit_name    = trim( preg_replace( '/\s*\[(?:Guest|INC)\]\s*/i', ' ', $a['name'] ) );
                                                 $edit_style       = ! empty( $a['original_style'] ) ? $a['original_style'] : $a['style'];
                                                 $disp_archer_name = ! empty( $a['display_name'] )
                                                     ? $a['display_name']
                                                     : ( $has_lf_formatter ? sywat_format_name_last_first( $a['name'] ) : $a['name'] );
+                                                if ( ! empty( $a['is_inc'] ) && stripos( $disp_archer_name, '[inc]' ) === false ) {
+                                                    $disp_archer_name .= ' [INC]';
+                                                }
                                                 $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $a['name'] ) );
                                             ?>
                                                 <tr class="sywat-tourn-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
