@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Pure presentation and quick-edit controller for the public tournament directory and single-tournament category leaderboards. Delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
+ * Description: Pure presentation and quick-edit controller for the season-scoped public tournament directory and single-tournament category leaderboards. Includes an inline Season selector in the directory header bar (defaulting to the active season while preserving season selection across directory, detail, and standings views), delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
  * Compliance: Pure View layer — zero hardcoded shop/division/style lists, zero inline style attributes, zero element.style.* mutations, opt-out shielded script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.3
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -118,15 +118,43 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
 }
 
 /**
- * Render Public Tournament Directory Listing with Host Location Filter & Turnout Stats
+ * Render Public Tournament Directory Listing scoped by Season with Host Location Filter & Turnout Stats.
  *
+ * @param string $selected_season_slug Requested season slug (defaults to active season).
  * @return void
  */
 if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
-    function sywat_render_public_tournament_directory() {
-        $tournaments = get_option( 'sywat_tournaments_list', array() );
-        if ( ! is_array( $tournaments ) ) {
-            $tournaments = array();
+    function sywat_render_public_tournament_directory( $selected_season_slug = '' ) {
+        $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
+        if ( ! is_array( $seasons ) ) {
+            $seasons = array();
+        }
+
+        if ( $selected_season_slug === '' || ( ! empty( $seasons ) && ! isset( $seasons[ $selected_season_slug ] ) ) ) {
+            $active_s             = function_exists( 'sywat_get_active_season' ) ? sywat_get_active_season() : array();
+            $selected_season_slug = ( ! empty( $active_s['slug'] ) && isset( $seasons[ $active_s['slug'] ] ) )
+                ? $active_s['slug']
+                : ( ! empty( $seasons ) ? (string) key( $seasons ) : '' );
+        }
+
+        $all_tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( ! is_array( $all_tournaments ) ) {
+            $all_tournaments = array();
+        }
+
+        $tournaments = array();
+        if ( $selected_season_slug !== '' && ! empty( $seasons ) ) {
+            foreach ( $all_tournaments as $t_name => $t_data ) {
+                $t_season = function_exists( 'sywat_get_tournament_season_slug' )
+                    ? sywat_get_tournament_season_slug( $t_data )
+                    : ( isset( $t_data['season'] ) ? (string) $t_data['season'] : ( isset( $t_data['season_slug'] ) ? (string) $t_data['season_slug'] : '' ) );
+
+                if ( $t_season === $selected_season_slug ) {
+                    $tournaments[ $t_name ] = $t_data;
+                }
+            }
+        } else {
+            $tournaments = $all_tournaments;
         }
 
         $all_shops          = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
@@ -167,6 +195,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                         Select a completed tournament below to view official scores and category leaderboards.
                     </div>
                 </div>
+
+                <?php if ( ! empty( $seasons ) ) : ?>
+                    <form method="get" id="sywat_dir_season_form" class="sywat-header-inline-select">
+                        <input type="hidden" name="view" value="tournaments">
+                        <label for="sywat_dir_season_select"><strong>Season:</strong></label>
+                        <select name="season" id="sywat_dir_season_select" onchange="this.form.submit()">
+                            <?php foreach ( $seasons as $slug => $s ) : ?>
+                                <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected_season_slug, $slug ); ?>>
+                                    <?php echo esc_html( $s['name'] ); ?> (<?php echo esc_html( ucfirst( $s['status'] ) ); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                <?php endif; ?>
             </div>
 
             <!-- Directory Filter Bar -->
@@ -193,7 +235,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
             </div>
 
             <?php if ( empty( $tournaments ) ) : ?>
-                <p class="sywat-empty-notice">No tournaments configured yet.</p>
+                <p class="sywat-empty-notice">No tournaments configured for the selected season.</p>
             <?php else : ?>
                 <div class="sywat-table-responsive">
                     <table class="sywat-table">
@@ -220,12 +262,14 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                     $raw_scores   = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
                                     $scores_count = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
 
-                                    $view_results_url = add_query_arg(
-                                        array(
-                                            'view'       => 'tournaments',
-                                            'tournament' => rawurlencode( $t_name ),
-                                        )
+                                    $view_args = array(
+                                        'view'       => 'tournaments',
+                                        'tournament' => rawurlencode( $t_name ),
                                     );
+                                    if ( $selected_season_slug !== '' ) {
+                                        $view_args['season'] = $selected_season_slug;
+                                    }
+                                    $view_results_url = add_query_arg( $view_args );
                                 ?>
                                 <tr class="sywat-dir-row" data-name="<?php echo esc_attr( strtolower( $t_name ) ); ?>" data-shop="<?php echo esc_attr( strtolower( $t_shop_name ) ); ?>">
                                     <td>
@@ -304,11 +348,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
  * displayed next to the archer's name and deduplicating official entries via normalized
  * First+Last (+ suffix) keys.
  *
- * @param string $tournament_name Target tournament name.
+ * @param string $tournament_name      Target tournament name.
+ * @param string $selected_season_slug Optional active/selected season slug for back-navigation continuity.
  * @return void
  */
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
-    function sywat_render_public_tournament_results( $tournament_name ) {
+    function sywat_render_public_tournament_results( $tournament_name, $selected_season_slug = '' ) {
         $tournament_name = trim( html_entity_decode( (string) $tournament_name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 
         // Resolve canonical tournament title if passed with URL/entity variations
@@ -322,6 +367,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 }
             }
         }
+
+        $back_season_slug = $selected_season_slug;
+        if ( $back_season_slug === '' && is_array( $all_tournaments ) && isset( $all_tournaments[ $tournament_name ] ) ) {
+            $t_cfg            = $all_tournaments[ $tournament_name ];
+            $back_season_slug = function_exists( 'sywat_get_tournament_season_slug' )
+                ? sywat_get_tournament_season_slug( $t_cfg )
+                : ( isset( $t_cfg['season'] ) ? (string) $t_cfg['season'] : ( isset( $t_cfg['season_slug'] ) ? (string) $t_cfg['season_slug'] : '' ) );
+        }
+
+        $back_args = array( 'view' => 'tournaments' );
+        if ( $back_season_slug !== '' ) {
+            $back_args['season'] = $back_season_slug;
+        }
+        $back_directory_url = add_query_arg( $back_args, remove_query_arg( array( 'tournament', 'season' ) ) );
 
         $raw_scores       = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $tournament_name ) : array();
         $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
@@ -548,7 +607,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         <div class="sywat-public-card">
             <div class="sywat-card-header-bar">
                 <h2>🎯 Results: <?php echo esc_html( $tournament_name ); ?></h2>
-                <a href="?view=tournaments" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Directory</a>
+                <a href="<?php echo esc_url( $back_directory_url ); ?>" class="sywat-btn sywat-btn-secondary sywat-btn-icon-back">Back to Directory</a>
             </div>
 
             <div class="sywat-filter-bar">
