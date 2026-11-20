@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Data Access & Atomic Batch Persistence
  * Path: includes/history/history-data.php
- * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Persists permanent discovered season manifests (sywat_history_discovered_seasons) and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and archer scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() before upserting archived seasons so active/default seasons are always preserved, and executes atomic MySQL transactions and chunked multi-row SQL upserts into wp_options (autoload = 'no').
+ * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Validates TFAA HTTPS hosts via wp_parse_url(), persists permanent discovered season manifests (sywat_history_discovered_seasons) and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() so active/default seasons are never overwritten, and executes atomic MySQL transactions with chunked multi-row SQL upserts (autoload = 'no').
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, O(1) hashtable lookups, explicit MySQL transactions, chunked batch SQL writes, object cache invalidation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,7 +21,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! function_exists( 'sywat_history_fetch_remote_html' ) ) {
     function sywat_history_fetch_remote_html( $url ) {
         $clean_url = esc_url_raw( trim( (string) $url ) );
-        if ( $clean_url === '' || stripos( $clean_url, 'https://texasfieldarchery.org/' ) !== 0 ) {
+        $parsed    = wp_parse_url( $clean_url );
+        $scheme    = isset( $parsed['scheme'] ) ? strtolower( (string) $parsed['scheme'] ) : '';
+        $host      = isset( $parsed['host'] ) ? strtolower( (string) $parsed['host'] ) : '';
+
+        if ( $clean_url === '' || $scheme !== 'https' || $host !== 'texasfieldarchery.org' ) {
             return array(
                 'success' => false,
                 'html'    => '',
@@ -149,6 +153,11 @@ if ( ! function_exists( 'sywat_history_save_discovered_seasons' ) ) {
                 $slug = sanitize_title( (string) $season['slug'] );
                 $key  = $sid > 0 ? 'id_' . $sid : 'slug_' . $slug;
 
+                // Remove any prior slug-only fallback key if numeric season_id is now known
+                if ( $sid > 0 && isset( $stored[ 'slug_' . $slug ] ) ) {
+                    unset( $stored[ 'slug_' . $slug ] );
+                }
+
                 $stored[ $key ] = array(
                     'season_id'    => $sid,
                     'slug'         => $slug,
@@ -183,36 +192,18 @@ if ( ! function_exists( 'sywat_history_get_discovered_seasons' ) ) {
             $stored = array();
         }
 
-        $tournaments = get_option( 'sywat_tournaments_list', array() );
-        $seasons_cfg = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
+        $existing_stats   = sywat_history_get_existing_season_stats();
+        $saved_events_map = get_option( 'sywat_history_discovered_events', array() );
+        if ( ! is_array( $saved_events_map ) ) {
+            $saved_events_map = array();
+        }
 
-        // Backfill any already-imported historical seasons if discovered option was not yet populated
-        if ( is_array( $tournaments ) ) {
-            $changed = false;
-            foreach ( $tournaments as $t_name => $t_data ) {
-                if ( ! is_array( $t_data ) || empty( $t_data['historical_import'] ) ) {
-                    continue;
-                }
-                $s_slug = ! empty( $t_data['season_slug'] )
-                    ? sanitize_title( (string) $t_data['season_slug'] )
-                    : ( ! empty( $t_data['season'] ) ? sanitize_title( (string) $t_data['season'] ) : '' );
-                if ( $s_slug === '' ) {
-                    continue;
-                }
-
-                $already_present = false;
-                foreach ( $stored as $item ) {
-                    if ( is_array( $item ) && isset( $item['slug'] ) && $item['slug'] === $s_slug ) {
-                        $already_present = true;
-                        break;
-                    }
-                }
-
-                if ( ! $already_present ) {
-                    $s_rec = ( is_array( $seasons_cfg ) && isset( $seasons_cfg[ $s_slug ] ) && is_array( $seasons_cfg[ $s_slug ] ) )
-                        ? $seasons_cfg[ $s_slug ]
-                        : array();
-
+        // Seed any already-imported historical season if discovered manifest is still empty
+        if ( empty( $stored ) ) {
+            $seasons_cfg = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : array();
+            foreach ( $existing_stats as $s_slug => $st ) {
+                if ( ! empty( $st['event_count'] ) && isset( $seasons_cfg[ $s_slug ] ) && ( $st['status'] === 'archived' ) ) {
+                    $s_rec                       = $seasons_cfg[ $s_slug ];
                     $stored[ 'slug_' . $s_slug ] = array(
                         'season_id'    => 0,
                         'slug'         => $s_slug,
@@ -224,11 +215,9 @@ if ( ! function_exists( 'sywat_history_get_discovered_seasons' ) ) {
                         'season_url'   => '',
                         'best_n_count' => ! empty( $s_rec['best_n_count'] ) ? intval( $s_rec['best_n_count'] ) : 3,
                     );
-                    $changed = true;
                 }
             }
-
-            if ( $changed ) {
+            if ( ! empty( $stored ) ) {
                 update_option( 'sywat_history_discovered_seasons', $stored, false );
                 wp_cache_delete( 'sywat_history_discovered_seasons', 'options' );
             }
@@ -236,12 +225,6 @@ if ( ! function_exists( 'sywat_history_get_discovered_seasons' ) ) {
 
         if ( empty( $stored ) ) {
             return array();
-        }
-
-        $existing_stats   = sywat_history_get_existing_season_stats();
-        $saved_events_map = get_option( 'sywat_history_discovered_events', array() );
-        if ( ! is_array( $saved_events_map ) ) {
-            $saved_events_map = array();
         }
 
         $hydrated = array();
@@ -361,22 +344,17 @@ if ( ! function_exists( 'sywat_history_get_discovered_events' ) ) {
             $existing_tournaments = array();
         }
 
-        // Build O(1) lookup maps for imported tournaments by title and by tfaa_event_id
         $imported_by_title    = array();
         $imported_by_event_id = array();
-        $changed              = false;
 
         foreach ( $existing_tournaments as $t_name => $t_data ) {
             if ( ! is_array( $t_data ) ) {
                 continue;
             }
-            $t_slug   = sanitize_title( $t_name );
-            $scores   = get_option( 'sywat_scores_' . $t_slug, array() );
-            $a_count  = is_array( $scores ) ? count( $scores ) : 0;
-            $t_ev_id  = isset( $t_data['tfaa_event_id'] ) ? intval( $t_data['tfaa_event_id'] ) : 0;
-            $t_season = ! empty( $t_data['season_slug'] )
-                ? sanitize_title( (string) $t_data['season_slug'] )
-                : ( ! empty( $t_data['season'] ) ? sanitize_title( (string) $t_data['season'] ) : '' );
+            $t_slug  = sanitize_title( $t_name );
+            $scores  = get_option( 'sywat_scores_' . $t_slug, array() );
+            $a_count = is_array( $scores ) ? count( $scores ) : 0;
+            $t_ev_id = isset( $t_data['tfaa_event_id'] ) ? intval( $t_data['tfaa_event_id'] ) : 0;
 
             $info = array(
                 'title'        => $t_name,
@@ -387,31 +365,6 @@ if ( ! function_exists( 'sywat_history_get_discovered_events' ) ) {
             if ( $t_ev_id > 0 ) {
                 $imported_by_event_id[ $t_ev_id ] = $info;
             }
-
-            // Backfill into discovered events if imported previously before manifest persistence existed
-            if ( ! empty( $t_data['historical_import'] ) && $t_season !== '' ) {
-                $ev_key = $t_ev_id > 0 ? 'ev_' . $t_ev_id : 'slug_' . $t_slug;
-                if ( ! isset( $all_saved[ $t_season ][ $ev_key ] ) ) {
-                    $all_saved[ $t_season ][ $ev_key ] = array(
-                        'event_id'    => $t_ev_id,
-                        'event_url'   => ! empty( $t_data['tfaa_results_url'] ) ? (string) $t_data['tfaa_results_url'] : ( $t_ev_id > 0 ? 'https://texasfieldarchery.org/results/' . $t_ev_id : '' ),
-                        'raw_title'   => $t_name,
-                        'title'       => $t_name,
-                        'season_id'   => 0,
-                        'season_slug' => $t_season,
-                        'season_name' => $t_season,
-                        'start_date'  => isset( $t_data['start_date'] ) ? (string) $t_data['start_date'] : '',
-                        'end_date'    => isset( $t_data['end_date'] ) ? (string) $t_data['end_date'] : '',
-                        'event_type'  => isset( $t_data['event_type'] ) ? (string) $t_data['event_type'] : 'SYWAT',
-                    );
-                    $changed = true;
-                }
-            }
-        }
-
-        if ( $changed ) {
-            update_option( 'sywat_history_discovered_events', $all_saved, false );
-            wp_cache_delete( 'sywat_history_discovered_events', 'options' );
         }
 
         $hydrate_bucket = function( $bucket ) use ( $imported_by_title, $imported_by_event_id ) {
