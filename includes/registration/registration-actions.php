@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
- * Description: Handles multi-archer phone intake using simplified 3-tier Category / Rate selection (Cub 10yd, Youth 20yd, Adult 20yd), Member Directory DOB & history profile resolution via sywat_resolve_archer_intake_profile() without guessing divisions for unmatched shooters, round/pricing profile resolution, First-Time/Lapsed Shooter promoter free-entry evaluation, dynamic Household Family Cap evaluation (line or tournament scope), waitlist triage ('all' vs. 'remainder'), and atomic multi-store persistence.
- * Compliance: Pure action layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Description: Handles multi-archer phone intake with per-archer multi-line checkbox matrix support (archers[i][line_indices][], with backward-compatible single-line line_idx fallback), enforces that every named archer selects at least one shooting line (zero silent default-line fallbacks), expands multi-line entries in chronological tournament line order, resolves Member Directory DOB & history profiles via sywat_resolve_archer_intake_profile() without guessing divisions for unmatched shooters, evaluates round/pricing profiles, First-Time/Lapsed Shooter promoter free-entry rules, and dynamic Household Family Caps (line or tournament scope), handles waitlist triage ('all' vs. 'remainder') with full line_indices[] preservation, and persists records atomically.
+ * Compliance: Pure action layer — zero output at include time, zero inline style attributes, zero inline JS event handlers (delegated data-sywat-action attributes only), hoisted O(1) capacity & duplicate maps, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.1
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -40,17 +40,23 @@ if ( ! function_exists( 'sywat_extract_due_amount' ) ) {
  *
  * @param string|int $raw_line_idx Raw submitted line index or title.
  * @param array      $t_lines      Tournament shooting lines array.
- * @return string                  Canonical string line index key.
+ * @return string                  Canonical string line index key, or empty string if unresolved.
  */
 if ( ! function_exists( 'sywat_registration_resolve_line_idx' ) ) {
     function sywat_registration_resolve_line_idx( $raw_line_idx, $t_lines ) {
         $idx_str = trim( (string) $raw_line_idx );
+        if ( $idx_str === '' ) {
+            return '';
+        }
         if ( ! is_array( $t_lines ) || empty( $t_lines ) ) {
-            return $idx_str !== '' ? $idx_str : '0';
+            return $idx_str;
         }
 
         if ( isset( $t_lines[ $idx_str ] ) ) {
             return $idx_str;
+        }
+        if ( is_numeric( $idx_str ) && isset( $t_lines[ (int) $idx_str ] ) ) {
+            return (string) (int) $idx_str;
         }
 
         foreach ( $t_lines as $l_key => $l_data ) {
@@ -59,14 +65,76 @@ if ( ! function_exists( 'sywat_registration_resolve_line_idx' ) ) {
             }
         }
 
-        return $idx_str !== '' ? $idx_str : '0';
+        return '';
     }
 }
 
 /**
- * Handles multi-archer phone intake, Member Directory & history profile lookup,
- * round/pricing profile fee calculation, First-Time/Lapsed Shooter promoter evaluation,
- * active-only household family capping, waitlists, and persistence.
+ * Resolve the list of canonical line index keys requested for a single archer row,
+ * preserving chronological tournament line order ($t_lines key order) and deduplicating entries.
+ *
+ * @param array  $archer_row       Raw submitted archer row array.
+ * @param string $fallback_line    Optional legacy single-line fallback index (when line_indices[] is absent).
+ * @param array  $t_lines          Chronologically ordered tournament lines map.
+ * @return array<int, string>      Ordered list of resolved canonical line index keys.
+ */
+if ( ! function_exists( 'sywat_registration_extract_row_line_indices' ) ) {
+    function sywat_registration_extract_row_line_indices( $archer_row, $fallback_line, $t_lines ) {
+        $raw_candidates = array();
+
+        if ( isset( $archer_row['line_indices'] ) && is_array( $archer_row['line_indices'] ) ) {
+            foreach ( $archer_row['line_indices'] as $raw_idx ) {
+                $clean = trim( sanitize_text_field( (string) $raw_idx ) );
+                if ( $clean !== '' ) {
+                    $raw_candidates[] = $clean;
+                }
+            }
+        } elseif ( isset( $archer_row['line_idx'] ) && trim( (string) $archer_row['line_idx'] ) !== '' ) {
+            $raw_candidates[] = trim( sanitize_text_field( (string) $archer_row['line_idx'] ) );
+        } elseif ( trim( (string) $fallback_line ) !== '' ) {
+            $raw_candidates[] = trim( sanitize_text_field( (string) $fallback_line ) );
+        }
+
+        if ( empty( $raw_candidates ) ) {
+            return array();
+        }
+
+        $resolved_set = array();
+        foreach ( $raw_candidates as $cand ) {
+            $canonical = sywat_registration_resolve_line_idx( $cand, $t_lines );
+            if ( $canonical !== '' ) {
+                $resolved_set[ $canonical ] = true;
+            }
+        }
+
+        if ( empty( $resolved_set ) ) {
+            return array();
+        }
+
+        if ( is_array( $t_lines ) && ! empty( $t_lines ) ) {
+            $ordered = array();
+            foreach ( array_keys( $t_lines ) as $t_key ) {
+                $key_str = (string) $t_key;
+                if ( isset( $resolved_set[ $key_str ] ) ) {
+                    $ordered[] = $key_str;
+                    unset( $resolved_set[ $key_str ] );
+                }
+            }
+            foreach ( array_keys( $resolved_set ) as $rem_key ) {
+                $ordered[] = (string) $rem_key;
+            }
+            return $ordered;
+        }
+
+        return array_map( 'strval', array_keys( $resolved_set ) );
+    }
+}
+
+/**
+ * Handles multi-archer phone intake with per-archer multi-line checkbox matrices,
+ * Member Directory & history profile lookup, round/pricing profile fee calculation,
+ * First-Time/Lapsed Shooter promoter evaluation, active-only household family capping,
+ * waitlists, and persistence.
  *
  * @param array $tournaments   Master tournament configuration array.
  * @param array $registrations Master registration state array reference.
@@ -76,7 +144,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
         $group_name       = trim( sanitize_text_field( wp_unslash( $_POST['group_name'] ?? '' ) ) );
         $group_phone      = trim( sanitize_text_field( wp_unslash( $_POST['group_phone'] ?? '' ) ) );
-        $default_line_idx = sanitize_text_field( wp_unslash( $_POST['default_line_idx'] ?? '0' ) );
+        $legacy_def_line  = trim( sanitize_text_field( wp_unslash( $_POST['default_line_idx'] ?? '' ) ) );
         $tourn_name       = sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ?? '' ) );
         $amount_paid      = isset( $_POST['amount_paid_today'] ) ? max( 0.00, floatval( wp_unslash( $_POST['amount_paid_today'] ) ) ) : 0.00;
         $allow_partial    = isset( $_POST['allow_partial'] ) && wp_unslash( $_POST['allow_partial'] ) === '1';
@@ -99,7 +167,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $default_prof_key = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
 
         $closed_lines_raw = get_option( 'sywat_closed_lines_' . $t_slug, array() );
-        $closed_lines     = is_array( $closed_lines_raw ) ? array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) : array();
+        $closed_lines_map = is_array( $closed_lines_raw )
+            ? array_flip( array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) )
+            : array();
 
         $archers_raw = isset( $_POST['archers'] ) && is_array( $_POST['archers'] ) ? wp_unslash( $_POST['archers'] ) : array();
 
@@ -108,18 +178,30 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         }
 
         $legacy_youth_divisions = array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' );
-        $valid_archers          = array();
+        $valid_entries          = array();
+        $missing_line_archers   = array();
+        $has_named_archer       = false;
 
         foreach ( $archers_raw as $a ) {
+            if ( ! is_array( $a ) ) {
+                continue;
+            }
             $name = trim( sanitize_text_field( $a['name'] ?? '' ) );
-            if ( empty( $name ) ) {
+            if ( $name === '' ) {
+                continue;
+            }
+            $has_named_archer = true;
+
+            $row_line_indices = sywat_registration_extract_row_line_indices( $a, $legacy_def_line, $t_lines );
+            if ( empty( $row_line_indices ) ) {
+                $missing_line_archers[] = $name;
                 continue;
             }
 
             $raw_tier = strtolower( trim( sanitize_text_field( $a['rate_tier'] ?? '' ) ) );
             $division = trim( sanitize_text_field( $a['division'] ?? '' ) );
 
-            // Resolve Member Directory (DOB age division, gender, contact) & cached shop/TFAA history
+            // Resolve Member Directory (DOB age division, gender, contact) & cached shop/TFAA history once per archer row
             $resolved_profile = function_exists( 'sywat_resolve_archer_intake_profile' )
                 ? sywat_resolve_archer_intake_profile( $name, $tourn_date, array( 'phone' => $group_phone ) )
                 : array();
@@ -177,41 +259,95 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 }
             }
 
-            $raw_round = ! empty( $a['pricing_profile'] ) ? sanitize_title( wp_unslash( $a['pricing_profile'] ) ) : $default_prof_key;
+            $raw_round = ! empty( $a['pricing_profile'] ) ? sanitize_title( (string) $a['pricing_profile'] ) : $default_prof_key;
             if ( ! empty( $t_profiles ) && ! isset( $t_profiles[ $raw_round ] ) ) {
                 $raw_round = $default_prof_key;
             }
 
-            $raw_l_idx    = ! empty( $a['line_idx'] ) || ( isset( $a['line_idx'] ) && (string) $a['line_idx'] === '0' )
-                ? sanitize_text_field( $a['line_idx'] )
-                : $default_line_idx;
-            $resolved_idx = sywat_registration_resolve_line_idx( $raw_l_idx, $t_lines );
+            $archer_phone = ! empty( $group_phone ) ? $group_phone : ( isset( $resolved_profile['phone'] ) ? $resolved_profile['phone'] : '' );
+            $archer_email = isset( $resolved_profile['email'] ) ? $resolved_profile['email'] : '';
 
-            $valid_archers[] = array(
-                'name'            => $canonical_name,
-                'division'        => $division,
-                'paid_tier'       => $paid_tier,
-                'distance'        => $distance,
-                'pricing_profile' => $raw_round,
-                'line_idx'        => $resolved_idx,
-                'gender'          => isset( $resolved_profile['gender'] ) ? $resolved_profile['gender'] : '',
-                'style'           => isset( $resolved_profile['style'] ) ? $resolved_profile['style'] : '',
-                'phone'           => ! empty( $group_phone ) ? $group_phone : ( isset( $resolved_profile['phone'] ) ? $resolved_profile['phone'] : '' ),
-                'email'           => isset( $resolved_profile['email'] ) ? $resolved_profile['email'] : '',
-            );
+            // Expand one entry per checked shooting line in chronological line order
+            foreach ( $row_line_indices as $resolved_idx ) {
+                $valid_entries[] = array(
+                    'name'            => $canonical_name,
+                    'division'        => $division,
+                    'paid_tier'       => $paid_tier,
+                    'distance'        => $distance,
+                    'pricing_profile' => $raw_round,
+                    'line_idx'        => $resolved_idx,
+                    'gender'          => isset( $resolved_profile['gender'] ) ? $resolved_profile['gender'] : '',
+                    'style'           => isset( $resolved_profile['style'] ) ? $resolved_profile['style'] : '',
+                    'phone'           => $archer_phone,
+                    'email'           => $archer_email,
+                );
+            }
         }
 
-        if ( empty( $valid_archers ) ) {
+        if ( ! $has_named_archer ) {
             return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please enter at least one valid archer name.</div>';
         }
 
-        // Tally requested slots per resolved line/distance combo
-        $line_dist_tallies = array();
-        foreach ( $valid_archers as $archer ) {
-            $l_idx = $archer['line_idx'];
-            $dist  = $archer['distance'];
-            $key   = $l_idx . '___' . $dist;
+        if ( ! empty( $missing_line_archers ) ) {
+            return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Please check at least one shooting line for: <strong>' . esc_html( implode( ', ', $missing_line_archers ) ) . '</strong>.</div>';
+        }
 
+        // Hoist O(1) existing registration occupancy and duplicate lookup maps once outside loops
+        $existing_occ_map  = array();
+        $existing_dup_map  = array();
+        $has_norm_dist_fn  = function_exists( 'sywat_normalize_dist' );
+        $has_line_label_fn = function_exists( 'sywat_resolve_tournament_line_label' );
+
+        if ( is_array( $registrations ) ) {
+            foreach ( $registrations as $ex ) {
+                if ( ! is_array( $ex ) || ! isset( $ex['tournament'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $ex['tournament'] ), trim( $tourn_name ) ) !== 0 ) {
+                    continue;
+                }
+
+                $ex_status = isset( $ex['status'] ) ? trim( (string) $ex['status'] ) : '';
+                if ( strcasecmp( $ex_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $ex_l_idx = isset( $ex['line_index'] ) ? trim( (string) $ex['line_index'] ) : '';
+                if ( $ex_l_idx === '' ) {
+                    continue;
+                }
+
+                $ex_name_raw = ! empty( $ex['name'] ) ? (string) $ex['name'] : ( ! empty( $ex['archer_name'] ) ? (string) $ex['archer_name'] : '' );
+                $ex_name_low = strtolower( trim( $ex_name_raw ) );
+                if ( $ex_name_low !== '' ) {
+                    $existing_dup_map[ $ex_l_idx . '___' . $ex_name_low ] = true;
+                }
+
+                if ( strcasecmp( $ex_status, 'Waitlist' ) !== 0 ) {
+                    $raw_ex_dist = isset( $ex['distance'] ) ? (string) $ex['distance'] : '20yd';
+                    $norm_ex_d   = $has_norm_dist_fn
+                        ? sywat_normalize_dist( $raw_ex_dist )
+                        : ( ( strcasecmp( trim( $raw_ex_dist ), 'Cub' ) === 0 || strcasecmp( trim( $raw_ex_dist ), '10yd' ) === 0 ) ? 'Cub' : '20yd' );
+                    $occ_key     = $ex_l_idx . '___' . $norm_ex_d;
+                    if ( ! isset( $existing_occ_map[ $occ_key ] ) ) {
+                        $existing_occ_map[ $occ_key ] = 0;
+                    }
+                    $existing_occ_map[ $occ_key ]++;
+                }
+            }
+        }
+
+        // Tally requested slots per resolved line/distance combo (excluding already-registered duplicates)
+        $line_dist_tallies = array();
+        foreach ( $valid_entries as $entry ) {
+            $l_idx    = $entry['line_idx'];
+            $dist     = $entry['distance'];
+            $name_low = strtolower( trim( $entry['name'] ) );
+            if ( isset( $existing_dup_map[ $l_idx . '___' . $name_low ] ) ) {
+                continue;
+            }
+
+            $key = $l_idx . '___' . $dist;
             if ( ! isset( $line_dist_tallies[ $key ] ) ) {
                 $line_dist_tallies[ $key ] = array(
                     'line_idx' => $l_idx,
@@ -231,14 +367,16 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $dist      = $tally['distance'];
             $req_cnt   = $tally['count'];
             $line_data = isset( $t_lines[ $l_idx ] ) ? $t_lines[ $l_idx ] : array();
-            $line_name = isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ( (int) $l_idx + 1 ) : $l_idx );
+            $line_name = $has_line_label_fn
+                ? sywat_resolve_tournament_line_label( $line_data, $l_idx )
+                : ( isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ( (int) $l_idx + 1 ) : $l_idx ) );
+            $raw_lname = ( is_array( $line_data ) && ! empty( $line_data['name'] ) ) ? trim( (string) $line_data['name'] ) : '';
 
-            $is_line_closed = in_array( (string) $l_idx, $closed_lines, true )
-                           || ( $line_name !== '' && in_array( trim( (string) $line_name ), $closed_lines, true ) );
+            $is_line_closed = isset( $closed_lines_map[ (string) $l_idx ] )
+                           || ( $raw_lname !== '' && isset( $closed_lines_map[ $raw_lname ] ) )
+                           || ( $line_name !== '' && isset( $closed_lines_map[ $line_name ] ) );
 
-            $current_count = function_exists( 'sywat_count_registered' )
-                ? sywat_count_registered( $tourn_name, $l_idx, $dist, $registrations )
-                : 0;
+            $current_count = isset( $existing_occ_map[ $key ] ) ? intval( $existing_occ_map[ $key ] ) : 0;
             $max_capacity  = function_exists( 'sywat_get_line_max_cap' )
                 ? sywat_get_line_max_cap( $line_data, $dist )
                 : 0;
@@ -274,12 +412,23 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             $hidden_archers_html = '';
             foreach ( $archers_raw as $i => $a ) {
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][name]" value="' . esc_attr( $a['name'] ?? '' ) . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][rate_tier]" value="' . esc_attr( $a['rate_tier'] ?? '' ) . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][distance]" value="' . esc_attr( $a['distance'] ?? '' ) . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][division]" value="' . esc_attr( $a['division'] ?? '' ) . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][pricing_profile]" value="' . esc_attr( $a['pricing_profile'] ?? $default_prof_key ) . '">';
-                $hidden_archers_html .= '<input type="hidden" name="archers[' . intval( $i ) . '][line_idx]" value="' . esc_attr( $a['line_idx'] ?? '' ) . '">';
+                if ( ! is_array( $a ) ) {
+                    continue;
+                }
+                $idx_int              = intval( $i );
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][name]" value="' . esc_attr( $a['name'] ?? '' ) . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][rate_tier]" value="' . esc_attr( $a['rate_tier'] ?? '' ) . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][distance]" value="' . esc_attr( $a['distance'] ?? '' ) . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][division]" value="' . esc_attr( $a['division'] ?? '' ) . '">';
+                $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][pricing_profile]" value="' . esc_attr( $a['pricing_profile'] ?? $default_prof_key ) . '">';
+
+                if ( isset( $a['line_indices'] ) && is_array( $a['line_indices'] ) ) {
+                    foreach ( $a['line_indices'] as $l_val ) {
+                        $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][line_indices][]" value="' . esc_attr( $l_val ) . '">';
+                    }
+                } elseif ( isset( $a['line_idx'] ) && $a['line_idx'] !== '' ) {
+                    $hidden_archers_html .= '<input type="hidden" name="archers[' . $idx_int . '][line_indices][]" value="' . esc_attr( $a['line_idx'] ) . '">';
+                }
             }
 
             $base_hidden_fields  = wp_nonce_field( 'sywat_desk_action', 'sywat_nonce', true, false );
@@ -287,7 +436,6 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $base_hidden_fields .= '<input type="hidden" name="selected_tournament" value="' . esc_attr( $tourn_name ) . '">';
             $base_hidden_fields .= '<input type="hidden" name="group_name" value="' . esc_attr( $group_name ) . '">';
             $base_hidden_fields .= '<input type="hidden" name="group_phone" value="' . esc_attr( $group_phone ) . '">';
-            $base_hidden_fields .= '<input type="hidden" name="default_line_idx" value="' . esc_attr( $default_line_idx ) . '">';
             $base_hidden_fields .= '<input type="hidden" name="amount_paid_today" value="' . esc_attr( $amount_paid ) . '">';
             $base_hidden_fields .= $hidden_archers_html;
 
@@ -305,18 +453,18 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             if ( $max_open_available > 0 ) {
                 $prompt_html .= '<form method="post" class="sywat-overflow-form">' . $base_hidden_fields;
                 $prompt_html .= '<input type="hidden" name="waitlist_mode" value="remainder">';
-                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning-solid sywat-btn-block">⚠️ Book Available Spots (' . intval( $max_open_available ) . ') & Waitlist Remainder</button>';
+                $prompt_html .= '<button type="submit" class="sywat-btn sywat-btn-warning-solid sywat-btn-block">⚠️ Book Available Spots (' . intval( $max_open_available ) . ') &amp; Waitlist Remainder</button>';
                 $prompt_html .= '</form>';
             }
 
-            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-block" onclick="const m=document.getElementById(\'sywat_capacity_overflow_modal\'); if(m) m.remove();">Cancel & Change Line</button>';
+            $prompt_html .= '<button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-block" data-sywat-action="dismiss-overflow-modal">Cancel &amp; Change Line</button>';
             $prompt_html .= '</div></div>';
 
             $GLOBALS['sywat_modal_notice'] = $prompt_html;
             return '';
         }
 
-        $family_base_name = ! empty( $group_name ) ? $group_name : $valid_archers[0]['name'];
+        $family_base_name = ! empty( $group_name ) ? $group_name : $valid_entries[0]['name'];
 
         // Determine if any offered profile uses tournament-wide vs line-scoped family caps
         $use_tourn_wide_cap = false;
@@ -342,35 +490,27 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $skipped_duplicates  = array();
         $skipped_full        = array();
         $claimed_promo_names = array();
+        $batch_seen_pairs    = array();
 
-        foreach ( $valid_archers as $archer ) {
+        foreach ( $valid_entries as $archer ) {
             $l_idx      = $archer['line_idx'];
             $dist       = $archer['distance'];
             $name       = $archer['name'];
+            $name_low   = strtolower( trim( $name ) );
             $round_slug = $archer['pricing_profile'];
             $key        = $l_idx . '___' . $dist;
+            $pair_key   = $l_idx . '___' . $name_low;
             $line_data  = isset( $t_lines[ $l_idx ] ) ? $t_lines[ $l_idx ] : array();
-            $line_name  = isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ( (int) $l_idx + 1 ) : $l_idx );
+            $line_name  = $has_line_label_fn
+                ? sywat_resolve_tournament_line_label( $line_data, $l_idx )
+                : ( isset( $line_data['name'] ) ? $line_data['name'] : ( is_numeric( $l_idx ) ? 'Line ' . ( (int) $l_idx + 1 ) : $l_idx ) );
 
-            $is_duplicate = false;
-            if ( function_exists( 'sywat_is_archer_on_line' ) ) {
-                $is_duplicate = sywat_is_archer_on_line( $tourn_name, $l_idx, $name, $registrations );
-            } else {
-                foreach ( $registrations as $existing ) {
-                    if ( isset( $existing['tournament'], $existing['line_index'], $existing['name'] ) &&
-                         strcasecmp( trim( $existing['tournament'] ), trim( $tourn_name ) ) === 0 &&
-                         (string) $existing['line_index'] === (string) $l_idx &&
-                         strcasecmp( trim( $existing['name'] ), trim( $name ) ) === 0 ) {
-                        $is_duplicate = true;
-                        break;
-                    }
-                }
-            }
-
+            $is_duplicate = isset( $existing_dup_map[ $pair_key ] ) || isset( $batch_seen_pairs[ $pair_key ] );
             if ( $is_duplicate ) {
                 $skipped_duplicates[] = $name . ' (' . $line_name . ')';
                 continue;
             }
+            $batch_seen_pairs[ $pair_key ] = true;
 
             $is_waitlist = false;
             if ( $waitlist_mode === 'all' ) {
@@ -388,10 +528,9 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 $remaining_open_slots[ $key ]--;
             }
 
-            // Evaluate First-Time / Lapsed Shooter Promotional Free Entry eligibility
+            // Evaluate First-Time / Lapsed Shooter Promotional Free Entry eligibility (at most once per shooter)
             $is_promo_free = false;
-            $norm_shooter  = strtolower( trim( $name ) );
-            if ( ! $is_waitlist && ! isset( $claimed_promo_names[ $norm_shooter ] ) && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+            if ( ! $is_waitlist && ! isset( $claimed_promo_names[ $name_low ] ) && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
                 $promo_check = sywat_check_archer_promo_eligibility(
                     $name,
                     ! empty( $t_data ) ? $t_data : $tourn_name,
@@ -399,8 +538,8 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                     is_array( $all_regs_for_promo ) ? $all_regs_for_promo : $registrations
                 );
                 if ( ! empty( $promo_check['eligible'] ) ) {
-                    $is_promo_free                        = true;
-                    $claimed_promo_names[ $norm_shooter ] = true;
+                    $is_promo_free                    = true;
+                    $claimed_promo_names[ $name_low ] = true;
                 }
             }
 
@@ -462,6 +601,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $remaining_payment       = $amount_paid;
         $created_timestamp       = current_time( 'mysql' );
         $shared_tourn_fam_id     = 'fam_' . $t_slug . '_' . sanitize_title( $family_base_name );
+        $has_persist_fn          = function_exists( 'sywat_waitlist_persist_record' );
 
         foreach ( $triaged_archers as $archer ) {
             $l_idx         = $archer['line_idx'];
@@ -553,7 +693,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
                 'created_at'      => $created_timestamp,
             );
 
-            if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
+            if ( $has_persist_fn ) {
                 sywat_waitlist_persist_record( $new_reg, $registrations );
             } else {
                 update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
@@ -578,7 +718,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             if ( ! is_array( $phone_cache ) ) {
                 $phone_cache = array();
             }
-            foreach ( $valid_archers as $archer ) {
+            foreach ( $valid_entries as $archer ) {
                 if ( ! empty( $archer['name'] ) ) {
                     $norm_name                 = strtolower( trim( $archer['name'] ) );
                     $phone_cache[ $norm_name ] = $group_phone;
@@ -596,13 +736,13 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $promo_suffix = ! empty( $promo_applied_names )
                 ? ' (First-Time/Lapsed Promo $0.00 applied to: ' . esc_html( implode( ', ', $promo_applied_names ) ) . ')'
                 : '';
-            $msg .= '<div class="sywat-alert sywat-alert-success">Successfully registered ' . intval( $added_count ) . ' archer(s) under \'' . esc_html( $family_base_name ) . '\'' . $promo_suffix . '.</div>';
+            $msg .= '<div class="sywat-alert sywat-alert-success">Successfully registered ' . intval( $added_count ) . ' entry/entries under \'' . esc_html( $family_base_name ) . '\'' . $promo_suffix . '.</div>';
         }
         if ( $waitlisted_count > 0 ) {
-            $msg .= '<div class="sywat-alert sywat-alert-warning">🕒 Added ' . intval( $waitlisted_count ) . ' archer(s) to the WAITLIST under \'' . esc_html( $family_base_name ) . '\' ($0 Balance Due).</div>';
+            $msg .= '<div class="sywat-alert sywat-alert-warning">🕒 Added ' . intval( $waitlisted_count ) . ' entry/entries to the WAITLIST under \'' . esc_html( $family_base_name ) . '\' ($0 Balance Due).</div>';
         }
         if ( ! empty( $skipped_duplicates ) ) {
-            $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ DUPLICATE BLOCKED: ' . implode( ', ', array_map( 'esc_html', $skipped_duplicates ) ) . ' — already registered on this shooting line!</div>';
+            $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ DUPLICATE BLOCKED: ' . implode( ', ', array_map( 'esc_html', $skipped_duplicates ) ) . ' — already registered on the selected shooting line(s)!</div>';
         }
         if ( ! empty( $skipped_full ) ) {
             $msg .= '<div class="sywat-alert sywat-alert-danger">⚠️ LINE FULL BLOCKED: ' . implode( ', ', array_map( 'esc_html', $skipped_full ) ) . ' — target shooting line is at maximum capacity!</div>';
