@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results AJAX Action Handlers
  * Path: includes/history/history-actions.php
- * Description: Nonce-verified and capability-gated wp_ajax_* endpoints for discovering historical TFAA seasons, scanning per-season tournament manifests, importing individual event scorecards in chunked AJAX ticks, and purging imported historical seasons.
+ * Description: Nonce-verified and capability-gated wp_ajax_* endpoints for discovering and permanently persisting historical TFAA seasons, scanning and caching per-season tournament manifests with live import statuses, importing individual event scorecards in chunked AJAX ticks, and purging imported historical seasons while retaining discovered manifests.
  * Compliance: Pure AJAX action layer — executes on wp_ajax_* before theme output, pure JSON responses via wp_send_json_*(), zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -44,7 +44,8 @@ if ( ! function_exists( 'sywat_history_verify_ajax_request' ) ) {
 }
 
 /**
- * AJAX Handler 1: Discover all available historical seasons from TFAA's season dropdown.
+ * AJAX Handler 1: Discover all available historical seasons from TFAA's season dropdown
+ * and persist them permanently in wp_options (sywat_history_discovered_seasons).
  * Action: wp_ajax_sywat_history_discover_seasons
  *
  * @return void
@@ -73,22 +74,14 @@ if ( ! function_exists( 'sywat_ajax_history_discover_seasons' ) ) {
             );
         }
 
-        $existing_stats = sywat_history_get_existing_season_stats();
-        $enriched       = array();
-
-        foreach ( $parsed_seasons as $season ) {
-            $slug               = isset( $season['slug'] ) ? $season['slug'] : '';
-            $stat               = isset( $existing_stats[ $slug ] ) ? $existing_stats[ $slug ] : array();
-            $season['imported'] = ! empty( $stat['event_count'] );
-            $season['existing_events'] = isset( $stat['event_count'] ) ? intval( $stat['event_count'] ) : 0;
-            $season['local_status']    = isset( $stat['status'] ) ? (string) $stat['status'] : 'new';
-            $enriched[]                = $season;
-        }
+        $hydrated_seasons = function_exists( 'sywat_history_save_discovered_seasons' )
+            ? sywat_history_save_discovered_seasons( $parsed_seasons )
+            : $parsed_seasons;
 
         wp_send_json_success(
             array(
-                'seasons' => $enriched,
-                'count'   => count( $enriched ),
+                'seasons' => $hydrated_seasons,
+                'count'   => count( $hydrated_seasons ),
             )
         );
     }
@@ -96,8 +89,8 @@ if ( ! function_exists( 'sywat_ajax_history_discover_seasons' ) ) {
 add_action( 'wp_ajax_sywat_history_discover_seasons', 'sywat_ajax_history_discover_seasons' );
 
 /**
- * AJAX Handler 2: Scan a single TFAA season page (/results/season/{id}) for its tournament manifest
- * and ensure the archived season configuration exists in sywat_seasons_list.
+ * AJAX Handler 2: Scan a single TFAA season page (/results/season/{id}) for its tournament manifest,
+ * persist the discovered events permanently, and ensure the archived season exists in sywat_seasons_list.
  * Action: wp_ajax_sywat_history_scan_season
  *
  * @return void
@@ -128,25 +121,21 @@ if ( ! function_exists( 'sywat_ajax_history_scan_season' ) ) {
             );
         }
 
-        $saved_season = sywat_history_upsert_season( $season_payload );
-        $events       = sywat_history_parse_season_events_html( $fetched['html'], $saved_season );
-
-        $existing_tournaments = get_option( 'sywat_tournaments_list', array() );
-        if ( ! is_array( $existing_tournaments ) ) {
-            $existing_tournaments = array();
+        if ( function_exists( 'sywat_history_save_discovered_seasons' ) ) {
+            sywat_history_save_discovered_seasons( array( $season_payload ) );
         }
 
-        foreach ( $events as &$ev ) {
-            $t_title               = isset( $ev['title'] ) ? $ev['title'] : '';
-            $ev['already_imported'] = ( $t_title !== '' && isset( $existing_tournaments[ $t_title ] ) );
-        }
-        unset( $ev );
+        $saved_season    = sywat_history_upsert_season( $season_payload );
+        $parsed_events   = sywat_history_parse_season_events_html( $fetched['html'], $saved_season );
+        $hydrated_events = function_exists( 'sywat_history_save_discovered_events' )
+            ? sywat_history_save_discovered_events( $saved_season['slug'], $parsed_events )
+            : $parsed_events;
 
         wp_send_json_success(
             array(
                 'season' => $saved_season,
-                'events' => $events,
-                'count'  => count( $events ),
+                'events' => $hydrated_events,
+                'count'  => count( $hydrated_events ),
             )
         );
     }
@@ -154,7 +143,97 @@ if ( ! function_exists( 'sywat_ajax_history_scan_season' ) ) {
 add_action( 'wp_ajax_sywat_history_scan_season', 'sywat_ajax_history_scan_season' );
 
 /**
- * AJAX Handler 3: Fetch and import a single historical TFAA tournament scorecard (/results/{id}).
+ * AJAX Handler 3: Retrieve permanently stored tournaments for a season (or refresh live from TFAA)
+ * with real-time imported/not-imported status and scorecard counts.
+ * Action: wp_ajax_sywat_history_get_season_events
+ *
+ * @return void
+ */
+if ( ! function_exists( 'sywat_ajax_history_get_season_events' ) ) {
+    function sywat_ajax_history_get_season_events() {
+        sywat_history_verify_ajax_request();
+
+        $season_id     = isset( $_POST['season_id'] ) ? intval( wp_unslash( $_POST['season_id'] ) ) : 0;
+        $season_slug   = isset( $_POST['season_slug'] ) ? sanitize_title( wp_unslash( $_POST['season_slug'] ) ) : '';
+        $season_label  = isset( $_POST['season_label'] ) ? sanitize_text_field( wp_unslash( $_POST['season_label'] ) ) : '';
+        $force_refresh = isset( $_POST['force_refresh'] ) && sanitize_text_field( wp_unslash( $_POST['force_refresh'] ) ) === '1';
+
+        if ( $season_slug === '' && $season_id > 0 && $season_label !== '' ) {
+            $tmp_payload = sywat_history_build_season_payload( $season_id, $season_label );
+            $season_slug = isset( $tmp_payload['slug'] ) ? $tmp_payload['slug'] : '';
+        }
+
+        if ( $season_slug === '' ) {
+            wp_send_json_error(
+                array( 'message' => 'Missing season identifier.' )
+            );
+        }
+
+        if ( ! $force_refresh && function_exists( 'sywat_history_get_discovered_events' ) ) {
+            $cached_events = sywat_history_get_discovered_events( $season_slug );
+            if ( ! empty( $cached_events ) ) {
+                wp_send_json_success(
+                    array(
+                        'season_slug' => $season_slug,
+                        'events'      => $cached_events,
+                        'count'       => count( $cached_events ),
+                        'source'      => 'cache',
+                    )
+                );
+            }
+        }
+
+        if ( $season_id <= 0 || $season_label === '' ) {
+            $fallback_events = function_exists( 'sywat_history_get_discovered_events' )
+                ? sywat_history_get_discovered_events( $season_slug )
+                : array();
+
+            wp_send_json_success(
+                array(
+                    'season_slug' => $season_slug,
+                    'events'      => $fallback_events,
+                    'count'       => count( $fallback_events ),
+                    'source'      => 'cache',
+                )
+            );
+        }
+
+        $season_payload = sywat_history_build_season_payload( $season_id, $season_label );
+        $fetched        = sywat_history_fetch_remote_html( $season_payload['season_url'] );
+
+        if ( empty( $fetched['success'] ) ) {
+            wp_send_json_error(
+                array(
+                    'message' => ! empty( $fetched['error'] )
+                        ? $fetched['error']
+                        : 'Failed to retrieve tournament list from TFAA.',
+                )
+            );
+        }
+
+        if ( function_exists( 'sywat_history_save_discovered_seasons' ) ) {
+            sywat_history_save_discovered_seasons( array( $season_payload ) );
+        }
+
+        $parsed_events   = sywat_history_parse_season_events_html( $fetched['html'], $season_payload );
+        $hydrated_events = function_exists( 'sywat_history_save_discovered_events' )
+            ? sywat_history_save_discovered_events( $season_slug, $parsed_events )
+            : $parsed_events;
+
+        wp_send_json_success(
+            array(
+                'season_slug' => $season_slug,
+                'events'      => $hydrated_events,
+                'count'       => count( $hydrated_events ),
+                'source'      => 'remote',
+            )
+        );
+    }
+}
+add_action( 'wp_ajax_sywat_history_get_season_events', 'sywat_ajax_history_get_season_events' );
+
+/**
+ * AJAX Handler 4: Fetch and import a single historical TFAA tournament scorecard (/results/{id}).
  * Executed 1 event per AJAX request to prevent shared-hosting PHP execution timeouts.
  * Action: wp_ajax_sywat_history_import_tournament
  *
@@ -227,12 +306,18 @@ if ( ! function_exists( 'sywat_ajax_history_import_tournament' ) ) {
             );
         }
 
+        $resolved_slug   = $event_item['season_slug'];
+        $hydrated_events = function_exists( 'sywat_history_get_discovered_events' )
+            ? sywat_history_get_discovered_events( $resolved_slug )
+            : array();
+
         wp_send_json_success(
             array(
                 'event_id'     => $event_id,
                 'title'        => $saved['title'],
-                'season_slug'  => $event_item['season_slug'],
+                'season_slug'  => $resolved_slug,
                 'archer_count' => intval( $saved['archer_count'] ),
+                'events'       => $hydrated_events,
             )
         );
     }
@@ -240,7 +325,8 @@ if ( ! function_exists( 'sywat_ajax_history_import_tournament' ) ) {
 add_action( 'wp_ajax_sywat_history_import_tournament', 'sywat_ajax_history_import_tournament' );
 
 /**
- * AJAX Handler 4: Purge all imported historical tournaments and score rows for an archived season.
+ * AJAX Handler 5: Purge all imported historical tournaments and score rows for an archived season
+ * while keeping permanent discovered manifests intact.
  * Action: wp_ajax_sywat_history_purge_season
  *
  * @return void
