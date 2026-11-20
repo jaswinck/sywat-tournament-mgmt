@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Loader Shell
  * Path: includes/results/class-sywat-results.php
- * Description: Main loader binding public shortcode [sywat_results] with Tournament Results as the primary/default tab and Season Standings as the secondary tab, loading separated helper, data, and view sub-modules.
+ * Description: Main loader binding public shortcode [sywat_results] with Tournament Results as the primary/default tab and Season Standings as the secondary tab, carrying selected season state across tabs and loading separated helper, data, and view sub-modules.
  * Compliance: Output-buffered shortcode handler, zero HTML emitted at include time, zero inline styles, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 3.8.0
+ * Version: 3.9.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -26,7 +26,8 @@ if ( shortcode_exists( 'sywat_results' ) ) {
 add_shortcode( 'sywat_results', 'render_sywat_public_results_portal' );
 
 /**
- * Renders the public [sywat_results] portal with Tournament Results and Season Standings tabs.
+ * Renders the public [sywat_results] portal with Tournament Results and Season Standings tabs,
+ * preserving the active/selected season parameter across tab transitions.
  *
  * @return string Buffered HTML output.
  */
@@ -37,12 +38,23 @@ function render_sywat_public_results_portal() {
     $view            = ( $raw_view === 'standings' ) ? 'standings' : 'tournaments';
     $selected_season = isset( $_REQUEST['season'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['season'] ) ) : '';
     $selected_tourn  = isset( $_REQUEST['tournament'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['tournament'] ) ) : '';
+
+    $tournaments_tab_args = array( 'view' => 'tournaments' );
+    $standings_tab_args   = array( 'view' => 'standings' );
+    if ( $selected_season !== '' ) {
+        $tournaments_tab_args['season'] = $selected_season;
+        $standings_tab_args['season']   = $selected_season;
+    }
+
+    $base_clean_url      = remove_query_arg( array( 'tournament', 'season' ) );
+    $tournaments_tab_url = add_query_arg( $tournaments_tab_args, $base_clean_url );
+    $standings_tab_url   = add_query_arg( $standings_tab_args, $base_clean_url );
     ?>
     <div class="sywat-wrap">
         <!-- Sub-Module Navigation Tabs (Card-Docked) -->
         <div class="sywat-nav-tabs no-print">
-            <a href="?view=tournaments" class="sywat-tab-item sywat-tab-icon-results <?php echo ( $view === 'tournaments' ) ? 'active' : ''; ?>">Tournament Results</a>
-            <a href="?view=standings" class="sywat-tab-item sywat-tab-icon-standings <?php echo ( $view === 'standings' ) ? 'active' : ''; ?>">Season Standings</a>
+            <a href="<?php echo esc_url( $tournaments_tab_url ); ?>" class="sywat-tab-item sywat-tab-icon-results <?php echo ( $view === 'tournaments' ) ? 'active' : ''; ?>">Tournament Results</a>
+            <a href="<?php echo esc_url( $standings_tab_url ); ?>" class="sywat-tab-item sywat-tab-icon-standings <?php echo ( $view === 'standings' ) ? 'active' : ''; ?>">Season Standings</a>
         </div>
 
         <?php
@@ -52,11 +64,11 @@ function render_sywat_public_results_portal() {
             }
         } elseif ( ! empty( $selected_tourn ) ) {
             if ( function_exists( 'sywat_render_public_tournament_results' ) ) {
-                sywat_render_public_tournament_results( $selected_tourn );
+                sywat_render_public_tournament_results( $selected_tourn, $selected_season );
             }
         } else {
             if ( function_exists( 'sywat_render_public_tournament_directory' ) ) {
-                sywat_render_public_tournament_directory();
+                sywat_render_public_tournament_directory( $selected_season );
             }
         }
         ?>
