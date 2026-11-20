@@ -2,10 +2,10 @@
 /**
  * Sub-Module: TFAA Authentication Views & Shortcode Renderer
  * Path: includes/auth/sywat-auth-views.php
- * Description: Renders master navigation header for logged-in and public users with responsive mobile hamburger drawer & accessible dropdown toggles (including role-gated Tournament Portal / Check-In & Scores links, Head of Household user profile dropdown, and Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
+ * Description: Renders master navigation header for logged-in and public users with responsive mobile hamburger drawer & accessible dropdown toggles (including role-gated Tournament Portal / Check-In & Scores links, toggleable Import TFAA History link under Administration, Head of Household user profile dropdown, and Shops & Clubs navigation), custom front-end login screens, lost password forms, and sign-in shortcodes.
  * Compliance: Zero output at include time, zero inline style attributes, zero inline event handlers, omitted closing PHP tag. Layout styling driven strictly by centralized CSS utility classes.
  * Author: SYWAT / TFAA Archery
- * Version: 6.0.0
+ * Version: 6.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -120,6 +120,16 @@ if ( ! function_exists( 'sywat_render_auth_header' ) ) {
                                         </svg>
                                         Pricing &amp; Round Formats
                                     </a>
+                                    <?php if ( defined( 'SYWAT_ENABLE_HISTORY_IMPORTER' ) && SYWAT_ENABLE_HISTORY_IMPORTER ) : ?>
+                                        <a href="<?php echo esc_url( sywat_page_url( 'history_import' ) ); ?>">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                            Import TFAA History
+                                        </a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         <?php endif; ?>
