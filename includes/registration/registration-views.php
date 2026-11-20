@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal with role-gated capability checks and desk tabs, persists sticky tournament selection across desk portals, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
- * Compliance: Pure view/shortcode layer — zero output at include time, zero inline styles, delegated data-sywat-action triggers, omitted closing PHP tag.
+ * Description: Renders the [sywat_register] Registration Desk portal with role-gated capability checks and desk tabs, persists sticky tournament selection across desk portals, computes single-pass O(R) per-line capacity and waitlist metrics ($line_stats) after POST action execution so Current Line Slot Usage and the multi-line intake matrix stay strictly synchronized without view-layer option queries, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view/orchestration layer — zero output at include time, zero inline styles, zero inline JS event handlers (delegated data-sywat-action attributes), single-pass O(R) line stats computation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.2
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -325,6 +325,119 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             }
         }
 
+        // Single-Pass O(R) Line Capacity & Waitlist Aggregation (post-action so counts reflect fresh mutations)
+        $line_stats = array();
+        if ( ! empty( $available_lines ) && is_array( $available_lines ) ) {
+            $closed_lines_raw = ( $active_t_slug !== '' ) ? get_option( 'sywat_closed_lines_' . $active_t_slug, array() ) : array();
+            $closed_map       = is_array( $closed_lines_raw )
+                ? array_flip( array_map( 'trim', array_map( 'strval', $closed_lines_raw ) ) )
+                : array();
+
+            $has_line_resolver = function_exists( 'sywat_resolve_tournament_line_label' );
+            $has_cap_fn        = function_exists( 'sywat_get_line_max_cap' );
+            $has_norm_dist     = function_exists( 'sywat_normalize_dist' );
+            $line_name_to_idx  = array();
+
+            foreach ( $available_lines as $idx => $line ) {
+                $idx_str       = (string) $idx;
+                $label         = $has_line_resolver
+                    ? sywat_resolve_tournament_line_label( $line, $idx )
+                    : ( is_array( $line ) && ! empty( $line['name'] ) ? trim( (string) $line['name'] ) : 'Line ' . ( (int) $idx + 1 ) );
+                $raw_line_name = ( is_array( $line ) && ! empty( $line['name'] ) ) ? trim( (string) $line['name'] ) : '';
+                $m_20          = $has_cap_fn ? sywat_get_line_max_cap( $line, '20yd' ) : 20;
+                $m_cub         = $has_cap_fn ? sywat_get_line_max_cap( $line, 'Cub' ) : 5;
+                $is_closed     = isset( $closed_map[ $idx_str ] )
+                              || ( $raw_line_name !== '' && isset( $closed_map[ $raw_line_name ] ) )
+                              || isset( $closed_map[ $label ] );
+
+                $line_stats[ $idx ] = array(
+                    'idx'                   => $idx_str,
+                    'label'                 => $label,
+                    'raw_name'              => $raw_line_name,
+                    'c_20'                  => 0,
+                    'm_20'                  => $m_20,
+                    'rem_20'                => $m_20,
+                    'c_cub'                 => 0,
+                    'm_cub'                 => $m_cub,
+                    'rem_cub'               => $m_cub,
+                    'waitlisted_20'         => 0,
+                    'waitlisted_cub'        => 0,
+                    'total_line_shooters'   => 0,
+                    'total_line_waitlisted' => 0,
+                    'is_closed'             => $is_closed,
+                );
+
+                $line_name_to_idx[ strtolower( $label ) ] = $idx;
+                if ( $raw_line_name !== '' ) {
+                    $line_name_to_idx[ strtolower( $raw_line_name ) ] = $idx;
+                }
+            }
+
+            foreach ( $registrations as $r ) {
+                if ( ! is_array( $r ) || ! isset( $r['tournament'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $r['tournament'] ), trim( $selected_tournament ) ) !== 0 ) {
+                    continue;
+                }
+
+                $status = isset( $r['status'] ) ? trim( (string) $r['status'] ) : '';
+                if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $matched_key = null;
+                if ( isset( $r['line_index'] ) ) {
+                    $r_idx_str = trim( (string) $r['line_index'] );
+                    if ( isset( $line_stats[ $r_idx_str ] ) ) {
+                        $matched_key = $r_idx_str;
+                    } elseif ( is_numeric( $r_idx_str ) && isset( $line_stats[ (int) $r_idx_str ] ) ) {
+                        $matched_key = (int) $r_idx_str;
+                    } elseif ( $r_idx_str !== '' && isset( $line_name_to_idx[ strtolower( $r_idx_str ) ] ) ) {
+                        $matched_key = $line_name_to_idx[ strtolower( $r_idx_str ) ];
+                    }
+                }
+
+                if ( $matched_key === null && ! empty( $r['line_name'] ) ) {
+                    $norm_r_name = strtolower( trim( (string) $r['line_name'] ) );
+                    if ( isset( $line_name_to_idx[ $norm_r_name ] ) ) {
+                        $matched_key = $line_name_to_idx[ $norm_r_name ];
+                    }
+                }
+
+                if ( $matched_key === null ) {
+                    continue;
+                }
+
+                $raw_dist = isset( $r['distance'] ) ? (string) $r['distance'] : '20yd';
+                $dist     = $has_norm_dist
+                    ? sywat_normalize_dist( $raw_dist )
+                    : ( ( strcasecmp( trim( $raw_dist ), 'Cub' ) === 0 || strcasecmp( trim( $raw_dist ), '10yd' ) === 0 ) ? 'Cub' : '20yd' );
+
+                if ( strcasecmp( $status, 'Waitlist' ) === 0 ) {
+                    if ( $dist === 'Cub' ) {
+                        $line_stats[ $matched_key ]['waitlisted_cub']++;
+                    } else {
+                        $line_stats[ $matched_key ]['waitlisted_20']++;
+                    }
+                } else {
+                    if ( $dist === 'Cub' ) {
+                        $line_stats[ $matched_key ]['c_cub']++;
+                    } else {
+                        $line_stats[ $matched_key ]['c_20']++;
+                    }
+                }
+            }
+
+            foreach ( $line_stats as $idx => &$st ) {
+                $st['rem_20']                = $st['is_closed'] ? 0 : max( 0, $st['m_20'] - $st['c_20'] );
+                $st['rem_cub']               = $st['is_closed'] ? 0 : max( 0, $st['m_cub'] - $st['c_cub'] );
+                $st['total_line_shooters']   = $st['c_20'] + $st['c_cub'];
+                $st['total_line_waitlisted'] = $st['waitlisted_20'] + $st['waitlisted_cub'];
+            }
+            unset( $st );
+        }
+
         // Enqueue Client Logic & Localize Data
         if ( function_exists( 'sywat_render_registration_scripts' ) ) {
             sywat_render_registration_scripts();
@@ -368,7 +481,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                         <form method="get" action="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>">
                             <div class="sywat-field-group">
                                 <label for="sywat_selected_tournament">Active Tournament:</label>
-                                <select id="sywat_selected_tournament" name="selected_tournament" onchange="this.form.submit()">
+                                <select id="sywat_selected_tournament" name="selected_tournament" data-sywat-action="switch-tournament">
                                     <?php if ( empty( $ordered_tournaments ) ) : ?>
                                         <option value="">No Tournaments Configured</option>
                                     <?php else : ?>
@@ -400,7 +513,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
                 <?php if ( $has_active_tourn ) : ?>
                     <?php
                     if ( function_exists( 'sywat_render_registration_modal' ) ) {
-                        sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
+                        sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations, $line_stats );
                     }
                     ?>
                 <?php else : ?>
