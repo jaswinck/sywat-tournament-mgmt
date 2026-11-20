@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Toolbars, Auth Header & Inline Filter Controls
    Path: assets/css/sywat-toolbar.css
-   Version: 7.0.2
+   Version: 7.0.3
    ========================================================================== */
 
 /* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
@@ -237,8 +237,8 @@
 .sywat-tracker-card-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--sywat-text-muted); }
 .sywat-tracker-card-actions { margin-top: 4px; border-top: 1px dashed var(--sywat-border); padding-top: 8px; display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .sywat-tracker-card-actions form,
-.sywat-tracker-card-actions > a.sywat-btn { margin: 0; flex: 1 1 105px; min-width: 105px; }
-.sywat-tracker-card-actions .sywat-btn { width: 100%; justify-content: center; }
+.sywat-tracker-card-actions > a.sywat-btn { margin: 0; flex: 1 1 100px; min-width: 100px; }
+.sywat-tracker-card-actions .sywat-btn { width: 100%; justify-content: center; padding: 6px 8px; font-size: 12px; height: 34px; }
 
 /* TFAA Sync Pill Component */
 .sywat-sync-pill { margin: 0 !important; display: inline-flex !important; align-items: center !important; background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border); border-radius: 18px; padding: 2px 4px 2px 8px !important; gap: 6px; height: 32px !important; box-sizing: border-box !important; }
