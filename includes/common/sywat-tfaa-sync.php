@@ -2,10 +2,10 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Verbatim Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Resolves parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)") prior to full-text lookup to prevent substring collisions, treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updates matching local pre-registrations unconditionally, and imports all TFAA entries verbatim.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Resolves parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)") prior to full-text lookup to prevent substring collisions, persists incomplete-round flags ("is_inc") on "[INC]" entries so Season Standings can exclude partial rounds while preserving individual tournament scorecards, treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updates matching local pre-registrations unconditionally, and imports all TFAA entries verbatim.
  * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity & style helpers, hoisted match metadata, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.0.1
+ * Version: 8.0.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -211,7 +211,7 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
  * Core Universal TFAA Event Score Verbatim Sync Engine.
  * Fetches the authoritative TFAA results page, purges prior TFAA-imported rows for the
  * tournament once valid entries are parsed, updates any matching local pre-registrations
- * unconditionally with TFAA's current name/division/gender/style/score, and inserts all
+ * unconditionally with TFAA's current name/division/gender/style/score/is_inc, and inserts all
  * remaining TFAA entries verbatim.
  *
  * @param string $t_name Tournament Title/Key Name.
@@ -501,8 +501,9 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm_div       = $normalize_div_key( $entry['division'] );
             $norm_style     = $normalize_style_key( $entry['style'] );
             $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
+            $entry_is_inc   = ! empty( $entry['is_inc'] ) ? 1 : 0;
 
-            if ( ! $entry_is_guest && ! $entry['is_inc'] && empty( $primary_styles[ $norm_name ] ) ) {
+            if ( ! $entry_is_guest && ! $entry_is_inc && empty( $primary_styles[ $norm_name ] ) ) {
                 $primary_styles[ $norm_name ] = $entry['style'];
             }
 
@@ -549,6 +550,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $reg['distance']   = $entry['distance'];
                 $reg['score']      = $entry['score'];
                 $reg['x_count']    = $entry['xs'];
+                $reg['is_inc']     = $entry_is_inc;
 
                 if ( $entry_is_guest ) {
                     $reg['type'] = 'Guest';
@@ -562,6 +564,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $scores[ $matched_reg_id ] = array(
                     'score'    => $entry['score'],
                     'xs'       => $entry['xs'],
+                    'is_inc'   => $entry_is_inc,
                     'saved_at' => current_time( 'mysql' ),
                 );
 
@@ -610,6 +613,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                     'checked_in'  => 1,
                     'score'       => $entry['score'],
                     'x_count'     => $entry['xs'],
+                    'is_inc'      => $entry_is_inc,
                     'tfaa_origin' => 1,
                     'created_at'  => current_time( 'mysql' ),
                 );
@@ -620,6 +624,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $scores[ $target_id ] = array(
                     'score'    => $entry['score'],
                     'xs'       => $entry['xs'],
+                    'is_inc'   => $entry_is_inc,
                     'saved_at' => current_time( 'mysql' ),
                 );
 
