@@ -3,7 +3,7 @@
  * Path: assets/js/sywat-registration.js
  * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA age-division & shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and every Archer Full Name row (.sywat-archer-name-input) with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, focusin, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden / .sywat-field-relative).
- * Version: 7.5.2
+ * Version: 7.5.3
  */
 
 (function() {
@@ -30,6 +30,12 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function isPlaceholderDivision(divStr) {
+        const clean = String(divStr || '').trim().toLowerCase();
+        if (!clean) return true;
+        return ['-', '--', '—', '–', 'n/a', 'na', 'none', 'unassigned', 'unknown', 'no show'].indexOf(clean) !== -1;
     }
 
     function cleanImportModalQueryParam() {
@@ -393,10 +399,11 @@
     }
 
     /**
-     * Map a historical TFAA division label/code to 'cub', 'youth', or 'adult' on the 3-tier selector.
+     * Map a verified NFAA age division label/code to 'cub', 'youth', or 'adult' on the 3-tier selector.
+     * Ignores empty or placeholder values so unverified shooters never receive a guessed tier.
      */
     function matchTfaaRateTier(tfaaDiv, selectEl) {
-        if (!tfaaDiv || !selectEl) return;
+        if (!tfaaDiv || !selectEl || isPlaceholderDivision(tfaaDiv)) return;
         const cleanTfaa = String(tfaaDiv).trim().toLowerCase();
         if (!cleanTfaa) return;
 
@@ -463,9 +470,10 @@
 
             if (isExact || isFl || isAlias || isPartial) {
                 seenNames.add(norm);
+                const cleanDiv = isPlaceholderDivision(s.division) ? '' : String(s.division).trim();
                 matches.push({
                     name: s.name,
-                    division: s.division || '',
+                    division: cleanDiv,
                     rank: isExact ? 4 : (isFl ? 3 : (isAlias ? 2 : 1))
                 });
             }
@@ -489,7 +497,10 @@
         matches.slice(0, 8).forEach(function(m) {
             const item = document.createElement('div');
             item.className = 'sywat-tfaa-item';
-            item.innerHTML = '<strong>' + escapeHtml(m.name) + '</strong> <span class="sywat-tfaa-item-badge">' + escapeHtml(m.division || '') + '</span>';
+            const badgeHtml = m.division
+                ? ' <span class="sywat-tfaa-item-badge">' + escapeHtml(m.division) + '</span>'
+                : '';
+            item.innerHTML = '<strong>' + escapeHtml(m.name) + '</strong>' + badgeHtml;
 
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
