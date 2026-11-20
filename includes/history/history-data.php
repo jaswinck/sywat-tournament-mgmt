@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Data Access & Atomic Batch Persistence
  * Path: includes/history/history-data.php
- * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Executes atomic MySQL transactions and chunked multi-row SQL upserts into wp_options (autoload = 'no') so 16+ seasons of independent historical scorecards import rapidly without wp_users bloat or PHP timeouts.
+ * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Seeds sywat_seasons_list via sywat_get_seasons() before upserting archived seasons so active/default seasons are always preserved, and executes atomic MySQL transactions and chunked multi-row SQL upserts into wp_options (autoload = 'no') so 16+ seasons of independent historical scorecards import rapidly without wp_users bloat or PHP timeouts.
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, explicit MySQL transactions, chunked batch SQL writes, object cache invalidation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -82,7 +82,7 @@ if ( ! function_exists( 'sywat_history_fetch_remote_html' ) ) {
  */
 if ( ! function_exists( 'sywat_history_get_existing_season_stats' ) ) {
     function sywat_history_get_existing_season_stats() {
-        $seasons     = get_option( 'sywat_seasons_list', array() );
+        $seasons     = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         $stats       = array();
 
@@ -127,7 +127,8 @@ if ( ! function_exists( 'sywat_history_get_existing_season_stats' ) ) {
 
 /**
  * Insert or update an archived season configuration in sywat_seasons_list.
- * Preserves existing active or upcoming season statuses if the season already exists locally.
+ * Seeds from sywat_get_seasons() first so active and default seasons are never lost,
+ * and preserves existing active or upcoming season statuses if the season already exists locally.
  *
  * @param array $season_payload Canonical season descriptor from sywat_history_build_season_payload().
  * @return array                Saved canonical season record.
@@ -139,7 +140,7 @@ if ( ! function_exists( 'sywat_history_upsert_season' ) ) {
         }
 
         $slug    = sanitize_title( (string) $season_payload['slug'] );
-        $seasons = get_option( 'sywat_seasons_list', array() );
+        $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
         if ( ! is_array( $seasons ) ) {
             $seasons = array();
         }
@@ -419,7 +420,7 @@ if ( ! function_exists( 'sywat_history_purge_season_data' ) ) {
         wp_cache_delete( 'sywat_tournaments_list', 'options' );
 
         if ( ! $has_non_hist_events ) {
-            $seasons = get_option( 'sywat_seasons_list', array() );
+            $seasons = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
             if ( is_array( $seasons ) && isset( $seasons[ $clean_slug ] ) ) {
                 $s_status = isset( $seasons[ $clean_slug ]['status'] ) ? $seasons[ $clean_slug ]['status'] : 'archived';
                 if ( $s_status === 'archived' ) {
