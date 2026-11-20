@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Pure view renderer for the compact horizontal Line Capacity Tracker card strip at the top of [sywat_register], the Phone & Group Registration Intake form featuring a per-archer multi-line checkbox matrix (zero pre-checked defaults, single-entry multi-line registration, live per-line capacity headers, 3-tier Category / Rate selection, dynamic Round Format selection), and the top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
+ * Description: Pure view renderer for the compact horizontal Line Capacity Tracker card strip at the top of [sywat_register], the Phone & Group Registration Intake form featuring TFAA division autocomplete anchoring on both Caller / Primary Archer Name (#sywat_group_name) and Archer Full Name rows, a per-archer multi-line checkbox matrix (zero pre-checked defaults, single-entry multi-line registration, live per-line capacity headers, 3-tier Category / Rate selection, dynamic Round Format selection), and the top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
  * Compliance: Pure view layer — zero database/option queries, zero stats aggregation loops, zero output at include time, zero inline style attributes, zero embedded script blocks, zero inline JS event handlers (delegated data-sywat-action attributes only), canonical sywat_resolve_tournament_line_label() delegation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.3
+ * Version: 7.4.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -301,11 +301,12 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                 <input type="hidden" name="modal_action" value="prereg">
 
                 <div class="sywat-form-grid-3 sywat-intake-group-wrapper">
-                    <div class="sywat-field-group">
+                    <div class="sywat-field-group sywat-field-relative">
                         <label for="sywat_group_name">Caller / Primary Archer Name</label>
                         <input type="text"
                                name="group_name"
                                id="sywat_group_name"
+                               autocomplete="off"
                                value="<?php echo esc_attr( $group_name_val ); ?>"
                                placeholder="e.g. John Smith"
                                data-sywat-action="caller-name-input">
