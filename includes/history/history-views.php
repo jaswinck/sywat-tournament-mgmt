@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Importer View Renderer
  * Path: includes/history/history-views.php
- * Description: Renders the [sywat_history_import] administrative portal for discovering historical TFAA seasons, selecting single test seasons or full multi-season batches, monitoring chunked AJAX progress, and purging imported seasons.
- * Compliance: Pure view layer — zero output at include time, zero direct SQL queries, zero inline style attributes, zero embedded script blocks, zero inline JS event handlers, accessible inline SVGs, omitted closing PHP tag.
+ * Description: Renders the [sywat_history_import] administrative portal for discovering historical TFAA seasons, selecting single test seasons or multi-season batches, and monitoring chunked AJAX progress and activity logs inside a dedicated modal overlay (#sywat_history_progress_modal).
+ * Compliance: Pure view layer — zero output at include time, zero direct SQL queries, zero inline style attributes, zero embedded script blocks, zero inline JS event handlers, Modal Markup Contract compliant, accessible inline SVGs, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -64,6 +64,18 @@ if ( ! function_exists( 'sywat_render_history_importer_view' ) ) {
                             Discover TFAA Seasons
                         </button>
 
+                        <button type="button" id="sywat_history_open_log_btn" class="sywat-btn sywat-btn-secondary" data-sywat-action="open-history-modal">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            Activity Log
+                        </button>
+
                         <?php if ( $results_url !== '' ) : ?>
                             <a href="<?php echo esc_url( $results_url ); ?>" class="sywat-btn sywat-btn-secondary">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -77,31 +89,12 @@ if ( ! function_exists( 'sywat_render_history_importer_view' ) ) {
                     </div>
                 </div>
 
-                <!-- Dynamic Feedback Alert Banner -->
+                <!-- Dynamic Card Feedback Alert Banner -->
                 <div id="sywat_history_status_banner" class="sywat-alert sywat-hidden" role="status" aria-live="polite"></div>
 
                 <!-- Operational Guidance Notice -->
                 <div class="sywat-notice-box sywat-mt-3 sywat-mb-4">
                     <strong>Migration Architecture:</strong> Imported seasons are saved with <strong>Archived</strong> status so they populate <strong>Results &amp; Standings</strong> without appearing in active registration or check-in dropdowns. Historical shooter rows remain decoupled from live Member Directory accounts, and events are processed one tournament per AJAX request to prevent server timeouts. Select a single season first to verify formatting before running a multi-season batch.
-                </div>
-
-                <!-- Live Chunked AJAX Progress Panel -->
-                <div id="sywat_history_progress_box" class="sywat-notice-box sywat-mt-3 sywat-mb-4 sywat-hidden">
-                    <div class="sywat-table-header-bar">
-                        <strong id="sywat_history_progress_label">Preparing historical migration...</strong>
-                        <span id="sywat_history_progress_stats">0 / 0 events</span>
-                    </div>
-
-                    <progress id="sywat_history_progress_bar" max="100" value="0" class="sywat-w-100"></progress>
-
-                    <div class="sywat-mt-3">
-                        <button type="button" id="sywat_history_stop_btn" class="sywat-btn sywat-btn-danger" data-sywat-action="stop-import">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <rect x="6" y="6" width="12" height="12"></rect>
-                            </svg>
-                            Stop After Current Event
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Season Discovery & Selection Table -->
@@ -154,19 +147,56 @@ if ( ! function_exists( 'sywat_render_history_importer_view' ) ) {
                     </div>
                 </div>
 
-                <!-- Live Migration Activity Log -->
-                <div id="sywat_history_log_section" class="sywat-mt-3 sywat-hidden">
-                    <div class="sywat-table-header-bar">
-                        <h3>Migration Activity Log</h3>
-                        <div class="sywat-table-header-controls">
-                            <button type="button" class="sywat-btn sywat-btn-secondary" data-sywat-action="clear-log">
-                                Clear Log
-                            </button>
+            </div>
+
+            <!-- Dedicated Progress & Activity Log Modal (#sywat_history_progress_modal) -->
+            <div class="sywat-modal-backdrop" id="sywat_history_progress_modal">
+                <div class="sywat-modal-content sywat-modal-lg">
+                    <div class="sywat-modal-header">
+                        <h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
+                            TFAA Migration Progress &amp; Activity Log
+                        </h3>
+                        <button type="button" id="sywat_history_modal_x_btn" class="sywat-modal-close" data-sywat-action="close-history-modal" aria-label="Close migration activity log">&times;</button>
+                    </div>
+
+                    <div class="sywat-modal-body">
+                        <div id="sywat_history_modal_banner" class="sywat-alert sywat-hidden" role="status" aria-live="polite"></div>
+
+                        <div id="sywat_history_progress_box" class="sywat-hidden">
+                            <div class="sywat-progress-meta">
+                                <span id="sywat_history_progress_label">Preparing historical migration...</span>
+                                <span id="sywat_history_progress_stats">0 / 0 events</span>
+                            </div>
+                            <div class="sywat-progress-track">
+                                <div id="sywat_history_progress_fill" class="sywat-progress-fill"></div>
+                            </div>
+                        </div>
+
+                        <div id="sywat_history_log_list" class="sywat-modal-log-box" role="log" aria-live="polite">
+                            <div>No migration activity recorded yet.</div>
                         </div>
                     </div>
-                    <div id="sywat_history_log_list" class="sywat-notice-box" role="log" aria-live="polite"></div>
-                </div>
 
+                    <div class="sywat-modal-footer">
+                        <button type="button" id="sywat_history_stop_btn" class="sywat-btn sywat-btn-danger sywat-hidden" data-sywat-action="stop-import">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="6" y="6" width="12" height="12"></rect>
+                            </svg>
+                            Stop After Current Event
+                        </button>
+
+                        <button type="button" id="sywat_history_clear_log_btn" class="sywat-btn sywat-btn-secondary" data-sywat-action="clear-log">
+                            Clear Log
+                        </button>
+
+                        <button type="button" id="sywat_history_close_modal_btn" class="sywat-btn sywat-btn-primary" data-sywat-action="close-history-modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         <?php
