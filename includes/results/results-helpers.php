@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Formatting & Sort Helpers
  * Path: includes/results/results-helpers.php
- * Description: Pure helper layer providing O(1) static per-request lookup maps for Age Divisions and Shooting Styles, category heading formatters, and database-driven sort-weight calculators.
- * Compliance: Pure helper layer — zero direct SQL queries, zero get_option() calls, zero HTML echo, omitted closing PHP tag.
+ * Description: Pure helper layer providing O(1) static per-request lookup maps for Age Divisions and Shooting Styles, database-driven tournament directory host/location resolution, category heading formatters, and sort-weight calculators.
+ * Compliance: Pure helper layer — zero direct SQL queries, zero get_option() calls, zero hardcoded shop names, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -195,6 +195,94 @@ if ( ! function_exists( 'sywat_results_resolve_style_record' ) ) {
         }
 
         return null;
+    }
+}
+
+/**
+ * Resolve the display host/range location for a tournament in the public directory
+ * using database-configured shops and the tournament title/metadata without hardcoding
+ * shop names or trusting stale default shop_id fallbacks on unmatched TFAA imports.
+ *
+ * @param string $t_name    Tournament title.
+ * @param array  $t_data    Tournament configuration array.
+ * @param array  $all_shops Configured shops keyed by shop_id.
+ * @return string           Resolved host/range location label.
+ */
+if ( ! function_exists( 'sywat_resolve_tournament_directory_location' ) ) {
+    function sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops = array() ) {
+        $normalize_loc = function( $val ) {
+            $s = strtolower( trim( (string) $val ) );
+            $s = str_replace( array( "'", '’', '&' ), array( '', '', 'and' ), $s );
+            $s = preg_replace( '/[^a-z0-9]+/', ' ', $s );
+            return trim( $s );
+        };
+
+        $shop_lookup = array();
+        if ( is_array( $all_shops ) ) {
+            foreach ( $all_shops as $s_id => $s_rec ) {
+                if ( ! empty( $s_rec['name'] ) ) {
+                    $canon_name = trim( (string) $s_rec['name'] );
+                    $exact_key  = strtolower( $canon_name );
+                    $norm_key   = $normalize_loc( $canon_name );
+
+                    $shop_lookup[ $exact_key ] = $canon_name;
+                    if ( $norm_key !== '' && ! isset( $shop_lookup[ $norm_key ] ) ) {
+                        $shop_lookup[ $norm_key ] = $canon_name;
+                    }
+                }
+            }
+        }
+
+        // Derive candidate host name from tournament title by stripping trailing "- 1" / "- 2" event numbers
+        $derived      = trim( preg_replace( '/\s*(?:-|–|—)\s*\d+\s*$/', '', (string) $t_name ) );
+        $derived_low  = strtolower( $derived );
+        $derived_norm = $normalize_loc( $derived );
+
+        // 1. Check explicit location/venue metadata if stored on tournament config
+        $explicit_loc = '';
+        if ( is_array( $t_data ) ) {
+            foreach ( array( 'location', 'venue', 'host_name' ) as $loc_key ) {
+                if ( ! empty( $t_data[ $loc_key ] ) ) {
+                    $explicit_loc = trim( (string) $t_data[ $loc_key ] );
+                    break;
+                }
+            }
+        }
+        if ( $explicit_loc !== '' ) {
+            $loc_low  = strtolower( $explicit_loc );
+            $loc_norm = $normalize_loc( $explicit_loc );
+            if ( isset( $shop_lookup[ $loc_low ] ) ) {
+                return $shop_lookup[ $loc_low ];
+            }
+            if ( $loc_norm !== '' && isset( $shop_lookup[ $loc_norm ] ) ) {
+                return $shop_lookup[ $loc_norm ];
+            }
+            return $explicit_loc;
+        }
+
+        // 2. Match derived tournament host name against configured shops (overrides stale fallback shop_ids)
+        if ( $derived !== '' ) {
+            if ( isset( $shop_lookup[ $derived_low ] ) ) {
+                return $shop_lookup[ $derived_low ];
+            }
+            if ( $derived_norm !== '' && isset( $shop_lookup[ $derived_norm ] ) ) {
+                return $shop_lookup[ $derived_norm ];
+            }
+        }
+
+        // 3. Check explicit shop_id when it is not a stale default fallback mismatched against the title
+        $explicit_shop_id = ( is_array( $t_data ) && ! empty( $t_data['shop_id'] ) ) ? trim( (string) $t_data['shop_id'] ) : '';
+        if ( $explicit_shop_id !== '' && is_array( $all_shops ) && isset( $all_shops[ $explicit_shop_id ]['name'] ) ) {
+            $assigned_shop_name = trim( (string) $all_shops[ $explicit_shop_id ]['name'] );
+            $default_shop_id    = isset( $all_shops['shop_ccr'] ) ? 'shop_ccr' : (string) key( $all_shops );
+            $is_default_shop    = ( $explicit_shop_id === $default_shop_id );
+
+            if ( ! $is_default_shop || $derived === '' ) {
+                return $assigned_shop_name;
+            }
+        }
+
+        return $derived;
     }
 }
 
