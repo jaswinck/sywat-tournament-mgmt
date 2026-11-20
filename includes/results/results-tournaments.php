@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Renders the public tournament directory, single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, explicit Guest-entry routing (including synced type === 'Guest' records), normalized First+Last (+ suffix) archer deduplication, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
+ * Description: Renders the public tournament directory with accurate host location resolution (preventing unmatched TFAA imports from defaulting to Cinnamon Creek Ranch), URL-encoded tournament action links (preserving "&" in names such as "Fort Grard Guns & Archery - 1"), single-tournament category leaderboards formatted and tie-sorted as "LastName, FirstName" with dual-format live search indexing, explicit Guest-entry routing, normalized First+Last (+ suffix) archer deduplication, and staff Quick Edit modal wired to canonical "FirstName LastName" storage and database-configured shooting styles and age divisions.
  * Compliance: Zero inline style attributes, opt-out shielded legacy script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -118,6 +118,51 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
 }
 
 /**
+ * Resolve the display host/range location for a tournament in the public directory
+ * without falsely defaulting unmatched TFAA-synced shoots to Cinnamon Creek Ranch.
+ *
+ * @param string $t_name        Tournament title.
+ * @param array  $t_data        Tournament configuration array.
+ * @param array  $all_shops     Configured shops keyed by shop_id.
+ * @param array  $shop_name_map Lowercase shop name => canonical shop name map.
+ * @return string               Resolved host/range location label.
+ */
+if ( ! function_exists( 'sywat_resolve_tournament_directory_location' ) ) {
+    function sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops, $shop_name_map ) {
+        $explicit_shop_id = ( is_array( $t_data ) && ! empty( $t_data['shop_id'] ) ) ? trim( (string) $t_data['shop_id'] ) : '';
+        if ( $explicit_shop_id !== '' && isset( $all_shops[ $explicit_shop_id ]['name'] ) ) {
+            return trim( (string) $all_shops[ $explicit_shop_id ]['name'] );
+        }
+
+        $explicit_loc = '';
+        if ( is_array( $t_data ) ) {
+            foreach ( array( 'location', 'venue', 'host_name' ) as $loc_key ) {
+                if ( ! empty( $t_data[ $loc_key ] ) ) {
+                    $explicit_loc = trim( (string) $t_data[ $loc_key ] );
+                    break;
+                }
+            }
+        }
+        if ( $explicit_loc !== '' ) {
+            $loc_lower = strtolower( $explicit_loc );
+            return isset( $shop_name_map[ $loc_lower ] ) ? $shop_name_map[ $loc_lower ] : $explicit_loc;
+        }
+
+        // Derive clean host name from tournament title by stripping trailing "- 1" / "- 2" event numbers
+        $derived = trim( preg_replace( '/\s*(?:-|–|—)\s*\d+\s*$/', '', (string) $t_name ) );
+        if ( $derived !== '' ) {
+            $derived_lower = strtolower( $derived );
+            if ( isset( $shop_name_map[ $derived_lower ] ) ) {
+                return $shop_name_map[ $derived_lower ];
+            }
+            return $derived;
+        }
+
+        return 'Cinnamon Creek Ranch';
+    }
+}
+
+/**
  * Render Public Tournament Directory Listing with Shop Search & Turnout Stats
  *
  * @return void
@@ -129,16 +174,28 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
             $tournaments = array();
         }
 
-        $all_shops    = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
-        $filter_shops = array();
-
-        foreach ( $tournaments as $t_name => $t_data ) {
-            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
-            if ( isset( $all_shops[ $t_shop ]['name'] ) ) {
-                $filter_shops[ $t_shop ] = $all_shops[ $t_shop ]['name'];
+        $all_shops     = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : array();
+        $shop_name_map = array();
+        if ( is_array( $all_shops ) ) {
+            foreach ( $all_shops as $s_id => $s_rec ) {
+                if ( ! empty( $s_rec['name'] ) ) {
+                    $clean_s_name                                   = trim( (string) $s_rec['name'] );
+                    $shop_name_map[ strtolower( $clean_s_name ) ]   = $clean_s_name;
+                }
             }
         }
-        asort( $filter_shops );
+
+        $filter_shops       = array();
+        $resolved_locations = array();
+
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $loc_label                     = sywat_resolve_tournament_directory_location( $t_name, $t_data, $all_shops, $shop_name_map );
+            $resolved_locations[ $t_name ] = $loc_label;
+            if ( $loc_label !== '' ) {
+                $filter_shops[ strtolower( $loc_label ) ] = $loc_label;
+            }
+        }
+        asort( $filter_shops, SORT_NATURAL | SORT_FLAG_CASE );
 
         // Sort tournaments chronologically by start_date ASC (Oldest to Newest)
         uasort( $tournaments, function( $a, $b ) {
@@ -170,8 +227,8 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                         <label for="sywat_dir_shop_filter">Host Location / Shop</label>
                         <select id="sywat_dir_shop_filter" onchange="sywatApplyDirectoryFilters()">
                             <option value="all">All Locations</option>
-                            <?php foreach ( $filter_shops as $s_id => $s_name ) : ?>
-                                <option value="<?php echo esc_attr( strtolower( $s_name ) ); ?>"><?php echo esc_html( $s_name ); ?></option>
+                            <?php foreach ( $filter_shops as $s_slug => $s_name ) : ?>
+                                <option value="<?php echo esc_attr( $s_slug ); ?>"><?php echo esc_html( $s_name ); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -209,8 +266,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                         $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), '—' );
                                     }
 
-                                    $t_shop_id   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
-                                    $t_shop_name = isset( $all_shops[ $t_shop_id ]['name'] ) ? $all_shops[ $t_shop_id ]['name'] : 'Cinnamon Creek Ranch';
+                                    $t_shop_name = isset( $resolved_locations[ $t_name ] ) ? $resolved_locations[ $t_name ] : 'Cinnamon Creek Ranch';
 
                                     $raw_scores   = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $t_name ) : array();
                                     $scores_count = is_array( $raw_scores ) ? count( $raw_scores ) : 0;
@@ -218,7 +274,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
                                     $view_results_url = add_query_arg(
                                         array(
                                             'view'       => 'tournaments',
-                                            'tournament' => $t_name,
+                                            'tournament' => rawurlencode( $t_name ),
                                         )
                                     );
                                 ?>
@@ -300,6 +356,20 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
  */
 if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
     function sywat_render_public_tournament_results( $tournament_name ) {
+        $tournament_name = trim( html_entity_decode( (string) $tournament_name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+
+        // Resolve canonical tournament title if passed with URL/entity variations
+        $all_tournaments = get_option( 'sywat_tournaments_list', array() );
+        if ( is_array( $all_tournaments ) && ! isset( $all_tournaments[ $tournament_name ] ) ) {
+            $target_slug = sanitize_title( $tournament_name );
+            foreach ( $all_tournaments as $cand_name => $cand_data ) {
+                if ( sanitize_title( $cand_name ) === $target_slug ) {
+                    $tournament_name = $cand_name;
+                    break;
+                }
+            }
+        }
+
         $raw_scores       = function_exists( 'sywat_get_tournament_scores' ) ? sywat_get_tournament_scores( $tournament_name ) : array();
         $has_lf_formatter = function_exists( 'sywat_format_name_last_first' );
         $has_match_keys   = function_exists( 'sywat_normalize_archer_match_keys' );
