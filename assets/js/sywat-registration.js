@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA shooter autocomplete with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
- * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.5.0
+ * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and Archer Full Name rows with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden / .sywat-field-relative).
+ * Version: 7.5.1
  */
 
 (function() {
@@ -365,9 +365,9 @@
         const firstArcherInput = document.getElementById('sywat_first_archer_name') || document.querySelector('.sywat-archer-name-input');
         if (firstArcherInput && !firstArcherInput.dataset.manuallyEdited) {
             firstArcherInput.value = callerInput.value;
-            handleTfaaAutocomplete(firstArcherInput);
             recalculateGroupTotal();
         }
+        handleTfaaAutocomplete(callerInput);
         checkAndFillPhone(callerInput.value);
     }
 
@@ -431,6 +431,7 @@
     /**
      * Registration Autocomplete: Ranks exact, middle-initial folded, given-name alias/stem
      * ("Steven Bergh" -> "Steve Bergh"), and substring matches across the unified Member DB + TFAA index.
+     * Supports both Caller / Primary Archer Name (#sywat_group_name) and Archer Full Name rows.
      */
     function handleTfaaAutocomplete(input) {
         if (!input) return;
@@ -478,7 +479,7 @@
 
         const parent = input.parentElement;
         if (parent && getComputedStyle(parent).position === 'static') {
-            parent.classList.add('sywat-relative-parent');
+            parent.classList.add('sywat-field-relative');
         }
 
         const dropdown = document.createElement('div');
@@ -493,6 +494,23 @@
                 e.preventDefault();
                 input.value = m.name;
                 closeAllTfaaAutocompletes();
+
+                if (input.id === 'sywat_group_name') {
+                    const firstArcherInput = document.getElementById('sywat_first_archer_name') || document.querySelector('.sywat-archer-name-input');
+                    if (firstArcherInput && !firstArcherInput.dataset.manuallyEdited) {
+                        firstArcherInput.value = m.name;
+                        const firstRow = firstArcherInput.closest('.sywat-archer-input-row');
+                        if (firstRow && m.division) {
+                            const firstTierSelect = firstRow.querySelector('.sywat-rate-tier-select');
+                            if (firstTierSelect) {
+                                matchTfaaRateTier(m.division, firstTierSelect);
+                            }
+                        }
+                    }
+                    checkAndFillPhone(m.name);
+                    recalculateGroupTotal();
+                    return;
+                }
 
                 const callerInput = document.getElementById('sywat_group_name');
                 if (callerInput && (!callerInput.value.trim() || input.id === 'sywat_first_archer_name')) {
@@ -912,7 +930,11 @@
             }
         }
 
-        if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && !e.target.closest('.sywat-archer-name-input')) {
+        if (
+            !e.target.closest('.sywat-tfaa-autocomplete-dropdown') &&
+            !e.target.closest('.sywat-archer-name-input') &&
+            e.target.id !== 'sywat_group_name'
+        ) {
             closeAllTfaaAutocompletes();
         }
     });
