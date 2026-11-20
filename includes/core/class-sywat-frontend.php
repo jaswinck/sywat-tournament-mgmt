@@ -2,7 +2,7 @@
 /**
  * SYWAT Archery - Front-End Integration Layer
  * Path: includes/core/class-sywat-frontend.php
- * Version: 7.3.3
+ * Version: 7.4.0
  *
  * Keeps the plugin theme-neutral so it behaves the same under Astra, Divi or
  * any other theme:
@@ -30,6 +30,7 @@ if ( ! function_exists( 'sywat_shortcode_tags' ) ) {
             'sywat_members', 'sywat_register', 'sywat_member_register', 'sywat_desk',
             'sywat_scores', 'sywat_results', 'sywat_schedule', 'sywat_login',
             'sywat_public_shops', 'sywat_manage_shops', 'sywat_shooting_styles', 'sywat_pricing',
+            'sywat_history_import',
         );
         return apply_filters( 'sywat_shortcode_tags', $tags );
     }
@@ -110,6 +111,7 @@ if ( ! function_exists( 'sywat_page_defaults' ) ) {
             'member_directory'    => array( '/member-directory/', 'Member Directory page' ),
             'shooting_styles'     => array( '/shooting-styles/', 'Shooting Styles & Rules page' ),
             'pricing'             => array( '/pricing/', 'Pricing & Round Formats page' ),
+            'history_import'      => array( '/import-tfaa-history/', 'Import TFAA History page' ),
             'after_login_manager' => array( '/sywat-manage-tournaments/', 'After login: tournament managers go to' ),
             'after_login_shop'    => array( '/sywat-desk/', 'After login: shop operators go to' ),
         );
