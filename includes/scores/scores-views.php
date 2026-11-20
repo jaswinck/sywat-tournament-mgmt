@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker, archer score entry table formatted and surname-sorted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels and database-normalized division/style labels, and control toolbars.
- * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker (counting completed scores and incomplete "INC" entries as saved), archer score entry table formatted and surname-sorted as "LastName, FirstName" with dual-format live search indexing, per-archer "INC" incomplete-round toggle with multi-scorekeeper concurrency metadata, responsive mobile card labels, database-normalized division/style labels, and control toolbars.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, zero embedded script blocks, filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.8.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -167,13 +167,15 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         }
         $is_hub_enabled = in_array( $selected_tournament, $active_hubs, true );
 
-        // Enqueue client score interactive JavaScript asset
-        wp_enqueue_script( 'sywat-scores-js', SYWAT_PLUGIN_URL . 'assets/js/sywat-scores.js', array(), SYWAT_PLUGIN_VERSION, true );
+        // Enqueue client score interactive JavaScript asset with filemtime cache-busting
+        $scores_js_rel  = 'assets/js/sywat-scores.js';
+        $scores_js_path = defined( 'SYWAT_PLUGIN_DIR' ) ? SYWAT_PLUGIN_DIR . $scores_js_rel : '';
+        $scores_js_ver  = ( $scores_js_path !== '' && file_exists( $scores_js_path ) ) ? (string) filemtime( $scores_js_path ) : SYWAT_PLUGIN_VERSION;
+        wp_enqueue_script( 'sywat-scores-js', SYWAT_PLUGIN_URL . $scores_js_rel, array(), $scores_js_ver, true );
 
-        $tab_query_args      = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
-        $has_norm_division   = function_exists( 'sywat_shooting_styles_normalize_division' );
-        $has_norm_style      = function_exists( 'sywat_shooting_styles_normalize_style' );
-        $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
+        $tab_query_args    = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
+        $has_norm_division = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_norm_style    = function_exists( 'sywat_shooting_styles_normalize_style' );
         ?>
 
         <div class="sywat-wrap">
@@ -209,7 +211,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         <form method="post" id="sywat_score_filter_form" class="sywat-filter-bar-form">
                             <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
                             <input type="hidden" id="sywat_nonce" value="<?php echo esc_attr( wp_create_nonce( 'sywat_scores_action' ) ); ?>">
-                            
+
                             <!-- Stacked Active Tournament Dropdown -->
                             <div class="sywat-field-group sywat-field-auto">
                                 <label for="selected_tournament_val">Active Tournament:</label>
@@ -299,11 +301,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
 
                                             if ( ( $match_index || $match_name ) && ! empty( $reg['checked_in'] ) ) {
                                                 $total_line_shooters++;
-                                                $rid   = isset( $reg['id'] ) ? $reg['id'] : '';
-                                                $map_s = isset( $scores_map[ $rid ]['score'] ) ? intval( $scores_map[ $rid ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
-                                                $map_x = isset( $scores_map[ $rid ]['xs'] )    ? intval( $scores_map[ $rid ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                                                $rid     = isset( $reg['id'] ) ? $reg['id'] : '';
+                                                $map_s   = isset( $scores_map[ $rid ]['score'] ) ? intval( $scores_map[ $rid ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
+                                                $map_x   = isset( $scores_map[ $rid ]['xs'] )    ? intval( $scores_map[ $rid ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                                                $map_inc = isset( $scores_map[ $rid ]['is_inc'] ) ? ! empty( $scores_map[ $rid ]['is_inc'] ) : ! empty( $reg['is_inc'] );
 
-                                                if ( $map_s > 0 || $map_x > 0 ) {
+                                                if ( $map_s > 0 || $map_x > 0 || $map_inc ) {
                                                     $scores_entered_line++;
                                                 }
                                             }
@@ -332,7 +335,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                             <span><strong>Scores Saved:</strong> <?php echo $scores_entered_line . ' / ' . $total_line_shooters; ?></span>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="sywat-tracker-card-actions">
                                         <form method="post" class="sywat-form-inline">
                                             <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
@@ -412,6 +415,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                             <th class="sywat-col-style">Style</th>
                                             <th class="sywat-col-center sywat-col-score">Score (Max 300)</th>
                                             <th class="sywat-col-center sywat-col-xs">X Count (Max 60)</th>
+                                            <th class="sywat-col-center sywat-col-inc" title="Incomplete Round (excluded from Season Standings)">INC</th>
                                             <th class="sywat-col-center sywat-col-status">Status</th>
                                         </tr>
                                     </thead>
@@ -421,6 +425,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 $reg_id     = isset( $reg['id'] ) ? $reg['id'] : '';
                                                 $score      = isset( $scores_map[ $reg_id ]['score'] ) ? intval( $scores_map[ $reg_id ]['score'] ) : ( isset( $reg['score'] ) ? intval( $reg['score'] ) : 0 );
                                                 $x_count    = isset( $scores_map[ $reg_id ]['xs'] )    ? intval( $scores_map[ $reg_id ]['xs'] )    : ( isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0 );
+                                                $is_inc     = isset( $scores_map[ $reg_id ]['is_inc'] ) ? ! empty( $scores_map[ $reg_id ]['is_inc'] ) : ! empty( $reg['is_inc'] );
                                                 $gender_str = ! empty( $reg['gender'] ) ? $reg['gender'] : '—';
 
                                                 $disp_archer_name = ! empty( $reg['display_name'] )
@@ -457,6 +462,10 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 <td class="sywat-col-center" data-label="X Count (Max 60)">
                                                     <input type="number" name="x_counts[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo esc_attr( $x_count ); ?>" value="<?php echo esc_attr( $x_count ); ?>" min="0" max="60" placeholder="0" class="sywat-score-input x-val" <?php echo $dis_attr; ?>>
                                                 </td>
+                                                <td class="sywat-col-center" data-label="INC">
+                                                    <input type="hidden" name="inc_state[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo $is_inc ? '1' : '0'; ?>" value="<?php echo $is_inc ? '1' : '0'; ?>" class="sywat-inc-state" <?php echo $dis_attr; ?>>
+                                                    <input type="checkbox" name="is_inc[<?php echo esc_attr( $reg_id ); ?>]" data-id="<?php echo esc_attr( $reg_id ); ?>" data-original-val="<?php echo $is_inc ? '1' : '0'; ?>" value="1" class="sywat-inc-val" aria-label="<?php echo esc_attr( 'Mark ' . $disp_archer_name . ' incomplete' ); ?>" <?php checked( $is_inc ); ?> <?php echo $dis_attr; ?>>
+                                                </td>
                                                 <td class="sywat-col-center" data-label="Status">
                                                     <?php if ( $is_locked ) : ?>
                                                         <span class="sywat-save-status sywat-status-locked" title="Unlocked by Admins & Shop Managers Only">🔒 Locked</span>
@@ -484,57 +493,6 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             <!-- Close Master Single Unified Desk Card -->
             </div>
         </div>
-
-        <script <?php echo $script_optout_attrs; ?>>
-        document.addEventListener("DOMContentLoaded", function() {
-            const searchInput = document.getElementById('sywat_score_search_input');
-
-            function applyScoreSearchFilter(query) {
-                const cleanQuery = query.trim().toLowerCase();
-                const rows = document.querySelectorAll('.sywat-score-row');
-
-                rows.forEach(function(row) {
-                    const dataName = (row.getAttribute('data-name') || '').toLowerCase();
-                    const textContent = (row.textContent || row.innerText || '').toLowerCase();
-
-                    if (!cleanQuery || dataName.includes(cleanQuery) || textContent.includes(cleanQuery)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-
-                document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
-                    hiddenInput.value = query;
-                });
-
-                if (query) {
-                    sessionStorage.setItem('sywat_score_search_query', query);
-                } else {
-                    sessionStorage.removeItem('sywat_score_search_query');
-                }
-            }
-
-            if (searchInput) {
-                let initialQuery = searchInput.value;
-                if (!initialQuery) {
-                    const savedQuery = sessionStorage.getItem('sywat_score_search_query');
-                    if (savedQuery) {
-                        initialQuery = savedQuery;
-                        searchInput.value = savedQuery;
-                    }
-                }
-
-                if (initialQuery) {
-                    applyScoreSearchFilter(initialQuery);
-                }
-
-                searchInput.addEventListener('input', function() {
-                    applyScoreSearchFilter(this.value);
-                });
-            }
-        });
-        </script>
         <?php
         return ob_get_clean();
     }
