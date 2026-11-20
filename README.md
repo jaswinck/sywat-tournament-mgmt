@@ -6,7 +6,8 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 
 ## 🛠️ Key System Features & Architecture
 
-- **Theme-Neutral Integration & Dual Layout Modes**: Runs cleanly under Astra (App mode) and Divi (Theme mode with `--tfaa-*` child theme tokens) via `includes/core/class-sywat-frontend.php`, with conditional asset loading, optimizer opt-outs (WP Rocket / Cloudflare / LiteSpeed), page-builder placeholders, `filemtime()` script cache-busting, and `Cache-Control: no-cache` headers on operational screens.
+- **Theme-Neutral Integration & Dual Layout Modes**: Runs cleanly under Astra (App mode) and Divi (Theme mode with `--tfaa-*` child theme tokens) via `includes/core/class-sywat-frontend.php`, with conditional asset loading, optimizer opt-outs (WP Rocket / Cloudflare / LiteSpeed), page-builder placeholders, `SYWAT_PLUGIN_VERSION` asset cache-busting, `390px` responsive mobile card layouts, and `Cache-Control: no-cache` headers on operational screens.
+- **Unified Archer Identity & Highest-Category Division Engine (`includes/common/sywat-archer-identity-helpers.php`)**: Single-source-of-truth shooter lookup combining the Member Directory, 18-Month TFAA Standings, and Shop Registration History with bidirectional `"First Last"` / `"Last, First"` normalization, given-name nickname/stem equivalence, and highest-category division selection (`max(History, DOB)`) so mid-season "shooting up" and birthday "aging up" both resolve accurately.
 - **Public Season Schedule & Role-Gated Navigation**: Live chronological schedule board (`[sywat_schedule]`) with List View and Monthly Calendar View, real-time district/shop filtering, automated event statuses, and synchronized **Register Online** (`[sywat_member_register]`), **Opens [Date]** lead-time badges, or **View Results** action buttons across both views. Features a clean, role-gated `Tournaments ▾` dropdown (`Register Online`, `Season Schedule`, `Results`, and staff-gated `Tournament Portal`).
 - **Public Online Registration Gatekeeper & Member Self-Registration (`[sywat_member_register]`)**: Shop-level default online registration settings (`public_reg_default_enabled`, `public_reg_default_lead_days`) inherited by new tournaments with per-event overrides (`sywat_get_public_registration_status()`). Logged-in TFAA members can self-register themselves and linked household family members with automatic tournament-date NFAA age division & distance detection (`20yd` vs. `Cub`), live line availability counts, automatic `Waitlist` placement (`$0.00` due) when a line is full, First-Time/Lapsed Shooter promos, and Household Family Caps.
 - **Multi-Tenant Shop & Indoor Range Scoping**: Isolate shooting lines, rosters, and financial reports by range host/location.
@@ -14,7 +15,7 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 - **Dedicated Waitlist Queue & Per-Line $75.00 Family Cap Engine**: Centralized FIFO family-clustered waitlist management (`includes/waitlist/`) with on-demand `#sywat_waitlist_modal` promotion, top-bar multi-select line moves, split-family reconciliation, and strict per-line $75.00 Family Cap recalculation.
 - **Household-Wide Balance Verification & Historical Auto-Fill at Check-In**: Enforces unpaid family balances across all household members sharing a line (`⚠️ OWE: FAMILY`) and automatically populates shooter Style, Division, and Gender from 18-month TFAA history and shop registration caches.
 - **Sticky Operational Context Across Portals**: Synchronizes the user's active tournament selection (`sywat_desk_selected_tournament` user meta + `?selected_tournament=` navigation tab carryover) across **Register Shooters**, **Check In Archers**, and **Enter Scores**.
-- **Phone & Group Registration Intake**: Quick caller intake form supporting multi-archer groups, per-line $75 family capping rules, FareHarbor CSV bulk imports, specific per-tournament online registration links, and direct line roster/waitlist management links.
+- **Phone & Group Registration Intake**: Quick caller intake form featuring a per-archer multi-line checkbox matrix (zero pre-checked line defaults), simplified 3-tier `Category / Rate` selection (`Cub`, `Youth`, `Adult`), dynamic Round Format selection, unified Member Directory + 18-Month TFAA autocomplete on both Caller and Archer fields, per-line $75 family capping rules, dirty-guarded **Clear Form** reset, 8-column `.xlsx`/`.xls`/`.csv` bulk spreadsheet imports, and direct line roster/waitlist management links.
 - **Waitlist-Aware Roster Sub-System**: Unified roster management interface (`includes/roster/`) with deep-linked line filtering, Pre-Reg/Waitlist status switching, real-time waitlist status badging (`🕒 Waitlist`), line purges, profile editing, and apostrophe-safe registration removal.
 - **Member & Board Directory Sub-System**: Unified member management interface (`includes/members/`) featuring household sub-profiles, unassigned archer pools, chunked AJAX spreadsheet imports (`Archers.xlsx` / CSV), multi-role capabilities, shop assignments, password policy validation, and automated TFAA Board role synchronization.
 - **Live Scoring & Leaderboard Engine**: Multi-category sorting (Division, Gender, Style), Guest style assignments for unturned cards, season standings leaderboards, background AJAX score auto-save, and instant CSV export capability.
@@ -25,13 +26,13 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 ## 📂 Sub-System Architecture & Module Reference
 
 ### 1. Core Plugin Loader & Integration Layer (`/` & `includes/core/`)
-- **`sywat-archery-manager.php`** (v7.2.0) — Master WordPress plugin entry point. Initializes constants (`SYWAT_PLUGIN_DIR`, `SYWAT_PLUGIN_URL`, `SYWAT_PLUGIN_VERSION = 7.2.0`), registers activation hooks, and bootstraps core integration and modular sub-systems.
+- **`sywat-archery-manager.php`** (v7.6.3) — Master WordPress plugin entry point. Initializes constants (`SYWAT_PLUGIN_DIR`, `SYWAT_PLUGIN_URL`, `SYWAT_PLUGIN_VERSION = 7.6.3`), registers activation hooks, and bootstraps core integration, shared helpers (`sywat-archer-identity-helpers.php`, `sywat-spreadsheet-helpers.php`), and modular sub-systems.
 - **`includes/core/class-sywat-permissions.php`** (v3.6.0) — Central roles, capabilities, and board position synchronization engine (`sywat_can_manage_tournaments()`, `sywat_can_edit_scores()`, `sywat_can_access_desk()`, `sywat_can_create_members()`, `sywat_can_manage_board()`).
 - **`includes/core/class-sywat-frontend.php`** — Central theme-neutral integration layer handling shortcode page detection (`sywat_shortcode_tags()`, including `[sywat_member_register]`), conditional CSS/JS enqueueing (never site-wide or in `wp-admin`), optimizer opt-out attributes, Divi Visual Builder placeholders, `sywat_page_url()` routing (including the `member_register` -> `/register-online/` key), and `Settings > SYWAT Display` Layout mode.
 
 ### 2. Assets & Styling (`assets/`)
-- **`assets/css/sywat-core.css`** — Central `:root` design tokens (`--sywat-*: var(--tfaa-*, <default>)`), scoped input rules (`:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop)`), card containers (`.sywat-card`), card-docked tab tracks (`.sywat-nav-tabs`), spacing utilities (`.sywat-mt-3`, `.sywat-mb-4`, `.sywat-ml-0`, `.sywat-hidden`), and alert banners.
-- **`assets/css/sywat-tables.css`** — Responsive table layout engine (`.sywat-table-responsive`, `.sywat-table`), column width modifiers (`.sywat-col-w-10` through `.sywat-col-w-32`), row hover states, isolated action wrappers (`.sywat-modal-roster-actions`), and centered vertical stacking containers (`.sywat-table-actions-vertical`).
+- **`assets/css/sywat-core.css`** (v7.7.0) — Central `:root` design tokens (`--sywat-*: var(--tfaa-*, <default>)`), scoped input rules (`:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop)`), card containers (`.sywat-card`), card-docked tab tracks (`.sywat-nav-tabs`), spacing utilities (`.sywat-mt-3`, `.sywat-mb-4`, `.sywat-ml-0`, `.sywat-hidden`), and alert banners.
+- **`assets/css/sywat-tables.css`** (v7.7.2) — Responsive table layout engine (`.sywat-table-responsive`, `.sywat-table`), column width modifiers (`.sywat-col-w-10` through `.sywat-col-w-32`), multi-line intake matrix rules (`#sywat_archer_intake_table`) with full-width stacked mobile card `<select>` layouts at `390px`, isolated action wrappers (`.sywat-modal-roster-actions`), and centered vertical stacking containers (`.sywat-table-actions-vertical`).
 - **`assets/css/sywat-modals.css`** — Tokenized modal stacking variables (`--sywat-z-modal`, `--sywat-z-modal-nested`, `--sywat-z-modal-dropdown`, `--sywat-z-modal-alert`), modal backdrops (`.sywat-modal-backdrop`), dialog dimensions (`.sywat-modal-sm` through `.sywat-modal-xl`), scrollable bodies, and pinned header/footer structures.
 - **`assets/css/sywat-buttons.css`** — Themeable action buttons (`.sywat-btn`, `.sywat-btn-primary`, `.sywat-btn-secondary`, `.sywat-btn-success`, `.sywat-btn-danger`), `.sywat-btn-full` block stretch rules, icon badges, and status pills (`.sywat-badge-open`, `.sywat-badge-full`, `.sywat-waitlist-pill`).
 - **`assets/css/sywat-toolbar.css`** — Authentication header bar (`.sywat-auth-bar`), integrated card header toolbars (`.sywat-card-header-bar`), table control headers (`.sywat-table-header-bar`), search input groups (`.sywat-search-input-group`), and TFAA sync pills (`.sywat-sync-pill`).
@@ -44,7 +45,7 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
   - `sywat-roster.js` (v6.8.1): Delegated roster modal controls (`window.SYWAT.roster`), confirmation dialogs (`data-sywat-confirm`), line-scoped family group dropdown updates, division/style restriction enforcement, and class-driven live search filtering.
   - `sywat-members.js` (v5.3.0): Client JavaScript for the Member sub-module handling household/board modals, chunked AJAX import/purge progress streams, and live autocomplete filtering.
   - `sywat-tfaa-reconcile.js` (v1.0.0): Namespaced client controller (`window.SYWAT.reconcile`) for the temporary post-import TFAA Gender & Pro reconciliation modal (`#sywat_tfaa_reconcile_modal`).
-  - `sywat-registration.js` (v6.4.0): Multi-archer dynamic row insertion, distance auto-switch, and group balance calculation.
+  - `sywat-registration.js` (v7.5.4): Multi-archer dynamic row insertion, per-archer multi-line checkbox matrix, 3-tier Category / Rate selection, unified Member Directory + 18-Month TFAA autocomplete on both Caller and Archer fields, dirty-guarded `clearIntakeForm()` reset, `#sywat_import_modal` controller, and live group balance / Family Cap calculation.
   - `sywat-scores.js` (v7.2.0): Batch score entry, offline draft caching, and background AJAX auto-save.
   - `sywat-tournaments.js` (v6.8.2): Tournament line template repeaters, season modal handlers, and async TFAA sync progress tracking.
   - `sywat-shops.js` (v6.8.3): Shop location editing tabs and CSV/Excel import file preview handlers.
@@ -62,15 +63,15 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 
 ### 5. Archer Registration Engine (`includes/registration/`)
 - **`class-sywat-registration.php`** (v6.1.0) — Lightweight controller shell for staff intake (`[sywat_register]`) and the public Member Online Registration portal (`[sywat_member_register]`).
-- **`registration-actions.php`** (v7.2.0) — Phone intake processing, multi-archer group registration, active-only per-line family cap logic, waitlist triage (`all` vs. `remainder`), and atomic multi-store persistence.
-- **`registration-import.php`** (v7.2.0) — FareHarbor CSV/text import file parsing and shooter auto-creation.
-- **`registration-views.php`** (v6.9.1) — Main registration layout container with sticky tournament selection (`sywat_desk_selected_tournament`), navigation tab carryover, and on-demand Waitlist modal rendering.
-- **`registration-modals.php`** (v7.1.0) — Renders Phone Intake Form, FareHarbor Bulk Upload Form, and Current Line Slot Usage Table with deep links into `class-sywat-roster.php` and clickable Waitlist badges/buttons into `#sywat_waitlist_modal`.
-- **`registration-scripts.php`** (v7.1.0) — Localized script loader for intake calculation and line override listeners.
+- **`registration-actions.php`** (v7.3.0) — Phone intake processing, per-archer multi-line matrix registration, canonical shooter resolution (`sywat_resolve_archer_intake_profile()`), active-only per-line family cap logic, waitlist triage (`all` vs. `remainder`), and atomic multi-store persistence.
+- **`registration-import.php`** (v7.4.5) — Standardized 8-column `.xlsx`/`.xls`/`.csv` bulk upload parser, `.xlsx` template generator, household per-line Family Cap grouping, and shooter auto-creation.
+- **`registration-views.php`** (v7.4.0) — Main registration layout container with sticky tournament selection (`sywat_desk_selected_tournament`), navigation tab carryover, and on-demand Waitlist and Bulk Import modal rendering.
+- **`registration-modals.php`** (v7.4.5) — Renders the compact horizontal Line Capacity Tracker grid, Phone & Group Multi-Line Registration Matrix Form (with `Clear Form` & `Save & Register Shooters` controls), and top-level `#sywat_import_modal` Bulk Spreadsheet Upload dialog.
+- **`registration-scripts.php`** (v7.2.0) — Localized script loader supplying unified Member Directory + 18-Month TFAA shooter index (`window.sywatRegData.tfaaShooters`), given-name alias maps, pricing profiles, and promo rules to `sywat-registration.js`.
 - **`member-registration-data.php`** (v1.0.0) — Pure database/option/user-meta data access layer retrieving open tournaments (`sywat_get_public_registration_status()`), scoped tournament registrations, raw Head of Household & linked dependent records, and active division records.
-- **`member-registration-helpers.php`** (v1.1.0) — Pure calculation & formatting layer resolving tournament-date NFAA age divisions, target distances (`20yd` vs. `Cub`), formatted household rosters, per-line slot availability maps, existing registration status maps, and complete view payloads (`sywat_member_reg_build_view_data()`).
-- **`member-registration-actions.php`** (v1.0.0) — Nonce-verified POST handler (`sywat_member_self_register`) validating open-tournament status, line locks, and household ownership; blocking duplicates; booking open slots as `Pre-Reg` (balance due at check-in) or automatically placing full-line entries on `Waitlist` (`\$0.00` due); evaluating First-Time/Lapsed Shooter promos and Household Family Caps; and persisting records atomically.
-- **`views/view-member-registration.php`** (v1.0.0) — Pure HTML view template for `[sywat_member_register]` rendering guest sign-in prompts, post-submission confirmation/waitlist banners, open tournament selection, live line availability tables, and household self-registration forms.
+- **`member-registration-helpers.php`** (v1.3.0) — Pure calculation & formatting layer resolving tournament-date NFAA age divisions, target distances (`20yd` vs. `Cub`), formatted household rosters, per-line slot availability maps, existing registration status maps, and complete view payloads (`sywat_member_reg_build_view_data()`).
+- **`member-registration-actions.php`** (v1.1.0) — Nonce-verified POST handler (`sywat_member_self_register`) validating open-tournament status, line locks, and household ownership; blocking duplicates; booking open slots as `Pre-Reg` (balance due at check-in) or automatically placing full-line entries on `Waitlist` (`\$0.00` due); evaluating First-Time/Lapsed Shooter promos and Household Family Caps; and persisting records atomically.
+- **`views/view-member-registration.php`** (v1.4.0) — Pure HTML view template for `[sywat_member_register]` rendering guest sign-in prompts, post-submission confirmation/waitlist banners, open tournament selection, live line availability tables, and household self-registration forms.
 
 ### 6. Archer Roster Sub-System (`includes/roster/`)
 - **`class-sywat-roster.php`** (v5.0.0) — Master sub-module loader shell for archer roster management, division/style restriction enforcement, line-scoped family group assignments, and line purges.
@@ -127,8 +128,10 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 - **`tournament-views.php`** (v7.20.0) — Master Admin Portal UI protected by `sywat_can_manage_tournaments()` with standardized navigation tabs, season/district filters, live `Public Reg: Open` / `Public Reg: Opens [Date]` / `Public Reg: Off` status pills, clickable Waitlist badges/buttons, `#sywat_waitlist_modal` integration, and configured events table.
 - **`volunteer-hub.php`** (v5.1.0) — Staff Volunteer Hub portal view (`[sywat_volunteer_hub]`) featuring `.sywat-tracker-grid` line cards and real-time roster stats.
 
-### 13. Standalone Supporting Modules (`includes/`)
+### 13. Standalone Supporting Modules & Shared Helpers (`includes/`)
 - **`class-sywat-accounting.php`** (v6.3.0) — Financial accounting engine, 50/50 host/TFAA fee split math, family cap calculations, embedded Base64 Zelle QR code rendering, and printable invoice/roster renderers with dynamic shop metadata.
+- **`common/sywat-archer-identity-helpers.php`** (v1.2.0) — Unified archer identity normalization (`sywat_normalize_archer_match_keys()`, `sywat_normalize_name_first_last()`, `sywat_format_name_last_first()`), given-name nickname/stem equivalence, highest-category NFAA division selector (`sywat_select_highest_category_division()`), canonical shooter resolver (`sywat_resolve_archer_intake_profile()`), and O(N) client autocomplete index builder (`sywat_get_unified_js_shooter_index()`).
+- **`common/sywat-spreadsheet-helpers.php`** — Native `.xlsx` template builder and `.xlsx`/`.xls`/`.csv` spreadsheet parser helpers for registration bulk imports.
 - **`common/sywat-tfaa-sync.php`** (v1.1.1) — TFAA membership verification, web scraping standings/URL cache engine, standalone sync button (`[sywat_tfaa_sync_btn]`), and daily WP-Cron background sync.
 
 ### 14. Public Schedule Sub-System (`includes/schedule/`)
@@ -140,7 +143,26 @@ An enterprise-grade, multi-tenant, theme-neutral WordPress plugin built for the 
 
 ---
 
-## 📜 Current Release Changelog Summary (`SYWAT_PLUGIN_VERSION` 7.2.0)
+## 📜 Current Release Changelog Summary (`SYWAT_PLUGIN_VERSION` 7.6.3)
+
+### Version 7.6.3
+1. **Mobile `390px` Registration Intake `<select>` Overflow Fix (`assets/css/sywat-tables.css` v7.7.2)**:
+   - Updated `#sywat_archer_intake_table.sywat-table-mobile-cards tbody td:has(select)` to stack the uppercase `CATEGORY / RATE *` (and `ROUND FORMAT *`) field label above a full-width (`width: 100%; min-width: 0; max-width: 100%`) `<select>` inside mobile intake cards so dropdowns never clip off-screen at `390px`.
+
+### Version 7.6.2
+1. **Phone & Group Registration Intake `Clear Form` Reset Control (`includes/registration/registration-modals.php` v7.4.5, `assets/js/sywat-registration.js` v7.5.4)**:
+   - Added a **`Clear Form`** button (`data-sywat-action="clear-intake-form"`) alongside **`Save & Register Shooters`** in the Phone & Group Registration Intake footer bar.
+   - Added `SYWAT.registration.clearIntakeForm()` with a dirty-state confirmation guard that resets caller fields, amount paid, dynamic archer rows, category selections, shooting line checkboxes, and totals back to `$0.00` without reloading the page or changing the active tournament.
+
+### Version 7.6.1
+1. **Unified Member Directory + 18-Month TFAA Autocomplete & Highest-Category Division Resolution (`includes/common/sywat-archer-identity-helpers.php` v1.2.0, `assets/js/sywat-registration.js` v7.5.3)**:
+   - Integrated `sywat_get_historical_shooters()` and Member Directory DOB age divisions into `sywat_get_unified_shooter_identity_index()` and `sywat_get_unified_js_shooter_index()`, normalizing `"Last, First"` entries and filtering placeholder dashes.
+   - Implemented highest-category division comparison (`sywat_select_highest_category_division()`, `max(History, DOB)`) across both `sywat_resolve_archer_intake_profile()` and `sywat_get_unified_js_shooter_index()` so mid-season "shooting up" (History higher) and birthday "aging up" (DOB higher) both populate and auto-select the proper `Category / Rate` (`Cub`, `Youth`, or `Adult`) on both Caller and Archer search fields.
+
+### Version 7.6.0
+1. **Multi-Line Phone Intake Matrix & 8-Column Bulk Spreadsheet Import (`includes/registration/`, `assets/js/sywat-registration.js`, `assets/css/sywat-tables.css`)**:
+   - Replaced single-line registration rows with a per-archer multi-line checkbox matrix (`zero` pre-checked line defaults), simplified 3-tier `Category / Rate` selection (`Cub`, `Youth`, `Adult`), dynamic Round Format pricing synchronization, and client-side pre-submit line validation.
+   - Upgraded `#sywat_import_modal` and `registration-import.php` to support standardized 8-column `.xlsx`/`.xls`/`.csv` bulk uploads with downloadable `.xlsx` templates and household per-line Family Cap reconciliation.
 
 ### Version 7.2.0
 1. **Shop-Level Public Online Registration Defaults & Tournament Window Gatekeeper (`includes/shops/`, `includes/tournaments/`)**:
