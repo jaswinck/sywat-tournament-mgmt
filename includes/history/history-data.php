@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Data Access & Atomic Batch Persistence
  * Path: includes/history/history-data.php
- * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Validates TFAA HTTPS hosts via wp_parse_url(), persists permanent discovered season manifests (sywat_history_discovered_seasons) and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() so active/default seasons are never overwritten, and executes atomic MySQL transactions with chunked multi-row SQL upserts (autoload = 'no').
+ * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Validates TFAA HTTPS hosts via wp_parse_url(), persists permanent discovered season manifests (sywat_history_discovered_seasons) sorted strictly by start_date descending and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() so active/default seasons are never overwritten, and executes atomic MySQL transactions with chunked multi-row SQL upserts (autoload = 'no').
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, O(1) hashtable lookups, explicit MySQL transactions, chunked batch SQL writes, object cache invalidation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.1
+ * Version: 1.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -181,7 +181,8 @@ if ( ! function_exists( 'sywat_history_save_discovered_seasons' ) ) {
 
 /**
  * Retrieve all permanently stored discovered TFAA seasons, hydrated in real time with
- * live imported tournament counts, discovered tournament counts, and local season status.
+ * live imported tournament counts, discovered tournament counts, and local season status,
+ * sorted chronologically descending by start_date.
  *
  * @return array Ordered list of hydrated season descriptors.
  */
@@ -248,15 +249,15 @@ if ( ! function_exists( 'sywat_history_get_discovered_seasons' ) ) {
         }
 
         usort( $hydrated, function( $a, $b ) {
-            $id_a = isset( $a['season_id'] ) ? intval( $a['season_id'] ) : 0;
-            $id_b = isset( $b['season_id'] ) ? intval( $b['season_id'] ) : 0;
-            if ( $id_a > 0 && $id_b > 0 && $id_a !== $id_b ) {
-                return $id_b <=> $id_a;
-            }
             $date_a = isset( $a['start_date'] ) ? (string) $a['start_date'] : '';
             $date_b = isset( $b['start_date'] ) ? (string) $b['start_date'] : '';
             if ( $date_a !== $date_b ) {
                 return strcmp( $date_b, $date_a );
+            }
+            $id_a = isset( $a['season_id'] ) ? intval( $a['season_id'] ) : 0;
+            $id_b = isset( $b['season_id'] ) ? intval( $b['season_id'] ) : 0;
+            if ( $id_a !== $id_b ) {
+                return $id_b <=> $id_a;
             }
             return strcasecmp( isset( $b['name'] ) ? $b['name'] : '', isset( $a['name'] ) ? $a['name'] : '' );
         } );
