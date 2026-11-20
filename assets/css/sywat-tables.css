@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.6.1
+   Version: 7.7.0
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -313,43 +313,68 @@
 .sywat-col-roster-action { width: 18%; text-align: center !important; }
 
 /* ==========================================================================
-   Phone & Group Registration Intake Row Alignment
+   Phone & Group Multi-Line Registration Matrix Table (#sywat_archer_intake_table)
    ========================================================================== */
-.sywat-archer-header-row,
-.sywat-archer-input-row {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 12px !important;
-    width: 100% !important;
-    margin-bottom: 8px;
-    box-sizing: border-box !important;
-}
-
-.sywat-archer-header-row {
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-intake-card .sywat-table-header-bar h3 {
+    margin: 0;
+    font-size: 15px;
     font-weight: 700;
+    line-height: 1.3;
+    color: var(--sywat-navy);
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-intake-card .sywat-table-header-bar .sywat-label-subtext {
     font-size: 12px;
-    color: var(--sywat-navy-soft);
-    padding: 6px 0;
-    border-bottom: 1px solid var(--sywat-border);
-    margin-bottom: 10px;
+    line-height: 1.4;
+    margin-top: 2px;
 }
 
-.sywat-col-archer-name   { flex: 3 !important; min-width: 0; }
-.sywat-col-archer-dist   { flex: 1.5 !important; min-width: 0; }
-.sywat-col-archer-div    { flex: 2.5 !important; min-width: 0; }
-.sywat-col-archer-line   { flex: 2 !important; min-width: 0; }
-.sywat-col-archer-action { flex: 0 0 36px !important; text-align: center !important; display: flex; justify-content: center; }
-
-.sywat-archer-input-row .sywat-field-group {
-    margin-bottom: 0 !important;
-    width: 100% !important;
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table#sywat_archer_intake_table {
+    width: 100%;
+    min-width: 720px;
+    table-layout: auto;
 }
 
-.sywat-archer-input-row input,
-.sywat-archer-input-row select {
-    width: 100% !important;
-    box-sizing: border-box !important;
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table tr.sywat-archer-input-row {
+    display: table-row;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table :is(th, td).sywat-col-center {
+    text-align: center;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table td:first-child {
+    min-width: 220px;
+    width: 30%;
+    position: relative;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table :is(input[type="text"], select) {
+    width: 100%;
+    min-width: 155px;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table input.sywat-archer-line-cb {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table td:last-child .sywat-btn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0 auto;
 }
 
 /* Line Slot Capacity Stack & Compact Waitlist Pill */
@@ -631,6 +656,7 @@
     }
 
     :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table.sywat-table-mobile-cards,
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table.sywat-table-mobile-cards#sywat_archer_intake_table,
     .sywat-table.sywat-table-mobile-cards {
         display: block;
         width: 100%;
@@ -649,7 +675,8 @@
         width: 100%;
     }
 
-    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody tr {
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody tr,
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table.sywat-table-mobile-cards tbody tr.sywat-archer-input-row {
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -736,6 +763,27 @@
         height: 38px;
         min-height: 38px;
         text-align: center;
+    }
+
+    /* Multi-Line Registration Intake Mobile Card Inputs */
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table.sywat-table-mobile-cards tbody td:first-child input.sywat-archer-name-input {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        text-align: left;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table.sywat-table-mobile-cards tbody td select {
+        width: auto;
+        min-width: 155px;
+        max-width: 220px;
+        text-align: left;
+    }
+
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table.sywat-table-mobile-cards tbody td:last-child .sywat-btn {
+        width: 100%;
+        min-width: 0;
+        height: 36px;
     }
 
     /* Last Cell: Full-Width Touch Action Bar */
