@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Importer Controller Shell
  * Path: includes/history/class-sywat-history-importer.php
- * Description: Master loader shell for the toggleable TFAA Historical Results Importer sub-module. Loads helper, data, AJAX action, and view files, registers the [sywat_history_import] shortcode, and enqueues assets/js/sywat-history-import.js in the footer with localized nonce and AJAX configuration.
+ * Description: Master loader shell for the toggleable TFAA Historical Results Importer sub-module. Loads helper, data, AJAX action, and view files, registers the [sywat_history_import] shortcode, and enqueues assets/js/sywat-history-import.js in the footer with localized nonce, AJAX configuration, and permanently stored discovered season/tournament manifests hydrated with live import status.
  * Compliance: Pure controller shell — zero HTML output at include time, zero jQuery dependencies, optimizer-safe sywat-* script handle, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -36,8 +36,9 @@ if ( ! function_exists( 'sywat_history_register_shortcode_tag' ) ) {
 }
 
 /**
- * Register and enqueue the standalone vanilla JS client controller for [sywat_history_import].
- * Safe to invoke multiple times; enqueues only once in the footer with no jQuery dependency.
+ * Register and enqueue the standalone vanilla JS client controller for [sywat_history_import],
+ * localizing permanently stored discovered seasons and per-season tournament manifests so
+ * they render immediately on every page visit without requiring re-discovery.
  *
  * @return void
  */
@@ -56,20 +57,29 @@ if ( ! function_exists( 'sywat_history_enqueue_assets' ) ) {
         }
         $enqueued = true;
 
-        $ver = defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '1.0.0';
+        $ver = defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '1.1.0';
         $url = defined( 'SYWAT_PLUGIN_URL' ) ? SYWAT_PLUGIN_URL . 'assets/js/sywat-history-import.js' : '';
 
         if ( $url === '' ) {
             return;
         }
 
+        $saved_seasons = function_exists( 'sywat_history_get_discovered_seasons' )
+            ? sywat_history_get_discovered_seasons()
+            : array();
+        $saved_events  = function_exists( 'sywat_history_get_discovered_events' )
+            ? sywat_history_get_discovered_events()
+            : array();
+
         wp_register_script( 'sywat-history-import', $url, array(), $ver, true );
         wp_localize_script(
             'sywat-history-import',
             'sywatHistoryData',
             array(
-                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-                'nonce'   => wp_create_nonce( 'sywat_history_import_nonce' ),
+                'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+                'nonce'        => wp_create_nonce( 'sywat_history_import_nonce' ),
+                'savedSeasons' => $saved_seasons,
+                'savedEvents'  => $saved_events,
             )
         );
         wp_enqueue_script( 'sywat-history-import' );
