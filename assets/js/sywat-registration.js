@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA age-division & shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and every Archer Full Name row (.sywat-archer-name-input) with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, instant dirty-guarded Clear Form reset, unified Member Directory + 18-Month TFAA age-division & shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and every Archer Full Name row (.sywat-archer-name-input) with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
  * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, focusin, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden / .sywat-field-relative).
- * Version: 7.5.3
+ * Version: 7.5.4
  */
 
 (function() {
@@ -643,6 +643,93 @@
     }
 
     /**
+     * Reset the Phone & Group Registration Intake form back to a clean initial state
+     * without reloading the page or changing the active tournament selection.
+     */
+    function clearIntakeForm() {
+        const form = document.getElementById('sywat_phone_intake_form');
+        if (!form) return;
+
+        const callerInput = document.getElementById('sywat_group_name');
+        const phoneInput  = document.getElementById('sywat_group_phone');
+        const paidInput   = document.getElementById('sywat_amount_paid_today');
+        const container   = document.getElementById('sywat_archer_rows_container');
+        const rows        = container ? container.querySelectorAll('.sywat-archer-input-row') : [];
+
+        let hasEnteredData = false;
+        if (callerInput && callerInput.value.trim() !== '') hasEnteredData = true;
+        if (phoneInput && phoneInput.value.trim() !== '') hasEnteredData = true;
+        if (paidInput && (parseFloat(paidInput.value) || 0) > 0) hasEnteredData = true;
+        if (rows.length > 1) hasEnteredData = true;
+
+        rows.forEach(function(row) {
+            const nInp  = row.querySelector('.sywat-archer-name-input');
+            const tSel  = row.querySelector('.sywat-rate-tier-select');
+            const cbs   = row.querySelectorAll('.sywat-archer-line-cb:checked');
+            if ((nInp && nInp.value.trim() !== '') || (tSel && tSel.value !== '') || cbs.length > 0) {
+                hasEnteredData = true;
+            }
+        });
+
+        if (hasEnteredData && !window.confirm('Clear all entered caller and archer details from this form?')) {
+            return;
+        }
+
+        closeAllTfaaAutocompletes();
+
+        const existingClientNotice = document.getElementById('sywat_client_line_validation_notice');
+        if (existingClientNotice) {
+            existingClientNotice.remove();
+        }
+
+        if (callerInput) {
+            callerInput.value = '';
+        }
+        if (phoneInput) {
+            phoneInput.value = '';
+        }
+        if (paidInput) {
+            paidInput.value = '0.00';
+        }
+
+        if (rows.length > 0) {
+            for (let i = rows.length - 1; i >= 1; i--) {
+                rows[i].remove();
+            }
+            nextArcherRowIndex = 1;
+
+            const firstRow    = rows[0];
+            const firstName   = firstRow.querySelector('.sywat-archer-name-input');
+            const firstRound  = firstRow.querySelector('.sywat-round-profile-select');
+            const firstTier   = firstRow.querySelector('.sywat-rate-tier-select');
+            const firstBoxes  = firstRow.querySelectorAll('.sywat-archer-line-cb');
+            const defProfSlug = getDefaultProfileKey();
+
+            if (firstName) {
+                firstName.value = '';
+                delete firstName.dataset.manuallyEdited;
+            }
+            if (firstRound) {
+                firstRound.value = defProfSlug;
+            }
+            updateRowRateTierOptionLabels(firstRow);
+            if (firstTier) {
+                firstTier.value = '';
+                delete firstTier.dataset.userChosen;
+            }
+            firstBoxes.forEach(function(cb) {
+                cb.checked = false;
+            });
+        }
+
+        recalculateGroupTotal();
+
+        if (callerInput && typeof callerInput.focus === 'function') {
+            callerInput.focus();
+        }
+    }
+
+    /**
      * Recalculate Group Total, Family Cap status (per line or tournament), and Balance Due
      * across all checked (archer, line) pairs in the multi-line matrix.
      */
@@ -854,6 +941,7 @@
         closeImportModal: closeImportModal,
         addArcherRow: addArcherRow,
         removeArcherRow: removeArcherRow,
+        clearIntakeForm: clearIntakeForm,
         recalculateGroupTotal: recalculateGroupTotal
     };
 
@@ -949,6 +1037,11 @@
             if (action === 'remove-archer-row') {
                 e.preventDefault();
                 removeArcherRow(actionTrigger);
+                return;
+            }
+            if (action === 'clear-intake-form') {
+                e.preventDefault();
+                clearIntakeForm();
                 return;
             }
         }
