@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.7.1
+   Version: 7.7.2
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -779,10 +779,19 @@
         text-align: left;
     }
 
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table.sywat-table-mobile-cards tbody td:has(select) {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 6px;
+        text-align: left;
+    }
+
     :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_archer_intake_table.sywat-table-mobile-cards tbody td select {
-        width: auto;
-        min-width: 155px;
-        max-width: 220px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
         text-align: left;
     }
 
