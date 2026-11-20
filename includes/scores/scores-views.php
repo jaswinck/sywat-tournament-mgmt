@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, line score tracker (counting completed scores and incomplete "INC" entries as saved), archer score entry table formatted and surname-sorted as "LastName, FirstName" with dual-format live search indexing, per-archer "INC" incomplete-round toggle with multi-scorekeeper concurrency metadata, responsive mobile card labels, database-normalized division/style labels, and control toolbars.
+ * Description: Visual HTML renderers for role-gated desk navigation tabs, active tournament selectors, canonical shooting line label rendering across dropdowns, tracker cards, and table rows via sywat_resolve_tournament_line_label(), line score tracker (counting completed scores and incomplete "INC" entries as saved), archer score entry table formatted and surname-sorted as "LastName, FirstName" with dual-format live search indexing, per-archer "INC" incomplete-round toggle with multi-scorekeeper concurrency metadata, responsive mobile card labels, database-normalized division/style labels, and control toolbars.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, zero embedded script blocks, filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.0
+ * Version: 7.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -176,6 +176,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $tab_query_args    = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
         $has_norm_division = function_exists( 'sywat_shooting_styles_normalize_division' );
         $has_norm_style    = function_exists( 'sywat_shooting_styles_normalize_style' );
+        $has_line_resolver = function_exists( 'sywat_resolve_tournament_line_label' );
         ?>
 
         <div class="sywat-wrap">
@@ -230,8 +231,13 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <select name="selected_line_idx" id="selected_line_val" class="sywat-select-line" onchange="document.getElementById('sywat_score_filter_form').submit();">
                                     <option value="all" <?php selected( $selected_line_idx, 'all' ); ?>>All Lines (Entire Weekend)</option>
                                     <?php foreach ( $lines as $idx => $line ) : ?>
+                                        <?php
+                                            $opt_line_label = $has_line_resolver
+                                                ? sywat_resolve_tournament_line_label( $line, $idx )
+                                                : ( ! empty( $line['name'] ) ? $line['name'] : 'Line ' . ( intval( $idx ) + 1 ) );
+                                        ?>
                                         <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $selected_line_idx, (string) $idx ); ?>>
-                                            <?php echo esc_html( $line['name'] ); ?>
+                                            <?php echo esc_html( $opt_line_label ); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -253,7 +259,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         <?php
                             $ordered_lines = array();
                             foreach ( $lines as $idx => $line ) {
-                                $line_title = isset( $line['name'] ) ? $line['name'] : 'Line ' . ( $idx + 1 );
+                                $line_title = $has_line_resolver
+                                    ? sywat_resolve_tournament_line_label( $line, $idx )
+                                    : ( ! empty( $line['name'] ) ? $line['name'] : 'Line ' . ( intval( $idx ) + 1 ) );
                                 $weight     = 50;
 
                                 if ( stripos( $line_title, 'Sat' ) !== false ) {
@@ -274,7 +282,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     }
                                 }
 
-                                $ordered_lines[] = array( 'idx' => $idx, 'line' => $line, 'weight' => $weight );
+                                $ordered_lines[] = array(
+                                    'idx'    => $idx,
+                                    'line'   => $line,
+                                    'title'  => $line_title,
+                                    'weight' => $weight,
+                                );
                             }
 
                             usort( $ordered_lines, function( $a, $b ) {
@@ -288,8 +301,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         <div class="sywat-tracker-grid">
                             <?php foreach ( $ordered_lines as $item ) : ?>
                                 <?php
-                                    $idx  = $item['idx'];
-                                    $line = $item['line'];
+                                    $idx        = $item['idx'];
+                                    $line       = $item['line'];
+                                    $line_title = $item['title'];
 
                                     $total_line_shooters = 0;
                                     $scores_entered_line = 0;
@@ -297,7 +311,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     foreach ( $registrations as $reg ) {
                                         if ( isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament ) {
                                             $match_index = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $idx;
-                                            $match_name  = isset( $reg['line_name'] ) && isset( $line['name'] ) && trim( $reg['line_name'] ) === trim( $line['name'] );
+                                            $match_name  = isset( $reg['line_name'] ) && trim( (string) $reg['line_name'] ) === trim( $line_title );
 
                                             if ( ( $match_index || $match_name ) && ! empty( $reg['checked_in'] ) ) {
                                                 $total_line_shooters++;
@@ -328,7 +342,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 <div class="sywat-tracker-card">
                                     <div>
                                         <div class="sywat-tracker-card-header">
-                                            <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
+                                            <strong class="sywat-tracker-card-title"><?php echo esc_html( $line_title ); ?></strong>
                                             <?php echo $status_badge; ?>
                                         </div>
                                         <div class="sywat-tracker-card-stats">
@@ -447,7 +461,9 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                                 $dis_attr  = $is_locked ? 'disabled' : '';
 
                                                 $lidx      = function_exists( 'sywat_roster_resolve_line_idx' ) ? sywat_roster_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-                                                $line_disp = isset( $lines[ $lidx ]['name'] ) ? $lines[ $lidx ]['name'] : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
+                                                $line_disp = isset( $lines[ $lidx ] )
+                                                    ? ( $has_line_resolver ? sywat_resolve_tournament_line_label( $lines[ $lidx ], $lidx ) : ( ! empty( $lines[ $lidx ]['name'] ) ? $lines[ $lidx ]['name'] : 'Line ' . ( intval( $lidx ) + 1 ) ) )
+                                                    : ( ! empty( $reg['line_name'] ) ? $reg['line_name'] : 'Line 1' );
                                             ?>
                                             <tr class="sywat-score-row <?php echo $is_locked ? 'locked-row' : ''; ?>" data-id="<?php echo esc_attr( $reg_id ); ?>" data-name="<?php echo esc_attr( $search_tokens ); ?>">
                                                 <td class="sywat-col-center" data-label="#"><strong><?php echo $num++; ?></strong></td>
