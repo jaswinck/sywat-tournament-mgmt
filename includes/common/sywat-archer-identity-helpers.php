@@ -2,10 +2,10 @@
 /**
  * Shared Common Helper: Unified Archer Identity & Historical Profile Resolution Engine
  * Path: includes/common/sywat-archer-identity-helpers.php
- * Description: Single-source-of-truth identity normalization (supporting both "First Last" and "Last, First" inputs), idempotent "LastName, FirstName" display & surname-sort formatting, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, Check-In, and Results.
+ * Description: Single-source-of-truth identity normalization (supporting both "First Last" and "Last, First" inputs), idempotent "LastName, FirstName" display & surname-sort formatting, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), highest-category division resolution (max of History vs. DOB so mid-season "shooting up" and birthday "aging up" both resolve accurately), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, Check-In, and Results.
  * Compliance: Pure helper layer — zero HTML echo, zero direct SQL queries (delegates Member Directory lookup to sywat_get_bulk_member_directory_records()), O(1) request-cached hashtables, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -91,6 +91,38 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
 }
 
 /**
+ * Normalize an archer's display name into canonical "FirstName [Middle] LastName [Suffix]" order
+ * when stored in "LastName [Suffix], FirstName [Middle]" format (e.g., TFAA standings rows).
+ *
+ * @param string $raw_name Raw archer name string.
+ * @return string          Canonical "FirstName LastName" string.
+ */
+if ( ! function_exists( 'sywat_normalize_name_first_last' ) ) {
+    function sywat_normalize_name_first_last( $raw_name ) {
+        $trimmed = trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( "\xC2\xA0", ' ', (string) $raw_name ) ) );
+        if ( $trimmed === '' || strpos( $trimmed, ',' ) === false ) {
+            return $trimmed;
+        }
+
+        $suffixes    = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
+        $comma_parts = explode( ',', $trimmed, 2 );
+        $left_part   = trim( $comma_parts[0] );
+        $right_part  = trim( $comma_parts[1] );
+
+        if ( $left_part === '' || $right_part === '' ) {
+            return $trimmed;
+        }
+
+        $right_norm = rtrim( strtolower( $right_part ), '.' );
+        if ( in_array( $right_norm, $suffixes, true ) ) {
+            return trim( $left_part . ' ' . $right_part );
+        }
+
+        return trim( $right_part . ' ' . $left_part );
+    }
+}
+
+/**
  * Format an archer's display name into "LastName [Suffix], FirstName [Middle]" for visual display
  * and alphabetical surname sorting while leaving underlying stored records untouched.
  *
@@ -170,6 +202,101 @@ if ( ! function_exists( 'sywat_format_name_last_first' ) ) {
         }
 
         return $last_name . ', ' . $first_and_middle . $trailing_tag;
+    }
+}
+
+/**
+ * Return the NFAA age-category hierarchy weight for a division label/code so the system
+ * can deterministically select the highest applicable category between tournament history
+ * (when an archer "shoots up" mid-season) and Date of Birth (when an archer ages up on their birthday).
+ *
+ * Hierarchy (lowest -> highest):
+ * 1: Cub (8 - 11)
+ * 2: Youth (12 - 14)
+ * 3: Young Adult (15 - 17)
+ * 4: Adult (18 - 49) / Pro Adult
+ * 5: Senior (50 - 59) / Pro Senior
+ * 6: Silver Senior (60 - 69) / Pro Silver Senior
+ * 7: Master Senior (70+) / Pro Master Senior
+ *
+ * @param string $raw_division Raw or normalized NFAA division label/code.
+ * @return int                 Category rank 1..7, or 0 if empty/placeholder/unrecognized.
+ */
+if ( ! function_exists( 'sywat_get_division_category_rank' ) ) {
+    function sywat_get_division_category_rank( $raw_division ) {
+        $clean = trim( (string) $raw_division );
+        if ( $clean === '' ) {
+            return 0;
+        }
+
+        $lower = strtolower( $clean );
+        if ( in_array( $lower, array( '-', '--', '—', '–', 'n/a', 'na', 'none', 'unassigned', 'unknown', 'no show' ), true ) ) {
+            return 0;
+        }
+
+        if ( function_exists( 'sywat_shooting_styles_normalize_division' ) ) {
+            $norm = sywat_shooting_styles_normalize_division( $clean );
+            if ( $norm !== '' ) {
+                $lower = strtolower( $norm );
+            }
+        }
+
+        if ( $lower === 'c' || preg_match( '/\bcub\b/', $lower ) ) {
+            return 1;
+        }
+        if ( $lower === 'ya' || strpos( $lower, 'young adult' ) !== false ) {
+            return 3;
+        }
+        if ( $lower === 'y' || preg_match( '/\byouth\b/', $lower ) ) {
+            return 2;
+        }
+        if ( $lower === 'ms' || strpos( $lower, 'master senior' ) !== false || preg_match( '/\bmaster\b/', $lower ) ) {
+            return 7;
+        }
+        if ( $lower === 'ss' || strpos( $lower, 'silver senior' ) !== false ) {
+            return 6;
+        }
+        if ( $lower === 's' || preg_match( '/\bsenior\b/', $lower ) ) {
+            return 5;
+        }
+        if ( $lower === 'a' || preg_match( '/\badult\b/', $lower ) ) {
+            return 4;
+        }
+
+        return 0;
+    }
+}
+
+/**
+ * Pick the higher NFAA age division between a historical division and a DOB-calculated division.
+ * - History wins when history places the shooter in a higher category ("shooting up").
+ * - DOB wins when DOB places the shooter in the highest category (birthday age-up or no history).
+ *
+ * @param string $hist_division Division from 18-month TFAA or shop history.
+ * @param string $dob_division  Division computed from Member Directory Date of Birth.
+ * @return string               Winning division label (or empty string if neither exists).
+ */
+if ( ! function_exists( 'sywat_select_highest_category_division' ) ) {
+    function sywat_select_highest_category_division( $hist_division, $dob_division ) {
+        $hist_clean = trim( (string) $hist_division );
+        $dob_clean  = trim( (string) $dob_division );
+
+        $hist_rank = sywat_get_division_category_rank( $hist_clean );
+        $dob_rank  = sywat_get_division_category_rank( $dob_clean );
+
+        if ( $hist_rank === 0 && $dob_rank === 0 ) {
+            return $hist_clean !== '' ? $hist_clean : $dob_clean;
+        }
+
+        if ( $hist_rank > $dob_rank ) {
+            return $hist_clean;
+        }
+
+        if ( $dob_rank > 0 ) {
+            return $dob_clean;
+        }
+
+        return $hist_clean;
     }
 }
 
@@ -297,7 +424,7 @@ if ( ! function_exists( 'sywat_are_given_names_compatible' ) ) {
 /**
  * Build and request-cache the unified shooter identity index merging:
  * 1. Member Directory (Primary Heads, Household Dependents, Unassigned Pool)
- * 2. 18-Month TFAA Standings Cache (sywat_tfaa_cache)
+ * 2. 18-Month TFAA Standings & Historical Shooters (sywat_get_historical_shooters() + sywat_tfaa_cache)
  * 3. Shop Registration History Cache (sywat_history_profiles_cache)
  *
  * @return array{
@@ -314,13 +441,22 @@ if ( ! function_exists( 'sywat_get_unified_shooter_identity_index' ) ) {
             return $unified_index;
         }
 
-        $records   = array();
-        $exact_map = array();
-        $fl_map    = array();
-        $last_map  = array();
+        $records      = array();
+        $exact_map    = array();
+        $fl_map       = array();
+        $last_map     = array();
+        $placeholders = array( '-', '--', '—', '–', 'n/a', 'na', 'none', 'unassigned', 'unknown', 'no show' );
+
+        $clean_field = function( $val ) use ( $placeholders ) {
+            $str = trim( (string) $val );
+            if ( $str === '' || in_array( strtolower( $str ), $placeholders, true ) ) {
+                return '';
+            }
+            return $str;
+        };
 
         $add_record = function( $rec ) use ( &$records, &$exact_map, &$fl_map, &$last_map ) {
-            $name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $rec['full_name'] ) );
+            $name = sywat_normalize_name_first_last( $rec['full_name'] );
             if ( $name === '' ) {
                 return;
             }
@@ -375,11 +511,15 @@ if ( ! function_exists( 'sywat_get_unified_shooter_identity_index' ) ) {
 
         // Sources 2 & 3: 18-Month TFAA Standings & Shop Registration History
         $history_sources = array(
-            'tfaa_standings' => array(
+            'tfaa_historical' => array(
+                'data'     => function_exists( 'sywat_get_historical_shooters' ) ? sywat_get_historical_shooters() : array(),
+                'priority' => 2,
+            ),
+            'tfaa_standings'  => array(
                 'data'     => get_option( 'sywat_tfaa_cache', array() ),
                 'priority' => 2,
             ),
-            'shop_history'   => array(
+            'shop_history'    => array(
                 'data'     => get_transient( 'sywat_history_profiles_cache' ),
                 'priority' => 1,
             ),
@@ -416,18 +556,12 @@ if ( ! function_exists( 'sywat_get_unified_shooter_identity_index' ) ) {
                 if ( $r_name === '' ) {
                     continue;
                 }
-                $r_div = isset( $rec['division'] ) ? trim( (string) $rec['division'] ) : '';
-                $r_sty = isset( $rec['style'] ) ? trim( (string) $rec['style'] ) : '';
-                $r_gen = isset( $rec['gender'] ) ? trim( (string) $rec['gender'] ) : '';
 
-                if ( strcasecmp( $r_div, 'No Show' ) === 0 ) {
-                    $r_div = '';
-                }
-                if ( strcasecmp( $r_sty, 'No Show' ) === 0 ) {
-                    $r_sty = '';
-                }
+                $r_div = $clean_field( isset( $rec['division'] ) ? $rec['division'] : '' );
+                $r_sty = $clean_field( isset( $rec['style'] ) ? $rec['style'] : '' );
+                $r_gen = $clean_field( isset( $rec['gender'] ) ? $rec['gender'] : '' );
 
-                $dedup_sig = strtolower( $r_name . '|' . $r_div . '|' . $r_sty . '|' . $r_gen );
+                $dedup_sig = strtolower( sywat_normalize_name_first_last( $r_name ) . '|' . $r_div . '|' . $r_sty . '|' . $r_gen );
                 if ( isset( $seen_in_source[ $dedup_sig ] ) ) {
                     continue;
                 }
@@ -601,6 +735,11 @@ if ( ! function_exists( 'sywat_find_unified_shooter_matches' ) ) {
  * - Member Online Self-Registration (member-registration-actions.php)
  * - Walk-In & Check-In Desk Standardization (checkin-actions.php)
  *
+ * Division Resolution Rule:
+ * - Evaluates both Historical Division (18-Month TFAA / Shop History) and Member Directory DOB Division.
+ * - Selects whichever category is higher on the NFAA ladder (max(History, DOB)) so mid-season
+ *   "shooting up" and birthday "aging up" both resolve accurately.
+ *
  * Enforces a strict ambiguity guard: if multiple distinct shooters match a fuzzy alias
  * (e.g., two different relatives sharing a last name and prefix), canonical_name is NOT
  * overwritten so Check-In can display the multi-profile selector safely.
@@ -655,25 +794,14 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
             return $profile;
         }
 
-        $apply_division = function( $raw_div ) use ( &$profile ) {
-            $norm_div = function_exists( 'sywat_shooting_styles_normalize_division' )
-                ? sywat_shooting_styles_normalize_division( $raw_div )
-                : trim( (string) $raw_div );
-            if ( $norm_div === '' || strcasecmp( $norm_div, 'No Show' ) === 0 ) {
-                return;
+        $has_norm_div_fn = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $normalize_div   = function( $raw_div ) use ( $has_norm_div_fn ) {
+            $clean_div = trim( (string) $raw_div );
+            if ( $clean_div === '' || strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+                return '';
             }
-            $dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
-                ? sywat_shooting_styles_get_division_distance( $norm_div )
-                : ( stripos( $norm_div, 'Cub' ) !== false ? 'Cub' : '20yd' );
-            $tier = ( $dist === 'Cub' )
-                ? 'Youth'
-                : ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
-                    ? sywat_shooting_styles_get_division_rate_tier( $norm_div )
-                    : ( stripos( $norm_div, 'Youth' ) !== false ? 'Youth' : 'Adult' ) );
-
-            $profile['division']  = $norm_div;
-            $profile['distance']  = $dist;
-            $profile['rate_tier'] = $tier;
+            $norm = $has_norm_div_fn ? sywat_shooting_styles_normalize_division( $clean_div ) : $clean_div;
+            return $norm !== '' ? $norm : $clean_div;
         };
 
         $primary_hit               = $top_tier[0];
@@ -683,8 +811,11 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
         $profile['canonical_name'] = $official_name;
         $profile['was_normalized'] = ( strcasecmp( $clean_name, $official_name ) !== 0 );
 
+        $dob_division  = '';
+        $hist_division = '';
+        $target_exact  = $primary_hit['keys']['exact'];
+
         // Merge attributes across all records belonging to this resolved shooter (Member DB + TFAA + Shop History)
-        $target_exact = $primary_hit['keys']['exact'];
         foreach ( $matches as $rec ) {
             if ( $rec['keys']['exact'] !== $target_exact ) {
                 continue;
@@ -704,20 +835,39 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
                 if ( $profile['phone'] === '' && ! empty( $rec['phone_digits'] ) ) {
                     $profile['phone'] = $rec['phone_digits'];
                 }
-                if ( $profile['division'] === '' && ! empty( $rec['dob'] ) && function_exists( 'sywat_get_eligible_age_division' ) ) {
-                    $apply_division( sywat_get_eligible_age_division( $rec['dob'], $tournament_date ?: null ) );
+                if ( $dob_division === '' && ! empty( $rec['dob'] ) && function_exists( 'sywat_get_eligible_age_division' ) ) {
+                    $dob_division = $normalize_div( sywat_get_eligible_age_division( $rec['dob'], $tournament_date ?: null ) );
+                }
+            } elseif ( ! empty( $rec['division'] ) ) {
+                $cand_hist_div = $normalize_div( $rec['division'] );
+                if ( $cand_hist_div !== '' ) {
+                    $hist_division = sywat_select_highest_category_division( $hist_division, $cand_hist_div );
                 }
             }
 
-            if ( $profile['division'] === '' && ! empty( $rec['division'] ) ) {
-                $apply_division( $rec['division'] );
-            }
             if ( $profile['style'] === '' && ! empty( $rec['style'] ) ) {
                 $profile['style'] = trim( (string) $rec['style'] );
             }
             if ( $profile['gender'] === '' && ! empty( $rec['gender'] ) ) {
                 $profile['gender'] = trim( (string) $rec['gender'] );
             }
+        }
+
+        // Select highest NFAA category between History ("shooting up") and DOB (birthday age-up)
+        $winning_division = sywat_select_highest_category_division( $hist_division, $dob_division );
+        if ( $winning_division !== '' ) {
+            $dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
+                ? sywat_shooting_styles_get_division_distance( $winning_division )
+                : ( stripos( $winning_division, 'Cub' ) !== false ? 'Cub' : '20yd' );
+            $tier = ( $dist === 'Cub' )
+                ? 'Youth'
+                : ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
+                    ? sywat_shooting_styles_get_division_rate_tier( $winning_division )
+                    : ( stripos( $winning_division, 'Youth' ) !== false ? 'Youth' : 'Adult' ) );
+
+            $profile['division']  = $winning_division;
+            $profile['distance']  = $dist;
+            $profile['rate_tier'] = $tier;
         }
 
         return $profile;
@@ -727,40 +877,121 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
 /**
  * Build a deduplicated, lightweight shooter list for client-side Registration Intake autocomplete
  * combining Member Directory records and 18-Month TFAA Standings.
+ * Applies the highest-category rule (max(History, DOB)) in O(N) single-pass hashtable lookups
+ * so both top and bottom search fields display accurate NFAA age divisions.
  *
+ * @param string $tournament_date Optional YYYY-MM-DD reference date for DOB age division calculation.
  * @return array<int, array{name: string, division: string, style: string, gender: string}>
  */
 if ( ! function_exists( 'sywat_get_unified_js_shooter_index' ) ) {
-    function sywat_get_unified_js_shooter_index() {
+    function sywat_get_unified_js_shooter_index( $tournament_date = '' ) {
         $index   = sywat_get_unified_shooter_identity_index();
         $records = $index['records'];
-        $by_name = array();
+        $ref_ymd = trim( (string) $tournament_date );
+        if ( $ref_ymd === '' ) {
+            $ref_ymd = function_exists( 'current_time' ) ? current_time( 'Y-m-d' ) : gmdate( 'Y-m-d' );
+        }
+
+        $has_norm_div_fn = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_dob_div_fn  = function_exists( 'sywat_get_eligible_age_division' );
+        $normalize_div   = function( $raw_div ) use ( $has_norm_div_fn ) {
+            $clean_div = trim( (string) $raw_div );
+            if ( $clean_div === '' || strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+                return '';
+            }
+            $norm = $has_norm_div_fn ? sywat_shooting_styles_normalize_division( $clean_div ) : $clean_div;
+            return $norm !== '' ? $norm : $clean_div;
+        };
+
+        $by_name   = array();
+        $fl_groups = array();
 
         foreach ( $records as $rec ) {
             $exact = $rec['keys']['exact'];
             if ( $exact === '' ) {
                 continue;
             }
+
             if ( ! isset( $by_name[ $exact ] ) ) {
                 $by_name[ $exact ] = array(
-                    'name'     => $rec['full_name'],
-                    'division' => $rec['division'],
-                    'style'    => $rec['style'],
-                    'gender'   => $rec['gender'],
+                    'name'      => $rec['full_name'],
+                    'fl'        => $rec['keys']['fl'],
+                    'hist_div'  => '',
+                    'dob_div'   => '',
+                    'style'     => '',
+                    'gender'    => '',
                 );
-            } else {
-                if ( $by_name[ $exact ]['division'] === '' && $rec['division'] !== '' ) {
-                    $by_name[ $exact ]['division'] = $rec['division'];
+                if ( $rec['keys']['fl'] !== '' && strpos( $rec['keys']['fl'], '___' ) !== false ) {
+                    $fl_groups[ $rec['keys']['fl'] ][] = $exact;
                 }
-                if ( $by_name[ $exact ]['style'] === '' && $rec['style'] !== '' ) {
-                    $by_name[ $exact ]['style'] = $rec['style'];
+            }
+
+            if ( $rec['source'] === 'member_directory' ) {
+                if ( $by_name[ $exact ]['dob_div'] === '' && ! empty( $rec['dob'] ) && $has_dob_div_fn ) {
+                    $by_name[ $exact ]['dob_div'] = $normalize_div( sywat_get_eligible_age_division( $rec['dob'], $ref_ymd ) );
                 }
-                if ( $by_name[ $exact ]['gender'] === '' && $rec['gender'] !== '' ) {
-                    $by_name[ $exact ]['gender'] = $rec['gender'];
+            } elseif ( ! empty( $rec['division'] ) ) {
+                $cand_hist = $normalize_div( $rec['division'] );
+                if ( $cand_hist !== '' ) {
+                    $by_name[ $exact ]['hist_div'] = sywat_select_highest_category_division( $by_name[ $exact ]['hist_div'], $cand_hist );
+                }
+            }
+
+            if ( $by_name[ $exact ]['style'] === '' && ! empty( $rec['style'] ) ) {
+                $by_name[ $exact ]['style'] = trim( (string) $rec['style'] );
+            }
+            if ( $by_name[ $exact ]['gender'] === '' && ! empty( $rec['gender'] ) ) {
+                $by_name[ $exact ]['gender'] = trim( (string) $rec['gender'] );
+            }
+        }
+
+        // Unambiguous First+Last backfill (e.g., "Mark E. Tanner" <-> "Mark Tanner" when only 1 identity shares that FL key)
+        foreach ( $fl_groups as $fl_exacts ) {
+            if ( count( $fl_exacts ) < 2 ) {
+                continue;
+            }
+            $shared_hist   = '';
+            $shared_dob    = '';
+            $shared_style  = '';
+            $shared_gender = '';
+
+            foreach ( $fl_exacts as $ex_key ) {
+                $shared_hist = sywat_select_highest_category_division( $shared_hist, $by_name[ $ex_key ]['hist_div'] );
+                $shared_dob  = sywat_select_highest_category_division( $shared_dob, $by_name[ $ex_key ]['dob_div'] );
+                if ( $shared_style === '' && $by_name[ $ex_key ]['style'] !== '' ) {
+                    $shared_style = $by_name[ $ex_key ]['style'];
+                }
+                if ( $shared_gender === '' && $by_name[ $ex_key ]['gender'] !== '' ) {
+                    $shared_gender = $by_name[ $ex_key ]['gender'];
+                }
+            }
+
+            foreach ( $fl_exacts as $ex_key ) {
+                if ( $by_name[ $ex_key ]['hist_div'] === '' && $shared_hist !== '' ) {
+                    $by_name[ $ex_key ]['hist_div'] = $shared_hist;
+                }
+                if ( $by_name[ $ex_key ]['dob_div'] === '' && $shared_dob !== '' ) {
+                    $by_name[ $ex_key ]['dob_div'] = $shared_dob;
+                }
+                if ( $by_name[ $ex_key ]['style'] === '' && $shared_style !== '' ) {
+                    $by_name[ $ex_key ]['style'] = $shared_style;
+                }
+                if ( $by_name[ $ex_key ]['gender'] === '' && $shared_gender !== '' ) {
+                    $by_name[ $ex_key ]['gender'] = $shared_gender;
                 }
             }
         }
 
-        return array_values( $by_name );
+        $output = array();
+        foreach ( $by_name as $entry ) {
+            $output[] = array(
+                'name'     => $entry['name'],
+                'division' => sywat_select_highest_category_division( $entry['hist_div'], $entry['dob_div'] ),
+                'style'    => $entry['style'],
+                'gender'   => $entry['gender'],
+            );
+        }
+
+        return $output;
     }
 }
