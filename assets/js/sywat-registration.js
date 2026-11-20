@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with simplified distance-neutral 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), unified Member Directory + 18-Month TFAA shooter autocomplete with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
- * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller, delegated data-sywat-action listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
- * Version: 7.4.0
+ * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA shooter autocomplete with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden).
+ * Version: 7.5.0
  */
 
 (function() {
@@ -11,7 +11,7 @@
 
     window.SYWAT = window.SYWAT || {};
 
-    let archerRowCount = 1;
+    let nextArcherRowIndex = 1;
 
     const DEFAULT_DIVISIONS = [
         { slug: 'cub-8-11',            code: 'C',  label: 'Cub (8 - 11)',           distance: 'Cub',  rate_tier: 'Youth', fee: 25, aliases: ['Cub'] },
@@ -22,6 +22,15 @@
         { slug: 'silver-senior-60-69', code: 'SS', label: 'Silver Senior (60 - 69)',distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Silver Senior'] },
         { slug: 'master-senior-70',    code: 'MS', label: 'Master Senior (70+)',    distance: '20yd', rate_tier: 'Adult', fee: 30, aliases: ['Master Senior', 'Master'] }
     ];
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
     function cleanImportModalQueryParam() {
         if (!window.history || typeof window.history.replaceState !== 'function') {
@@ -60,17 +69,9 @@
         cleanImportModalQueryParam();
     }
 
-    window.SYWAT.registration = {
-        openImportModal: openImportModal,
-        closeImportModal: closeImportModal
-    };
-
     function getTfaaShooters() {
         if (window.sywatRegData && Array.isArray(window.sywatRegData.tfaaShooters)) {
             return window.sywatRegData.tfaaShooters;
-        }
-        if (typeof sywatTfaaShooters !== 'undefined' && Array.isArray(sywatTfaaShooters)) {
-            return sywatTfaaShooters;
         }
         return [];
     }
@@ -160,9 +161,6 @@
     function getPhoneCache() {
         if (window.sywatRegData && typeof window.sywatRegData.phoneCache === 'object' && window.sywatRegData.phoneCache !== null) {
             return window.sywatRegData.phoneCache;
-        }
-        if (typeof sywatPhoneCache !== 'undefined' && typeof sywatPhoneCache === 'object' && sywatPhoneCache !== null) {
-            return sywatPhoneCache;
         }
         return {};
     }
@@ -254,6 +252,26 @@
     }
 
     /**
+     * Parse configured shooting line columns from #sywat_archer_rows_container[data-lines].
+     */
+    function getConfiguredLineColumns() {
+        const container = document.getElementById('sywat_archer_rows_container');
+        if (!container) {
+            return [];
+        }
+        const rawJson = container.getAttribute('data-lines');
+        if (!rawJson) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(rawJson);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+            return [];
+        }
+    }
+
+    /**
      * Resolve individual entry fee for a specific round profile + simplified tier ('cub' | 'youth' | 'adult').
      */
     function getFeeForRow(profileSlug, tierVal) {
@@ -307,7 +325,7 @@
             adult: 'Adult'
         };
 
-        Array.from(tierSelect.options).forEach(opt => {
+        Array.from(tierSelect.options).forEach(function(opt) {
             const val = String(opt.value || '').toLowerCase();
             if (!val || !labelMap[val]) return;
             const fee = getFeeForRow(roundSlug, val);
@@ -316,16 +334,7 @@
         });
     }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    window.checkAndFillPhone = function(archerName) {
+    function checkAndFillPhone(archerName) {
         if (!archerName) return;
         const phoneCache = getPhoneCache();
         const cleanName  = archerName.trim().toLowerCase();
@@ -333,23 +342,37 @@
 
         if (phoneInput && !phoneInput.value && phoneCache[cleanName]) {
             phoneInput.value = phoneCache[cleanName];
-            window.formatPhoneNumber(phoneInput);
+            formatPhoneNumber(phoneInput);
         }
-    };
+    }
 
-    window.handleCallerNameInput = function(callerInput) {
+    function formatPhoneNumber(input) {
+        if (!input) return;
+        let digits = input.value.replace(/\D/g, '');
+        if (digits.length > 10) digits = digits.substring(0, 10);
+
+        if (digits.length > 6) {
+            input.value = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
+        } else if (digits.length > 3) {
+            input.value = digits.substring(0, 3) + '-' + digits.substring(3);
+        } else {
+            input.value = digits;
+        }
+    }
+
+    function handleCallerNameInput(callerInput) {
+        if (!callerInput) return;
         const firstArcherInput = document.getElementById('sywat_first_archer_name') || document.querySelector('.sywat-archer-name-input');
-        if (!firstArcherInput) return;
-
-        if (!firstArcherInput.dataset.manuallyEdited) {
+        if (firstArcherInput && !firstArcherInput.dataset.manuallyEdited) {
             firstArcherInput.value = callerInput.value;
-            window.handleTfaaAutocomplete(firstArcherInput);
-            window.recalculateGroupTotal();
+            handleTfaaAutocomplete(firstArcherInput);
+            recalculateGroupTotal();
         }
-        window.checkAndFillPhone(callerInput.value);
-    };
+        checkAndFillPhone(callerInput.value);
+    }
 
-    window.handleArcherNameInput = function(archerInput) {
+    function handleArcherNameInput(archerInput) {
+        if (!archerInput) return;
         const callerInput = document.getElementById('sywat_group_name');
         if (callerInput && archerInput.id === 'sywat_first_archer_name') {
             if (archerInput.value !== callerInput.value && archerInput.value !== '') {
@@ -358,29 +381,21 @@
                 delete archerInput.dataset.manuallyEdited;
             }
         }
-        window.handleTfaaAutocomplete(archerInput);
-        window.recalculateGroupTotal();
-        window.checkAndFillPhone(archerInput.value);
-    };
+        handleTfaaAutocomplete(archerInput);
+        recalculateGroupTotal();
+        checkAndFillPhone(archerInput.value);
+    }
 
-    window.handleRateTierChange = function(tierSelect) {
+    function handleRateTierChange(tierSelect) {
         if (!tierSelect) return;
         tierSelect.dataset.userChosen = 'true';
-        window.recalculateGroupTotal();
-    };
-
-    window.handleDivisionChange = function(divSelect) {
-        window.handleRateTierChange(divSelect);
-    };
-
-    window.handleDistanceChange = function() {
-        window.recalculateGroupTotal();
-    };
+        recalculateGroupTotal();
+    }
 
     /**
      * Map a historical TFAA division label/code to 'cub', 'youth', or 'adult' on the 3-tier selector.
      */
-    window.matchTfaaRateTier = function(tfaaDiv, selectEl) {
+    function matchTfaaRateTier(tfaaDiv, selectEl) {
         if (!tfaaDiv || !selectEl) return;
         const cleanTfaa = String(tfaaDiv).trim().toLowerCase();
         if (!cleanTfaa) return;
@@ -404,20 +419,23 @@
         }
 
         selectEl.value = resolvedTier;
-        window.handleRateTierChange(selectEl);
-    };
+        handleRateTierChange(selectEl);
+    }
 
-    window.matchTfaaDivision = function(tfaaDiv, selectEl) {
-        window.matchTfaaRateTier(tfaaDiv, selectEl);
-    };
+    function closeAllTfaaAutocompletes() {
+        document.querySelectorAll('.sywat-tfaa-autocomplete-dropdown').forEach(function(el) {
+            el.remove();
+        });
+    }
 
     /**
      * Registration Autocomplete: Ranks exact, middle-initial folded, given-name alias/stem
      * ("Steven Bergh" -> "Steve Bergh"), and substring matches across the unified Member DB + TFAA index.
      */
-    window.handleTfaaAutocomplete = function(input) {
+    function handleTfaaAutocomplete(input) {
+        if (!input) return;
         const query = input.value.trim().toLowerCase();
-        window.closeAllTfaaAutocompletes();
+        closeAllTfaaAutocompletes();
 
         const shooters = getTfaaShooters();
         if (query.length < 2 || !Array.isArray(shooters) || shooters.length === 0) {
@@ -428,7 +446,7 @@
         const seenNames = new Set();
         const matches   = [];
 
-        shooters.forEach(s => {
+        shooters.forEach(function(s) {
             if (!s || !s.name) return;
             const norm = s.name.trim().toLowerCase();
             if (seenNames.has(norm)) return;
@@ -459,23 +477,22 @@
         });
 
         const parent = input.parentElement;
-        if (getComputedStyle(parent).position === 'static') {
+        if (parent && getComputedStyle(parent).position === 'static') {
             parent.classList.add('sywat-relative-parent');
         }
 
         const dropdown = document.createElement('div');
         dropdown.className = 'sywat-tfaa-autocomplete-dropdown';
 
-        matches.slice(0, 8).forEach(m => {
+        matches.slice(0, 8).forEach(function(m) {
             const item = document.createElement('div');
             item.className = 'sywat-tfaa-item';
-
-            item.innerHTML = `<strong>${escapeHtml(m.name)}</strong> <span class="sywat-tfaa-item-badge">${escapeHtml(m.division || '')}</span>`;
+            item.innerHTML = '<strong>' + escapeHtml(m.name) + '</strong> <span class="sywat-tfaa-item-badge">' + escapeHtml(m.division || '') + '</span>';
 
             item.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 input.value = m.name;
-                window.closeAllTfaaAutocompletes();
+                closeAllTfaaAutocompletes();
 
                 const callerInput = document.getElementById('sywat_group_name');
                 if (callerInput && (!callerInput.value.trim() || input.id === 'sywat_first_archer_name')) {
@@ -486,153 +503,127 @@
                 if (row) {
                     const tierSelect = row.querySelector('.sywat-rate-tier-select');
                     if (tierSelect && m.division) {
-                        window.matchTfaaRateTier(m.division, tierSelect);
+                        matchTfaaRateTier(m.division, tierSelect);
                     }
                 }
-                window.checkAndFillPhone(m.name);
-                window.recalculateGroupTotal();
+                checkAndFillPhone(m.name);
+                recalculateGroupTotal();
             });
 
             dropdown.appendChild(item);
         });
 
-        parent.appendChild(dropdown);
-    };
-
-    window.closeAllTfaaAutocompletes = function() {
-        document.querySelectorAll('.sywat-tfaa-autocomplete-dropdown').forEach(el => el.remove());
-    };
-
-    window.formatPhoneNumber = function(input) {
-        let digits = input.value.replace(/\D/g, '');
-        if (digits.length > 10) digits = digits.substring(0, 10);
-
-        if (digits.length > 6) {
-            input.value = digits.substring(0, 3) + '-' + digits.substring(3, 6) + '-' + digits.substring(6);
-        } else if (digits.length > 3) {
-            input.value = digits.substring(0, 3) + '-' + digits.substring(3);
-        } else {
-            input.value = digits;
+        if (parent) {
+            parent.appendChild(dropdown);
         }
-    };
+    }
 
-    window.updateAllArcherLines = function(selectedLineIdx) {
-        if (selectedLineIdx !== undefined && selectedLineIdx !== null && selectedLineIdx !== '') {
-            sessionStorage.setItem('sywat_last_line_idx', selectedLineIdx);
-        }
-        const lineSelects = document.querySelectorAll('.sywat-line-override-select');
-        lineSelects.forEach(select => {
-            select.value = selectedLineIdx;
-        });
-        window.recalculateGroupTotal();
-    };
-
-    window.addArcherRow = function() {
+    /**
+     * Append a new multi-line archer row with zero pre-checked shooting line checkboxes.
+     */
+    function addArcherRow() {
         const container = document.getElementById('sywat_archer_rows_container');
         if (!container) return;
 
         const existingRows = container.querySelectorAll('.sywat-archer-input-row');
-        const rowIndex     = existingRows.length > 0 ? existingRows.length : archerRowCount;
+        if (existingRows.length >= nextArcherRowIndex) {
+            nextArcherRowIndex = existingRows.length;
+        }
+        const rowIndex     = nextArcherRowIndex++;
         const isMultiRound = container.getAttribute('data-multi-round') === '1';
         const defProfKey   = getDefaultProfileKey();
+        const lineColumns  = getConfiguredLineColumns();
 
-        const savedLineIdx = sessionStorage.getItem('sywat_last_line_idx');
-        const defaultLineSelect = document.getElementById('sywat_default_line_idx');
-        const defaultLineIdx = savedLineIdx !== null
-            ? savedLineIdx
-            : (defaultLineSelect ? defaultLineSelect.value : '0');
-
-        let lineOptionsHtml = '';
-        if (defaultLineSelect) {
-            Array.from(defaultLineSelect.options).forEach(opt => {
-                const isSel = (opt.value === defaultLineIdx) ? 'selected' : '';
-                lineOptionsHtml += `<option value="${escapeHtml(opt.value)}" ${isSel}>${escapeHtml(opt.text)}</option>`;
-            });
-        }
-
-        let roundControlHtml = '';
+        let hiddenProfileHtml = '';
+        let roundCellHtml     = '';
         if (isMultiRound) {
             const profiles = getProfiles();
             let roundOptionsHtml = '';
-            Object.keys(profiles).forEach(pSlug => {
+            Object.keys(profiles).forEach(function(pSlug) {
                 const pRec    = profiles[pSlug];
-                const isSel   = (pSlug === defProfKey) ? 'selected' : '';
+                const isSel   = (pSlug === defProfKey) ? ' selected' : '';
                 const optText = pRec.label + (pRec.round_subtitle ? ' (' + pRec.round_subtitle + ')' : '');
-                roundOptionsHtml += `<option value="${escapeHtml(pSlug)}" ${isSel}>${escapeHtml(optText)}</option>`;
+                roundOptionsHtml += '<option value="' + escapeHtml(pSlug) + '"' + isSel + '>' + escapeHtml(optText) + '</option>';
             });
-            roundControlHtml = `
-                <div class="sywat-field-group sywat-col-archer-dist">
-                    <select name="archers[${rowIndex}][pricing_profile]" class="sywat-round-profile-select" onchange="recalculateGroupTotal()">
-                        ${roundOptionsHtml}
-                    </select>
-                </div>
-            `;
+            roundCellHtml =
+                '<td data-label="Round Format *">' +
+                    '<select name="archers[' + rowIndex + '][pricing_profile]" class="sywat-round-profile-select" data-sywat-action="round-profile-change">' +
+                        roundOptionsHtml +
+                    '</select>' +
+                '</td>';
         } else {
-            roundControlHtml = `<input type="hidden" name="archers[${rowIndex}][pricing_profile]" class="sywat-round-profile-input" value="${escapeHtml(defProfKey)}">`;
+            hiddenProfileHtml = '<input type="hidden" name="archers[' + rowIndex + '][pricing_profile]" class="sywat-round-profile-input" value="' + escapeHtml(defProfKey) + '">';
         }
 
         const cubFee   = getFeeForRow(defProfKey, 'cub');
         const youthFee = getFeeForRow(defProfKey, 'youth');
         const adultFee = getFeeForRow(defProfKey, 'adult');
 
-        const tierOptionsHtml = `
-            <option value="" disabled selected hidden>Select Category *</option>
-            <option value="cub" data-distance="Cub" data-rate-tier="Youth" data-fee="${cubFee.toFixed(2)}">Cub [$${cubFee.toFixed(2)}]</option>
-            <option value="youth" data-distance="20yd" data-rate-tier="Youth" data-fee="${youthFee.toFixed(2)}">Youth [$${youthFee.toFixed(2)}]</option>
-            <option value="adult" data-distance="20yd" data-rate-tier="Adult" data-fee="${adultFee.toFixed(2)}">Adult [$${adultFee.toFixed(2)}]</option>
-        `;
+        const tierOptionsHtml =
+            '<option value="" disabled selected hidden>Select Category *</option>' +
+            '<option value="cub" data-distance="Cub" data-rate-tier="Youth" data-fee="' + cubFee.toFixed(2) + '">Cub [$' + cubFee.toFixed(2) + ']</option>' +
+            '<option value="youth" data-distance="20yd" data-rate-tier="Youth" data-fee="' + youthFee.toFixed(2) + '">Youth [$' + youthFee.toFixed(2) + ']</option>' +
+            '<option value="adult" data-distance="20yd" data-rate-tier="Adult" data-fee="' + adultFee.toFixed(2) + '">Adult [$' + adultFee.toFixed(2) + ']</option>';
 
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'sywat-archer-input-row';
+        let lineCellsHtml = '';
+        lineColumns.forEach(function(col) {
+            const colIdx   = String(col.idx !== undefined ? col.idx : '');
+            const colLabel = String(col.label || ('Line ' + (parseInt(colIdx, 10) + 1)));
+            const ariaText = 'Register archer for ' + colLabel;
+            lineCellsHtml +=
+                '<td class="sywat-col-center" data-label="' + escapeHtml(colLabel) + '">' +
+                    '<input type="checkbox" class="sywat-archer-line-cb" name="archers[' + rowIndex + '][line_indices][]" value="' + escapeHtml(colIdx) + '" aria-label="' + escapeHtml(ariaText) + '" data-sywat-action="archer-line-toggle">' +
+                '</td>';
+        });
 
-        rowDiv.innerHTML = `
-            <div class="sywat-field-group sywat-col-archer-name">
-                <input type="text" name="archers[${rowIndex}][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required oninput="handleArcherNameInput(this); recalculateGroupTotal();">
-            </div>
+        const tr = document.createElement('tr');
+        tr.className = 'sywat-archer-input-row';
+        tr.innerHTML =
+            '<td data-label="Archer Full Name *">' +
+                '<input type="text" name="archers[' + rowIndex + '][name]" class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required data-sywat-action="archer-name-input">' +
+                hiddenProfileHtml +
+            '</td>' +
+            roundCellHtml +
+            '<td data-label="Category / Rate *">' +
+                '<select name="archers[' + rowIndex + '][rate_tier]" class="sywat-rate-tier-select" required data-sywat-action="rate-tier-change">' +
+                    tierOptionsHtml +
+                '</select>' +
+            '</td>' +
+            lineCellsHtml +
+            '<td class="sywat-col-center" data-label="Action">' +
+                '<button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" data-sywat-action="remove-archer-row" title="Remove Archer" aria-label="Remove Archer"></button>' +
+            '</td>';
 
-            ${roundControlHtml}
+        container.appendChild(tr);
+        recalculateGroupTotal();
+    }
 
-            <div class="sywat-field-group sywat-col-archer-div">
-                <select name="archers[${rowIndex}][rate_tier]" class="sywat-rate-tier-select" required onchange="handleRateTierChange(this);">
-                    ${tierOptionsHtml}
-                </select>
-            </div>
-
-            <div class="sywat-field-group sywat-col-archer-line">
-                <select name="archers[${rowIndex}][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
-                    ${lineOptionsHtml}
-                </select>
-            </div>
-
-            <div class="sywat-col-archer-action">
-                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer" aria-label="Remove Archer"></button>
-            </div>
-        `;
-
-        container.appendChild(rowDiv);
-        archerRowCount++;
-        window.recalculateGroupTotal();
-    };
-
-    window.removeArcherRow = function(btn) {
+    function removeArcherRow(btn) {
+        if (!btn) return;
         const rows = document.querySelectorAll('.sywat-archer-input-row');
         if (rows.length <= 1) {
-            alert('At least one archer row is required.');
+            window.alert('At least one archer row is required.');
             return;
         }
-        btn.closest('.sywat-archer-input-row').remove();
-        window.recalculateGroupTotal();
-    };
+        const row = btn.closest('.sywat-archer-input-row');
+        if (row) {
+            row.remove();
+        }
+        recalculateGroupTotal();
+    }
 
-    window.recalculateGroupTotal = function() {
+    /**
+     * Recalculate Group Total, Family Cap status (per line or tournament), and Balance Due
+     * across all checked (archer, line) pairs in the multi-line matrix.
+     */
+    function recalculateGroupTotal() {
         const rows      = document.querySelectorAll('.sywat-archer-input-row');
         const profiles  = getProfiles();
         const defSlug   = getDefaultProfileKey();
         const bucketMap = {};
 
-        // Check if any offered pricing profile uses tournament-wide family caps
         let useTournWideCap = false;
-        Object.keys(profiles).forEach(pSlug => {
+        Object.keys(profiles).forEach(function(pSlug) {
             const p = profiles[pSlug];
             if (p && p.family_cap_enabled && p.family_cap_scope === 'tournament') {
                 useTournWideCap = true;
@@ -642,21 +633,27 @@
         const claimedPromoNames = {};
         let promoAppliedCount   = 0;
 
-        rows.forEach(row => {
-            const nameInput   = row.querySelector('input[type="text"]');
-            const roundSelect = row.querySelector('.sywat-round-profile-select');
-            const roundInput  = row.querySelector('.sywat-round-profile-input');
-            const tierSelect  = row.querySelector('.sywat-rate-tier-select');
-            const lineSelect  = row.querySelector('.sywat-line-override-select');
+        rows.forEach(function(row) {
+            const nameInput        = row.querySelector('.sywat-archer-name-input');
+            const roundSelect      = row.querySelector('.sywat-round-profile-select');
+            const roundInput       = row.querySelector('.sywat-round-profile-input');
+            const tierSelect       = row.querySelector('.sywat-rate-tier-select');
+            const checkedLineBoxes = row.querySelectorAll('.sywat-archer-line-cb:checked');
 
-            if (nameInput && nameInput.value.trim() !== '') {
-                const rawName   = nameInput.value.trim();
-                const normName  = rawName.toLowerCase();
-                const roundSlug = roundSelect
-                    ? roundSelect.value
-                    : (roundInput ? roundInput.value : defSlug);
-                const lIdx      = lineSelect ? lineSelect.value : '0';
-                const tierVal   = tierSelect ? tierSelect.value : '';
+            if (!nameInput || nameInput.value.trim() === '' || checkedLineBoxes.length === 0) {
+                return;
+            }
+
+            const rawName   = nameInput.value.trim();
+            const normName  = rawName.toLowerCase();
+            const roundSlug = roundSelect
+                ? roundSelect.value
+                : (roundInput ? roundInput.value : defSlug);
+            const tierVal   = tierSelect ? tierSelect.value : '';
+            const profRec   = getProfile(roundSlug);
+
+            checkedLineBoxes.forEach(function(cb) {
+                const lIdx = String(cb.value || '0');
 
                 let isPromoFree = false;
                 if (!claimedPromoNames[normName] && isArcherPromoEligible(rawName, roundSlug)) {
@@ -666,8 +663,7 @@
                 }
 
                 const archerFee = isPromoFree ? 0 : getFeeForRow(roundSlug, tierVal);
-                const profRec   = getProfile(roundSlug);
-                const capBucket = useTournWideCap ? 'tournament' : String(lIdx);
+                const capBucket = useTournWideCap ? 'tournament' : lIdx;
 
                 if (!isPromoFree && tierVal !== '') {
                     if (!bucketMap[capBucket]) {
@@ -695,14 +691,14 @@
                         }
                     }
                 }
-            }
+            });
         });
 
         let overallTotal       = 0;
         let anyCapped          = false;
         let cappedBucketsCount = 0;
 
-        Object.keys(bucketMap).forEach(bKey => {
+        Object.keys(bucketMap).forEach(function(bKey) {
             const grp       = bucketMap[bKey];
             const minNeeded = (grp.minArchers && grp.minArchers !== 99) ? grp.minArchers : 3;
             const isCapped  = grp.capEnabled && grp.count >= minNeeded && grp.rawTotal > grp.capAmount;
@@ -720,7 +716,10 @@
         const paidInput = document.getElementById('sywat_amount_paid_today');
         const dueDisp   = document.getElementById('sywat_balance_due_disp');
 
-        if (totalDisp) totalDisp.textContent = '$' + overallTotal.toFixed(2);
+        if (totalDisp) {
+            totalDisp.textContent = '$' + overallTotal.toFixed(2);
+        }
+
         if (capBadge) {
             if (anyCapped || promoAppliedCount > 0) {
                 capBadge.classList.remove('sywat-hidden');
@@ -744,10 +743,64 @@
         const paidVal    = paidInput ? parseFloat(paidInput.value) || 0 : 0;
         const balanceDue = Math.max(0, overallTotal - paidVal);
 
-        if (dueDisp) dueDisp.textContent = '$' + balanceDue.toFixed(2);
-    };
+        if (dueDisp) {
+            dueDisp.textContent = '$' + balanceDue.toFixed(2);
+        }
+    }
 
-    window.initAutoDismissAlerts = function() {
+    /**
+     * Client-side pre-submit validation ensuring every named archer row has at least one
+     * shooting line checked before submitting the intake form.
+     */
+    function validatePhoneIntakeForm(form, submitEvent) {
+        if (!form) return;
+
+        const existingClientNotice = document.getElementById('sywat_client_line_validation_notice');
+        if (existingClientNotice) {
+            existingClientNotice.remove();
+        }
+
+        const rows           = form.querySelectorAll('.sywat-archer-input-row');
+        const missingArchers = [];
+        let firstMissingCb   = null;
+
+        rows.forEach(function(row) {
+            const nameInput = row.querySelector('.sywat-archer-name-input');
+            const nameVal   = nameInput ? nameInput.value.trim() : '';
+            if (!nameVal) {
+                return;
+            }
+            const checkedCount = row.querySelectorAll('.sywat-archer-line-cb:checked').length;
+            if (checkedCount === 0) {
+                missingArchers.push(nameVal);
+                if (!firstMissingCb) {
+                    firstMissingCb = row.querySelector('.sywat-archer-line-cb');
+                }
+            }
+        });
+
+        if (missingArchers.length > 0) {
+            submitEvent.preventDefault();
+
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'sywat_client_line_validation_notice';
+            alertDiv.className = 'sywat-alert sywat-alert-danger sywat-mb-3';
+            alertDiv.innerHTML = '<strong>Shooting Line Required:</strong> Please check at least one shooting line for <strong>' + escapeHtml(missingArchers.join(', ')) + '</strong>.';
+
+            const intakeCard = form.closest('.sywat-intake-card');
+            if (intakeCard) {
+                intakeCard.insertBefore(alertDiv, form);
+            } else {
+                form.prepend(alertDiv);
+            }
+
+            if (firstMissingCb && typeof firstMissingCb.focus === 'function') {
+                firstMissingCb.focus();
+            }
+        }
+    }
+
+    function initAutoDismissAlerts() {
         setTimeout(function() {
             const alerts = document.querySelectorAll('#sywat-notice.sywat-alert-success');
             alerts.forEach(function(alert) {
@@ -759,25 +812,72 @@
                     return;
                 }
                 alert.classList.add('sywat-dismissing');
-                setTimeout(function() { alert.remove(); }, 500);
+                setTimeout(function() {
+                    alert.remove();
+                }, 500);
             });
         }, 5000);
+    }
+
+    window.SYWAT.registration = {
+        openImportModal: openImportModal,
+        closeImportModal: closeImportModal,
+        addArcherRow: addArcherRow,
+        removeArcherRow: removeArcherRow,
+        recalculateGroupTotal: recalculateGroupTotal
     };
 
+    // Single Delegated 'input' Listener
     document.addEventListener('input', function(e) {
-        if (e.target && e.target.name && e.target.name.includes('[name]')) {
-            window.handleTfaaAutocomplete(e.target);
+        const target = e.target;
+        if (!target || !target.getAttribute) return;
+
+        const action = target.getAttribute('data-sywat-action');
+        if (action === 'caller-name-input') {
+            handleCallerNameInput(target);
+            return;
+        }
+        if (action === 'group-phone-input') {
+            formatPhoneNumber(target);
+            return;
+        }
+        if (action === 'amount-paid-input') {
+            recalculateGroupTotal();
+            return;
+        }
+        if (action === 'archer-name-input') {
+            handleArcherNameInput(target);
         }
     });
 
+    // Single Delegated 'change' Listener
     document.addEventListener('change', function(e) {
-        if (e.target && e.target.classList && e.target.classList.contains('sywat-round-profile-select')) {
-            const row = e.target.closest('.sywat-archer-input-row');
+        const target = e.target;
+        if (!target || !target.getAttribute) return;
+
+        const action = target.getAttribute('data-sywat-action');
+        if (action === 'switch-tournament') {
+            if (target.form) {
+                target.form.submit();
+            }
+            return;
+        }
+        if (action === 'round-profile-change') {
+            const row = target.closest('.sywat-archer-input-row');
             updateRowRateTierOptionLabels(row);
-            window.recalculateGroupTotal();
+            recalculateGroupTotal();
+            return;
+        }
+        if (action === 'rate-tier-change') {
+            handleRateTierChange(target);
+            return;
+        }
+        if (action === 'archer-line-toggle') {
+            recalculateGroupTotal();
         }
     });
 
+    // Single Delegated 'click' Listener
     document.addEventListener('click', function(e) {
         const actionTrigger = e.target.closest('[data-sywat-action]');
         if (actionTrigger) {
@@ -800,27 +900,51 @@
                 }
                 return;
             }
+            if (action === 'add-archer-row') {
+                e.preventDefault();
+                addArcherRow();
+                return;
+            }
+            if (action === 'remove-archer-row') {
+                e.preventDefault();
+                removeArcherRow(actionTrigger);
+                return;
+            }
         }
 
-        if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && (!e.target.name || !e.target.name.includes('[name]'))) {
-            window.closeAllTfaaAutocompletes();
+        if (!e.target.closest('.sywat-tfaa-autocomplete-dropdown') && !e.target.closest('.sywat-archer-name-input')) {
+            closeAllTfaaAutocompletes();
+        }
+    });
+
+    // Single Delegated 'submit' Listener
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (!form || !form.getAttribute) return;
+
+        const action = form.getAttribute('data-sywat-action');
+        if (action === 'confirm-purge-line') {
+            const msg = form.getAttribute('data-confirm-msg') || 'Are you sure you want to clear this line?';
+            if (!window.confirm(msg)) {
+                e.preventDefault();
+            }
+            return;
+        }
+        if (action === 'phone-intake-form') {
+            validatePhoneIntakeForm(form, e);
         }
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        const defaultLineSelect = document.getElementById('sywat_default_line_idx');
-        if (defaultLineSelect) {
-            const savedLineIdx = sessionStorage.getItem('sywat_last_line_idx');
-            if (savedLineIdx !== null && defaultLineSelect.querySelector('option[value="' + savedLineIdx + '"]')) {
-                defaultLineSelect.value = savedLineIdx;
-                window.updateAllArcherLines(savedLineIdx);
-            }
+        const existingRows = document.querySelectorAll('.sywat-archer-input-row');
+        if (existingRows.length > 0) {
+            nextArcherRowIndex = existingRows.length;
         }
-        document.querySelectorAll('.sywat-archer-input-row').forEach(row => {
+        existingRows.forEach(function(row) {
             updateRowRateTierOptionLabels(row);
         });
-        window.recalculateGroupTotal();
-        window.initAutoDismissAlerts();
+        recalculateGroupTotal();
+        initAutoDismissAlerts();
 
         const importModal = document.getElementById('sywat_import_modal');
         if (importModal) {
