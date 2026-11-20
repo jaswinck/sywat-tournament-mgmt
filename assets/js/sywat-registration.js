@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Registration Intake & Client Logic Engine
  * Path: assets/js/sywat-registration.js
- * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and Archer Full Name rows with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
- * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden / .sywat-field-relative).
- * Version: 7.5.1
+ * Description: Manages multi-archer phone intake rows with per-archer multi-line checkbox matrices (zero pre-checked defaults, single-entry multi-line registration), simplified 3-tier Category / Rate selection (Cub, Youth, Adult), round/pricing profile fee synchronization, live First-Time/Lapsed Shooter promo detection, dynamic Household Family Cap calculation (line or tournament scope), pre-submit line-selection validation, unified Member Directory + 18-Month TFAA age-division & shooter autocomplete on both Caller / Primary Archer Name (#sywat_group_name) and every Archer Full Name row (.sywat-archer-name-input) with given-name alias & stem matching, and the dedicated Bulk Spreadsheet Import modal (#sywat_import_modal).
+ * Compliance: Vanilla JS only (zero jQuery), namespaced window.SYWAT.registration controller (zero bare globals), single delegated data-sywat-action listeners (input, focusin, change, click, submit), zero document-level keydown listeners, zero element.style.* mutations, class-based visibility (.active / .sywat-hidden / .sywat-field-relative).
+ * Version: 7.5.2
  */
 
 (function() {
@@ -430,8 +430,9 @@
 
     /**
      * Registration Autocomplete: Ranks exact, middle-initial folded, given-name alias/stem
-     * ("Steven Bergh" -> "Steve Bergh"), and substring matches across the unified Member DB + TFAA index.
-     * Supports both Caller / Primary Archer Name (#sywat_group_name) and Archer Full Name rows.
+     * ("Steven Bergh" -> "Steve Bergh"), and substring matches across the unified Member DB + TFAA index,
+     * displaying each shooter's NFAA age division badge in both the top Caller / Primary Archer Name
+     * field (#sywat_group_name) and every bottom Archer Full Name row (.sywat-archer-name-input).
      */
     function handleTfaaAutocomplete(input) {
         if (!input) return;
@@ -868,6 +869,17 @@
         }
     });
 
+    // Single Delegated 'focusin' Listener (Re-opens TFAA division lookup on top & bottom name fields)
+    document.addEventListener('focusin', function(e) {
+        const target = e.target;
+        if (!target || !target.getAttribute) return;
+
+        const action = target.getAttribute('data-sywat-action');
+        if (action === 'caller-name-input' || action === 'archer-name-input') {
+            handleTfaaAutocomplete(target);
+        }
+    });
+
     // Single Delegated 'change' Listener
     document.addEventListener('change', function(e) {
         const target = e.target;
@@ -933,7 +945,7 @@
         if (
             !e.target.closest('.sywat-tfaa-autocomplete-dropdown') &&
             !e.target.closest('.sywat-archer-name-input') &&
-            e.target.id !== 'sywat_group_name'
+            !e.target.closest('#sywat_group_name')
         ) {
             closeAllTfaaAutocompletes();
         }
