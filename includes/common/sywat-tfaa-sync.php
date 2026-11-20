@@ -2,10 +2,10 @@
 /**
  * Shared Module: TFAA Event Score Scraper & Verbatim Sync Engine
  * Path: includes/common/sywat-tfaa-sync.php
- * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Resolves parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)") prior to full-text lookup to prevent substring collisions, persists incomplete-round flags ("is_inc") on "[INC]" entries so Season Standings can exclude partial rounds while preserving individual tournament scorecards, treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updates matching local pre-registrations unconditionally, and imports all TFAA entries verbatim.
- * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity & style helpers, hoisted match metadata, omitted closing PHP tag.
+ * Description: Standalone TFAA remote HTTP scraper, HTML parser, and verbatim sync engine integrated with database-configured shooting styles and age divisions. Resolves parenthetical TFAA style codes (e.g., "(MBH)", "(BHFS)", "(FSLR)") prior to full-text lookup to prevent substring collisions, persists incomplete-round flags ("is_inc") on "[INC]" entries (and preserves manual staff "INC" flags across re-syncs) so Season Standings can exclude partial rounds while preserving individual tournament scorecards, treats texasfieldarchery.org as the authoritative system of record by purging prior TFAA-synced rows on re-import, updates matching local pre-registrations unconditionally, imports all TFAA entries verbatim, and executes an atomic Unlock -> Populate -> Lock cycle on all shooting lines so imported scores are immediately protected from accidental online edits.
+ * Compliance: Pure backend sync layer — zero HTML echo, DRY reuse of shared identity & style helpers, hoisted match metadata, autoload-disabled lock persistence with object cache invalidation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.0.2
+ * Version: 8.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -209,10 +209,12 @@ if ( ! function_exists( 'sywat_parse_tfaa_style' ) ) {
 
 /**
  * Core Universal TFAA Event Score Verbatim Sync Engine.
- * Fetches the authoritative TFAA results page, purges prior TFAA-imported rows for the
- * tournament once valid entries are parsed, updates any matching local pre-registrations
- * unconditionally with TFAA's current name/division/gender/style/score/is_inc, and inserts all
- * remaining TFAA entries verbatim.
+ * Fetches the authoritative TFAA results page, temporarily unlocks all shooting lines once
+ * valid entries are parsed, preserves any manual staff "INC" incomplete-round overrides,
+ * purges prior TFAA-imported rows for the tournament, updates any matching local
+ * pre-registrations unconditionally with TFAA's current name/division/gender/style/score/is_inc,
+ * inserts all remaining TFAA entries verbatim, and re-locks all shooting lines so imported
+ * scores cannot be altered online unless explicitly unlocked by an admin or shop manager.
  *
  * @param string $t_name Tournament Title/Key Name.
  * @return array         Result payload array containing success boolean, count, and notice message.
@@ -374,6 +376,11 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return array( 'success' => false, 'message' => 'No valid archer score rows extracted.' );
         }
 
+        // Step 1 of Lock Lifecycle: Temporarily unlock all shooting lines before populating fresh TFAA scores
+        $locks_key = 'sywat_locks_' . $t_slug;
+        delete_option( $locks_key );
+        wp_cache_delete( $locks_key, 'options' );
+
         // Auto-Expand Line Capacity
         $t_lines    = function_exists( 'sywat_get_tournament_lines' ) ? sywat_get_tournament_lines( $t_data ) : ( isset( $t_data['lines'] ) ? $t_data['lines'] : array() );
         $line_0_idx = ! empty( $t_lines ) ? (string) key( $t_lines ) : '0';
@@ -399,32 +406,6 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         $gender_cache = get_option( 'sywat_shooter_genders_cache', array() );
         if ( ! is_array( $gender_cache ) ) {
             $gender_cache = array();
-        }
-
-        // Purge all prior TFAA-imported rows for this tournament so TFAA remains a 1:1 verbatim system of record,
-        // while keeping genuine local shop/online pre-registrations intact for matching below.
-        $stats_purged = 0;
-        if ( is_array( $db_results ) ) {
-            foreach ( $db_results as $row ) {
-                $reg_data = maybe_unserialize( $row->option_value );
-                if ( ! is_array( $reg_data ) ) {
-                    delete_option( $row->option_name );
-                    continue;
-                }
-
-                $r_id           = isset( $reg_data['id'] ) ? (string) $reg_data['id'] : str_replace( 'sywat_t_' . $t_slug . '_', '', (string) $row->option_name );
-                $is_tfaa_origin = ( strpos( $r_id, 'reg_seq_' ) === 0 || ! empty( $reg_data['tfaa_origin'] ) );
-
-                if ( $is_tfaa_origin ) {
-                    delete_option( $row->option_name );
-                    wp_cache_delete( $row->option_name, 'options' );
-                    unset( $master_regs[ $r_id ] );
-                    unset( $scores[ $r_id ] );
-                    $stats_purged++;
-                } else {
-                    $local_regs[ $r_id ] = $reg_data;
-                }
-            }
         }
 
         // Hoist normalizers outside entry loop
@@ -465,6 +446,47 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             return $normalize_str( $raw );
         };
 
+        // Snapshot any manually flagged "INC" rounds before purging prior TFAA-imported rows
+        $preserved_inc_by_cat  = array();
+        $preserved_inc_by_name = array();
+
+        // Purge all prior TFAA-imported rows for this tournament so TFAA remains a 1:1 verbatim system of record,
+        // while keeping genuine local shop/online pre-registrations intact for matching below.
+        $stats_purged = 0;
+        if ( is_array( $db_results ) ) {
+            foreach ( $db_results as $row ) {
+                $reg_data = maybe_unserialize( $row->option_value );
+                if ( ! is_array( $reg_data ) ) {
+                    delete_option( $row->option_name );
+                    continue;
+                }
+
+                $r_id           = isset( $reg_data['id'] ) ? (string) $reg_data['id'] : str_replace( 'sywat_t_' . $t_slug . '_', '', (string) $row->option_name );
+                $is_tfaa_origin = ( strpos( $r_id, 'reg_seq_' ) === 0 || ! empty( $reg_data['tfaa_origin'] ) );
+                $was_inc        = ! empty( $reg_data['is_inc'] ) || ( isset( $scores[ $r_id ]['is_inc'] ) && ! empty( $scores[ $r_id ]['is_inc'] ) );
+
+                if ( $was_inc && ! empty( $reg_data['name'] ) ) {
+                    $inc_name_norm  = $normalize_str( $reg_data['name'] );
+                    $inc_div_norm   = $normalize_div_key( isset( $reg_data['division'] ) ? $reg_data['division'] : '' );
+                    $inc_style_norm = $normalize_style_key( isset( $reg_data['style'] ) ? $reg_data['style'] : '' );
+                    if ( $inc_name_norm !== '' ) {
+                        $preserved_inc_by_cat[ $inc_name_norm . '|||' . $inc_div_norm . '|||' . $inc_style_norm ] = true;
+                        $preserved_inc_by_name[ $inc_name_norm ] = true;
+                    }
+                }
+
+                if ( $is_tfaa_origin ) {
+                    delete_option( $row->option_name );
+                    wp_cache_delete( $row->option_name, 'options' );
+                    unset( $master_regs[ $r_id ] );
+                    unset( $scores[ $r_id ] );
+                    $stats_purged++;
+                } else {
+                    $local_regs[ $r_id ] = $reg_data;
+                }
+            }
+        }
+
         // Pre-compute match metadata for any remaining local shop/online pre-registrations
         $local_meta         = array();
         $occupied_by_archer = array();
@@ -490,6 +512,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
 
         $claimed_local_ids = array();
         $primary_styles    = array();
+        $used_line_indices = array();
         $stats_updated     = 0;
         $stats_created     = 0;
 
@@ -501,7 +524,10 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
             $norm_div       = $normalize_div_key( $entry['division'] );
             $norm_style     = $normalize_style_key( $entry['style'] );
             $entry_is_guest = ! empty( $entry['is_guest'] ) || $entry['style'] === 'Guest';
-            $entry_is_inc   = ! empty( $entry['is_inc'] ) ? 1 : 0;
+
+            $cat_inc_key   = $norm_name . '|||' . $norm_div . '|||' . $norm_style;
+            $preserved_inc = isset( $preserved_inc_by_cat[ $cat_inc_key ] ) || isset( $preserved_inc_by_name[ $norm_name ] );
+            $entry_is_inc  = ( ! empty( $entry['is_inc'] ) || $preserved_inc ) ? 1 : 0;
 
             if ( ! $entry_is_guest && ! $entry_is_inc && empty( $primary_styles[ $norm_name ] ) ) {
                 $primary_styles[ $norm_name ] = $entry['style'];
@@ -541,6 +567,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 // OVERWRITE MATCHING LOCAL RECORD UNCONDITIONALLY WITH TFAA AUTHORITATIVE DATA
                 $claimed_local_ids[ $matched_reg_id ] = true;
                 $reg                                  = $local_regs[ $matched_reg_id ];
+                $matched_was_inc                      = ! empty( $reg['is_inc'] ) ? 1 : 0;
+                $resolved_is_inc                      = ( $entry_is_inc || $matched_was_inc ) ? 1 : 0;
 
                 $reg['checked_in'] = 1;
                 $reg['name']       = $entry['clean_name'];
@@ -550,12 +578,16 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $reg['distance']   = $entry['distance'];
                 $reg['score']      = $entry['score'];
                 $reg['x_count']    = $entry['xs'];
-                $reg['is_inc']     = $entry_is_inc;
+                $reg['is_inc']     = $resolved_is_inc;
 
                 if ( $entry_is_guest ) {
                     $reg['type'] = 'Guest';
                 } elseif ( isset( $reg['type'] ) && $reg['type'] === 'Guest' ) {
                     $reg['type'] = 'Walk-In';
+                }
+
+                if ( isset( $reg['line_index'] ) ) {
+                    $used_line_indices[ (string) $reg['line_index'] ] = true;
                 }
 
                 update_option( 'sywat_t_' . $t_slug . '_' . $matched_reg_id, $reg, false );
@@ -564,7 +596,7 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 $scores[ $matched_reg_id ] = array(
                     'score'    => $entry['score'],
                     'xs'       => $entry['xs'],
-                    'is_inc'   => $entry_is_inc,
+                    'is_inc'   => $resolved_is_inc,
                     'saved_at' => current_time( 'mysql' ),
                 );
 
@@ -586,6 +618,8 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
                 if ( $archer_sig !== '' ) {
                     $occupied_by_archer[ $archer_sig ][] = $assigned_line_idx;
                 }
+
+                $used_line_indices[ (string) $assigned_line_idx ] = true;
 
                 $line_name = isset( $t_lines[ $assigned_line_idx ]['name'] ) ? $t_lines[ $assigned_line_idx ]['name'] : 'Line ' . ( intval( $assigned_line_idx ) + 1 );
                 $target_id = uniqid( 'reg_seq_' );
@@ -641,12 +675,30 @@ if ( ! function_exists( 'sywat_sync_tfaa_event_scores' ) ) {
         update_option( 'sywat_shooter_genders_cache', $gender_cache, false );
         delete_transient( 'sywat_history_profiles_cache' );
 
+        // Step 3 of Lock Lifecycle: Lock all shooting lines so imported scores cannot be edited online unless manually unlocked
+        $locked_lines = array();
+        if ( ! empty( $t_lines ) && is_array( $t_lines ) ) {
+            foreach ( array_keys( $t_lines ) as $l_idx ) {
+                $locked_lines[ (string) $l_idx ] = 1;
+            }
+        }
+        foreach ( array_keys( $used_line_indices ) as $u_idx ) {
+            $locked_lines[ (string) $u_idx ] = 1;
+        }
+        if ( empty( $locked_lines ) ) {
+            $locked_lines['0'] = 1;
+        }
+
+        delete_option( $locks_key );
+        add_option( $locks_key, $locked_lines, '', 'no' );
+        wp_cache_delete( $locks_key, 'options' );
+
         $purged_note = ( $stats_purged > 0 ) ? "Replaced {$stats_purged} prior TFAA records; " : '';
 
         return array(
             'success' => true,
             'count'   => ( $stats_updated + $stats_created ),
-            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers verbatim from TFAA! ({$purged_note}updated {$stats_updated} local records and imported {$stats_created} TFAA records).",
+            'message' => 'Successfully synced <strong>' . ( $stats_updated + $stats_created ) . "</strong> archers verbatim from TFAA and locked all shooting lines! ({$purged_note}updated {$stats_updated} local records and imported {$stats_created} TFAA records).",
         );
     }
 }
