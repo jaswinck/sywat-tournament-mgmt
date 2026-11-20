@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
- * Description: Provides season/tournament retrieval, live registration loading with automatic slug-to-title reconciliation (excluding archived "_hist_" migration records), TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
+ * Description: Provides season/tournament retrieval (with automatic default active-season recovery if sywat_seasons_list was saved without an active season), live registration loading with automatic slug-to-title reconciliation (excluding archived "_hist_" migration records), TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
  * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.4
+ * Version: 8.1.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,6 +19,8 @@ if ( ! defined( 'SYWAT_DEBUG_SYNC' ) ) {
 
 /**
  * Retrieves all competition seasons sorted chronologically descending by start date.
+ * Automatically restores default seasons (including the active season) if sywat_seasons_list
+ * was persisted without any active season entry.
  */
 if ( ! function_exists( 'sywat_get_seasons' ) ) {
     function sywat_get_seasons() {
@@ -46,8 +48,30 @@ if ( ! function_exists( 'sywat_get_seasons' ) ) {
         );
 
         $seasons = get_option( 'sywat_seasons_list', $default_seasons );
-        if ( ! is_array( $seasons ) ) {
+        if ( ! is_array( $seasons ) || empty( $seasons ) ) {
             $seasons = $default_seasons;
+        }
+
+        $has_active = false;
+        foreach ( $seasons as $s_item ) {
+            if ( is_array( $s_item ) && isset( $s_item['status'] ) && $s_item['status'] === 'active' ) {
+                $has_active = true;
+                break;
+            }
+        }
+
+        if ( ! $has_active ) {
+            $repaired = false;
+            foreach ( $default_seasons as $def_slug => $def_season ) {
+                if ( ! isset( $seasons[ $def_slug ] ) ) {
+                    $seasons[ $def_slug ] = $def_season;
+                    $repaired             = true;
+                }
+            }
+            if ( $repaired ) {
+                update_option( 'sywat_seasons_list', $seasons, false );
+                wp_cache_delete( 'sywat_seasons_list', 'options' );
+            }
         }
 
         uasort( $seasons, function( $a, $b ) {
