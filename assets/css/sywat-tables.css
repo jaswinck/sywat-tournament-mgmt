@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.7.0
+   Version: 7.7.1
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -327,6 +327,12 @@
     font-size: 12px;
     line-height: 1.4;
     margin-top: 2px;
+}
+
+@media (min-width: 769px) {
+    :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-table-responsive:has(#sywat_archer_intake_table) {
+        overflow: visible;
+    }
 }
 
 :is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table#sywat_archer_intake_table {
