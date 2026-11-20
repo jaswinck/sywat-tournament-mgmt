@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.1
+ * Version: 1.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -119,7 +119,7 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest').
+ * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest') and 'is_inc'.
  * Defaults blank/unset score fields to 0 so every roster entry is included.
  *
  * @param string $t_name Tournament title.
@@ -169,6 +169,7 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                     'style'      => $norm_style,
                     'score'      => $score_val,
                     'x_count'    => $x_val,
+                    'is_inc'     => ! empty( $reg['is_inc'] ) ? 1 : 0,
                     'tournament' => $t_name,
                 );
             }
@@ -181,8 +182,8 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
 /**
  * Aggregates season standings grouped by Division + Gender -> Style using a single
  * batched SQL query across all published tournaments in the season.
- * EXCLUDES all Guest entries (type === 'Guest', style === 'Guest', or '[Guest]' tags),
- * score-0 cards, and secondary re-entries entirely.
+ * EXCLUDES all incomplete ("[INC]") rounds, Guest entries (type === 'Guest', style === 'Guest',
+ * or '[Guest]' tags), score-0 cards, and secondary re-entries entirely.
  * Resolves each archer's canonical O(1) identity key in a single pass via
  * sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map() so
  * identical archers with differing/missing tfaa_ids and unambiguous given-name variants
@@ -288,6 +289,11 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 $raw_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
                 $raw_style = isset( $reg['style'] ) && trim( (string) $reg['style'] ) !== '' ? trim( (string) $reg['style'] ) : 'FS – Freestyle';
                 $raw_type  = isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '';
+
+                // Exclude all incomplete ([INC]) rounds from Season Standings
+                if ( ! empty( $reg['is_inc'] ) || stripos( $raw_name, '[inc]' ) !== false || strcasecmp( $raw_type, 'INC' ) === 0 ) {
+                    continue;
+                }
 
                 // Exclude all Guest entries (including synced type === 'Guest' records)
                 if ( strcasecmp( $raw_type, 'Guest' ) === 0 || strcasecmp( $raw_style, 'Guest' ) === 0 || stripos( $raw_name, '[guest]' ) !== false ) {
