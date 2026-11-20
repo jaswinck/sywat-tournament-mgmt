@@ -3,11 +3,14 @@
  * Path: assets/js/sywat-history-import.js
  * Description: Vanilla JS chunked queue controller for discovering historical TFAA seasons,
  *              scanning per-season event manifests, importing 1 tournament scorecard per AJAX
- *              request with live progress tracking, and purging imported archived seasons.
+ *              request with live progress tracking and activity logging inside #sywat_history_progress_modal,
+ *              and purging imported archived seasons.
  * Compliance: Zero jQuery, namespaced under window.SYWAT.historyImport, delegated data-sywat-action
- *             listeners, zero element.style.* mutations, class-based .sywat-hidden visibility.
+ *             listeners across document (supports modal relocation to <body>), Modal Markup Contract
+ *             compliant (.active class + data-sywat-static="true" while running), zero element.style.*
+ *             mutations except progress bar width.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 (function () {
@@ -19,7 +22,8 @@
         seasons: [],
         seasonMap: {},
         isRunning: false,
-        stopRequested: false
+        stopRequested: false,
+        hasLogEntries: false
     };
 
     /**
@@ -104,53 +108,96 @@
     }
 
     /**
-     * Display or hide the top status alert banner.
-     *
-     * @param {string} type    Alert modifier: 'success', 'danger', or 'info'.
-     * @param {string} message Plain-text message to display.
+     * Open the Progress & Activity Log modal (#sywat_history_progress_modal) via the .active class.
      */
-    function showBanner(type, message) {
-        var banner = document.getElementById('sywat_history_status_banner');
-        if (!banner) {
+    function openProgressModal() {
+        var modal = document.getElementById('sywat_history_progress_modal');
+        if (modal) {
+            modal.classList.add('active');
+        }
+    }
+
+    /**
+     * Close the Progress & Activity Log modal (#sywat_history_progress_modal) when no batch is running.
+     */
+    function closeProgressModal() {
+        if (state.isRunning) {
+            return;
+        }
+        var modal = document.getElementById('sywat_history_progress_modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    /**
+     * Apply alert styling and message to a target banner element.
+     *
+     * @param {HTMLElement|null} bannerEl Target banner element.
+     * @param {string} type               Alert modifier: 'success', 'danger', or 'info'.
+     * @param {string} message            Plain-text message to display.
+     */
+    function applyBannerState(bannerEl, type, message) {
+        if (!bannerEl) {
             return;
         }
 
-        banner.classList.remove('sywat-hidden', 'sywat-alert-success', 'sywat-alert-danger', 'sywat-alert-info');
+        bannerEl.classList.remove('sywat-hidden', 'sywat-alert-success', 'sywat-alert-danger', 'sywat-alert-info');
         if (type === 'success') {
-            banner.classList.add('sywat-alert-success');
+            bannerEl.classList.add('sywat-alert-success');
         } else if (type === 'danger') {
-            banner.classList.add('sywat-alert-danger');
+            bannerEl.classList.add('sywat-alert-danger');
         } else {
-            banner.classList.add('sywat-alert-info');
+            bannerEl.classList.add('sywat-alert-info');
         }
 
-        banner.textContent = message;
+        bannerEl.textContent = message;
     }
 
     /**
-     * Hide the top status alert banner.
+     * Display status alert banner on the main card and/or inside the progress modal.
+     *
+     * @param {string} type        Alert modifier: 'success', 'danger', or 'info'.
+     * @param {string} message     Plain-text message to display.
+     * @param {boolean} syncModal  Whether to also update #sywat_history_modal_banner.
      */
-    function hideBanner() {
-        var banner = document.getElementById('sywat_history_status_banner');
-        if (banner) {
-            banner.classList.add('sywat-hidden');
+    function showBanner(type, message, syncModal) {
+        applyBannerState(document.getElementById('sywat_history_status_banner'), type, message);
+        if (syncModal) {
+            applyBannerState(document.getElementById('sywat_history_modal_banner'), type, message);
         }
     }
 
     /**
-     * Append a timestamped entry to the live Migration Activity Log.
+     * Hide status alert banners.
+     */
+    function hideBanners() {
+        var cardBanner = document.getElementById('sywat_history_status_banner');
+        var modalBanner = document.getElementById('sywat_history_modal_banner');
+        if (cardBanner) {
+            cardBanner.classList.add('sywat-hidden');
+        }
+        if (modalBanner) {
+            modalBanner.classList.add('sywat-hidden');
+        }
+    }
+
+    /**
+     * Append a timestamped entry to the Migration Activity Log inside #sywat_history_progress_modal.
      *
      * @param {string} level   Entry severity ('info', 'success', 'error').
      * @param {string} message Log message text.
      */
     function appendLog(level, message) {
-        var logSection = document.getElementById('sywat_history_log_section');
         var logList = document.getElementById('sywat_history_log_list');
-        if (!logSection || !logList) {
+        if (!logList) {
             return;
         }
 
-        logSection.classList.remove('sywat-hidden');
+        if (!state.hasLogEntries) {
+            logList.innerHTML = '';
+            state.hasLogEntries = true;
+        }
 
         var now = new Date();
         var stamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -168,21 +215,22 @@
     }
 
     /**
-     * Clear all entries from the Migration Activity Log.
+     * Clear all entries from the Migration Activity Log and restore placeholder text.
      */
     function clearLog() {
         var logList = document.getElementById('sywat_history_log_list');
-        var logSection = document.getElementById('sywat_history_log_section');
+        var modalBanner = document.getElementById('sywat_history_modal_banner');
         if (logList) {
-            logList.innerHTML = '';
+            logList.innerHTML = '<div>No migration activity recorded yet.</div>';
         }
-        if (logSection && !state.isRunning) {
-            logSection.classList.add('sywat-hidden');
+        if (modalBanner && !state.isRunning) {
+            modalBanner.classList.add('sywat-hidden');
         }
+        state.hasLogEntries = false;
     }
 
     /**
-     * Update the live progress bar and status counters.
+     * Update the live progress bar and status counters inside #sywat_history_progress_modal.
      *
      * @param {string} label   Current operation description.
      * @param {number} current Completed items count.
@@ -192,7 +240,7 @@
         var box = document.getElementById('sywat_history_progress_box');
         var labelEl = document.getElementById('sywat_history_progress_label');
         var statsEl = document.getElementById('sywat_history_progress_stats');
-        var barEl = document.getElementById('sywat_history_progress_bar');
+        var fillEl = document.getElementById('sywat_history_progress_fill');
 
         if (box) {
             box.classList.remove('sywat-hidden');
@@ -203,33 +251,56 @@
         if (statsEl) {
             statsEl.textContent = current + ' / ' + total + ' events';
         }
-        if (barEl) {
-            barEl.max = total > 0 ? total : 100;
-            barEl.value = total > 0 ? Math.min(current, total) : 0;
+        if (fillEl) {
+            var pct = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+            fillEl.style.width = pct + '%';
         }
     }
 
     /**
-     * Enable or disable interactive controls while a batch migration is running.
+     * Enable or disable interactive controls and lock/unlock the modal while a batch is running.
      *
-     * @param {boolean} running True when import queue is active.
+     * @param {boolean} running True when import or purge operation is active.
      */
     function setControlsLocked(running) {
         state.isRunning = running;
 
+        var modal = document.getElementById('sywat_history_progress_modal');
+        var modalXBtn = document.getElementById('sywat_history_modal_x_btn');
+        var modalCloseBtn = document.getElementById('sywat_history_close_modal_btn');
+        var stopBtn = document.getElementById('sywat_history_stop_btn');
         var discoverBtn = document.getElementById('sywat_history_discover_btn');
         var runBtn = document.getElementById('sywat_history_run_btn');
         var checkAll = document.getElementById('sywat_history_check_all');
-        var stopBtn = document.getElementById('sywat_history_stop_btn');
+
+        if (modal) {
+            if (running) {
+                modal.setAttribute('data-sywat-static', 'true');
+            } else {
+                modal.removeAttribute('data-sywat-static');
+            }
+        }
+
+        if (modalXBtn) {
+            modalXBtn.disabled = running;
+        }
+        if (modalCloseBtn) {
+            modalCloseBtn.disabled = running;
+        }
+        if (stopBtn) {
+            stopBtn.disabled = !running;
+            if (running) {
+                stopBtn.classList.remove('sywat-hidden');
+            } else {
+                stopBtn.classList.add('sywat-hidden');
+            }
+        }
 
         if (discoverBtn) {
             discoverBtn.disabled = running;
         }
         if (checkAll) {
             checkAll.disabled = running;
-        }
-        if (stopBtn) {
-            stopBtn.disabled = !running;
         }
 
         var actionBtns = document.querySelectorAll(
@@ -371,7 +442,7 @@
             discoverBtn.disabled = true;
         }
 
-        showBanner('info', 'Connecting to texasfieldarchery.org to discover available seasons...');
+        showBanner('info', 'Connecting to texasfieldarchery.org to discover available seasons...', false);
 
         postAjax('sywat_history_discover_seasons', {})
             .then(function (data) {
@@ -384,11 +455,11 @@
                 });
 
                 renderSeasonsTable();
-                showBanner('success', 'Discovered ' + list.length + ' historical season(s) from TFAA. Select one season to test or select multiple seasons to batch import.');
+                showBanner('success', 'Discovered ' + list.length + ' historical season(s) from TFAA. Select one season to test or select multiple seasons to batch import.', false);
                 appendLog('success', 'Discovered ' + list.length + ' TFAA season(s).');
             })
             .catch(function (err) {
-                showBanner('danger', err.message || 'Failed to discover TFAA seasons.');
+                showBanner('danger', err.message || 'Failed to discover TFAA seasons.', false);
                 appendLog('error', err.message || 'Season discovery failed.');
             })
             .finally(function () {
@@ -399,7 +470,7 @@
     }
 
     /**
-     * Execute the two-stage chunked AJAX migration for an array of season objects:
+     * Execute the two-stage chunked AJAX migration for an array of season objects inside #sywat_history_progress_modal:
      * Stage 1: Scan each selected season manifest (/results/season/{id})
      * Stage 2: Import 1 tournament scorecard (/results/{id}) per AJAX request
      *
@@ -410,9 +481,10 @@
             return;
         }
 
-        hideBanner();
+        hideBanners();
         state.stopRequested = false;
         setControlsLocked(true);
+        openProgressModal();
 
         var eventQueue = [];
         var seasonCounts = {};
@@ -518,12 +590,12 @@
             renderSeasonsTable();
 
             if (state.stopRequested) {
-                showBanner('info', 'Migration stopped by user. Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' archer scorecards before stopping.');
+                showBanner('info', 'Migration stopped by user. Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' archer scorecards before stopping.', true);
                 appendLog('info', 'Batch stopped cleanly after current event.');
             } else if (totalErrors > 0) {
-                showBanner('danger', 'Migration finished with ' + totalErrors + ' error(s). Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' archer scorecards. Review the log below.');
+                showBanner('danger', 'Migration finished with ' + totalErrors + ' error(s). Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' archer scorecards. Review the log below.', true);
             } else {
-                showBanner('success', 'Migration complete! Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' independent archer scorecards.');
+                showBanner('success', 'Migration complete! Imported ' + totalImportedEvents + ' tournament(s) and ' + totalImportedArchers + ' independent archer scorecards.', true);
             }
         });
     }
@@ -546,8 +618,18 @@
             return;
         }
 
+        hideBanners();
         setControlsLocked(true);
-        showBanner('info', 'Purging historical records for "' + (seasonName || seasonSlug) + '"...');
+        openProgressModal();
+
+        var stopBtn = document.getElementById('sywat_history_stop_btn');
+        if (stopBtn) {
+            stopBtn.classList.add('sywat-hidden');
+        }
+
+        updateProgress('Purging historical records for "' + (seasonName || seasonSlug) + '"...', 0, 1);
+        showBanner('info', 'Purging historical records for "' + (seasonName || seasonSlug) + '"...', true);
+        appendLog('info', 'Purging historical season "' + (seasonName || seasonSlug) + '"...');
 
         postAjax('sywat_history_purge_season', {
             season_slug: seasonSlug
@@ -560,11 +642,12 @@
                 }
             });
 
+            updateProgress('Purge complete for "' + (seasonName || seasonSlug) + '"', 1, 1);
             renderSeasonsTable();
-            showBanner('success', res.message || 'Historical season purged.');
+            showBanner('success', res.message || 'Historical season purged.', true);
             appendLog('success', (seasonName || seasonSlug) + ': ' + (res.message || 'Purged.'));
         }).catch(function (err) {
-            showBanner('danger', err.message || 'Failed to purge historical season.');
+            showBanner('danger', err.message || 'Failed to purge historical season.', true);
             appendLog('error', err.message || 'Purge failed.');
         }).finally(function () {
             setControlsLocked(false);
@@ -572,10 +655,11 @@
     }
 
     /**
-     * Delegated click listener for all [data-sywat-action] triggers inside #sywat_history_importer_app.
+     * Delegated click listener across both #sywat_history_importer_app and #sywat_history_progress_modal
+     * (modal is relocated to <body> by sywat-modal-manager.js when active).
      */
     document.addEventListener('click', function (event) {
-        var trigger = event.target.closest('#sywat_history_importer_app [data-sywat-action]');
+        var trigger = event.target.closest('#sywat_history_importer_app [data-sywat-action], #sywat_history_progress_modal [data-sywat-action]');
         if (!trigger) {
             return;
         }
@@ -585,6 +669,12 @@
         if (action === 'discover-seasons') {
             event.preventDefault();
             discoverSeasons();
+        } else if (action === 'open-history-modal') {
+            event.preventDefault();
+            openProgressModal();
+        } else if (action === 'close-history-modal') {
+            event.preventDefault();
+            closeProgressModal();
         } else if (action === 'select-all') {
             event.preventDefault();
             document.querySelectorAll('.sywat-history-season-cb').forEach(function (cb) {
@@ -626,7 +716,7 @@
             if (state.isRunning) {
                 state.stopRequested = true;
                 trigger.disabled = true;
-                showBanner('info', 'Stopping after the current tournament finishes...');
+                showBanner('info', 'Stopping after the current tournament finishes...', true);
             }
         } else if (action === 'clear-log') {
             event.preventDefault();
@@ -657,6 +747,8 @@
 
     window.SYWAT.historyImport = {
         discoverSeasons: discoverSeasons,
+        openProgressModal: openProgressModal,
+        closeProgressModal: closeProgressModal,
         runMigrationBatch: runMigrationBatch,
         purgeSeason: purgeSeason,
         clearLog: clearLog
