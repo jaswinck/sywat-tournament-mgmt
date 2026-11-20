@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Renders the Phone & Group Intake form with simplified 3-tier Category / Rate selection (Cub, Youth, Adult), dynamic Round Format selection (single or dual-round events such as Field + Field 50), Current Line Slot Usage table with clickable Waitlist badges/buttons, and the dedicated top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
- * Compliance: Zero output at include time, zero inline styles, delegated data-sywat-action modal triggers, omitted closing PHP tag.
+ * Description: Pure view renderer for the Current Line Slot Usage summary table at the top of [sywat_register], the Phone & Group Registration Intake form featuring a per-archer multi-line checkbox matrix (zero pre-checked defaults, single-entry multi-line registration, live per-line capacity headers, 3-tier Category / Rate selection, dynamic Round Format selection), and the top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
+ * Compliance: Pure view layer — zero database/option queries, zero stats aggregation loops, zero output at include time, zero inline style attributes, zero embedded script blocks, zero inline JS event handlers (delegated data-sywat-action attributes only), canonical sywat_resolve_tournament_line_label() delegation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.3
+ * Version: 7.4.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,54 +13,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Helper: Resolve a human-readable shooting line label from line config array.
- * Prevents "Line 1, Line 2" fallback when lines are stored with day/time keys.
+ * Helper: Delegate shooting line label resolution to the single source of truth in tournament-helpers.php.
+ *
+ * @param array|string $line Line configuration array or label string.
+ * @param int|string   $idx  Zero-based line array index key.
+ * @return string            Normalized, non-empty line display label.
  */
 if ( ! function_exists( 'sywat_reg_resolve_line_label' ) ) {
     function sywat_reg_resolve_line_label( $line, $idx ) {
-        $label = '';
-        if ( is_array( $line ) ) {
-            if ( ! empty( $line['name'] ) ) {
-                $label = trim( $line['name'] );
-            } else {
-                $day_str  = isset( $line['day'] ) ? trim( $line['day'] ) : '';
-                $time_str = isset( $line['time'] ) ? trim( $line['time'] ) : ( isset( $line['start_time'] ) ? trim( $line['start_time'] ) : '' );
-                if ( ! empty( $day_str ) && ! empty( $time_str ) ) {
-                    $label = trim( $day_str . ' ' . $time_str );
-                } elseif ( ! empty( $day_str ) ) {
-                    $label = $day_str;
-                } elseif ( ! empty( $time_str ) ) {
-                    $label = $time_str;
-                }
-            }
-        } elseif ( is_string( $line ) && trim( $line ) !== '' ) {
-            $label = trim( $line );
+        if ( function_exists( 'sywat_resolve_tournament_line_label' ) ) {
+            return sywat_resolve_tournament_line_label( $line, $idx );
         }
-
-        if ( $label === '' ) {
-            return 'Line ' . ( (int) $idx + 1 );
+        if ( is_array( $line ) && ! empty( $line['name'] ) ) {
+            return trim( (string) $line['name'] );
         }
-
-        // Normalize line times consistently with Manage Tournaments view
-        $label = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $label );
-        $label = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $label );
-        $label = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $label );
-
-        return $label;
+        return ( is_string( $line ) && trim( $line ) !== '' ) ? trim( $line ) : 'Line ' . ( (int) $idx + 1 );
     }
 }
 
 /**
- * Main Dispatcher: Registration Forms & Line Usage Component Container
+ * Main Dispatcher: Registration Line Usage & Multi-Line Intake Component Container
+ *
+ * @param string $selected_tournament Active tournament title.
+ * @param array  $available_lines     Configured shooting lines keyed by line index.
+ * @param array  $registrations       Scoped registration records for the tournament.
+ * @param array  $line_stats          Pre-computed per-line capacity and waitlist metrics from registration-views.php.
  */
 if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
-    function sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations ) {
+    function sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations, $line_stats = array() ) {
         $skipped_duplicates = ! empty( $GLOBALS['sywat_skipped_duplicates'] ) ? $GLOBALS['sywat_skipped_duplicates'] : array();
         $skipped_full       = ! empty( $GLOBALS['sywat_skipped_full'] ) ? $GLOBALS['sywat_skipped_full'] : array();
         $modal_notice       = ! empty( $GLOBALS['sywat_modal_notice'] ) ? $GLOBALS['sywat_modal_notice'] : '';
         ?>
         <div class="no-print sywat-intake-wrapper">
-            
             <?php if ( ! empty( $modal_notice ) ) : ?>
                 <?php if ( stripos( $modal_notice, 'OVERFLOW' ) !== false ) : ?>
                     <div id="sywat_capacity_overflow_modal" class="sywat-modal-backdrop sywat-modal-active sywat-modal-overflow-backdrop">
@@ -75,7 +60,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 
             <?php if ( ! empty( $skipped_duplicates ) ) : ?>
                 <div class="sywat-alert sywat-alert-warning">
-                    <strong>⚠️ DUPLICATE REGISTRATION BLOCKED:</strong> The following archer(s) were NOT registered because they are already signed up on this line:
+                    <strong>⚠️ DUPLICATE REGISTRATION BLOCKED:</strong> The following archer(s) were NOT registered because they are already signed up on the selected line(s):
                     <ul>
                         <?php foreach ( $skipped_duplicates as $dup ) : ?>
                             <li><?php echo esc_html( $dup ); ?></li>
@@ -95,26 +80,156 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 </div>
             <?php endif; ?>
 
-            <!-- Component 1: Phone & Group Intake Form -->
-            <?php sywat_render_phone_intake_form( $selected_tournament, $available_lines ); ?>
+            <!-- Component 1: Live Line Slot Usage Table (Top-of-Portal Capacity Overview) -->
+            <?php sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations, $line_stats ); ?>
 
-            <!-- Component 2: Line Slot Usage Table -->
-            <?php sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations ); ?>
-
+            <!-- Component 2: Phone & Group Multi-Line Registration Matrix Form -->
+            <?php sywat_render_phone_intake_form( $selected_tournament, $available_lines, $line_stats ); ?>
         </div>
         <?php
     }
 }
 
 /**
- * Component 1: Phone & Multi-Archer Group Registration Intake Form (3-Tier Category / Rate)
+ * Component 1: Line Slot Usage Table with Direct Manage Roster & Waitlist Modal Links
+ *
+ * @param string $selected_tournament Active tournament title.
+ * @param array  $available_lines     Configured shooting lines keyed by line index.
+ * @param array  $registrations       Scoped registration records for the tournament.
+ * @param array  $line_stats          Pre-computed per-line capacity and waitlist metrics.
+ */
+if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
+    function sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations, $line_stats = array() ) {
+        $register_base_url = function_exists( 'sywat_page_url' )
+            ? add_query_arg( array( 'selected_tournament' => $selected_tournament ), sywat_page_url( 'register' ) )
+            : '';
+        ?>
+        <div class="sywat-intake-card">
+            <div class="sywat-table-header-bar">
+                <h2>📊 Current Line Slot Usage</h2>
+            </div>
+            <div class="sywat-table-responsive">
+                <table class="sywat-table">
+                    <thead>
+                        <tr>
+                            <th class="sywat-col-line-name">Line Name</th>
+                            <th class="sywat-col-cap-20yd sywat-col-center">20yd Capacity</th>
+                            <th class="sywat-col-cap-cub sywat-col-center">Cub Capacity</th>
+                            <th class="sywat-col-line-action sywat-col-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $available_lines as $idx => $line ) : ?>
+                            <?php
+                                $st                    = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
+                                $line_title            = isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx );
+                                $c_20                  = isset( $st['c_20'] ) ? intval( $st['c_20'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations ) : 0 );
+                                $m_20                  = isset( $st['m_20'] ) ? intval( $st['m_20'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, '20yd' ) : 20 );
+                                $c_cub                 = isset( $st['c_cub'] ) ? intval( $st['c_cub'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations ) : 0 );
+                                $m_cub                 = isset( $st['m_cub'] ) ? intval( $st['m_cub'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, 'Cub' ) : 5 );
+                                $waitlisted_20         = isset( $st['waitlisted_20'] ) ? intval( $st['waitlisted_20'] ) : 0;
+                                $waitlisted_cub        = isset( $st['waitlisted_cub'] ) ? intval( $st['waitlisted_cub'] ) : 0;
+                                $total_line_shooters   = isset( $st['total_line_shooters'] ) ? intval( $st['total_line_shooters'] ) : ( $c_20 + $c_cub );
+                                $total_line_waitlisted = isset( $st['total_line_waitlisted'] ) ? intval( $st['total_line_waitlisted'] ) : ( $waitlisted_20 + $waitlisted_cub );
+                                $is_closed             = ! empty( $st['is_closed'] );
+
+                                $manage_url = add_query_arg(
+                                    array(
+                                        'tab'             => 'manage',
+                                        'view_tournament' => $selected_tournament,
+                                        'modal_action'    => 'manage',
+                                        'filter_line_idx' => $idx,
+                                        'return_to'       => 'register',
+                                    ),
+                                    sywat_page_url( 'manage_tournaments' )
+                                );
+
+                                $waitlist_modal_url = function_exists( 'sywat_waitlist_get_modal_url' )
+                                    ? sywat_waitlist_get_modal_url( $selected_tournament, $idx, $register_base_url )
+                                    : '';
+
+                                $confirm_msg = sprintf( 'Are you sure you want to clear ALL archers from %s?', $line_title );
+                            ?>
+                            <tr>
+                                <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
+                                <td class="sywat-col-center">
+                                    <strong><?php echo $c_20; ?></strong> / <?php echo $m_20; ?>
+                                    <?php if ( $is_closed ) : ?>
+                                        <span class="sywat-badge sywat-badge-muted">Closed</span>
+                                    <?php else : ?>
+                                        <span class="sywat-badge <?php echo ( $c_20 >= $m_20 ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_20 >= $m_20 ) ? 'Full' : 'Open'; ?></span>
+                                    <?php endif; ?>
+                                    <?php if ( $waitlisted_20 > 0 ) : ?>
+                                        <div>
+                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
+                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_20, $idx, $register_base_url ); ?>
+                                            <?php else : ?>
+                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_20; ?> Waitlisted</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <strong><?php echo $c_cub; ?></strong> / <?php echo $m_cub; ?>
+                                    <?php if ( $is_closed ) : ?>
+                                        <span class="sywat-badge sywat-badge-muted">Closed</span>
+                                    <?php else : ?>
+                                        <span class="sywat-badge <?php echo ( $c_cub >= $m_cub ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_cub >= $m_cub ) ? 'Full' : 'Open'; ?></span>
+                                    <?php endif; ?>
+                                    <?php if ( $waitlisted_cub > 0 ) : ?>
+                                        <div>
+                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
+                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_cub, $idx, $register_base_url ); ?>
+                                            <?php else : ?>
+                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_cub; ?> Waitlisted</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="sywat-col-center">
+                                    <div class="sywat-table-actions-vertical">
+                                        <a href="<?php echo esc_url( $manage_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">
+                                            Manage Roster
+                                        </a>
+                                        <?php if ( $total_line_waitlisted > 0 && ! empty( $waitlist_modal_url ) ) : ?>
+                                            <a href="<?php echo esc_url( $waitlist_modal_url ); ?>" class="sywat-btn sywat-btn-warning sywat-btn-full sywat-waitlist-trigger-btn" title="Open Waitlist Management Window">
+                                                <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
+                                                <span>Waitlist (<?php echo intval( $total_line_waitlisted ); ?>)</span>
+                                            </a>
+                                        <?php endif; ?>
+                                        <?php if ( $total_line_shooters > 0 || $total_line_waitlisted > 0 ) : ?>
+                                            <form method="post" class="sywat-table-action-form" data-sywat-action="confirm-purge-line" data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>">
+                                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                <input type="hidden" name="sywat_action" value="purge_line">
+                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                                <input type="hidden" name="redirect_action" value="prereg">
+                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Clear Line</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php
+    }
+}
+
+/**
+ * Component 2: Phone & Multi-Archer Group Registration Matrix Form
+ * Zero pre-checked line defaults; supports single-entry multi-line registration per shooter.
+ *
+ * @param string $selected_tournament Active tournament title.
+ * @param array  $available_lines     Configured shooting lines keyed by line index.
+ * @param array  $line_stats          Pre-computed per-line capacity and waitlist metrics.
  */
 if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
-    function sywat_render_phone_intake_form( $selected_tournament, $available_lines ) {
-        $current_default_line = isset( $_REQUEST['default_line_idx'] )
-            ? sanitize_text_field( wp_unslash( $_REQUEST['default_line_idx'] ) )
-            : ( isset( $_REQUEST['target_line_idx'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['target_line_idx'] ) ) : 0 );
-
+    function sywat_render_phone_intake_form( $selected_tournament, $available_lines, $line_stats = array() ) {
         // Resolve active Pricing & Round Profiles offered by this Tournament
         $t_profiles       = function_exists( 'sywat_get_tournament_pricing_profiles' )
             ? sywat_get_tournament_pricing_profiles( $selected_tournament )
@@ -147,7 +262,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                     'distance'        => '20yd',
                     'division'        => '',
                     'pricing_profile' => $default_prof_key,
-                    'line_idx'        => $current_default_line,
+                    'line_indices'    => array(),
                 ),
             );
         }
@@ -160,171 +275,240 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
             }
             $format_badges[] = $lbl;
         }
+
+        $line_columns_payload = array();
+        foreach ( $available_lines as $idx => $line ) {
+            $st                     = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
+            $line_columns_payload[] = array(
+                'idx'   => (string) $idx,
+                'label' => isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx ),
+            );
+        }
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
-                <h2>📞 Phone & Group Registration Intake</h2>
+                <h2>📞 Phone &amp; Group Registration Intake</h2>
                 <?php if ( ! empty( $format_badges ) ) : ?>
                     <span class="sywat-badge sywat-badge-prereg">Format: <?php echo esc_html( implode( ' / ', $format_badges ) ); ?></span>
                 <?php endif; ?>
             </div>
-            
-            <form method="post" id="sywat_phone_intake_form">
+
+            <form method="post" id="sywat_phone_intake_form" data-sywat-action="phone-intake-form">
                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                 <input type="hidden" name="sywat_action" value="register_shooter">
                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                 <input type="hidden" name="modal_action" value="prereg">
 
-                <div class="sywat-form-grid-4 sywat-intake-group-wrapper">
+                <div class="sywat-form-grid-3 sywat-intake-group-wrapper">
                     <div class="sywat-field-group">
                         <label for="sywat_group_name">Caller / Primary Archer Name</label>
-                        <input type="text" name="group_name" id="sywat_group_name" value="<?php echo esc_attr( $group_name_val ); ?>" placeholder="e.g. John Smith" oninput="handleCallerNameInput(this)">
+                        <input type="text"
+                               name="group_name"
+                               id="sywat_group_name"
+                               value="<?php echo esc_attr( $group_name_val ); ?>"
+                               placeholder="e.g. John Smith"
+                               data-sywat-action="caller-name-input">
                     </div>
 
                     <div class="sywat-field-group">
                         <label for="sywat_group_phone">Contact Phone Number</label>
-                        <input type="tel" name="group_phone" id="sywat_group_phone" value="<?php echo esc_attr( $group_phone_val ); ?>" placeholder="e.g. 817-555-1234" oninput="formatPhoneNumber(this)">
-                    </div>
-
-                    <div class="sywat-field-group">
-                        <label for="sywat_default_line_idx">Default Shooting Line *</label>
-                        <select name="default_line_idx" id="sywat_default_line_idx" required onchange="updateAllArcherLines(this.value)">
-                            <?php foreach ( $available_lines as $idx => $line ) : ?>
-                                <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $current_default_line, (string) $idx ); ?>>
-                                    <?php echo esc_html( sywat_reg_resolve_line_label( $line, $idx ) ); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <input type="tel"
+                               name="group_phone"
+                               id="sywat_group_phone"
+                               value="<?php echo esc_attr( $group_phone_val ); ?>"
+                               placeholder="e.g. 817-555-1234"
+                               data-sywat-action="group-phone-input">
                     </div>
 
                     <div class="sywat-field-group">
                         <label for="sywat_amount_paid_today">Amount Paid Today ($)</label>
-                        <input type="number" step="0.01" min="0" name="amount_paid_today" id="sywat_amount_paid_today" value="<?php echo esc_attr( $amount_paid_val ); ?>" oninput="recalculateGroupTotal()">
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               name="amount_paid_today"
+                               id="sywat_amount_paid_today"
+                               value="<?php echo esc_attr( $amount_paid_val ); ?>"
+                               data-sywat-action="amount-paid-input">
                     </div>
                 </div>
 
-                <div class="sywat-archer-header-row">
-                    <div class="sywat-col-archer-name">Archer Full Name *</div>
-                    <?php if ( $is_multi_round ) : ?>
-                        <div class="sywat-col-archer-dist">Round Format *</div>
-                    <?php endif; ?>
-                    <div class="sywat-col-archer-div">Category / Rate *</div>
-                    <div class="sywat-col-archer-line">Line Override</div>
-                    <div class="sywat-col-archer-action"></div>
+                <div class="sywat-table-header-bar sywat-mt-3">
+                    <div>
+                        <h3>Select Archer(s), Category / Rate &amp; Shooting Line(s) *</h3>
+                        <div class="sywat-label-subtext">Enter each shooter once and check one or more shooting lines (no lines are pre-selected by default).</div>
+                    </div>
                 </div>
 
-                <div id="sywat_archer_rows_container" data-multi-round="<?php echo $is_multi_round ? '1' : '0'; ?>" data-default-profile="<?php echo esc_attr( $default_prof_key ); ?>">
-                    <?php foreach ( $archers_data as $i => $a ) : ?>
-                        <?php
-                            $a_name  = isset( $a['name'] ) ? sanitize_text_field( $a['name'] ) : '';
-                            $a_dist  = isset( $a['distance'] ) ? sanitize_text_field( $a['distance'] ) : '20yd';
-                            $a_div   = isset( $a['division'] ) ? trim( sanitize_text_field( $a['division'] ) ) : '';
-                            $a_round = ! empty( $a['pricing_profile'] ) ? sanitize_title( $a['pricing_profile'] ) : $default_prof_key;
-                            if ( ! isset( $t_profiles[ $a_round ] ) ) {
-                                $a_round = $default_prof_key;
-                            }
+                <div class="sywat-table-responsive sywat-mb-3">
+                    <table class="sywat-table sywat-table-mobile-cards" id="sywat_archer_intake_table">
+                        <thead>
+                            <tr>
+                                <th>Archer Full Name *</th>
+                                <?php if ( $is_multi_round ) : ?>
+                                    <th>Round Format *</th>
+                                <?php endif; ?>
+                                <th>Category / Rate *</th>
+                                <?php foreach ( $available_lines as $idx => $line ) : ?>
+                                    <?php
+                                        $st         = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
+                                        $col_label  = isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx );
+                                        $is_closed  = ! empty( $st['is_closed'] );
+                                        $is_wl_only = ! empty( $st ) && intval( $st['rem_20'] ) <= 0 && intval( $st['rem_cub'] ) <= 0;
+                                    ?>
+                                    <th class="sywat-col-center">
+                                        <?php echo esc_html( $col_label ); ?>
+                                        <?php if ( $is_closed ) : ?>
+                                            <div class="sywat-label-subtext">Closed</div>
+                                        <?php elseif ( $is_wl_only ) : ?>
+                                            <div class="sywat-label-subtext">Waitlist</div>
+                                        <?php endif; ?>
+                                    </th>
+                                <?php endforeach; ?>
+                                <th class="sywat-col-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sywat_archer_rows_container"
+                               data-multi-round="<?php echo $is_multi_round ? '1' : '0'; ?>"
+                               data-default-profile="<?php echo esc_attr( $default_prof_key ); ?>"
+                               data-lines="<?php echo esc_attr( wp_json_encode( $line_columns_payload ) ); ?>">
+                            <?php foreach ( $archers_data as $i => $a ) : ?>
+                                <?php
+                                    $a_name  = isset( $a['name'] ) ? sanitize_text_field( $a['name'] ) : '';
+                                    $a_dist  = isset( $a['distance'] ) ? sanitize_text_field( $a['distance'] ) : '20yd';
+                                    $a_div   = isset( $a['division'] ) ? trim( sanitize_text_field( $a['division'] ) ) : '';
+                                    $a_round = ! empty( $a['pricing_profile'] ) ? sanitize_title( $a['pricing_profile'] ) : $default_prof_key;
+                                    if ( ! isset( $t_profiles[ $a_round ] ) ) {
+                                        $a_round = $default_prof_key;
+                                    }
 
-                            $a_tier = isset( $a['rate_tier'] ) ? strtolower( trim( sanitize_text_field( $a['rate_tier'] ) ) ) : '';
-                            if ( ! in_array( $a_tier, array( 'cub', 'youth', 'adult' ), true ) ) {
-                                if ( $a_dist === 'Cub' ) {
-                                    $a_tier = 'cub';
-                                } elseif ( $a_div !== '' ) {
-                                    $is_y_div = function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
-                                        ? ( sywat_shooting_styles_get_division_rate_tier( $a_div ) === 'Youth' )
-                                        : ( stripos( $a_div, 'Youth' ) !== false || stripos( $a_div, 'Young Adult' ) !== false );
-                                    $a_tier = $is_y_div ? 'youth' : 'adult';
-                                } else {
-                                    $a_tier = '';
-                                }
-                            }
+                                    $a_tier = isset( $a['rate_tier'] ) ? strtolower( trim( sanitize_text_field( $a['rate_tier'] ) ) ) : '';
+                                    if ( ! in_array( $a_tier, array( 'cub', 'youth', 'adult' ), true ) ) {
+                                        if ( $a_dist === 'Cub' ) {
+                                            $a_tier = 'cub';
+                                        } elseif ( $a_div !== '' ) {
+                                            $is_y_div = function_exists( 'sywat_shooting_styles_get_division_rate_tier' )
+                                                ? ( sywat_shooting_styles_get_division_rate_tier( $a_div ) === 'Youth' )
+                                                : ( stripos( $a_div, 'Youth' ) !== false || stripos( $a_div, 'Young Adult' ) !== false );
+                                            $a_tier = $is_y_div ? 'youth' : 'adult';
+                                        } else {
+                                            $a_tier = '';
+                                        }
+                                    }
 
-                            $row_prof  = isset( $t_profiles[ $a_round ] ) ? $t_profiles[ $a_round ] : $default_prof;
-                            $row_youth = is_array( $row_prof ) && isset( $row_prof['youth_rate'] ) ? floatval( $row_prof['youth_rate'] ) : $init_youth_rate;
-                            $row_adult = is_array( $row_prof ) && isset( $row_prof['adult_rate'] ) ? floatval( $row_prof['adult_rate'] ) : $init_adult_rate;
-                            $row_cub   = ( is_array( $row_prof ) && isset( $row_prof['division_overrides']['cub-8-11'] ) && $row_prof['division_overrides']['cub-8-11'] !== '' )
-                                ? floatval( $row_prof['division_overrides']['cub-8-11'] )
-                                : $row_youth;
+                                    $row_prof  = isset( $t_profiles[ $a_round ] ) ? $t_profiles[ $a_round ] : $default_prof;
+                                    $row_youth = is_array( $row_prof ) && isset( $row_prof['youth_rate'] ) ? floatval( $row_prof['youth_rate'] ) : $init_youth_rate;
+                                    $row_adult = is_array( $row_prof ) && isset( $row_prof['adult_rate'] ) ? floatval( $row_prof['adult_rate'] ) : $init_adult_rate;
+                                    $row_cub   = ( is_array( $row_prof ) && isset( $row_prof['division_overrides']['cub-8-11'] ) && $row_prof['division_overrides']['cub-8-11'] !== '' )
+                                        ? floatval( $row_prof['division_overrides']['cub-8-11'] )
+                                        : $row_youth;
 
-                            $a_line = isset( $a['line_idx'] ) ? sanitize_text_field( $a['line_idx'] ) : $current_default_line;
-                        ?>
-                        <div class="sywat-archer-input-row">
-                            <div class="sywat-field-group sywat-col-archer-name">
-                                <input type="text" name="archers[<?php echo $i; ?>][name]" <?php if ( $i === 0 ) echo 'id="sywat_first_archer_name"'; ?> class="sywat-archer-name-input" placeholder="Archer Full Name *" autocomplete="off" required value="<?php echo esc_attr( $a_name ); ?>" oninput="handleArcherNameInput(this); recalculateGroupTotal();">
-                            </div>
+                                    $checked_lines = array();
+                                    if ( $retain_form_data ) {
+                                        if ( isset( $a['line_indices'] ) && is_array( $a['line_indices'] ) ) {
+                                            $checked_lines = array_map( 'strval', array_map( 'sanitize_text_field', $a['line_indices'] ) );
+                                        } elseif ( isset( $a['line_idx'] ) && $a['line_idx'] !== '' ) {
+                                            $checked_lines = array( (string) sanitize_text_field( $a['line_idx'] ) );
+                                        }
+                                    }
+                                ?>
+                                <tr class="sywat-archer-input-row">
+                                    <td data-label="Archer Full Name *">
+                                        <input type="text"
+                                               name="archers[<?php echo $i; ?>][name]"
+                                               <?php if ( $i === 0 ) echo 'id="sywat_first_archer_name"'; ?>
+                                               class="sywat-archer-name-input"
+                                               placeholder="Archer Full Name *"
+                                               autocomplete="off"
+                                               required
+                                               value="<?php echo esc_attr( $a_name ); ?>"
+                                               data-sywat-action="archer-name-input">
+                                        <?php if ( ! $is_multi_round ) : ?>
+                                            <input type="hidden" name="archers[<?php echo $i; ?>][pricing_profile]" class="sywat-round-profile-input" value="<?php echo esc_attr( $default_prof_key ); ?>">
+                                        <?php endif; ?>
+                                    </td>
 
-                            <?php if ( $is_multi_round ) : ?>
-                                <div class="sywat-field-group sywat-col-archer-dist">
-                                    <select name="archers[<?php echo $i; ?>][pricing_profile]" class="sywat-round-profile-select" onchange="recalculateGroupTotal()">
-                                        <?php foreach ( $t_profiles as $p_slug => $p_rec ) : ?>
-                                            <?php
-                                                $opt_text = $p_rec['label'];
-                                                if ( ! empty( $p_rec['round_subtitle'] ) ) {
-                                                    $opt_text .= ' (' . $p_rec['round_subtitle'] . ')';
-                                                }
-                                            ?>
-                                            <option value="<?php echo esc_attr( $p_slug ); ?>" <?php selected( $a_round, $p_slug ); ?>>
-                                                <?php echo esc_html( $opt_text ); ?>
+                                    <?php if ( $is_multi_round ) : ?>
+                                        <td data-label="Round Format *">
+                                            <select name="archers[<?php echo $i; ?>][pricing_profile]" class="sywat-round-profile-select" data-sywat-action="round-profile-change">
+                                                <?php foreach ( $t_profiles as $p_slug => $p_rec ) : ?>
+                                                    <?php
+                                                        $opt_text = $p_rec['label'];
+                                                        if ( ! empty( $p_rec['round_subtitle'] ) ) {
+                                                            $opt_text .= ' (' . $p_rec['round_subtitle'] . ')';
+                                                        }
+                                                    ?>
+                                                    <option value="<?php echo esc_attr( $p_slug ); ?>" <?php selected( $a_round, $p_slug ); ?>>
+                                                        <?php echo esc_html( $opt_text ); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                    <?php endif; ?>
+
+                                    <td data-label="Category / Rate *">
+                                        <select name="archers[<?php echo $i; ?>][rate_tier]" class="sywat-rate-tier-select" required data-sywat-action="rate-tier-change">
+                                            <option value="" disabled <?php selected( $a_tier, '' ); ?> hidden>Select Category *</option>
+                                            <option
+                                                value="cub"
+                                                data-distance="Cub"
+                                                data-rate-tier="Youth"
+                                                data-fee="<?php echo esc_attr( number_format( $row_cub, 2, '.', '' ) ); ?>"
+                                                <?php selected( $a_tier, 'cub' ); ?>
+                                            >
+                                                <?php echo esc_html( 'Cub [$' . number_format( $row_cub, 2 ) . ']' ); ?>
                                             </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            <?php else : ?>
-                                <input type="hidden" name="archers[<?php echo $i; ?>][pricing_profile]" class="sywat-round-profile-input" value="<?php echo esc_attr( $default_prof_key ); ?>">
-                            <?php endif; ?>
+                                            <option
+                                                value="youth"
+                                                data-distance="20yd"
+                                                data-rate-tier="Youth"
+                                                data-fee="<?php echo esc_attr( number_format( $row_youth, 2, '.', '' ) ); ?>"
+                                                <?php selected( $a_tier, 'youth' ); ?>
+                                            >
+                                                <?php echo esc_html( 'Youth [$' . number_format( $row_youth, 2 ) . ']' ); ?>
+                                            </option>
+                                            <option
+                                                value="adult"
+                                                data-distance="20yd"
+                                                data-rate-tier="Adult"
+                                                data-fee="<?php echo esc_attr( number_format( $row_adult, 2, '.', '' ) ); ?>"
+                                                <?php selected( $a_tier, 'adult' ); ?>
+                                            >
+                                                <?php echo esc_html( 'Adult [$' . number_format( $row_adult, 2 ) . ']' ); ?>
+                                            </option>
+                                        </select>
+                                    </td>
 
-                            <div class="sywat-field-group sywat-col-archer-div">
-                                <select name="archers[<?php echo $i; ?>][rate_tier]" class="sywat-rate-tier-select" required onchange="handleRateTierChange(this);">
-                                    <option value="" disabled <?php selected( $a_tier, '' ); ?> hidden>Select Category *</option>
-                                    <option
-                                        value="cub"
-                                        data-distance="Cub"
-                                        data-rate-tier="Youth"
-                                        data-fee="<?php echo esc_attr( number_format( $row_cub, 2, '.', '' ) ); ?>"
-                                        <?php selected( $a_tier, 'cub' ); ?>
-                                    >
-                                        <?php echo esc_html( 'Cub [$' . number_format( $row_cub, 2 ) . ']' ); ?>
-                                    </option>
-                                    <option
-                                        value="youth"
-                                        data-distance="20yd"
-                                        data-rate-tier="Youth"
-                                        data-fee="<?php echo esc_attr( number_format( $row_youth, 2, '.', '' ) ); ?>"
-                                        <?php selected( $a_tier, 'youth' ); ?>
-                                    >
-                                        <?php echo esc_html( 'Youth [$' . number_format( $row_youth, 2 ) . ']' ); ?>
-                                    </option>
-                                    <option
-                                        value="adult"
-                                        data-distance="20yd"
-                                        data-rate-tier="Adult"
-                                        data-fee="<?php echo esc_attr( number_format( $row_adult, 2, '.', '' ) ); ?>"
-                                        <?php selected( $a_tier, 'adult' ); ?>
-                                    >
-                                        <?php echo esc_html( 'Adult [$' . number_format( $row_adult, 2 ) . ']' ); ?>
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div class="sywat-field-group sywat-col-archer-line">
-                                <select name="archers[<?php echo $i; ?>][line_idx]" class="sywat-line-override-select" onchange="recalculateGroupTotal()">
                                     <?php foreach ( $available_lines as $idx => $line ) : ?>
-                                        <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $a_line, (string) $idx ); ?>>
-                                            <?php echo esc_html( sywat_reg_resolve_line_label( $line, $idx ) ); ?>
-                                        </option>
+                                        <?php
+                                            $idx_str    = (string) $idx;
+                                            $st         = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
+                                            $col_label  = isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx );
+                                            $is_checked = in_array( $idx_str, $checked_lines, true );
+                                            $cb_aria    = 'Register archer for ' . $col_label;
+                                        ?>
+                                        <td class="sywat-col-center" data-label="<?php echo esc_attr( $col_label ); ?>">
+                                            <input type="checkbox"
+                                                   class="sywat-archer-line-cb"
+                                                   name="archers[<?php echo $i; ?>][line_indices][]"
+                                                   value="<?php echo esc_attr( $idx_str ); ?>"
+                                                   aria-label="<?php echo esc_attr( $cb_aria ); ?>"
+                                                   data-sywat-action="archer-line-toggle"
+                                                   <?php checked( $is_checked ); ?>>
+                                        </td>
                                     <?php endforeach; ?>
-                                </select>
-                            </div>
 
-                            <div class="sywat-col-archer-action">
-                                <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" onclick="removeArcherRow(this)" title="Remove Archer" aria-label="Remove Archer"></button>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                                    <td class="sywat-col-center" data-label="Action">
+                                        <button type="button" class="sywat-btn sywat-btn-danger sywat-btn-icon-clear" data-sywat-action="remove-archer-row" title="Remove Archer" aria-label="Remove Archer"></button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div class="sywat-intake-footer-bar">
-                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" onclick="addArcherRow()">Add Another Archer</button>
+                    <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-add" data-sywat-action="add-archer-row">Add Another Archer</button>
 
                     <div class="sywat-intake-summary">
                         <div class="sywat-intake-total-text">
@@ -336,7 +520,7 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
                         </div>
                     </div>
 
-                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Save & Register Shooters</button>
+                    <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-checkin">Save &amp; Register Shooters</button>
                 </div>
             </form>
         </div>
@@ -348,6 +532,11 @@ if ( ! function_exists( 'sywat_render_phone_intake_form' ) ) {
  * Dedicated Top-Level Modal: Bulk Spreadsheet Upload (.xlsx, .xls, .csv)
  * Rendered outside card containers inside .sywat-wrap so sywat-modal-manager.js
  * relocates it directly under <body> above theme/app headers.
+ *
+ * @param string $selected_tournament Active tournament title.
+ * @param array  $available_lines     Configured shooting lines keyed by line index.
+ * @param array  $tourn_data          Active tournament configuration array.
+ * @param bool   $auto_open           Whether to auto-open modal on validation failure.
  */
 if ( ! function_exists( 'sywat_render_import_modal' ) ) {
     function sywat_render_import_modal( $selected_tournament, $available_lines = array(), $tourn_data = array(), $auto_open = false ) {
@@ -439,154 +628,6 @@ if ( ! function_exists( 'sywat_render_import_modal' ) ) {
                         <button type="submit" id="sywat_upload_btn" class="sywat-btn sywat-btn-primary">Upload &amp; Import Shooters</button>
                     </div>
                 </form>
-            </div>
-        </div>
-        <?php
-    }
-}
-
-/**
- * Component 2: Line Slot Usage Table with Direct Manage Roster & Waitlist Modal Links
- */
-if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
-    function sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations ) {
-        $register_base_url = function_exists( 'sywat_page_url' )
-            ? add_query_arg( array( 'selected_tournament' => $selected_tournament ), sywat_page_url( 'register' ) )
-            : '';
-        ?>
-        <div class="sywat-intake-card">
-            <div class="sywat-table-header-bar">
-                <h2>📊 Current Line Slot Usage</h2>
-            </div>
-            <div class="sywat-table-responsive">
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th class="sywat-col-line-name">Line Name</th>
-                            <th class="sywat-col-cap-20yd sywat-col-center">20yd Capacity</th>
-                            <th class="sywat-col-cap-cub sywat-col-center">Cub Capacity</th>
-                            <th class="sywat-col-line-action sywat-col-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $available_lines as $idx => $line ) : ?>
-                            <?php
-                                $line_title          = sywat_reg_resolve_line_label( $line, $idx );
-                                $raw_line_name       = is_array( $line ) && ! empty( $line['name'] ) ? trim( (string) $line['name'] ) : '';
-                                $c_20                = sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations );
-                                $m_20                = sywat_get_line_max_cap( $line, '20yd' );
-                                $c_cub               = sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations );
-                                $m_cub               = sywat_get_line_max_cap( $line, 'Cub' );
-                                $total_line_shooters = $c_20 + $c_cub;
-
-                                $waitlisted_20  = 0;
-                                $waitlisted_cub = 0;
-
-                                foreach ( $registrations as $r ) {
-                                    if ( ! isset( $r['tournament'] ) || strcasecmp( trim( $r['tournament'] ), trim( $selected_tournament ) ) !== 0 ) {
-                                        continue;
-                                    }
-
-                                    $match_idx  = isset( $r['line_index'] ) && (string) $r['line_index'] === (string) $idx;
-                                    $match_name = false;
-                                    if ( isset( $r['line_name'] ) && is_string( $idx ) && strcasecmp( trim( $r['line_name'] ), trim( $idx ) ) === 0 ) {
-                                        $match_name = true;
-                                    }
-                                    if ( isset( $r['line_name'] ) && $raw_line_name !== '' && strcasecmp( trim( $r['line_name'] ), $raw_line_name ) === 0 ) {
-                                        $match_name = true;
-                                    }
-                                    if ( isset( $r['line_index'] ) && is_string( $r['line_index'] ) && ! is_numeric( $r['line_index'] ) ) {
-                                        if ( (string) $r['line_index'] === (string) $idx ) {
-                                            $match_name = true;
-                                        }
-                                    }
-
-                                    if ( $match_idx || $match_name ) {
-                                        if ( isset( $r['status'] ) && strcasecmp( trim( $r['status'] ), 'Waitlist' ) === 0 ) {
-                                            if ( isset( $r['distance'] ) && strcasecmp( trim( $r['distance'] ), 'Cub' ) === 0 ) {
-                                                $waitlisted_cub++;
-                                            } else {
-                                                $waitlisted_20++;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                $total_line_waitlisted = $waitlisted_20 + $waitlisted_cub;
-
-                                $manage_url = add_query_arg(
-                                    array(
-                                        'tab'             => 'manage',
-                                        'view_tournament' => $selected_tournament,
-                                        'modal_action'    => 'manage',
-                                        'filter_line_idx' => $idx,
-                                        'return_to'       => 'register',
-                                    ),
-                                    sywat_page_url( 'manage_tournaments' )
-                                );
-
-                                $waitlist_modal_url = function_exists( 'sywat_waitlist_get_modal_url' )
-                                    ? sywat_waitlist_get_modal_url( $selected_tournament, $idx, $register_base_url )
-                                    : '';
-
-                                $confirm_msg = sprintf( 'Are you sure you want to clear ALL archers from %s?', $line_title );
-                            ?>
-                            <tr>
-                                <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
-                                <td class="sywat-col-center">
-                                    <strong><?php echo $c_20; ?></strong> / <?php echo $m_20; ?>
-                                    <span class="sywat-badge <?php echo ( $c_20 >= $m_20 ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_20 >= $m_20 ) ? 'Full' : 'Open'; ?></span>
-                                    <?php if ( $waitlisted_20 > 0 ) : ?>
-                                        <div>
-                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
-                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_20, $idx, $register_base_url ); ?>
-                                            <?php else : ?>
-                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_20; ?> Waitlisted</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="sywat-col-center">
-                                    <strong><?php echo $c_cub; ?></strong> / <?php echo $m_cub; ?>
-                                    <span class="sywat-badge <?php echo ( $c_cub >= $m_cub ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_cub >= $m_cub ) ? 'Full' : 'Open'; ?></span>
-                                    <?php if ( $waitlisted_cub > 0 ) : ?>
-                                        <div>
-                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
-                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_cub, $idx, $register_base_url ); ?>
-                                            <?php else : ?>
-                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_cub; ?> Waitlisted</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="sywat-col-center">
-                                    <div class="sywat-table-actions-vertical">
-                                        <a href="<?php echo esc_url( $manage_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">
-                                            Manage Roster
-                                        </a>
-                                        <?php if ( $total_line_waitlisted > 0 && ! empty( $waitlist_modal_url ) ) : ?>
-                                            <a href="<?php echo esc_url( $waitlist_modal_url ); ?>" class="sywat-btn sywat-btn-warning sywat-btn-full sywat-waitlist-trigger-btn" title="Open Waitlist Management Window">
-                                                <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
-                                                <span>Waitlist (<?php echo intval( $total_line_waitlisted ); ?>)</span>
-                                            </a>
-                                        <?php endif; ?>
-                                        <?php if ( $total_line_shooters > 0 || $total_line_waitlisted > 0 ) : ?>
-                                            <form method="post" class="sywat-table-action-form" data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>" onsubmit="return confirm(this.dataset.confirmMsg);">
-                                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                                <input type="hidden" name="sywat_action" value="purge_line">
-                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                                <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
-                                                <input type="hidden" name="redirect_action" value="prereg">
-                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Clear Line</button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
             </div>
         </div>
         <?php
