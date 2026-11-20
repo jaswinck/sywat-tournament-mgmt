@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups, single-tournament score queries, and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries, and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.2
+ * Version: 1.3.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,7 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Fetches distinct historical archer profiles across Indoor and Outdoor cycles (18-Month Rolling Window).
- * Queries custom scores tables and tournament registration options, returning ONLY complete (Name, Division, Gender, Style) profiles.
+ * Queries custom scores tables and active tournament registration options (excluding archived "_hist_" records),
+ * returning ONLY complete (Name, Division, Gender, Style) profiles.
  *
  * @return array List of shooter objects for JS localization.
  */
@@ -72,9 +73,9 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
             }
         }
 
-        // 2. Secondary Query: Tournament options store (sywat_t_%)
+        // 2. Secondary Query: Active tournament options store (sywat_t_%, excluding archived "_hist_" migration rows)
         $opt_results = $wpdb->get_results(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'"
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'"
         );
 
         if ( is_array( $opt_results ) ) {
