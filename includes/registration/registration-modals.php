@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Component & Modal Views
  * Path: includes/registration/registration-modals.php
- * Description: Pure view renderer for the Current Line Slot Usage summary table at the top of [sywat_register], the Phone & Group Registration Intake form featuring a per-archer multi-line checkbox matrix (zero pre-checked defaults, single-entry multi-line registration, live per-line capacity headers, 3-tier Category / Rate selection, dynamic Round Format selection), and the top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
+ * Description: Pure view renderer for the compact horizontal Line Capacity Tracker card strip at the top of [sywat_register], the Phone & Group Registration Intake form featuring a per-archer multi-line checkbox matrix (zero pre-checked defaults, single-entry multi-line registration, live per-line capacity headers, 3-tier Category / Rate selection, dynamic Round Format selection), and the top-level 8-column Bulk Spreadsheet Import Modal (#sywat_import_modal).
  * Compliance: Pure view layer — zero database/option queries, zero stats aggregation loops, zero output at include time, zero inline style attributes, zero embedded script blocks, zero inline JS event handlers (delegated data-sywat-action attributes only), canonical sywat_resolve_tournament_line_label() delegation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.2
+ * Version: 7.4.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -32,7 +32,7 @@ if ( ! function_exists( 'sywat_reg_resolve_line_label' ) ) {
 }
 
 /**
- * Main Dispatcher: Registration Line Usage & Multi-Line Intake Component Container
+ * Main Dispatcher: Registration Line Capacity Tracker & Multi-Line Intake Component Container
  *
  * @param string $selected_tournament Active tournament title.
  * @param array  $available_lines     Configured shooting lines keyed by line index.
@@ -80,7 +80,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
                 </div>
             <?php endif; ?>
 
-            <!-- Component 1: Live Line Slot Usage Table (Top-of-Portal Capacity Overview) -->
+            <!-- Component 1: Compact Horizontal Line Capacity Tracker Card Grid -->
             <?php sywat_render_line_slot_usage_table( $selected_tournament, $available_lines, $registrations, $line_stats ); ?>
 
             <!-- Component 2: Phone & Group Multi-Line Registration Matrix Form -->
@@ -91,7 +91,7 @@ if ( ! function_exists( 'sywat_render_registration_modal' ) ) {
 }
 
 /**
- * Component 1: Line Slot Usage Table with Direct Manage Roster & Waitlist Modal Links
+ * Component 1: Line Capacity Tracker Card Grid with Manage Roster, Waitlist & Clear Line Controls
  *
  * @param string $selected_tournament Active tournament title.
  * @param array  $available_lines     Configured shooting lines keyed by line index.
@@ -106,114 +106,114 @@ if ( ! function_exists( 'sywat_render_line_slot_usage_table' ) ) {
         ?>
         <div class="sywat-intake-card">
             <div class="sywat-table-header-bar">
-                <h2>📊 Current Line Slot Usage</h2>
+                <h2>📊 Line Capacity Tracker</h2>
             </div>
-            <div class="sywat-table-responsive">
-                <table class="sywat-table">
-                    <thead>
-                        <tr>
-                            <th class="sywat-col-line-name">Line Name</th>
-                            <th class="sywat-col-cap-20yd sywat-col-center">20yd Capacity</th>
-                            <th class="sywat-col-cap-cub sywat-col-center">Cub Capacity</th>
-                            <th class="sywat-col-line-action sywat-col-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $available_lines as $idx => $line ) : ?>
-                            <?php
-                                $st                    = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
-                                $line_title            = isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx );
-                                $c_20                  = isset( $st['c_20'] ) ? intval( $st['c_20'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations ) : 0 );
-                                $m_20                  = isset( $st['m_20'] ) ? intval( $st['m_20'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, '20yd' ) : 20 );
-                                $c_cub                 = isset( $st['c_cub'] ) ? intval( $st['c_cub'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations ) : 0 );
-                                $m_cub                 = isset( $st['m_cub'] ) ? intval( $st['m_cub'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, 'Cub' ) : 5 );
-                                $waitlisted_20         = isset( $st['waitlisted_20'] ) ? intval( $st['waitlisted_20'] ) : 0;
-                                $waitlisted_cub        = isset( $st['waitlisted_cub'] ) ? intval( $st['waitlisted_cub'] ) : 0;
-                                $total_line_shooters   = isset( $st['total_line_shooters'] ) ? intval( $st['total_line_shooters'] ) : ( $c_20 + $c_cub );
-                                $total_line_waitlisted = isset( $st['total_line_waitlisted'] ) ? intval( $st['total_line_waitlisted'] ) : ( $waitlisted_20 + $waitlisted_cub );
-                                $is_closed             = ! empty( $st['is_closed'] );
+            <div class="sywat-tracker-grid">
+                <?php foreach ( $available_lines as $idx => $line ) : ?>
+                    <?php
+                        $st                    = isset( $line_stats[ $idx ] ) && is_array( $line_stats[ $idx ] ) ? $line_stats[ $idx ] : array();
+                        $line_title            = isset( $st['label'] ) ? $st['label'] : sywat_reg_resolve_line_label( $line, $idx );
+                        $c_20                  = isset( $st['c_20'] ) ? intval( $st['c_20'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, '20yd', $registrations ) : 0 );
+                        $m_20                  = isset( $st['m_20'] ) ? intval( $st['m_20'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, '20yd' ) : 20 );
+                        $c_cub                 = isset( $st['c_cub'] ) ? intval( $st['c_cub'] ) : ( function_exists( 'sywat_count_registered' ) ? sywat_count_registered( $selected_tournament, $idx, 'Cub', $registrations ) : 0 );
+                        $m_cub                 = isset( $st['m_cub'] ) ? intval( $st['m_cub'] ) : ( function_exists( 'sywat_get_line_max_cap' ) ? sywat_get_line_max_cap( $line, 'Cub' ) : 5 );
+                        $is_closed             = ! empty( $st['is_closed'] );
+                        $rem_20                = isset( $st['rem_20'] ) ? intval( $st['rem_20'] ) : ( $is_closed ? 0 : max( 0, $m_20 - $c_20 ) );
+                        $rem_cub               = isset( $st['rem_cub'] ) ? intval( $st['rem_cub'] ) : ( $is_closed ? 0 : max( 0, $m_cub - $c_cub ) );
+                        $waitlisted_20         = isset( $st['waitlisted_20'] ) ? intval( $st['waitlisted_20'] ) : 0;
+                        $waitlisted_cub        = isset( $st['waitlisted_cub'] ) ? intval( $st['waitlisted_cub'] ) : 0;
+                        $total_line_shooters   = isset( $st['total_line_shooters'] ) ? intval( $st['total_line_shooters'] ) : ( $c_20 + $c_cub );
+                        $total_line_waitlisted = isset( $st['total_line_waitlisted'] ) ? intval( $st['total_line_waitlisted'] ) : ( $waitlisted_20 + $waitlisted_cub );
 
-                                $manage_url = add_query_arg(
-                                    array(
-                                        'tab'             => 'manage',
-                                        'view_tournament' => $selected_tournament,
-                                        'modal_action'    => 'manage',
-                                        'filter_line_idx' => $idx,
-                                        'return_to'       => 'register',
-                                    ),
-                                    sywat_page_url( 'manage_tournaments' )
-                                );
+                        $has_open_20  = ( $m_20 > 0 && $rem_20 > 0 );
+                        $has_open_cub = ( $m_cub > 0 && $rem_cub > 0 );
+                        $is_line_full = ( ! $is_closed && ! $has_open_20 && ! $has_open_cub && ( $m_20 > 0 || $m_cub > 0 ) );
 
-                                $waitlist_modal_url = function_exists( 'sywat_waitlist_get_modal_url' )
-                                    ? sywat_waitlist_get_modal_url( $selected_tournament, $idx, $register_base_url )
-                                    : '';
+                        $manage_url = add_query_arg(
+                            array(
+                                'tab'             => 'manage',
+                                'view_tournament' => $selected_tournament,
+                                'modal_action'    => 'manage',
+                                'filter_line_idx' => $idx,
+                                'return_to'       => 'register',
+                            ),
+                            sywat_page_url( 'manage_tournaments' )
+                        );
 
-                                $confirm_msg = sprintf( 'Are you sure you want to clear ALL archers from %s?', $line_title );
-                            ?>
-                            <tr>
-                                <td><strong><?php echo esc_html( $line_title ); ?></strong></td>
-                                <td class="sywat-col-center">
-                                    <strong><?php echo $c_20; ?></strong> / <?php echo $m_20; ?>
+                        $waitlist_modal_url = function_exists( 'sywat_waitlist_get_modal_url' )
+                            ? sywat_waitlist_get_modal_url( $selected_tournament, $idx, $register_base_url )
+                            : '';
+
+                        $confirm_msg = sprintf( 'Are you sure you want to clear ALL archers from %s?', $line_title );
+                    ?>
+                    <div class="sywat-tracker-card">
+                        <div>
+                            <div class="sywat-tracker-card-header">
+                                <span class="sywat-tracker-card-title"><?php echo esc_html( $line_title ); ?></span>
+                                <div class="sywat-tracker-header-badges">
                                     <?php if ( $is_closed ) : ?>
                                         <span class="sywat-badge sywat-badge-muted">Closed</span>
+                                    <?php elseif ( $is_line_full ) : ?>
+                                        <span class="sywat-badge sywat-badge-full">Full</span>
                                     <?php else : ?>
-                                        <span class="sywat-badge <?php echo ( $c_20 >= $m_20 ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_20 >= $m_20 ) ? 'Full' : 'Open'; ?></span>
+                                        <span class="sywat-badge sywat-badge-open">Open</span>
                                     <?php endif; ?>
-                                    <?php if ( $waitlisted_20 > 0 ) : ?>
-                                        <div>
-                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
-                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_20, $idx, $register_base_url ); ?>
-                                            <?php else : ?>
-                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_20; ?> Waitlisted</span>
-                                            <?php endif; ?>
-                                        </div>
+                                    <?php if ( $total_line_waitlisted > 0 ) : ?>
+                                        <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
+                                            <?php sywat_waitlist_render_badge_link( $selected_tournament, $total_line_waitlisted, $idx, $register_base_url ); ?>
+                                        <?php else : ?>
+                                            <span class="sywat-waitlist-pill">🕒 <?php echo intval( $total_line_waitlisted ); ?> Waitlisted</span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
-                                </td>
-                                <td class="sywat-col-center">
-                                    <strong><?php echo $c_cub; ?></strong> / <?php echo $m_cub; ?>
-                                    <?php if ( $is_closed ) : ?>
-                                        <span class="sywat-badge sywat-badge-muted">Closed</span>
+                                </div>
+                            </div>
+                            <div class="sywat-tracker-card-stats">
+                                <span>
+                                    <strong>20yd:</strong>
+                                    <?php if ( $m_20 <= 0 ) : ?>
+                                        N/A
+                                    <?php elseif ( ! $has_open_20 ) : ?>
+                                        <span class="sywat-text-closed">FULL</span> (<?php echo $c_20; ?>/<?php echo $m_20; ?>)
                                     <?php else : ?>
-                                        <span class="sywat-badge <?php echo ( $c_cub >= $m_cub ) ? 'sywat-badge-full' : 'sywat-badge-open'; ?>"><?php echo ( $c_cub >= $m_cub ) ? 'Full' : 'Open'; ?></span>
+                                        <?php echo $rem_20; ?> Open (<?php echo $c_20; ?>/<?php echo $m_20; ?>)
                                     <?php endif; ?>
-                                    <?php if ( $waitlisted_cub > 0 ) : ?>
-                                        <div>
-                                            <?php if ( function_exists( 'sywat_waitlist_render_badge_link' ) ) : ?>
-                                                <?php sywat_waitlist_render_badge_link( $selected_tournament, $waitlisted_cub, $idx, $register_base_url ); ?>
-                                            <?php else : ?>
-                                                <span class="sywat-waitlist-pill">🕒 <?php echo $waitlisted_cub; ?> Waitlisted</span>
-                                            <?php endif; ?>
-                                        </div>
+                                </span>
+                                <span>
+                                    <strong>Cub:</strong>
+                                    <?php if ( $m_cub <= 0 ) : ?>
+                                        N/A
+                                    <?php elseif ( ! $has_open_cub ) : ?>
+                                        <span class="sywat-text-closed">FULL</span> (<?php echo $c_cub; ?>/<?php echo $m_cub; ?>)
+                                    <?php else : ?>
+                                        <?php echo $rem_cub; ?> Open (<?php echo $c_cub; ?>/<?php echo $m_cub; ?>)
                                     <?php endif; ?>
-                                </td>
-                                <td class="sywat-col-center">
-                                    <div class="sywat-table-actions-vertical">
-                                        <a href="<?php echo esc_url( $manage_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">
-                                            Manage Roster
-                                        </a>
-                                        <?php if ( $total_line_waitlisted > 0 && ! empty( $waitlist_modal_url ) ) : ?>
-                                            <a href="<?php echo esc_url( $waitlist_modal_url ); ?>" class="sywat-btn sywat-btn-warning sywat-btn-full sywat-waitlist-trigger-btn" title="Open Waitlist Management Window">
-                                                <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
-                                                <span>Waitlist (<?php echo intval( $total_line_waitlisted ); ?>)</span>
-                                            </a>
-                                        <?php endif; ?>
-                                        <?php if ( $total_line_shooters > 0 || $total_line_waitlisted > 0 ) : ?>
-                                            <form method="post" class="sywat-table-action-form" data-sywat-action="confirm-purge-line" data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>">
-                                                <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
-                                                <input type="hidden" name="sywat_action" value="purge_line">
-                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                                <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-                                                <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
-                                                <input type="hidden" name="redirect_action" value="prereg">
-                                                <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete sywat-btn-full">Clear Line</button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="sywat-tracker-card-actions">
+                            <a href="<?php echo esc_url( $manage_url ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage">
+                                Manage Roster
+                            </a>
+                            <?php if ( $total_line_waitlisted > 0 && ! empty( $waitlist_modal_url ) ) : ?>
+                                <a href="<?php echo esc_url( $waitlist_modal_url ); ?>" class="sywat-btn sywat-btn-warning sywat-waitlist-trigger-btn" title="Open Waitlist Management Window">
+                                    <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
+                                    <span>Waitlist (<?php echo intval( $total_line_waitlisted ); ?>)</span>
+                                </a>
+                            <?php endif; ?>
+                            <?php if ( $total_line_shooters > 0 || $total_line_waitlisted > 0 ) : ?>
+                                <form method="post" data-sywat-action="confirm-purge-line" data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>">
+                                    <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                    <input type="hidden" name="sywat_action" value="purge_line">
+                                    <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                    <input type="hidden" name="view_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                    <input type="hidden" name="target_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                    <input type="hidden" name="redirect_action" value="prereg">
+                                    <button type="submit" class="sywat-btn sywat-btn-danger sywat-btn-icon-delete">Clear Line</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
         <?php
