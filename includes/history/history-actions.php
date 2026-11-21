@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results AJAX Action Handlers
  * Path: includes/history/history-actions.php
- * Description: Nonce-verified and capability-gated wp_ajax_* endpoints for discovering and permanently persisting historical TFAA seasons, scanning and caching per-season tournament manifests with live import statuses, importing individual event scorecards in chunked AJAX ticks, and purging imported historical seasons while retaining discovered manifests.
+ * Description: Nonce-verified and capability-gated wp_ajax_* endpoints for discovering and permanently persisting historical TFAA seasons, scanning and caching per-season tournament manifests with live import statuses, importing individual or concurrent multi-event batches of historical scorecards in single-process serialized commits, and purging imported historical seasons while retaining discovered manifests.
  * Compliance: Pure AJAX action layer — executes on wp_ajax_* before theme output, pure JSON responses via wp_send_json_*(), zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -234,7 +234,7 @@ add_action( 'wp_ajax_sywat_history_get_season_events', 'sywat_ajax_history_get_s
 
 /**
  * AJAX Handler 4: Fetch and import a single historical TFAA tournament scorecard (/results/{id}).
- * Executed 1 event per AJAX request to prevent shared-hosting PHP execution timeouts.
+ * Executed 1 event per AJAX request when triggered individually from the modal.
  * Action: wp_ajax_sywat_history_import_tournament
  *
  * @return void
@@ -323,6 +323,156 @@ if ( ! function_exists( 'sywat_ajax_history_import_tournament' ) ) {
     }
 }
 add_action( 'wp_ajax_sywat_history_import_tournament', 'sywat_ajax_history_import_tournament' );
+
+/**
+ * AJAX Handler 4B: Fetch up to 10 historical TFAA tournament scorecards concurrently
+ * via curl_multi (sywat_history_fetch_remote_html_batch) and commit each scorecard
+ * sequentially inside a single PHP process so serialized wp_options arrays never collide.
+ * Action: wp_ajax_sywat_history_import_tournament_batch
+ *
+ * @return void
+ */
+if ( ! function_exists( 'sywat_ajax_history_import_tournament_batch' ) ) {
+    function sywat_ajax_history_import_tournament_batch() {
+        sywat_history_verify_ajax_request();
+
+        $raw_json = isset( $_POST['events_json'] ) ? wp_unslash( $_POST['events_json'] ) : '';
+        $decoded  = is_string( $raw_json ) && $raw_json !== '' ? json_decode( $raw_json, true ) : null;
+
+        if ( ! is_array( $decoded ) || empty( $decoded ) ) {
+            wp_send_json_error(
+                array( 'message' => 'Invalid or empty tournament batch payload.' )
+            );
+        }
+
+        $batch_items  = array_slice( $decoded, 0, 10 );
+        $normalized   = array();
+        $urls_by_key  = array();
+        $season_cache = array();
+
+        foreach ( $batch_items as $idx => $raw_item ) {
+            if ( ! is_array( $raw_item ) ) {
+                continue;
+            }
+
+            $event_id    = isset( $raw_item['event_id'] ) ? intval( $raw_item['event_id'] ) : 0;
+            $raw_title   = isset( $raw_item['raw_title'] ) ? sanitize_text_field( (string) $raw_item['raw_title'] ) : '';
+            $title       = isset( $raw_item['title'] ) ? sanitize_text_field( (string) $raw_item['title'] ) : '';
+            $season_id   = isset( $raw_item['season_id'] ) ? intval( $raw_item['season_id'] ) : 0;
+            $season_name = isset( $raw_item['season_name'] ) ? sanitize_text_field( (string) $raw_item['season_name'] ) : '';
+            $season_slug = isset( $raw_item['season_slug'] ) ? sanitize_title( (string) $raw_item['season_slug'] ) : '';
+            $start_date  = isset( $raw_item['start_date'] ) ? sanitize_text_field( (string) $raw_item['start_date'] ) : '';
+            $end_date    = isset( $raw_item['end_date'] ) ? sanitize_text_field( (string) $raw_item['end_date'] ) : '';
+            $event_type  = isset( $raw_item['event_type'] ) ? sanitize_text_field( (string) $raw_item['event_type'] ) : 'SYWAT';
+
+            $key               = 'item_' . $idx;
+            $event_url         = $event_id > 0 ? 'https://texasfieldarchery.org/results/' . $event_id : '';
+            $normalized[ $key ] = array(
+                'event_id'    => $event_id,
+                'event_url'   => $event_url,
+                'raw_title'   => $raw_title !== '' ? $raw_title : $title,
+                'title'       => $title,
+                'season_id'   => $season_id,
+                'season_name' => $season_name,
+                'season_slug' => $season_slug,
+                'start_date'  => $start_date,
+                'end_date'    => $end_date !== '' ? $end_date : $start_date,
+                'event_type'  => $event_type,
+            );
+
+            if ( $event_id > 0 && $title !== '' ) {
+                $urls_by_key[ $key ] = $event_url;
+            }
+        }
+
+        $fetched_map = function_exists( 'sywat_history_fetch_remote_html_batch' )
+            ? sywat_history_fetch_remote_html_batch( $urls_by_key )
+            : array();
+
+        $results = array();
+
+        foreach ( $normalized as $key => $item ) {
+            if ( $item['event_id'] <= 0 || $item['title'] === '' ) {
+                $results[] = array(
+                    'success'      => false,
+                    'event_id'     => $item['event_id'],
+                    'title'        => $item['title'],
+                    'season_slug'  => $item['season_slug'],
+                    'archer_count' => 0,
+                    'message'      => 'Missing event ID or canonical tournament title.',
+                );
+                continue;
+            }
+
+            $fetched = isset( $fetched_map[ $key ] )
+                ? $fetched_map[ $key ]
+                : sywat_history_fetch_remote_html( $item['event_url'] );
+
+            if ( empty( $fetched['success'] ) ) {
+                $results[] = array(
+                    'success'      => false,
+                    'event_id'     => $item['event_id'],
+                    'title'        => $item['title'],
+                    'season_slug'  => $item['season_slug'],
+                    'archer_count' => 0,
+                    'message'      => ! empty( $fetched['error'] )
+                        ? $fetched['error']
+                        : 'Failed to retrieve event scorecard from TFAA.',
+                );
+                continue;
+            }
+
+            $parsed_card = sywat_history_parse_event_scorecard_html( $fetched['html'] );
+
+            $cache_key = $item['season_slug'] !== '' ? $item['season_slug'] : ( 'sid_' . $item['season_id'] );
+            if ( isset( $season_cache[ $cache_key ] ) ) {
+                $season_record = $season_cache[ $cache_key ];
+            } else {
+                $season_record = array(
+                    'slug' => $item['season_slug'],
+                    'name' => $item['season_name'],
+                );
+                if ( $item['season_id'] > 0 && $item['season_name'] !== '' ) {
+                    $season_payload = sywat_history_build_season_payload( $item['season_id'], $item['season_name'] );
+                    $season_record  = sywat_history_upsert_season( $season_payload );
+                }
+                $season_cache[ $cache_key ] = $season_record;
+            }
+
+            $item['season_slug'] = isset( $season_record['slug'] ) ? $season_record['slug'] : $item['season_slug'];
+            $item['season_name'] = isset( $season_record['name'] ) ? $season_record['name'] : $item['season_name'];
+
+            $saved = sywat_history_save_event_scores_atomic( $item, $season_record, $parsed_card );
+            if ( empty( $saved['success'] ) ) {
+                $results[] = array(
+                    'success'      => false,
+                    'event_id'     => $item['event_id'],
+                    'title'        => $item['title'],
+                    'season_slug'  => $item['season_slug'],
+                    'archer_count' => 0,
+                    'message'      => ! empty( $saved['error'] ) ? $saved['error'] : 'Failed to save event scores.',
+                );
+                continue;
+            }
+
+            $results[] = array(
+                'success'      => true,
+                'event_id'     => $item['event_id'],
+                'title'        => $saved['title'],
+                'season_slug'  => $item['season_slug'],
+                'archer_count' => intval( $saved['archer_count'] ),
+                'message'      => '',
+            );
+        }
+
+        wp_send_json_success(
+            array(
+                'results' => $results,
+            )
+        );
+    }
+}
+add_action( 'wp_ajax_sywat_history_import_tournament_batch', 'sywat_ajax_history_import_tournament_batch' );
 
 /**
  * AJAX Handler 5: Purge all imported historical tournaments and score rows for an archived season
