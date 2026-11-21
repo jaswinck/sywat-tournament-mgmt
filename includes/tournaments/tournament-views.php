@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
- * Description: Renders the Manage Tournaments & Seasons portal with live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), single-pass O(R) pre-indexed tournament and line occupancy counters, live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Compliance: Pure view layer — zero output at include time, zero inline style attributes, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.20.0
+ * Version: 7.21.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,15 +25,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) ? sywat_can_manage_seasons() : current_user_can( 'manage_options' );
         $user_shop_id       = function_exists( 'sywat_get_user_shop_id' ) ? sywat_get_user_shop_id() : '';
 
-        // Mutable Data Collections for Action Handling
-        $tournaments        = get_option( 'sywat_tournaments_list', array() );
-        $active_tournaments = get_option( 'sywat_active_tournaments', array() );
-        $registrations      = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : array();
-
         $notice     = '';
         $active_tab = isset( $_REQUEST['tab'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['tab'] ) ) : 'manage';
 
-        // 2. Execute POST Actions FIRST (Before rendering data load)
+        // 2. Execute POST Actions FIRST (load mutable collections only on valid POST requests)
         $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_desk_action' ) )
                        || ( isset( $_POST['sywat_import_schedule_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_import_schedule_nonce'] ) ), 'sywat_import_schedule_nonce' ) )
                        || ( isset( $_POST['sywat_confirm_schedule_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_confirm_schedule_nonce'] ) ), 'sywat_confirm_schedule_nonce' ) );
@@ -42,6 +38,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'cancel' ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Security token expired. Please refresh the page and try again.</div>';
         } elseif ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
+            $tournaments        = get_option( 'sywat_tournaments_list', array() );
+            $active_tournaments = get_option( 'sywat_active_tournaments', array() );
+            $registrations      = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations( $tournaments ) : array();
+
             if ( function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $notice = sywat_handle_tournament_post_actions( $tournaments, $active_tournaments, $registrations, $can_manage_seasons, $user_shop_id );
             }
@@ -93,8 +93,26 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             }
         }
 
-        // Build list of unique TFAA districts across scoped tournaments
-        $filter_districts = array();
+        // Build list of unique TFAA districts & pre-resolve shooting lines across scoped tournaments
+        $filter_districts        = array();
+        $scoped_lines_by_tourn   = array();
+        $scoped_line_titles      = array();
+        $tourn_valid_line_idxs   = array();
+        $tourn_line_name_to_idx  = array();
+        $tourn_counts            = array();
+
+        $normalize_line_title = function( $line, $idx ) {
+            $day_str    = isset( $line['day'] ) ? $line['day'] : '';
+            $time_str   = isset( $line['time'] ) ? $line['time'] : ( isset( $line['start_time'] ) ? $line['start_time'] : '' );
+            $line_title = ! empty( $line['name'] ) ? $line['name'] : ( ( ! empty( $day_str ) && ! empty( $time_str ) ) ? trim( $day_str . ' ' . $time_str ) : 'Line ' . ( $idx + 1 ) );
+
+            $line_title = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $line_title );
+            $line_title = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $line_title );
+            $line_title = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $line_title );
+
+            return $line_title;
+        };
+
         foreach ( $scoped_tournaments as $t_name => $t_info ) {
             $s_id   = sywat_get_tournament_shop_id( $t_info );
             $d_name = '';
@@ -114,8 +132,87 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             if ( ! empty( $d_name ) && ! in_array( $d_name, $filter_districts, true ) ) {
                 $filter_districts[] = $d_name;
             }
+
+            $t_key                        = strtolower( trim( (string) $t_name ) );
+            $t_lines                      = sywat_get_tournament_lines( $t_info );
+            $scoped_lines_by_tourn[ $t_name ] = $t_lines;
+            $scoped_line_titles[ $t_name ]    = array();
+            $tourn_valid_line_idxs[ $t_key ]  = array();
+            $tourn_line_name_to_idx[ $t_key ] = array();
+            $tourn_counts[ $t_key ]           = array(
+                'active'   => 0,
+                'waitlist' => 0,
+                'lines'    => array(),
+            );
+
+            if ( ! empty( $t_lines ) && is_array( $t_lines ) ) {
+                foreach ( $t_lines as $idx => $line ) {
+                    $idx_str    = (string) $idx;
+                    $line_title = $normalize_line_title( $line, $idx );
+
+                    $scoped_line_titles[ $t_name ][ $idx_str ]                    = $line_title;
+                    $tourn_valid_line_idxs[ $t_key ][ $idx_str ]                  = true;
+                    $tourn_line_name_to_idx[ $t_key ][ strtolower( trim( $line_title ) ) ] = $idx_str;
+                    $tourn_counts[ $t_key ]['lines'][ $idx_str ]                  = array(
+                        '20yd'     => 0,
+                        'Cub'      => 0,
+                        'waitlist' => 0,
+                    );
+                }
+            }
         }
         sort( $filter_districts );
+
+        // Single-pass O(R) aggregation of active, waitlist, 20yd, and Cub counts across scoped tournaments
+        if ( is_array( $registrations ) && ! empty( $tourn_counts ) ) {
+            foreach ( $registrations as $r ) {
+                if ( ! is_array( $r ) || ! isset( $r['tournament'] ) ) {
+                    continue;
+                }
+                $t_key = strtolower( trim( (string) $r['tournament'] ) );
+                if ( ! isset( $tourn_counts[ $t_key ] ) ) {
+                    continue;
+                }
+
+                $status = isset( $r['status'] ) ? trim( (string) $r['status'] ) : '';
+                if ( strcasecmp( $status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $resolved_idx = '';
+                if ( isset( $r['line_index'] ) && $r['line_index'] !== '' ) {
+                    $raw_l_idx = (string) $r['line_index'];
+                    if ( isset( $tourn_valid_line_idxs[ $t_key ][ $raw_l_idx ] ) ) {
+                        $resolved_idx = $raw_l_idx;
+                    } else {
+                        $norm_l_idx = strtolower( trim( $raw_l_idx ) );
+                        if ( isset( $tourn_line_name_to_idx[ $t_key ][ $norm_l_idx ] ) ) {
+                            $resolved_idx = $tourn_line_name_to_idx[ $t_key ][ $norm_l_idx ];
+                        }
+                    }
+                }
+                if ( $resolved_idx === '' && ! empty( $r['line_name'] ) ) {
+                    $norm_l_name = strtolower( trim( (string) $r['line_name'] ) );
+                    if ( isset( $tourn_line_name_to_idx[ $t_key ][ $norm_l_name ] ) ) {
+                        $resolved_idx = $tourn_line_name_to_idx[ $t_key ][ $norm_l_name ];
+                    }
+                }
+
+                if ( strcasecmp( $status, 'Waitlist' ) === 0 ) {
+                    $tourn_counts[ $t_key ]['waitlist']++;
+                    if ( $resolved_idx !== '' && isset( $tourn_counts[ $t_key ]['lines'][ $resolved_idx ] ) ) {
+                        $tourn_counts[ $t_key ]['lines'][ $resolved_idx ]['waitlist']++;
+                    }
+                    continue;
+                }
+
+                $tourn_counts[ $t_key ]['active']++;
+                if ( $resolved_idx !== '' && isset( $tourn_counts[ $t_key ]['lines'][ $resolved_idx ] ) ) {
+                    $reg_dist = isset( $r['distance'] ) ? sywat_normalize_dist( $r['distance'] ) : '20yd';
+                    $tourn_counts[ $t_key ]['lines'][ $resolved_idx ][ $reg_dist ]++;
+                }
+            }
+        }
 
         $manage_base_url = function_exists( 'sywat_page_url' )
             ? sywat_page_url( 'manage_tournaments' )
@@ -267,7 +364,8 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <tbody>
                                     <?php foreach ( $scoped_tournaments as $t_name => $t_data ) : ?>
                                         <?php
-                                            $t_lines       = sywat_get_tournament_lines( $t_data );
+                                            $t_key         = strtolower( trim( (string) $t_name ) );
+                                            $t_lines       = isset( $scoped_lines_by_tourn[ $t_name ] ) ? $scoped_lines_by_tourn[ $t_name ] : sywat_get_tournament_lines( $t_data );
                                             $t_shop_id     = sywat_get_tournament_shop_id( $t_data );
                                             $t_season_slug = sywat_get_tournament_season_slug( $t_data );
                                             $t_season_name = isset( $seasons[ $t_season_slug ]['name'] ) ? $seasons[ $t_season_slug ]['name'] : 'Active Season';
@@ -295,19 +393,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 $disp_dates = get_option( 'sywat_dates_' . sanitize_title( $t_name ), 'Dates Not Set' );
                                             }
 
-                                            $line_count    = is_array( $t_lines ) ? count( $t_lines ) : 0;
-                                            $reg_count     = sywat_get_tournament_count( $t_name, $registrations );
-                                            $is_active_hub = in_array( $t_name, $active_tournaments, true );
-
-                                            // Count total waitlisted archers across this tournament
-                                            $total_tourn_waitlist = 0;
-                                            foreach ( $registrations as $r ) {
-                                                if ( isset( $r['tournament'], $r['status'] )
-                                                    && strcasecmp( trim( (string) $r['tournament'] ), trim( (string) $t_name ) ) === 0
-                                                    && strcasecmp( trim( (string) $r['status'] ), 'Waitlist' ) === 0 ) {
-                                                    $total_tourn_waitlist++;
-                                                }
-                                            }
+                                            $line_count           = is_array( $t_lines ) ? count( $t_lines ) : 0;
+                                            $reg_count            = isset( $tourn_counts[ $t_key ]['active'] ) ? $tourn_counts[ $t_key ]['active'] : 0;
+                                            $total_tourn_waitlist = isset( $tourn_counts[ $t_key ]['waitlist'] ) ? $tourn_counts[ $t_key ]['waitlist'] : 0;
+                                            $is_active_hub        = in_array( $t_name, $active_tournaments, true );
 
                                             // Resolve TFAA Link Status Indicator
                                             $tfaa_link = ! empty( $t_data['tfaa_results_url'] ) ? $t_data['tfaa_results_url'] : '';
@@ -376,36 +465,17 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                     <div class="sywat-lines-grid">
                                                         <?php foreach ( $t_lines as $idx => $line ) : ?>
                                                             <?php
-                                                                $day_str    = isset( $line['day'] ) ? $line['day'] : '';
-                                                                $time_str   = isset( $line['time'] ) ? $line['time'] : ( isset( $line['start_time'] ) ? $line['start_time'] : '' );
-                                                                $line_title = ! empty( $line['name'] ) ? $line['name'] : ( ( ! empty( $day_str ) && ! empty( $time_str ) ) ? trim( $day_str . ' ' . $time_str ) : 'Line ' . ( $idx + 1 ) );
+                                                                $idx_str       = (string) $idx;
+                                                                $line_title    = isset( $scoped_line_titles[ $t_name ][ $idx_str ] ) ? $scoped_line_titles[ $t_name ][ $idx_str ] : $normalize_line_title( $line, $idx );
+                                                                $line_counts   = isset( $tourn_counts[ $t_key ]['lines'][ $idx_str ] ) ? $tourn_counts[ $t_key ]['lines'][ $idx_str ] : array( '20yd' => 0, 'Cub' => 0, 'waitlist' => 0 );
 
-                                                                // View Normalization for Line Times (6AM/6:00AM -> 6PM, 6:00PM -> 6PM)
-                                                                $line_title = preg_replace( '/\b6(?::00)?\s*AM\b/i', '6PM', $line_title );
-                                                                $line_title = preg_replace( '/\b6:30\s*AM\b/i', '6:30PM', $line_title );
-                                                                $line_title = preg_replace( '/(\d{1,2}):00\s*(AM|PM)/i', '$1$2', $line_title );
-
-                                                                $c_20    = sywat_count_registered( $t_name, $idx, '20yd', $registrations );
-                                                                $m_20    = sywat_get_line_max_cap( $line, '20yd' );
-                                                                $rem_20  = max( 0, $m_20 - $c_20 );
-                                                                $c_cub   = sywat_count_registered( $t_name, $idx, 'Cub', $registrations );
-                                                                $m_cub   = sywat_get_line_max_cap( $line, 'Cub' );
-                                                                $rem_cub = max( 0, $m_cub - $c_cub );
-
-                                                                // Count waitlisted archers for this specific line
-                                                                $line_waitlist = 0;
-                                                                foreach ( $registrations as $r ) {
-                                                                    if ( ! isset( $r['tournament'] ) || strcasecmp( trim( $r['tournament'] ), trim( $t_name ) ) !== 0 ) {
-                                                                        continue;
-                                                                    }
-                                                                    $match_idx  = isset( $r['line_index'] ) && (string) $r['line_index'] === (string) $idx;
-                                                                    $match_name = isset( $r['line_name'] ) && strcasecmp( trim( $r['line_name'] ), trim( $line_title ) ) === 0;
-                                                                    if ( $match_idx || $match_name ) {
-                                                                        if ( isset( $r['status'] ) && strcasecmp( trim( $r['status'] ), 'Waitlist' ) === 0 ) {
-                                                                            $line_waitlist++;
-                                                                        }
-                                                                    }
-                                                                }
+                                                                $c_20          = $line_counts['20yd'];
+                                                                $m_20          = sywat_get_line_max_cap( $line, '20yd' );
+                                                                $rem_20        = max( 0, $m_20 - $c_20 );
+                                                                $c_cub         = $line_counts['Cub'];
+                                                                $m_cub         = sywat_get_line_max_cap( $line, 'Cub' );
+                                                                $rem_cub       = max( 0, $m_cub - $c_cub );
+                                                                $line_waitlist = $line_counts['waitlist'];
                                                             ?>
                                                             <div class="sywat-line-slot-compact">
                                                                 <span class="sywat-line-slot-title"><?php echo esc_html( $line_title ); ?></span>
