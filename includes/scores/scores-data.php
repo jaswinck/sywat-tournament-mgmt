@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Data Access & Metric Engine
  * Path: includes/scores/scores-data.php
- * Description: Pure data access and metric aggregation engine for the Batch Score Entry application ([sywat_scores]). Resolves staff capabilities, filters tournaments to active-season and non-historical events (excluding archived historical_import records), executes indexed single-tournament wp_options queries, and computes O(R) line score completion counters.
+ * Description: Pure data access and metric aggregation engine for the Batch Score Entry application ([sywat_scores]). Resolves staff capabilities, filters tournaments to active-season and non-historical events (excluding archived historical_import records), executes indexed single-tournament wp_options queries, returns all checked-in tournament registrations with resolved line indices for zero-reload client-side line filtering, and computes O(R) line score completion counters.
  * Compliance: Pure data layer — zero HTML rendering, zero presentation formatting strings, zero output at include time, indexed single-tournament option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -80,7 +80,7 @@ if ( ! function_exists( 'sywat_scores_get_context' ) ) {
 
         $search_query = isset( $_POST['search_query'] )
             ? sanitize_text_field( wp_unslash( $_POST['search_query'] ) )
-            : '';
+            : ( isset( $_GET['search_query'] ) ? sanitize_text_field( wp_unslash( $_GET['search_query'] ) ) : '' );
 
         $saved_user_t = ( is_object( $user ) && ! empty( $user->ID ) )
             ? trim( (string) get_user_meta( $user->ID, 'sywat_desk_selected_tournament', true ) )
@@ -239,8 +239,9 @@ if ( ! function_exists( 'sywat_scores_get_context' ) ) {
 
 /**
  * Queries checked-in archer records and master score map for the active tournament
- * using an indexed single-tournament option prefix, and computes O(R) line score
- * completion metrics across all configured shooting lines.
+ * using an indexed single-tournament option prefix, resolves each archer's canonical
+ * line index across all lines for zero-reload client-side line filtering, and computes
+ * O(R) line score completion metrics across all configured shooting lines.
  *
  * @param string $selected_tournament Active tournament name.
  * @param string $selected_line_idx   Active shooting line index or 'all'.
@@ -286,6 +287,7 @@ if ( ! function_exists( 'sywat_scores_get_records_and_tracker' ) ) {
         $ordered_lines     = array();
         $line_stats        = array();
         $line_title_to_idx = array();
+        $has_line_resolver = function_exists( 'sywat_resolve_tournament_line_label' );
 
         if ( ! empty( $lines ) && is_array( $lines ) ) {
             foreach ( $lines as $idx => $line ) {
@@ -328,6 +330,12 @@ if ( ! function_exists( 'sywat_scores_get_records_and_tracker' ) ) {
                 if ( $trim_title !== '' && ! isset( $line_title_to_idx[ $trim_title ] ) ) {
                     $line_title_to_idx[ $trim_title ] = $idx_str;
                 }
+                if ( $has_line_resolver ) {
+                    $resolved_label = trim( (string) sywat_resolve_tournament_line_label( $line, $idx ) );
+                    if ( $resolved_label !== '' && ! isset( $line_title_to_idx[ $resolved_label ] ) ) {
+                        $line_title_to_idx[ $resolved_label ] = $idx_str;
+                    }
+                }
             }
 
             usort( $ordered_lines, function( $a, $b ) {
@@ -340,19 +348,17 @@ if ( ! function_exists( 'sywat_scores_get_records_and_tracker' ) ) {
 
         $tourn_registrations = array();
         foreach ( $registrations as $reg ) {
-            if ( ! is_array( $reg ) || ! isset( $reg['tournament'] ) || $reg['tournament'] !== $selected_tournament ) {
+            if ( ! is_array( $reg ) || ! isset( $reg['tournament'] ) ) {
+                continue;
+            }
+            if ( strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
                 continue;
             }
             if ( empty( $reg['checked_in'] ) ) {
                 continue;
             }
 
-            // Filter records for active table view
-            if ( $selected_line_idx === 'all' || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx ) ) {
-                $tourn_registrations[] = $reg;
-            }
-
-            // Aggregate line tracker counters across all lines of the tournament
+            // Resolve canonical line index for both O(R) tracker counts and client-side line filtering
             $resolved_idx = '';
             if ( isset( $reg['line_index'] ) ) {
                 $raw_l_idx = (string) $reg['line_index'];
@@ -366,8 +372,14 @@ if ( ! function_exists( 'sywat_scores_get_records_and_tracker' ) ) {
                     $resolved_idx = $line_title_to_idx[ $raw_l_name ];
                 }
             }
+            if ( $resolved_idx === '' ) {
+                $resolved_idx = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
+            }
 
-            if ( $resolved_idx !== '' && isset( $line_stats[ $resolved_idx ] ) ) {
+            $reg['resolved_line_idx'] = $resolved_idx;
+            $tourn_registrations[]    = $reg;
+
+            if ( isset( $line_stats[ $resolved_idx ] ) ) {
                 $line_stats[ $resolved_idx ]['total']++;
 
                 $rid     = isset( $reg['id'] ) ? $reg['id'] : '';
