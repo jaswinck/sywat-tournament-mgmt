@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Data Tables & Responsive Scrolling
    Path: assets/css/sywat-tables.css
-   Version: 7.7.2
+   Version: 7.7.3
    ========================================================================== */
 
 /* Header Toolbar Alignments (Lock buttons to bottom baseline, labels flush left) */
@@ -311,6 +311,24 @@
 .sywat-col-roster-line   { width: 22%; }
 .sywat-col-roster-dist   { width: 14%; text-align: center; }
 .sywat-col-roster-action { width: 18%; text-align: center !important; }
+
+/* ==========================================================================
+   Historical TFAA Season Tournaments Modal Table (#sywat_history_events_table)
+   ========================================================================== */
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) table.sywat-table#sywat_history_events_table {
+    width: 100%;
+    min-width: 640px;
+    margin-top: 0;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_history_events_table :is(th, td):not(:nth-child(2)) {
+    white-space: nowrap;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) #sywat_history_events_table td:nth-child(2) {
+    white-space: normal;
+    word-break: break-word;
+}
 
 /* ==========================================================================
    Phone & Group Multi-Line Registration Matrix Table (#sywat_archer_intake_table)
