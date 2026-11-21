@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Data Layer
  * Path: includes/checkin/checkin-data.php
- * Description: Fetches and prepares Check-In Desk state datasets, gating legacy option migrations behind a one-time completion flag, excluding historical_import archives and "_hist_" rows from dropdowns and shooter history caches, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, hoisted "LastName, FirstName" display labels with surname alphabetical sorting, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with indexed active-tournament queries.
- * Compliance: Pure data layer — zero HTML echo, zero POST mutations, indexed non-historical option queries, omitted closing PHP tag.
+ * Description: Pure data access and raw aggregation layer for the Check-In Desk portal. Gates legacy option migrations behind a one-time completion flag, excludes historical_import archives and "_hist_" rows from dropdowns and shooter history caches, queries active-tournament registrations via indexed wp_options prefixes, resolves database-configured NFAA shooting styles, age divisions, and tournament pricing/round profiles, and exposes raw family membership and tournament registration datasets for formatting by includes/checkin/checkin-helpers.php.
+ * Compliance: Pure data layer — zero HTML echo, zero presentation formatting strings, zero POST mutations, indexed non-historical option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.1
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -175,9 +175,9 @@ if ( ! function_exists( 'sywat_desk_build_promo_rules_payload' ) ) {
 }
 
 /**
- * Fetches and prepares all Check-In Desk portal state datasets.
+ * Fetches and prepares raw Check-In Desk portal state datasets (zero presentation formatting).
  *
- * @return array Aggregated state array containing tournaments, lines, archers, pricing profiles, and TFAA bundles.
+ * @return array Aggregated raw state array containing tournaments, lines, registrations, pricing profiles, and division/style configs.
  */
 if ( ! function_exists( 'sywat_desk_get_data' ) ) {
     function sywat_desk_get_data() {
@@ -401,9 +401,8 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         $is_multi_round   = count( $t_profiles ) > 1;
 
         $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-
-        $raw_closed   = get_option( $closed_lines_key, array() );
-        $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
+        $raw_closed       = get_option( $closed_lines_key, array() );
+        $closed_lines     = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
 
         $registrations = array();
         if ( $active_t_slug !== '' ) {
@@ -468,16 +467,8 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             set_transient( 'sywat_history_profiles_cache', $history_profiles, 15 * MINUTE_IN_SECONDS );
         }
 
-        $tfaa_cache_option = get_option( 'sywat_tfaa_cache', array() );
-        $tfaa_data_bundle  = array(
-            'exact'      => isset( $tfaa_cache_option['exact'] ) ? $tfaa_cache_option['exact'] : array(),
-            'fl'         => isset( $tfaa_cache_option['fl'] ) ? $tfaa_cache_option['fl'] : array(),
-            'updated_at' => isset( $tfaa_cache_option['updated_at'] ) ? $tfaa_cache_option['updated_at'] : 'Never',
-        );
-
-        $existing_families_by_line = array();
-        $family_members_by_id      = array();
-
+        // Aggregate raw family membership records; human-readable group labels are formatted in checkin-helpers.php
+        $family_members_by_id = array();
         foreach ( $registrations as $r ) {
             $fid = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
             if ( empty( $fid ) ) {
@@ -502,45 +493,6 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             }
             if ( ! empty( $r['name'] ) ) {
                 $family_members_by_id[ $fid ]['names'][] = trim( $r['name'] );
-            }
-        }
-
-        foreach ( $family_members_by_id as $fid => $fam_info ) {
-            $l_idx     = $fam_info['line_idx'];
-            $raw_fname = $fam_info['family_name'];
-            $names     = $fam_info['names'];
-
-            if ( ! empty( $raw_fname ) && stripos( $raw_fname, 'fam_' ) === false && stripos( $raw_fname, 'Booking' ) === false && strlen( $raw_fname ) > 2 ) {
-                $label = $raw_fname;
-            } elseif ( ! empty( $names ) ) {
-                if ( count( $names ) == 1 ) {
-                    $label = $names[0] . ' Group';
-                } elseif ( count( $names ) <= 3 ) {
-                    $last_names = array_map( function( $n ) {
-                        $p = explode( ' ', trim( $n ) );
-                        return end( $p );
-                    }, $names );
-                    $label = implode( ' / ', array_unique( $last_names ) ) . ' Group';
-                } else {
-                    $p     = explode( ' ', trim( $names[0] ) );
-                    $label = end( $p ) . ' Family Group (' . count( $names ) . ' Archers)';
-                }
-            } else {
-                $label = 'Family Group (' . substr( $fid, -6 ) . ')';
-            }
-
-            if ( ! isset( $existing_families_by_line[ $l_idx ] ) ) {
-                $existing_families_by_line[ $l_idx ] = array();
-            }
-            $existing_families_by_line[ $l_idx ][ $fid ] = $label;
-        }
-
-        $existing_families = isset( $existing_families_by_line[ $selected_line_idx ] ) ? $existing_families_by_line[ $selected_line_idx ] : array();
-        if ( empty( $existing_families ) && $selected_line_idx === 'all' ) {
-            foreach ( $existing_families_by_line as $l_fams ) {
-                foreach ( $l_fams as $fid => $flabel ) {
-                    $existing_families[ $fid ] = $flabel;
-                }
             }
         }
 
@@ -655,28 +607,13 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         }
         $sywat_styles[] = 'No Show';
 
-        $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
+        // Collect all registrations for the selected tournament; presentation sorting & formatting run in checkin-helpers.php
         $tourn_registrations = array();
         foreach ( $registrations as $reg ) {
-            $match_tourn = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
-            $match_line  = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
-            if ( $match_tourn && $match_line ) {
-                $raw_name              = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
-                $reg['display_name']   = $has_lf_formatter ? sywat_format_name_last_first( $raw_name ) : $raw_name;
+            if ( isset( $reg['tournament'] ) && strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) === 0 ) {
                 $tourn_registrations[] = $reg;
             }
         }
-
-        usort( $tourn_registrations, function( $a, $b ) {
-            $line_a = isset( $a['line_index'] ) ? (int) $a['line_index'] : 99;
-            $line_b = isset( $b['line_index'] ) ? (int) $b['line_index'] : 99;
-            if ( $line_a !== $line_b ) {
-                return $line_a <=> $line_b;
-            }
-            $disp_a = isset( $a['display_name'] ) ? trim( (string) $a['display_name'] ) : ( isset( $a['name'] ) ? trim( (string) $a['name'] ) : '' );
-            $disp_b = isset( $b['display_name'] ) ? trim( (string) $b['display_name'] ) : ( isset( $b['name'] ) ? trim( (string) $b['name'] ) : '' );
-            return strcasecmp( $disp_a, $disp_b );
-        } );
 
         $modal_target_id   = isset( $_POST['open_checkin_id'] ) ? sanitize_text_field( wp_unslash( $_POST['open_checkin_id'] ) ) : '';
         $modal_edit_id     = isset( $_POST['open_edit_id'] )    ? sanitize_text_field( wp_unslash( $_POST['open_edit_id'] ) )    : '';
@@ -685,7 +622,7 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
 
         if ( $modal_target_id || $modal_edit_id ) {
             $search_id = $modal_target_id ? $modal_target_id : $modal_edit_id;
-            foreach ( $registrations as $reg ) {
+            foreach ( $tourn_registrations as $reg ) {
                 if ( isset( $reg['id'] ) && $reg['id'] === $search_id ) {
                     if ( $modal_target_id ) {
                         $modal_archer = $reg;
@@ -721,15 +658,18 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             'closed_lines'              => $closed_lines,
             'closed_lines_key'          => $closed_lines_key,
             'pricing_profiles'          => $t_profiles,
+            'modal_round_profiles'      => $t_profiles,
             'default_pricing_profile'   => $default_prof_key,
             'is_multi_round'            => $is_multi_round,
             'promo_rules'               => $promo_rules,
             'registrations'             => $registrations,
             'tourn_registrations'       => $tourn_registrations,
+            'active_checkins'           => array(),
             'history_profiles'          => $history_profiles,
-            'tfaa_data_bundle'          => $tfaa_data_bundle,
-            'existing_families'         => $existing_families,
-            'existing_families_by_line' => $existing_families_by_line,
+            'tfaa_data_bundle'          => array(),
+            'family_members_by_id'      => $family_members_by_id,
+            'existing_families'         => array(),
+            'existing_families_by_line' => array(),
             'divs'                      => $divs,
             'active_divs'               => $active_divs,
             'divisions_meta'            => $divisions_meta,
