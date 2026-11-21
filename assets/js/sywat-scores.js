@@ -1,23 +1,45 @@
 /**
  * Client Script: Score Engine Interactivity & Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Dynamic TFAA target URL switcher, real-time search filtering with sessionStorage persistence and class-based visibility toggling, range validation, local draft recovery (score, X count, and incomplete round "INC" flag), AJAX auto-save, offline sync, and multi-scorekeeper batch concurrency protection.
- * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden class toggling), multi-scorekeeper field-level concurrency protection.
+ * Description: Instantaneous zero-reload shooting line and live search filtering with sessionStorage persistence, dynamic TFAA target URL switcher, range validation, local draft recovery (score, X count, and incomplete round "INC" flag), per-archer serialized AJAX auto-save (eliminating concurrent field-overwrite race conditions), offline sync, optimizer-safe delegated data-sywat-action listeners, and multi-scorekeeper batch concurrency protection.
+ * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.4.0
  */
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener('DOMContentLoaded', function() {
+    'use strict';
+
+    window.SYWAT = window.SYWAT || {};
+
     // 1. Prevent form resubmission on page refresh (F5)
-    if (window.history.replaceState) {
+    if (window.history && window.history.replaceState) {
         window.history.replaceState(null, null, window.location.href);
     }
 
     const currentTournInput = document.getElementById('selected_tournament_val');
+    const lineSelect        = document.getElementById('selected_line_val');
     const nonceInput        = document.getElementById('sywat_nonce');
+    const searchInput       = document.getElementById('sywat_score_search_input');
+    const batchForm         = document.getElementById('sywat_batch_score_form');
 
     const currentTourn = currentTournInput ? currentTournInput.value : '';
     const nonceVal     = nonceInput ? nonceInput.value : '';
+
+    // Per-archer auto-save concurrency guards (prevents overlapping Score & X Count requests)
+    const inFlightSaves = new Set();
+    const queuedSaves   = new Set();
+
+    // Parse locked line state map for instant view lock-button synchronization
+    let lockedLinesMap = {};
+    if (batchForm && batchForm.dataset.lockedLines) {
+        try {
+            const parsed = JSON.parse(batchForm.dataset.lockedLines);
+            if (parsed && typeof parsed === 'object') {
+                lockedLinesMap = parsed;
+            }
+        } catch (err) {}
+    }
 
     // 2. Dynamic TFAA Preview Button URL Switcher
     const tfaaPreviewBtn = document.getElementById('sywat_tfaa_preview_btn');
@@ -37,62 +59,98 @@ document.addEventListener("DOMContentLoaded", function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Real-Time Search Filter (Class-Based Visibility + Session Persistence)
-    const searchInput = document.getElementById('sywat_score_search_input');
-    const clearBtn    = document.getElementById('sywat_score_search_clear');
+    // 3. Synchronize Header Line Lock Button on Client-Side Line Filter
+    function syncViewLockButton(selectedLine) {
+        const viewLockBtn = document.getElementById('sywat_scores_view_lock_btn');
+        if (!viewLockBtn) return;
 
-    function applyScoreSearchFilter(query) {
-        const cleanQuery = query.trim().toLowerCase();
-        const rows       = document.querySelectorAll('.sywat-score-row');
+        if (!selectedLine || selectedLine === 'all') {
+            viewLockBtn.classList.add('sywat-hidden');
+            return;
+        }
+
+        const isLineLocked = Array.isArray(lockedLinesMap)
+            ? !!lockedLinesMap[Number(selectedLine)]
+            : !!lockedLinesMap[selectedLine];
+
+        viewLockBtn.classList.remove('sywat-hidden');
+        viewLockBtn.classList.toggle('sywat-btn-icon-unlock', isLineLocked);
+        viewLockBtn.classList.toggle('sywat-btn-icon-lock', !isLineLocked);
+        viewLockBtn.setAttribute('title', isLineLocked ? 'Unlock to edit scores' : 'Lock to prevent edits');
+        viewLockBtn.textContent = isLineLocked ? 'Unlock Line' : 'Lock Line';
+    }
+
+    // 4. Instant Client-Side Line + Live Search Filter (Zero Page Reload)
+    function applyScoresLineAndSearchFilter() {
+        const selectedLine = lineSelect ? String(lineSelect.value || 'all') : 'all';
+        const rawQuery     = searchInput ? String(searchInput.value || '') : '';
+        const cleanQuery   = rawQuery.trim().toLowerCase();
+        const rows         = document.querySelectorAll('.sywat-score-row');
+
+        let visibleCount = 0;
 
         rows.forEach(function(row) {
-            const dataName    = (row.getAttribute('data-name') || '').toLowerCase();
-            const textContent = (row.textContent || row.innerText || '').toLowerCase();
-            const isMatch     = (!cleanQuery || dataName.includes(cleanQuery) || textContent.includes(cleanQuery));
+            const rowLine  = row.getAttribute('data-line-idx') || '';
+            const dataName = (row.getAttribute('data-name') || '').toLowerCase();
+            const lineOk   = (!selectedLine || selectedLine === 'all' || rowLine === selectedLine);
+            const queryOk  = (!cleanQuery || dataName.includes(cleanQuery));
+            const isMatch  = (lineOk && queryOk);
 
             row.classList.toggle('sywat-hidden', !isMatch);
+            if (isMatch) {
+                visibleCount++;
+            }
+        });
+
+        const countEl = document.getElementById('sywat_scores_visible_count');
+        if (countEl) {
+            countEl.textContent = String(visibleCount);
+        }
+
+        const emptyMsg = document.getElementById('sywat_scores_empty_filter_msg');
+        if (emptyMsg) {
+            emptyMsg.classList.toggle('sywat-hidden', visibleCount > 0);
+        }
+
+        document.querySelectorAll('.sywat-scores-hidden-line').forEach(function(hiddenLine) {
+            hiddenLine.value = selectedLine;
         });
 
         document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
-            hiddenInput.value = query;
+            hiddenInput.value = rawQuery;
         });
 
-        if (query) {
-            sessionStorage.setItem('sywat_score_search_query', query);
+        syncViewLockButton(selectedLine);
+
+        if (rawQuery) {
+            sessionStorage.setItem('sywat_score_search_query', rawQuery);
         } else {
             sessionStorage.removeItem('sywat_score_search_query');
         }
     }
 
     if (searchInput) {
-        let initialQuery = searchInput.value;
-        if (!initialQuery) {
+        if (!searchInput.value) {
             const savedQuery = sessionStorage.getItem('sywat_score_search_query');
             if (savedQuery) {
-                initialQuery = savedQuery;
                 searchInput.value = savedQuery;
             }
         }
 
-        if (initialQuery) {
-            applyScoreSearchFilter(initialQuery);
-        }
-
         searchInput.addEventListener('input', function() {
-            applyScoreSearchFilter(this.value);
+            applyScoresLineAndSearchFilter();
         });
 
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function(e) {
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
                 e.preventDefault();
-                searchInput.value = '';
-                applyScoreSearchFilter('');
-                searchInput.focus();
-            });
-        }
+            }
+        });
     }
 
-    // 4. Helper: Status Badge Class & Text Updater
+    applyScoresLineAndSearchFilter();
+
+    // 5. Helper: Status Badge Class & Text Updater
     function setRowStatus(regId, state, customMsg) {
         const badge = document.getElementById('status_' + regId);
         if (!badge) return;
@@ -113,7 +171,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // 5. Helper: Input Range & Format Validator
+    // 6. Helper: Input Range & Format Validator
     function validateInput(input) {
         if (!input) return true;
         const min    = parseInt(input.getAttribute('min'), 10) || 0;
@@ -129,13 +187,13 @@ document.addEventListener("DOMContentLoaded", function() {
         if (isNaN(val) || val < min || val > max) {
             input.classList.add('invalid-input');
             return false;
-        } else {
-            input.classList.remove('invalid-input');
-            return true;
         }
+
+        input.classList.remove('invalid-input');
+        return true;
     }
 
-    // 6. Helper: Local Storage Key Generator & Row State Reader
+    // 7. Helper: Local Storage Key Generator & Row State Reader
     function getStorageKey(regId) {
         return 'sywat_draft_' + currentTourn.replace(/[^a-z0-9]/gi, '_') + '_' + regId;
     }
@@ -154,7 +212,7 @@ document.addEventListener("DOMContentLoaded", function() {
         return incStateInput ? (incStateInput.value === '1' ? '1' : '0') : '0';
     }
 
-    // 7. Restore Unsaved Local Drafts on Page Load
+    // 8. Restore Unsaved Local Drafts on Page Load
     document.querySelectorAll('.sywat-score-row').forEach(function(row) {
         const regId      = row.getAttribute('data-id');
         const savedDraft = localStorage.getItem(getStorageKey(regId));
@@ -184,7 +242,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // 8. Background Asynchronous Single-Score & INC Saver
+    // 9. Serialized Background Asynchronous Single-Score & INC Saver
     function performBackgroundSave(regId) {
         const row = document.querySelector('.sywat-score-row[data-id="' + regId + '"]');
         if (!row || row.classList.contains('locked-row')) return;
@@ -213,6 +271,13 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
+        // Queue follow-up save if an auto-save for this archer is already in flight
+        if (inFlightSaves.has(regId)) {
+            queuedSaves.add(regId);
+            return;
+        }
+
+        inFlightSaves.add(regId);
         setRowStatus(regId, 'saving', '⏳ Saving...');
 
         const formData = new FormData();
@@ -230,24 +295,33 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(function(res) { return res.json(); })
         .then(function(data) {
-            if (data.success) {
+            if (data && data.success) {
                 if (scoreInput)    scoreInput.setAttribute('data-original-val', scoreVal);
                 if (xInput)        xInput.setAttribute('data-original-val', xVal);
                 if (incCheckbox)   incCheckbox.setAttribute('data-original-val', incVal);
                 if (incStateInput) incStateInput.setAttribute('data-original-val', incVal);
 
-                localStorage.removeItem(getStorageKey(regId));
-                setRowStatus(regId, 'saved', '✓ Saved');
+                if (!queuedSaves.has(regId)) {
+                    localStorage.removeItem(getStorageKey(regId));
+                    setRowStatus(regId, 'saved', '✓ Saved');
+                }
             } else {
                 setRowStatus(regId, 'draft', '⚡ Local Draft');
             }
         })
         .catch(function() {
             setRowStatus(regId, 'draft', '⚠️ Offline Draft');
+        })
+        .finally(function() {
+            inFlightSaves.delete(regId);
+            if (queuedSaves.has(regId)) {
+                queuedSaves.delete(regId);
+                performBackgroundSave(regId);
+            }
         });
     }
 
-    // 9. Dynamic Event Listeners for User Input, INC Checkbox Toggle, & Blur
+    // 10. Dynamic Event Listeners for User Input, INC Checkbox Toggle, & Blur
     document.addEventListener('input', function(e) {
         if (e.target && e.target.classList.contains('sywat-score-input') && !e.target.disabled) {
             const regId = e.target.getAttribute('data-id');
@@ -271,13 +345,56 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     document.addEventListener('change', function(e) {
-        if (e.target && e.target.classList.contains('sywat-inc-val') && !e.target.disabled) {
+        if (!e.target) return;
+
+        if (e.target.classList.contains('sywat-inc-val') && !e.target.disabled) {
             const regId = e.target.getAttribute('data-id');
             const row   = document.querySelector('.sywat-score-row[data-id="' + regId + '"]');
             if (!row || !regId) return;
 
             getRowIncValue(row);
             performBackgroundSave(regId);
+            return;
+        }
+
+        const action = e.target.getAttribute('data-sywat-action') || '';
+        if (action === 'submit-scores-tournament') {
+            const filterForm = document.getElementById('sywat_score_filter_form');
+            if (filterForm) {
+                filterForm.submit();
+            }
+        } else if (action === 'filter-scores-line') {
+            applyScoresLineAndSearchFilter();
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        const actionEl = e.target.closest('[data-sywat-action]');
+        if (!actionEl) return;
+
+        const action = actionEl.getAttribute('data-sywat-action');
+
+        if (action === 'select-scores-line') {
+            e.preventDefault();
+            if (lineSelect) {
+                lineSelect.value = actionEl.getAttribute('data-line-idx') || 'all';
+            }
+            applyScoresLineAndSearchFilter();
+            const tableEl = document.getElementById('sywat_scores_table');
+            if (tableEl && typeof tableEl.scrollIntoView === 'function') {
+                tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        } else if (action === 'clear-scores-search') {
+            e.preventDefault();
+            if (searchInput) {
+                searchInput.value = '';
+                applyScoresLineAndSearchFilter();
+                searchInput.focus();
+            }
+        } else if (action === 'confirm-reset-scores') {
+            if (!window.confirm('⚠️ Are you sure you want to RESET ALL SCORES to 0 for the selected line/tournament?\n\nThis will set score and X count to 0 for all unlocked, checked-in archers in this view.')) {
+                e.preventDefault();
+            }
         }
     });
 
@@ -288,7 +405,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // 10. Sync Unsaved Local Drafts Automatically When Reconnecting Online
+    // 11. Sync Unsaved Local Drafts Automatically When Reconnecting Online
     window.addEventListener('online', function() {
         document.querySelectorAll('.sywat-score-row:not(.locked-row)').forEach(function(row) {
             const regId = row.getAttribute('data-id');
@@ -298,8 +415,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
-    // 11. Multi-Scorekeeper Concurrency Protection & Local Storage Clear on Full Batch Submit
-    const batchForm = document.getElementById('sywat_batch_score_form');
+    // 12. Multi-Scorekeeper Concurrency Protection & Local Storage Clear on Full Batch Submit
     if (batchForm) {
         batchForm.addEventListener('submit', function(e) {
             const submitterVal = e.submitter ? e.submitter.value : '';
@@ -371,4 +487,9 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
+
+    window.SYWAT.scores = {
+        applyLineAndSearchFilter: applyScoresLineAndSearchFilter,
+        performBackgroundSave: performBackgroundSave
+    };
 });
