@@ -2,10 +2,10 @@
 /**
  * Module: Check-In Desk Portal Controller
  * Path: includes/checkin/class-sywat-checkin.php
- * Description: Main entry point and shortcode definition for the Check-In Desk portal, skipping redundant state reloads on non-mutating modal open/cancel POSTs, and enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, and active tournament pricing/promoter data.
+ * Description: Main entry point and shortcode definition for the Check-In Desk portal, orchestrating raw data retrieval (checkin-data.php) and pure presentation/payload formatting (checkin-helpers.php), skipping redundant state reloads on non-mutating modal open/cancel POSTs, and enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, and active tournament pricing/promoter data.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 7.2.1
+ * Version: 7.2.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Load Check-In Desk Sub-Modules
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-data.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-helpers.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-actions.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-views.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-modals.php';
@@ -39,8 +40,11 @@ if ( ! function_exists( 'render_sywat_desk_app' ) ) {
         // 1. Run Data Migrations
         sywat_desk_run_migrations();
 
-        // 2. Fetch Data State
+        // 2. Fetch Raw Data State & Prepare Presentation Payloads
         $data = sywat_desk_get_data();
+        if ( function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
+            sywat_desk_prepare_presentation_data( $data );
+        }
 
         // 3. Process Form Actions
         $action_notice = sywat_desk_handle_actions( $data );
@@ -49,6 +53,9 @@ if ( ! function_exists( 'render_sywat_desk_app' ) ) {
         $posted_action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
         if ( $posted_action !== '' && $posted_action !== 'cancel' ) {
             $data = sywat_desk_get_data();
+            if ( function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
+                sywat_desk_prepare_presentation_data( $data );
+            }
         }
 
         // 4. Enqueue External JS & Localize Data State
@@ -139,7 +146,7 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
 
         $handle  = 'sywat-checkin-js';
         $js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin.js';
-        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.2.1' );
+        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.2.2' );
         $deps    = ( wp_script_is( 'sywat-shooting-styles-js', 'registered' ) || wp_script_is( 'sywat-shooting-styles-js', 'enqueued' ) )
             ? array( 'sywat-shooting-styles-js' )
             : array();
@@ -156,7 +163,6 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
         );
 
         $inline_js = 'window.sywatHistory = ' . wp_json_encode( $data['history_profiles'] ) . '; ' .
-                     'window.tfaaData = ' . wp_json_encode( $data['tfaa_data_bundle'] ) . '; ' .
                      'window.sywatDeskMembers = ' . wp_json_encode( $js_member_desk_data ) . '; ' .
                      'window.sywatDeskTfaaShooters = ' . wp_json_encode( array_values( $js_tfaa_desk_data ) ) . '; ' .
                      'window.existingFamiliesByLine = ' . wp_json_encode( $data['existing_families_by_line'] ) . '; ' .
