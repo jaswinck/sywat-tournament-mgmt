@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Parser & Payload Helpers
  * Path: includes/history/history-helpers.php
- * Description: Pure parsing, normalization, and payload formatting helpers for migrating historical TFAA seasons, tournament manifests, and 1-day / 2-day / 3-day event scorecards from texasfieldarchery.org into independent archived records.
+ * Description: Pure parsing, normalization, and payload formatting helpers for migrating historical TFAA seasons, tournament manifests, and 1-day / 2-day / 3-day event scorecards (including Inside-Out "I/Os" tie-breaker counts) from texasfieldarchery.org into independent archived records.
  * Compliance: Pure helper layer — zero direct SQL queries, zero get_option()/update_option() calls, zero remote HTTP requests, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.1
+ * Version: 1.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -354,7 +354,8 @@ if ( ! function_exists( 'sywat_history_strip_tfaa_class_code' ) ) {
  * Parse an individual TFAA event scorecard page (/results/{id}) into normalized archer score rows.
  * Supports 1-day ("Score Xs [Total TotalX] [I/Os]"), 2-day ("Score Xs Score Xs Total TotalX [I/Os]"),
  * and 3-day ("Score Xs Score Xs Score Xs Total TotalX [I/Os]") tables, storing per-day round
- * scores alongside the combined tournament total while stripping TFAA class codes from names.
+ * scores alongside combined totals and Inside-Out ("I/Os") tie-breaker counts while stripping
+ * TFAA class codes from names.
  *
  * @param string $html Raw HTML from https://texasfieldarchery.org/results/{id}.
  * @return array       Associative array with 'extracted_start_date', 'extracted_end_date', and 'entries'.
@@ -401,11 +402,12 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
         $has_div_dist   = function_exists( 'sywat_shooting_styles_get_division_distance' );
         $has_style_find = function_exists( 'sywat_find_shooting_style' );
 
-        $entries     = array();
-        $curr_div    = '';
-        $curr_gen    = 'Male';
-        $curr_style  = '';
-        $curr_is_pro = false;
+        $entries      = array();
+        $curr_div     = '';
+        $curr_gen     = 'Male';
+        $curr_style   = '';
+        $curr_is_pro  = false;
+        $event_has_io = false;
 
         foreach ( $raw_lines as $raw_line ) {
             $decoded = html_entity_decode( $raw_line, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
@@ -416,7 +418,7 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 continue;
             }
 
-            // 1. Archer Score Row (1-day: "1 Coleman, Chris 300 58 2" | 2-day: "1 Whicker, Easton CMFS 299 51 300 49 599 100 0")
+            // 1. Archer Score Row (1-day: "1 Coleman, Chris 300 58 2" | 2-day: "1 Winckler, Jason 300 59 300 60 600 119 37")
             if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 if ( $curr_div === '' || $curr_style === '' ) {
                     continue;
@@ -450,6 +452,7 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 $r3_xs      = 0;
                 $score      = $r1_score;
                 $xs         = $r1_xs;
+                $io_count   = 0;
 
                 if ( $num_cols >= 8 ) {
                     // 3-day tournament: Score1 Xs1 Score2 Xs2 Score3 Xs3 Total TotalX [I/Os]
@@ -462,6 +465,9 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                     $tot_x      = intval( $score_parts[7] );
                     $score      = ( $tot_s > 0 ) ? $tot_s : ( $r1_score + $r2_score + $r3_score );
                     $xs         = ( $tot_s > 0 || $tot_x > 0 ) ? $tot_x : ( $r1_xs + $r2_xs + $r3_xs );
+                    if ( $num_cols >= 9 ) {
+                        $io_count = max( 0, intval( $score_parts[8] ) );
+                    }
                 } elseif ( $num_cols >= 6 ) {
                     // 2-day tournament: Score1 Xs1 Score2 Xs2 Total TotalX [I/Os]
                     $round_days = 2;
@@ -471,6 +477,20 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                     $tot_x      = intval( $score_parts[5] );
                     $score      = ( $tot_s > 0 ) ? $tot_s : ( $r1_score + $r2_score );
                     $xs         = ( $tot_s > 0 || $tot_x > 0 ) ? $tot_x : ( $r1_xs + $r2_xs );
+                    if ( $num_cols >= 7 ) {
+                        $io_count = max( 0, intval( $score_parts[6] ) );
+                    }
+                } else {
+                    // 1-day tournament: Score1 Xs1 [I/Os] or Score1 Xs1 Total TotalX I/Os
+                    if ( $num_cols === 3 ) {
+                        $io_count = max( 0, intval( $score_parts[2] ) );
+                    } elseif ( $num_cols === 5 ) {
+                        $io_count = max( 0, intval( $score_parts[4] ) );
+                    }
+                }
+
+                if ( $io_count > 0 ) {
+                    $event_has_io = true;
                 }
 
                 $dist = $has_div_dist
@@ -492,6 +512,8 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                     'r3_xs'      => $r3_xs,
                     'score'      => $score,
                     'xs'         => $xs,
+                    'io_count'   => $io_count,
+                    'has_io'     => 0,
                     'is_guest'   => $is_guest,
                     'is_inc'     => $is_inc,
                 );
@@ -522,6 +544,13 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                     }
                 }
             }
+        }
+
+        if ( $event_has_io ) {
+            foreach ( $entries as &$entry_ref ) {
+                $entry_ref['has_io'] = 1;
+            }
+            unset( $entry_ref );
         }
 
         return array(
@@ -577,7 +606,8 @@ if ( ! function_exists( 'sywat_history_build_tournament_record' ) ) {
  * Build deterministic, independent historical registration & score records for an event.
  * Uses deterministic IDs ("hist_{event_id}_{row}") so re-importing an event overwrites in place
  * without duplicating entries or linking to live wp_users / Member Directory accounts, while
- * storing per-day round breakdowns (r1/r2/r3) alongside combined totals.
+ * storing per-day round breakdowns (r1/r2/r3) and Inside-Out ("io_count") tie-breakers
+ * alongside combined totals.
  *
  * @param string $t_name         Canonical tournament title.
  * @param int    $event_id       Numeric TFAA event ID.
@@ -623,6 +653,8 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
             $round_days = isset( $entry['round_days'] ) ? max( 1, intval( $entry['round_days'] ) ) : 1;
             $tot_score  = intval( $entry['score'] );
             $tot_xs     = intval( $entry['xs'] );
+            $io_count   = isset( $entry['io_count'] ) ? max( 0, intval( $entry['io_count'] ) ) : 0;
+            $has_io     = ! empty( $entry['has_io'] ) ? 1 : 0;
             $r1_score   = isset( $entry['r1_score'] ) ? intval( $entry['r1_score'] ) : $tot_score;
             $r1_xs      = isset( $entry['r1_xs'] ) ? intval( $entry['r1_xs'] ) : $tot_xs;
             $r2_score   = isset( $entry['r2_score'] ) ? intval( $entry['r2_score'] ) : 0;
@@ -659,6 +691,8 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
                 'r3_xs'             => $r3_xs,
                 'score'             => $tot_score,
                 'x_count'           => $tot_xs,
+                'io_count'          => $io_count,
+                'has_io'            => $has_io,
                 'is_inc'            => $is_inc,
                 'tfaa_origin'       => 1,
                 'historical_import' => 1,
@@ -675,6 +709,8 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
                 'r3_xs'      => $r3_xs,
                 'score'      => $tot_score,
                 'xs'         => $tot_xs,
+                'io_count'   => $io_count,
+                'has_io'     => $has_io,
                 'is_inc'     => $is_inc,
                 'saved_at'   => $created_at,
             );
