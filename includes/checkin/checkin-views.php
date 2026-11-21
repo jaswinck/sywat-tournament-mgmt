@@ -2,8 +2,8 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and compact header status pills/badges, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search & client-side line filtering, serialized row JSON payloads for instantaneous client-side Check-In & Edit modal opening (eliminating full-page reload delays), responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
- * Compliance: Pure view layer — zero output at include time, zero inline styles, O(R) pre-indexed counters, omitted closing PHP tag.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
  * Version: 7.6.0
  */
@@ -50,10 +50,10 @@ if ( ! function_exists( 'sywat_desk_render_family_banner' ) ) {
                 Is there another family member to register under this same payment group?
             </div>
             <div class="sywat-family-banner-actions">
-                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="continueFamilyLoop('<?php echo esc_js( $added_family_prompt['family_id'] ); ?>', '<?php echo esc_js( $added_family_prompt['line_idx'] ); ?>')">
+                <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" data-sywat-action="continue-family-loop" data-family-id="<?php echo esc_attr( $added_family_prompt['family_id'] ); ?>" data-line-idx="<?php echo esc_attr( $added_family_prompt['line_idx'] ); ?>">
                     Yes, Add Next Family Member
                 </button>
-                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="this.parentElement.parentElement.remove();">
+                <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="dismiss-family-banner">
                     Done / Finish Family
                 </button>
             </div>
@@ -131,7 +131,7 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
                         <!-- Stacked Active Tournament Select -->
                         <div class="sywat-field-group sywat-field-auto">
                             <label for="sywat_selected_tournament">Active Tournament:</label>
-                            <select id="sywat_selected_tournament" name="selected_tournament" class="sywat-select-tournament" onchange="document.getElementById('sywat_filter_form').submit();">
+                            <select id="sywat_selected_tournament" name="selected_tournament" class="sywat-select-tournament" data-sywat-action="submit-desk-tournament">
                                 <?php foreach ( $data['tournaments'] as $t_name => $t_lines ) : ?>
                                     <option value="<?php echo esc_attr( $t_name ); ?>" <?php selected( $data['selected_tournament'], $t_name ); ?>>
                                         <?php echo esc_html( $t_name ); ?>
@@ -140,7 +140,7 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
                             </select>
                         </div>
 
-                        <!-- Stacked Shooting Line Select -->
+                        <!-- Stacked Shooting Line Select (Instant Client-Side Line Filter) -->
                         <div class="sywat-field-group sywat-field-auto">
                             <label for="sywat_selected_line_idx">Shooting Line:</label>
                             <select id="sywat_selected_line_idx" name="selected_line_idx" class="sywat-select-line" data-sywat-action="filter-desk-line">
@@ -277,7 +277,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                     <?php if ( $total_tourn_waitlist > 0 && function_exists( 'sywat_waitlist_render_button_link' ) ) : ?>
                         <?php sywat_waitlist_render_button_link( $selected_tournament, $total_tourn_waitlist, 'all', $desk_base_url, 'Waitlist' ); ?>
                     <?php endif; ?>
-                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" onclick="openWalkinModal()">Add Walk-In</button>
+                    <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-add" data-sywat-action="open-desk-walkin-modal">Add Walk-In</button>
                 </div>
             </div>
             <?php if ( ! empty( $lines ) && is_array( $lines ) ) : ?>
@@ -285,7 +285,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                     <?php foreach ( $lines as $raw_idx => $line ) : ?>
                         <?php
                             $idx       = (string) $raw_idx;
-                            $line_name = isset( $line['name'] ) ? trim( $line['name'] ) : '';
+                            $line_name = isset( $line['name'] ) ? trim( (string) $line['name'] ) : '';
                             $stats     = isset( $line_stats[ $idx ] )
                                 ? $line_stats[ $idx ]
                                 : array( 'booked_20yd' => 0, 'booked_cub' => 0, 'total_reg' => 0, 'checked_in' => 0, 'waitlist' => 0 );
@@ -371,87 +371,32 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 }
 
 /**
- * Render Active Registered Archers table with "LastName, FirstName" display, dual-format live search,
- * instantaneous client-side Check-In & Edit modal triggers, and O(1) household OWE badges.
+ * Render Active Registered Archers table consuming pre-computed presentation & modal payloads
+ * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
  */
 if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
     function sywat_desk_render_archers_table( $data ) {
-        $tourn_registrations = $data['tourn_registrations'];
-        $all_tourn_regs      = isset( $data['registrations'] ) ? $data['registrations'] : $tourn_registrations;
-        $search_query        = $data['search_query'];
-        $selected_tournament = $data['selected_tournament'];
-        $selected_line_idx   = $data['selected_line_idx'];
-        $lines               = $data['lines'];
+        $active_checkins     = isset( $data['active_checkins'] ) && is_array( $data['active_checkins'] ) ? $data['active_checkins'] : array();
+        $all_tourn_regs      = isset( $data['registrations'] ) ? $data['registrations'] : $active_checkins;
+        $search_query        = isset( $data['search_query'] ) ? (string) $data['search_query'] : '';
+        $selected_tournament = isset( $data['selected_tournament'] ) ? (string) $data['selected_tournament'] : '';
+        $selected_line_idx   = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
-        $t_context           = ! empty( $data['selected_tournament_data'] ) ? $data['selected_tournament_data'] : $selected_tournament;
-        $legacy_div_map      = isset( $data['legacy_div_map'] ) && is_array( $data['legacy_div_map'] ) ? $data['legacy_div_map'] : array();
-        $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
-        $has_household_fn    = function_exists( 'sywat_get_household_balance_info' );
-        $has_norm_div        = function_exists( 'sywat_shooting_styles_normalize_division' );
-        $has_norm_style      = function_exists( 'sywat_shooting_styles_normalize_style' );
-        $has_rate_tier_fn    = function_exists( 'sywat_shooting_styles_get_division_rate_tier' );
-        $has_dist_fn         = function_exists( 'sywat_shooting_styles_get_division_distance' );
-        $has_ind_fee_fn      = function_exists( 'sywat_get_archer_individual_fee' );
 
-        $t_profiles       = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
-        $default_prof_key = ! empty( $data['default_pricing_profile'] )
-            ? (string) $data['default_pricing_profile']
-            : ( ! empty( $t_profiles ) ? (string) key( $t_profiles ) : 'indoor' );
-        $is_multi_round   = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
-
-        // Resolve active tournament Family Cap threshold for fallback evaluations
-        $active_cap_amount = 75.00;
-        if ( ! empty( $t_profiles ) ) {
-            $max_prof_cap = 0.00;
-            foreach ( $t_profiles as $tp ) {
-                if ( ! empty( $tp['family_cap_enabled'] ) && isset( $tp['family_cap_amount'] ) ) {
-                    $max_prof_cap = max( $max_prof_cap, floatval( $tp['family_cap_amount'] ) );
-                }
-            }
-            if ( $max_prof_cap > 0 ) {
-                $active_cap_amount = $max_prof_cap;
+        $clean_search_init     = strtolower( trim( $search_query ) );
+        $initial_visible_count = 0;
+        foreach ( $active_checkins as $reg ) {
+            $r_line   = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+            $r_tokens = isset( $reg['search_tokens'] ) ? (string) $reg['search_tokens'] : strtolower( trim( (string) ( isset( $reg['name'] ) ? $reg['name'] : '' ) ) );
+            $line_ok  = ( $selected_line_idx === 'all' || $selected_line_idx === '' || $r_line === $selected_line_idx );
+            $query_ok = ( $clean_search_init === '' || strpos( $r_tokens, $clean_search_init ) !== false );
+            if ( $line_ok && $query_ok ) {
+                $initial_visible_count++;
             }
         }
-
-        $closed_lines = ( isset( $data['closed_lines'] ) && is_array( $data['closed_lines'] ) )
-            ? array_map( 'trim', array_map( 'strval', $data['closed_lines'] ) )
-            : array();
-
-        // Pre-index household max unpaid balances in O(R) when shared helper is unavailable
-        $fallback_group_due = array();
-        if ( ! $has_household_fn && is_array( $all_tourn_regs ) ) {
-            foreach ( $all_tourn_regs as $other_r ) {
-                if ( ! is_array( $other_r ) ) {
-                    continue;
-                }
-                $o_status = isset( $other_r['status'] ) ? trim( (string) $other_r['status'] ) : '';
-                if ( strcasecmp( $o_status, 'Waitlist' ) === 0 || strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
-                    continue;
-                }
-                $o_due  = isset( $other_r['balance_due'] ) ? floatval( $other_r['balance_due'] ) : 0.0;
-                $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
-                $o_book = ! empty( $other_r['booking_id'] ) ? trim( (string) $other_r['booking_id'] ) : '';
-                if ( $o_fam !== '' ) {
-                    $fallback_group_due[ $o_fam ] = isset( $fallback_group_due[ $o_fam ] ) ? max( $fallback_group_due[ $o_fam ], $o_due ) : $o_due;
-                }
-                if ( $o_book !== '' ) {
-                    $fallback_group_due[ $o_book ] = isset( $fallback_group_due[ $o_book ] ) ? max( $fallback_group_due[ $o_book ], $o_due ) : $o_due;
-                }
-            }
-        }
-
-        // Filter out Waitlisted & Cancelled archers from the active check-in table
-        // (Waitlisted archers are managed on-demand via the Dedicated Waitlist Management Modal)
-        $active_checkins = array_values( array_filter( $tourn_registrations, function( $reg ) {
-            $status = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
-            if ( strcasecmp( $status, 'Waitlist' ) === 0 || strcasecmp( $status, 'Cancelled' ) === 0 ) {
-                return false;
-            }
-            return true;
-        } ) );
 
         $desk_clean_url = function_exists( 'sywat_page_url' )
             ? add_query_arg(
@@ -466,18 +411,18 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         <!-- Nested Section: Registered Archers Table -->
         <div>
             <div class="sywat-table-header-bar">
-                <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( count( $active_checkins ) ); ?></span>)</h2>
+                <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
                 <div class="sywat-table-header-controls">
                     <div class="sywat-search-input-group">
-                        <input type="text" id="sywat_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
-                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" onclick="document.getElementById('sywat_search_input').value=''; document.getElementById('sywat_search_input').dispatchEvent(new Event('input'));">Clear</button>
+                        <input type="text" id="sywat_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search name..." autocomplete="off">
+                        <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-desk-search">Clear</button>
                     </div>
                 </div>
             </div>
 
             <?php if ( ! empty( $active_checkins ) ) : ?>
                 <div class="sywat-table-responsive">
-                    <table class="sywat-table sywat-table-mobile-cards" id="sywat_desk_archers_table" data-all-lines-loaded="<?php echo ( $selected_line_idx === 'all' ) ? '1' : '0'; ?>">
+                    <table class="sywat-table sywat-table-mobile-cards" id="sywat_desk_archers_table">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -494,147 +439,34 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                         <tbody>
                             <?php foreach ( $active_checkins as $reg ) : ?>
                                 <?php
-                                    $reg_type    = isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ? 'Walk-In' : 'Pre-Reg';
-                                    $badge_class = ( $reg_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-                                    $balance_due = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0;
+                                    $disp_archer_name = isset( $reg['display_name'] ) ? $reg['display_name'] : ( isset( $reg['name'] ) ? $reg['name'] : '' );
+                                    $search_tokens    = isset( $reg['search_tokens'] ) ? $reg['search_tokens'] : strtolower( trim( $disp_archer_name ) );
+                                    $resolved_l_idx   = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : '0';
+                                    $is_line_closed   = ! empty( $reg['is_line_closed'] );
+                                    $is_checked_in    = ! empty( $reg['is_checked_in'] );
+                                    $is_promo_free    = ! empty( $reg['is_promo_free'] );
+                                    $round_label      = isset( $reg['round_label'] ) ? (string) $reg['round_label'] : '';
+                                    $owe_badge_text   = isset( $reg['owe_badge_text'] ) ? (string) $reg['owe_badge_text'] : '';
+                                    $tbl              = isset( $reg['table_display'] ) && is_array( $reg['table_display'] ) ? $reg['table_display'] : array();
+                                    $modal_payload    = isset( $reg['modal_payload'] ) && is_array( $reg['modal_payload'] ) ? $reg['modal_payload'] : array();
 
-                                    $disp_archer_name = ! empty( $reg['display_name'] )
-                                        ? $reg['display_name']
-                                        : ( $has_lf_formatter ? sywat_format_name_last_first( $reg['name'] ) : $reg['name'] );
-                                    $search_tokens    = strtolower( trim( $disp_archer_name . ' ' . $reg['name'] ) );
+                                    $reg_type    = isset( $tbl['type'] ) ? $tbl['type'] : 'Pre-Reg';
+                                    $badge_class = isset( $tbl['badge_class'] ) ? $tbl['badge_class'] : 'sywat-badge-prereg';
+                                    $line_disp   = isset( $tbl['line'] ) ? $tbl['line'] : '';
+                                    $div_disp    = isset( $tbl['division'] ) ? $tbl['division'] : '—';
+                                    $gender_disp = isset( $tbl['gender'] ) ? $tbl['gender'] : 'N/A';
+                                    $style_disp  = isset( $tbl['style'] ) ? $tbl['style'] : '—';
+                                    $paid_disp   = isset( $tbl['paid'] ) ? $tbl['paid'] : '—';
+                                    $dist_disp   = isset( $tbl['distance'] ) ? $tbl['distance'] : 'N/A';
 
-                                    // Clean Line Title Resolution
-                                    $resolved_l_idx = function_exists( 'sywat_desk_resolve_line_idx' ) ? sywat_desk_resolve_line_idx( $reg, $lines ) : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-                                    $reg_line_name  = ( isset( $reg['line_name'] ) && ! empty( trim( $reg['line_name'] ) ) )
-                                                        ? trim( $reg['line_name'] )
-                                                        : ( isset( $lines[ $resolved_l_idx ]['name'] ) ? trim( $lines[ $resolved_l_idx ]['name'] ) : 'Line ' . ( intval( $resolved_l_idx ) + 1 ) );
-
-                                    $is_line_closed = in_array( (string) $resolved_l_idx, $closed_lines, true ) || ( $reg_line_name !== '' && in_array( $reg_line_name, $closed_lines, true ) );
-                                    $is_checked_in  = ! empty( $reg['checked_in'] );
-
-                                    $raw_div    = ! empty( $reg['division'] ) ? $reg['division'] : '—';
-                                    $is_no_show = ! $is_checked_in && ( $is_line_closed || $raw_div === 'No Show' );
-
-                                    // Uniform No Show Metadata Overrides
-                                    $div_disp    = $is_no_show ? 'No Show' : $raw_div;
-                                    $gender_disp = $is_no_show ? 'No Show' : ( ! empty( $reg['gender'] ) ? $reg['gender'] : 'N/A' );
-                                    $style_disp  = $is_no_show ? 'No Show' : ( ! empty( $reg['style'] ) ? $reg['style'] : '—' );
-                                    $paid_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['paid'] ) ? $reg['paid'] : '—' );
-                                    $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? $reg['distance'] : 'N/A' );
-
-                                    $raw_paid_str  = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
-                                    $is_promo_free = ! $is_no_show && (
-                                        ! empty( $reg['is_promo_free'] )
-                                        || strcasecmp( $paid_disp, 'Promo (Free)' ) === 0
-                                        || stripos( $paid_disp, 'Promo' ) === 0
-                                    );
-
-                                    $round_slug  = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : '';
-                                    $round_label = '';
-                                    if ( $is_multi_round && $round_slug !== '' ) {
-                                        if ( isset( $t_profiles[ $round_slug ] ) ) {
-                                            $round_label = $t_profiles[ $round_slug ]['label'];
-                                        } elseif ( function_exists( 'sywat_find_pricing_profile' ) ) {
-                                            $rp = sywat_find_pricing_profile( $round_slug );
-                                            if ( is_array( $rp ) && ! empty( $rp['label'] ) ) {
-                                                $round_label = $rp['label'];
-                                            }
-                                        }
-                                    }
-
-                                    $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && strcasecmp( $reg['paid'], 'Family' ) === 0 ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
-
-                                    // Evaluate household-wide unpaid balance so every family member reflects an open family balance
-                                    $household_info = $has_household_fn
-                                        ? sywat_get_household_balance_info( $reg, $all_tourn_regs, $lines )
-                                        : null;
-
-                                    $effective_due      = $household_info ? floatval( $household_info['effective_due'] ) : $balance_due;
-                                    $is_true_family_cap = $household_info ? ! empty( $household_info['is_family_capped'] ) : false;
-
-                                    if ( ! $household_info && $is_family_due ) {
-                                        $fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : ( ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '' );
-                                        if ( $fam_id !== '' && isset( $fallback_group_due[ $fam_id ] ) ) {
-                                            $effective_due = max( $effective_due, $fallback_group_due[ $fam_id ] );
-                                        }
-                                        $is_true_family_cap = ( $effective_due >= $active_cap_amount );
-                                    }
-
-                                    // Pre-compute normalized modal values & JSON payload for instantaneous client-side modal open
-                                    $norm_div = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
-                                    if ( $norm_div === '—' ) {
-                                        $norm_div = '';
-                                    }
-                                    if ( isset( $legacy_div_map[ $norm_div ] ) ) {
-                                        $norm_div = $legacy_div_map[ $norm_div ];
-                                    }
-                                    if ( $norm_div !== '' && strcasecmp( $norm_div, 'No Show' ) !== 0 && $has_norm_div ) {
-                                        $norm_div = sywat_shooting_styles_normalize_division( $norm_div );
-                                    }
-
-                                    $norm_sty = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
-                                    if ( $norm_sty === '—' ) {
-                                        $norm_sty = '';
-                                    }
-                                    if ( $norm_sty !== '' && strcasecmp( $norm_sty, 'No Show' ) !== 0 && $has_norm_style ) {
-                                        $norm_sty = sywat_shooting_styles_normalize_style( $norm_sty );
-                                    }
-
-                                    $modal_round_slug = $round_slug !== '' ? $round_slug : $default_prof_key;
-                                    if ( $norm_div !== '' && $has_rate_tier_fn ) {
-                                        $is_youth_row = ( sywat_shooting_styles_get_division_rate_tier( $norm_div ) === 'Youth' );
-                                    } else {
-                                        $is_youth_row = ( stripos( $norm_div, 'Cub' ) !== false || stripos( $norm_div, 'Youth' ) !== false || stripos( $norm_div, 'Young Adult' ) !== false );
-                                    }
-                                    $calc_dist_row = $has_dist_fn
-                                        ? sywat_shooting_styles_get_division_distance( $norm_div )
-                                        : ( ( stripos( $norm_div, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
-
-                                    $fallback_ind_fee = 0.00;
-                                    if ( ! $is_promo_free && strcasecmp( $raw_paid_str, 'Field Governor' ) !== 0 ) {
-                                        $fallback_ind_fee = $has_ind_fee_fn
-                                            ? sywat_get_archer_individual_fee( $t_context, $norm_div, $calc_dist_row, $norm_sty, $modal_round_slug, '' )
-                                            : ( $is_youth_row ? 25.00 : 30.00 );
-                                    }
-
-                                    $is_family_balance = ( strcasecmp( $raw_paid_str, 'Family' ) === 0 ) || ( $household_info && ! empty( $household_info['has_family'] ) );
-                                    $display_due       = $is_family_balance ? $effective_due : ( $balance_due > 0 ? $balance_due : $fallback_ind_fee );
-
-                                    if ( $is_promo_free ) {
-                                        $pay_opt_val = 'Promo (Free)';
-                                    } elseif ( strcasecmp( $raw_paid_str, 'Family' ) === 0 ) {
-                                        $pay_opt_val = 'Family';
-                                    } elseif ( strcasecmp( $raw_paid_str, 'Field Governor' ) === 0 ) {
-                                        $pay_opt_val = 'Field Governor';
-                                    } else {
-                                        $pay_opt_val = 'Individual';
-                                    }
-
-                                    $archer_payload = array(
-                                        'id'                => isset( $reg['id'] ) ? (string) $reg['id'] : '',
-                                        'name'              => isset( $reg['name'] ) ? (string) $reg['name'] : '',
-                                        'display_name'      => $disp_archer_name,
-                                        'line_index'        => (string) $resolved_l_idx,
-                                        'line_name'         => $reg_line_name,
-                                        'division'          => $norm_div,
-                                        'gender'            => isset( $reg['gender'] ) ? (string) $reg['gender'] : '',
-                                        'style'             => $norm_sty,
-                                        'pricing_profile'   => $modal_round_slug,
-                                        'paid'              => $raw_paid_str,
-                                        'pay_option'        => $pay_opt_val,
-                                        'is_promo_free'     => $is_promo_free,
-                                        'family_id'         => isset( $reg['family_id'] ) ? (string) $reg['family_id'] : '',
-                                        'balance_due'       => round( $balance_due, 2 ),
-                                        'effective_due'     => round( $effective_due, 2 ),
-                                        'display_due'       => round( $display_due, 2 ),
-                                        'is_family_balance' => $is_family_balance,
-                                        'checked_in'        => $is_checked_in,
-                                    );
+                                    $is_row_line_match  = ( $selected_line_idx === 'all' || $selected_line_idx === '' || $resolved_l_idx === $selected_line_idx );
+                                    $is_row_query_match = ( $clean_search_init === '' || strpos( $search_tokens, $clean_search_init ) !== false );
+                                    $is_row_visible     = ( $is_row_line_match && $is_row_query_match );
                                 ?>
-                                <tr class="sywat-archer-row"
-                                    data-line-idx="<?php echo esc_attr( (string) $resolved_l_idx ); ?>"
+                                <tr class="sywat-archer-row<?php echo $is_row_visible ? '' : ' sywat-hidden'; ?>"
+                                    data-line-idx="<?php echo esc_attr( $resolved_l_idx ); ?>"
                                     data-name="<?php echo esc_attr( $search_tokens ); ?>"
-                                    data-archer="<?php echo esc_attr( wp_json_encode( $archer_payload ) ); ?>">
+                                    data-archer="<?php echo esc_attr( wp_json_encode( $modal_payload ) ); ?>">
                                     <td>
                                         <div class="sywat-archer-name">
                                             <?php echo esc_html( $disp_archer_name ); ?>
@@ -643,22 +475,16 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                             <?php endif; ?>
                                         </div>
                                         <!-- OWE Badge Rule: Show across all members of an unpaid household; suppress for No Shows and Zero Balances -->
-                                        <?php if ( ! $is_no_show && $effective_due > 0 ) : ?>
+                                        <?php if ( $owe_badge_text !== '' ) : ?>
                                             <div class="sywat-owe-badge-wrap">
-                                                <span class="sywat-badge sywat-badge-full">
-                                                    <?php if ( $is_true_family_cap || ( $is_family_due && $household_info && ! empty( $household_info['has_family'] ) ) ) : ?>
-                                                        ⚠️ OWE: FAMILY
-                                                    <?php else : ?>
-                                                        ⚠️ OWE $<?php echo number_format( $effective_due, 2 ); ?>
-                                                    <?php endif; ?>
-                                                </span>
+                                                <span class="sywat-badge sywat-badge-full"><?php echo esc_html( $owe_badge_text ); ?></span>
                                             </div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="sywat-col-center" data-label="Type">
                                         <span class="sywat-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $reg_type ); ?></span>
                                     </td>
-                                    <td data-label="Line"><?php echo esc_html( $reg_line_name ); ?></td>
+                                    <td data-label="Line"><?php echo esc_html( $line_disp ); ?></td>
                                     <td data-label="Division"><?php echo esc_html( $div_disp ); ?></td>
                                     <td class="sywat-col-center" data-label="Gender"><?php echo esc_html( $gender_disp ); ?></td>
                                     <td data-label="Style"><?php echo esc_html( $style_disp ); ?></td>
@@ -699,7 +525,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                         </tbody>
                     </table>
                 </div>
-                <p id="sywat_desk_empty_filter_msg" class="sywat-empty-text sywat-hidden">No active archers match the selected line or search filter.</p>
+                <p id="sywat_desk_empty_filter_msg" class="sywat-empty-text<?php echo ( $initial_visible_count === 0 ) ? '' : ' sywat-hidden'; ?>">No active archers match the selected line or search filter.</p>
             <?php else : ?>
                 <p class="sywat-empty-text">No active archers registered for this selection.</p>
             <?php endif; ?>
