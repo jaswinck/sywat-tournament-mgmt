@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Pure presentation and quick-edit controller for the season-scoped public tournament directory and single-tournament category leaderboards. Includes an inline Season selector in the directory header bar (defaulting to the active season while preserving season selection across directory, detail, and standings views), delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), renders 1-day scoreboards as well as multi-day (Day 1 / Day 2 / Day 3 + Total) State Championship scoreboards, formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
+ * Description: Pure presentation and quick-edit controller for the season-scoped public tournament directory and single-tournament category leaderboards. Includes an inline Season selector in the directory header bar (defaulting to the active season while preserving season selection across directory, detail, and standings views), delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), renders 1-day scoreboards as well as multi-day (Day 1 / Day 2 / Day 3 + Total) State Championship scoreboards and conditional Inside-Out ("I/Os") tie-breaker columns, formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
  * Compliance: Pure View layer — zero hardcoded shop/division/style lists, zero inline style attributes, zero element.style.* mutations, opt-out shielded script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -93,6 +93,13 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
                 if ( isset( $_POST['x_count'] ) ) {
                     $reg['x_count'] = max( 0, min( 180, intval( wp_unslash( $_POST['x_count'] ) ) ) );
                 }
+                if ( isset( $_POST['io_count'] ) ) {
+                    $io_val          = max( 0, min( 180, intval( wp_unslash( $_POST['io_count'] ) ) ) );
+                    $reg['io_count'] = $io_val;
+                    if ( $io_val > 0 ) {
+                        $reg['has_io'] = 1;
+                    }
+                }
 
                 update_option( $opt_key, $reg, false );
                 wp_cache_delete( $opt_key, 'options' );
@@ -102,6 +109,12 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
                 if ( is_array( $scores_map ) && isset( $scores_map[ $reg_id ] ) ) {
                     $scores_map[ $reg_id ]['score']    = isset( $reg['score'] ) ? intval( $reg['score'] ) : 0;
                     $scores_map[ $reg_id ]['xs']       = isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0;
+                    if ( isset( $reg['io_count'] ) ) {
+                        $scores_map[ $reg_id ]['io_count'] = intval( $reg['io_count'] );
+                    }
+                    if ( ! empty( $reg['has_io'] ) ) {
+                        $scores_map[ $reg_id ]['has_io'] = 1;
+                    }
                     $scores_map[ $reg_id ]['saved_at'] = current_time( 'mysql' );
                     update_option( 'sywat_scores_' . $active_slug, $scores_map, false );
                 }
@@ -343,11 +356,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
 /**
  * Render Single Tournament Results Breakdown
  * Supports 1-day scoreboards as well as multi-day (Day 1 / Day 2 / Day 3 + Total) State
- * Championship scoreboards. Routes explicit Guest records (type === 'Guest', style === 'Guest',
- * or '[Guest]' tags), completed-round 0-score cards, and secondary re-entries into the Guest
- * category while preserving incomplete ("[INC]") rounds in their primary division/style with
- * "[INC]" displayed next to the archer's name and deduplicating official entries via normalized
- * First+Last (+ suffix) keys.
+ * Championship scoreboards and conditional Inside-Out ("I/Os") tie-breaker columns. Routes
+ * explicit Guest records (type === 'Guest', style === 'Guest', or '[Guest]' tags), completed-round
+ * 0-score cards, and secondary re-entries into the Guest category while preserving incomplete
+ * ("[INC]") rounds in their primary division/style with "[INC]" displayed next to the archer's
+ * name and deduplicating official entries via normalized First+Last (+ suffix) keys.
  *
  * @param string $tournament_name      Target tournament name.
  * @param string $selected_season_slug Optional active/selected season slug for back-navigation continuity.
@@ -476,15 +489,19 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             }
         }
 
-        $groups         = array();
-        $all_divisions  = array();
-        $all_styles     = array();
-        $max_round_days = 1;
+        $groups            = array();
+        $all_divisions     = array();
+        $all_styles        = array();
+        $max_round_days    = 1;
+        $tournament_has_io = false;
 
         foreach ( $processed_scores as $s ) {
             $entry_days = isset( $s['round_days'] ) ? max( 1, intval( $s['round_days'] ) ) : 1;
             if ( $entry_days > $max_round_days ) {
                 $max_round_days = $entry_days;
+            }
+            if ( ! empty( $s['has_io'] ) || ( isset( $s['io_count'] ) && intval( $s['io_count'] ) > 0 ) ) {
+                $tournament_has_io = true;
             }
 
             $div_gen_key = $s['division'] . '|||' . $s['gender'];
@@ -555,9 +572,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             } );
 
             foreach ( $group['styles'] as $st_key => &$archers ) {
-                usort( $archers, function( $a, $b ) {
+                usort( $archers, function( $a, $b ) use ( $tournament_has_io ) {
                     if ( $a['score'] === $b['score'] ) {
                         if ( $a['x_count'] === $b['x_count'] ) {
+                            if ( $tournament_has_io ) {
+                                $ioA = isset( $a['io_count'] ) ? intval( $a['io_count'] ) : 0;
+                                $ioB = isset( $b['io_count'] ) ? intval( $b['io_count'] ) : 0;
+                                if ( $ioA !== $ioB ) {
+                                    return $ioB - $ioA;
+                                }
+                            }
                             $dispA = ! empty( $a['display_name'] ) ? $a['display_name'] : $a['name'];
                             $dispB = ! empty( $b['display_name'] ) ? $b['display_name'] : $b['name'];
                             return strcasecmp( $dispA, $dispB );
@@ -708,6 +732,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                 <?php else : ?>
                                                     <th class="sywat-col-right">Score / X</th>
                                                 <?php endif; ?>
+                                                <?php if ( $tournament_has_io ) : ?>
+                                                    <th class="sywat-col-center">I/Os</th>
+                                                <?php endif; ?>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -717,8 +744,9 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                             $prev_x       = null;
 
                                             foreach ( $archers as $idx => $a ) :
-                                                $s_val = intval( $a['score'] );
-                                                $x_val = intval( $a['x_count'] );
+                                                $s_val  = intval( $a['score'] );
+                                                $x_val  = intval( $a['x_count'] );
+                                                $io_val = isset( $a['io_count'] ) ? max( 0, intval( $a['io_count'] ) ) : 0;
 
                                                 if ( $prev_score !== null && $s_val === $prev_score && $x_val === $prev_x ) {
                                                     // Tied with previous archer - keep current rank
@@ -748,7 +776,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                             <?php if ( $can_edit_scores && ! empty( $reg_id ) ) : ?>
                                                                 <button type="button"
                                                                         class="sywat-btn sywat-btn-secondary sywat-btn-icon-edit sywat-btn-sm"
-                                                                        onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $raw_edit_name ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $gender_val ); ?>', '<?php echo esc_js( $edit_style ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>)">
+                                                                        onclick="openResultsEditModal('<?php echo esc_js( $reg_id ); ?>', '<?php echo esc_js( $raw_edit_name ); ?>', '<?php echo esc_js( $a['division'] ); ?>', '<?php echo esc_js( $gender_val ); ?>', '<?php echo esc_js( $edit_style ); ?>', <?php echo $s_val; ?>, <?php echo $x_val; ?>, <?php echo $io_val; ?>)">
                                                                     Edit
                                                                 </button>
                                                             <?php endif; ?>
@@ -764,6 +792,15 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                     <td class="sywat-col-right sywat-score-cell">
                                                         <strong><?php echo $s_val . ' / ' . $x_val . 'X'; ?></strong>
                                                     </td>
+                                                    <?php if ( $tournament_has_io ) : ?>
+                                                        <td class="sywat-col-center">
+                                                            <?php if ( $s_val <= 0 && $x_val <= 0 && $io_val <= 0 ) : ?>
+                                                                <span class="sywat-score-null">&mdash;</span>
+                                                            <?php else : ?>
+                                                                <strong><?php echo $io_val; ?></strong>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                    <?php endif; ?>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -834,6 +871,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                     <input type="number" name="x_count" id="edit_modal_x_count" min="0" max="180" required>
                                 </div>
                             </div>
+
+                            <div class="sywat-field-group">
+                                <label for="edit_modal_io_count">I/Os (Inside-Outs, Optional)</label>
+                                <input type="number" name="io_count" id="edit_modal_io_count" min="0" max="180" value="0">
+                            </div>
                         </div>
 
                         <div class="sywat-modal-footer">
@@ -869,7 +911,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 selectEl.value = cleanTarget;
             }
 
-            function openResultsEditModal(regId, name, division, gender, style, score, xCount) {
+            function openResultsEditModal(regId, name, division, gender, style, score, xCount, ioCount) {
                 document.getElementById('edit_modal_reg_id').value = regId;
                 document.getElementById('edit_modal_name').value   = name;
 
@@ -882,8 +924,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
                 setSelectValueWithFallback(document.getElementById('edit_modal_style'), style);
 
-                document.getElementById('edit_modal_score').value   = score;
-                document.getElementById('edit_modal_x_count').value = xCount;
+                document.getElementById('edit_modal_score').value    = score;
+                document.getElementById('edit_modal_x_count').value  = xCount;
+                const ioInput = document.getElementById('edit_modal_io_count');
+                if (ioInput) {
+                    ioInput.value = ioCount || 0;
+                }
 
                 const modal = document.getElementById('sywat_results_edit_modal');
                 if (modal) {
