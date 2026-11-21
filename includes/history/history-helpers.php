@@ -5,7 +5,7 @@
  * Description: Pure parsing, normalization, and payload formatting helpers for migrating historical TFAA seasons, tournament manifests, and 1-day / 2-day / 3-day event scorecards from texasfieldarchery.org into independent archived records.
  * Compliance: Pure helper layer — zero direct SQL queries, zero get_option()/update_option() calls, zero remote HTTP requests, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -327,10 +327,34 @@ if ( ! function_exists( 'sywat_history_parse_date_to_ymd' ) ) {
 }
 
 /**
+ * Strip trailing uppercase TFAA class codes (e.g. "CMFS", "CMBHFS", "AMFS", "YAMFSLR", "SSMTRAD")
+ * extracted from multi-day State Championship table rows so only the archer's name remains.
+ *
+ * @param string $raw_name Archer name string prior to or after comma splitting.
+ * @return string          Cleaned archer name without trailing TFAA class code.
+ */
+if ( ! function_exists( 'sywat_history_strip_tfaa_class_code' ) ) {
+    function sywat_history_strip_tfaa_class_code( $raw_name ) {
+        $clean = trim( preg_replace( '/\s+/u', ' ', (string) $raw_name ) );
+        if ( $clean === '' ) {
+            return '';
+        }
+
+        $clean = preg_replace(
+            '/\s+(?:MS|SS|YA|C|Y|A|S|P)[MF](?:BHFS|FSL-R|FSLR|FSL|FSPRO|FS|MBH|BBC|BBR|BB|TRAD|LB|GEN)$/',
+            '',
+            $clean
+        );
+
+        return trim( (string) $clean );
+    }
+}
+
+/**
  * Parse an individual TFAA event scorecard page (/results/{id}) into normalized archer score rows.
  * Supports 1-day ("Score Xs [Total TotalX] [I/Os]"), 2-day ("Score Xs Score Xs Total TotalX [I/Os]"),
  * and 3-day ("Score Xs Score Xs Score Xs Total TotalX [I/Os]") tables, storing per-day round
- * scores alongside the combined tournament total.
+ * scores alongside the combined tournament total while stripping TFAA class codes from names.
  *
  * @param string $html Raw HTML from https://texasfieldarchery.org/results/{id}.
  * @return array       Associative array with 'extracted_start_date', 'extracted_end_date', and 'entries'.
@@ -392,7 +416,7 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 continue;
             }
 
-            // 1. Archer Score Row (1-day: "1 Coleman, Chris 300 58 2" | 2-day: "1 Whicker, Easton 299 51 300 49 599 100 0")
+            // 1. Archer Score Row (1-day: "1 Coleman, Chris 300 58 2" | 2-day: "1 Whicker, Easton CMFS 299 51 300 49 599 100 0")
             if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 if ( $curr_div === '' || $curr_style === '' ) {
                     continue;
@@ -403,6 +427,7 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 $is_inc   = ( stripos( $raw_name, '[INC]' ) !== false || stripos( $line, '[INC]' ) !== false );
 
                 $clean_raw_name = trim( preg_replace( '/\[.*?\]/', '', $raw_name ) );
+                $clean_raw_name = sywat_history_strip_tfaa_class_code( $clean_raw_name );
                 $parts          = explode( ',', $clean_raw_name, 2 );
                 $clean_name     = ( count( $parts ) === 2 )
                     ? trim( preg_replace( '/\s+/u', ' ', trim( $parts[1] ) . ' ' . trim( $parts[0] ) ) )
