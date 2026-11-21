@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Modals View Layer
  * Path: includes/tournaments/tournament-modals.php
- * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament Public Online Registration On/Off & lead-time overrides inherited from host shop defaults, External Online Registration Links, standardized 30-minute AM/PM shooting line dropdowns, and shop-default line reset), Bulk Schedule Import modals, Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
+ * Description: Renders the streamlined Add/Edit Tournament modal (with Season-filtered Pricing & Round Format selection, per-tournament Public Online Registration On/Off & lead-time overrides inherited from host shop defaults, External Online Registration Links, standardized 30-minute AM/PM shooting line dropdowns, shop-default line reset, and active-only shop event sequence counting), Bulk Schedule Import modals, tournament-scoped Roster/Invoice/Print modal container, and TFAA Sync Progress modal.
  * Compliance: Pure view layer — zero inline style attributes, zero embedded script blocks, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.18.0
+ * Version: 7.19.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -258,10 +258,13 @@ if ( ! function_exists( 'sywat_render_add_edit_tournament_modal' ) ) {
         $shop_display_name   = isset( $all_shops[ $edit_t_shop ]['name'] ) ? $all_shops[ $edit_t_shop ]['name'] : ( isset( $edit_t_data['shop_name'] ) ? $edit_t_data['shop_name'] : 'Host Archery Shop' );
         $season_display_name = isset( $seasons[ $edit_t_season ]['name'] ) ? $seasons[ $edit_t_season ]['name'] : $edit_t_season;
 
-        // Calculate existing tournament counts & collect start dates per shop for auto-naming logic
+        // Calculate existing active (non-historical) tournament counts & start dates per shop for auto-naming logic
         $shop_counts = array();
         $shop_events = array();
         foreach ( $tournaments as $t_name => $t_info ) {
+            if ( is_array( $t_info ) && ! empty( $t_info['historical_import'] ) ) {
+                continue;
+            }
             $s_id = $resolve_canonical_shop_id( sywat_get_tournament_shop_id( $t_info ), $t_info );
             if ( ! empty( $s_id ) ) {
                 $shop_counts[ $s_id ] = isset( $shop_counts[ $s_id ] ) ? $shop_counts[ $s_id ] + 1 : 1;
@@ -761,6 +764,7 @@ if ( ! function_exists( 'sywat_render_import_schedule_modal' ) ) {
 
 /**
  * Render Delegated Archer / Roster / Invoice Modal Container
+ * Pre-scopes registrations to the selected tournament before delegating to sub-modal renderers.
  *
  * @param array $data Central data bundle from data engine.
  */
@@ -779,6 +783,16 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
         $filter_line_idx  = isset( $_REQUEST['filter_line_idx'] ) ? sanitize_text_field( $_REQUEST['filter_line_idx'] ) : 'all';
         $search_query     = isset( $_REQUEST['search_shooter'] ) ? trim( sanitize_text_field( $_REQUEST['search_shooter'] ) ) : '';
         $is_specific_line = ( $filter_line_idx !== 'all' && $filter_line_idx !== '' && $filter_line_idx !== null );
+
+        $modal_registrations = array();
+        if ( $open_modal && is_array( $registrations ) ) {
+            $target_norm = trim( (string) $selected_tournament );
+            foreach ( $registrations as $reg ) {
+                if ( is_array( $reg ) && isset( $reg['tournament'] ) && strcasecmp( trim( (string) $reg['tournament'] ), $target_norm ) === 0 ) {
+                    $modal_registrations[] = $reg;
+                }
+            }
+        }
         ?>
         <div class="sywat-modal-backdrop <?php echo $open_modal ? 'active' : ''; ?>" id="sywat_modal">
             <div class="sywat-modal-content sywat-modal-xl">
@@ -800,13 +814,13 @@ if ( ! function_exists( 'sywat_render_delegated_modal_container' ) ) {
                     <?php if ( $open_modal ) : ?>
                         <?php
                             if ( $modal_action === 'prereg' && function_exists( 'sywat_render_registration_modal' ) ) {
-                                sywat_render_registration_modal( $selected_tournament, $available_lines, $registrations );
+                                sywat_render_registration_modal( $selected_tournament, $available_lines, $modal_registrations );
                             } elseif ( $modal_action === 'manage' && function_exists( 'sywat_render_roster_modal' ) ) {
-                                sywat_render_roster_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $search_query, $modal_edit_archer, $tournaments );
+                                sywat_render_roster_modal( $selected_tournament, $available_lines, $modal_registrations, $filter_line_idx, $search_query, $modal_edit_archer, $tournaments );
                             } elseif ( $modal_action === 'invoice' && function_exists( 'sywat_render_invoice_modal' ) ) {
-                                sywat_render_invoice_modal( $selected_tournament, $registrations );
+                                sywat_render_invoice_modal( $selected_tournament, $modal_registrations );
                             } elseif ( $modal_action === 'print' && function_exists( 'sywat_render_print_modal' ) ) {
-                                sywat_render_print_modal( $selected_tournament, $available_lines, $registrations, $filter_line_idx, $is_specific_line );
+                                sywat_render_print_modal( $selected_tournament, $available_lines, $modal_registrations, $filter_line_idx, $is_specific_line );
                             }
                         ?>
                     <?php endif; ?>
