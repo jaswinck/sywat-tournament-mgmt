@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries, and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries (including 1-day, 2-day, and 3-day round breakdowns), and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.3
+ * Version: 1.3.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -120,7 +120,8 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest') and 'is_inc'.
+ * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest'), 'is_inc',
+ * and multi-day round score breakdowns (r1/r2/r3).
  * Defaults blank/unset score fields to 0 so every roster entry is included.
  *
  * @param string $t_name Tournament title.
@@ -147,8 +148,15 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
         foreach ( $results as $row ) {
             $reg = maybe_unserialize( $row->option_value );
             if ( is_array( $reg ) ) {
-                $score_val = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
-                $x_val     = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
+                $score_val  = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
+                $x_val      = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
+                $round_days = isset( $reg['round_days'] ) ? max( 1, intval( $reg['round_days'] ) ) : 1;
+                $r1_score   = isset( $reg['r1_score'] ) ? intval( $reg['r1_score'] ) : $score_val;
+                $r1_xs      = isset( $reg['r1_xs'] ) ? intval( $reg['r1_xs'] ) : $x_val;
+                $r2_score   = isset( $reg['r2_score'] ) ? intval( $reg['r2_score'] ) : 0;
+                $r2_xs      = isset( $reg['r2_xs'] ) ? intval( $reg['r2_xs'] ) : 0;
+                $r3_score   = isset( $reg['r3_score'] ) ? intval( $reg['r3_score'] ) : 0;
+                $r3_xs      = isset( $reg['r3_xs'] ) ? intval( $reg['r3_xs'] ) : 0;
 
                 $raw_div  = isset( $reg['division'] ) && trim( (string) $reg['division'] ) !== '' ? trim( (string) $reg['division'] ) : 'Adult (18 - 49)';
                 $div_rec  = $has_div_res ? sywat_results_resolve_division_record( $raw_div ) : null;
@@ -168,6 +176,13 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                     'division'   => $norm_div,
                     'gender'     => isset( $reg['gender'] ) ? $reg['gender'] : 'Male',
                     'style'      => $norm_style,
+                    'round_days' => $round_days,
+                    'r1_score'   => $r1_score,
+                    'r1_xs'      => $r1_xs,
+                    'r2_score'   => $r2_score,
+                    'r2_xs'      => $r2_xs,
+                    'r3_score'   => $r3_score,
+                    'r3_xs'      => $r3_xs,
                     'score'      => $score_val,
                     'x_count'    => $x_val,
                     'is_inc'     => ! empty( $reg['is_inc'] ) ? 1 : 0,
