@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Parser & Payload Helpers
  * Path: includes/history/history-helpers.php
- * Description: Pure parsing, normalization, and payload formatting helpers for migrating historical TFAA seasons, tournament manifests, and event scorecards from texasfieldarchery.org into independent archived records.
+ * Description: Pure parsing, normalization, and payload formatting helpers for migrating historical TFAA seasons, tournament manifests, and 1-day / 2-day / 3-day event scorecards from texasfieldarchery.org into independent archived records.
  * Compliance: Pure helper layer — zero direct SQL queries, zero get_option()/update_option() calls, zero remote HTTP requests, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -328,8 +328,9 @@ if ( ! function_exists( 'sywat_history_parse_date_to_ymd' ) ) {
 
 /**
  * Parse an individual TFAA event scorecard page (/results/{id}) into normalized archer score rows.
- * Reuses sywat_parse_tfaa_div_gen() and sywat_parse_tfaa_style() when available so every
- * Division, Gender, and Shooting Style maps cleanly to canonical database labels.
+ * Supports 1-day ("Score Xs [Total TotalX] [I/Os]"), 2-day ("Score Xs Score Xs Total TotalX [I/Os]"),
+ * and 3-day ("Score Xs Score Xs Score Xs Total TotalX [I/Os]") tables, storing per-day round
+ * scores alongside the combined tournament total.
  *
  * @param string $html Raw HTML from https://texasfieldarchery.org/results/{id}.
  * @return array       Associative array with 'extracted_start_date', 'extracted_end_date', and 'entries'.
@@ -391,7 +392,7 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 continue;
             }
 
-            // 1. Archer Score Row ("1 Coleman, Chris 300 58 2")
+            // 1. Archer Score Row (1-day: "1 Coleman, Chris 300 58 2" | 2-day: "1 Whicker, Easton 299 51 300 49 599 100 0")
             if ( preg_match( '/^(\d+)\s+([^,]+,\s*[^0-9]+?)(?=\s+\d|$)/', $line, $matches ) ) {
                 if ( $curr_div === '' || $curr_style === '' ) {
                     continue;
@@ -412,10 +413,40 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                 }
 
                 $rest        = trim( substr( $line, strlen( $matches[0] ) ) );
-                $score_parts = $rest !== '' ? explode( ' ', $rest ) : array();
+                $score_parts = $rest !== '' ? array_values( array_filter( explode( ' ', $rest ), 'is_numeric' ) ) : array();
+                $num_cols    = count( $score_parts );
 
-                $score = isset( $score_parts[0] ) ? intval( $score_parts[0] ) : 0;
-                $xs    = isset( $score_parts[1] ) ? intval( $score_parts[1] ) : 0;
+                $round_days = 1;
+                $r1_score   = isset( $score_parts[0] ) ? intval( $score_parts[0] ) : 0;
+                $r1_xs      = isset( $score_parts[1] ) ? intval( $score_parts[1] ) : 0;
+                $r2_score   = 0;
+                $r2_xs      = 0;
+                $r3_score   = 0;
+                $r3_xs      = 0;
+                $score      = $r1_score;
+                $xs         = $r1_xs;
+
+                if ( $num_cols >= 8 ) {
+                    // 3-day tournament: Score1 Xs1 Score2 Xs2 Score3 Xs3 Total TotalX [I/Os]
+                    $round_days = 3;
+                    $r2_score   = intval( $score_parts[2] );
+                    $r2_xs      = intval( $score_parts[3] );
+                    $r3_score   = intval( $score_parts[4] );
+                    $r3_xs      = intval( $score_parts[5] );
+                    $tot_s      = intval( $score_parts[6] );
+                    $tot_x      = intval( $score_parts[7] );
+                    $score      = ( $tot_s > 0 ) ? $tot_s : ( $r1_score + $r2_score + $r3_score );
+                    $xs         = ( $tot_s > 0 || $tot_x > 0 ) ? $tot_x : ( $r1_xs + $r2_xs + $r3_xs );
+                } elseif ( $num_cols >= 6 ) {
+                    // 2-day tournament: Score1 Xs1 Score2 Xs2 Total TotalX [I/Os]
+                    $round_days = 2;
+                    $r2_score   = intval( $score_parts[2] );
+                    $r2_xs      = intval( $score_parts[3] );
+                    $tot_s      = intval( $score_parts[4] );
+                    $tot_x      = intval( $score_parts[5] );
+                    $score      = ( $tot_s > 0 ) ? $tot_s : ( $r1_score + $r2_score );
+                    $xs         = ( $tot_s > 0 || $tot_x > 0 ) ? $tot_x : ( $r1_xs + $r2_xs );
+                }
 
                 $dist = $has_div_dist
                     ? sywat_shooting_styles_get_division_distance( $curr_div )
@@ -427,6 +458,13 @@ if ( ! function_exists( 'sywat_history_parse_event_scorecard_html' ) ) {
                     'gender'     => $curr_gen,
                     'style'      => $curr_style,
                     'distance'   => $dist,
+                    'round_days' => $round_days,
+                    'r1_score'   => $r1_score,
+                    'r1_xs'      => $r1_xs,
+                    'r2_score'   => $r2_score,
+                    'r2_xs'      => $r2_xs,
+                    'r3_score'   => $r3_score,
+                    'r3_xs'      => $r3_xs,
                     'score'      => $score,
                     'xs'         => $xs,
                     'is_guest'   => $is_guest,
@@ -513,7 +551,8 @@ if ( ! function_exists( 'sywat_history_build_tournament_record' ) ) {
 /**
  * Build deterministic, independent historical registration & score records for an event.
  * Uses deterministic IDs ("hist_{event_id}_{row}") so re-importing an event overwrites in place
- * without duplicating entries or linking to live wp_users / Member Directory accounts.
+ * without duplicating entries or linking to live wp_users / Member Directory accounts, while
+ * storing per-day round breakdowns (r1/r2/r3) alongside combined totals.
  *
  * @param string $t_name         Canonical tournament title.
  * @param int    $event_id       Numeric TFAA event ID.
@@ -555,7 +594,17 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
                 $final_style = $primary_style[ $norm_name ];
             }
 
-            $reg_id    = 'hist_' . $event_id . '_' . ( intval( $idx ) + 1 );
+            $reg_id     = 'hist_' . $event_id . '_' . ( intval( $idx ) + 1 );
+            $round_days = isset( $entry['round_days'] ) ? max( 1, intval( $entry['round_days'] ) ) : 1;
+            $tot_score  = intval( $entry['score'] );
+            $tot_xs     = intval( $entry['xs'] );
+            $r1_score   = isset( $entry['r1_score'] ) ? intval( $entry['r1_score'] ) : $tot_score;
+            $r1_xs      = isset( $entry['r1_xs'] ) ? intval( $entry['r1_xs'] ) : $tot_xs;
+            $r2_score   = isset( $entry['r2_score'] ) ? intval( $entry['r2_score'] ) : 0;
+            $r2_xs      = isset( $entry['r2_xs'] ) ? intval( $entry['r2_xs'] ) : 0;
+            $r3_score   = isset( $entry['r3_score'] ) ? intval( $entry['r3_score'] ) : 0;
+            $r3_xs      = isset( $entry['r3_xs'] ) ? intval( $entry['r3_xs'] ) : 0;
+
             $paid_tier = $has_div_tier
                 ? sywat_shooting_styles_get_division_rate_tier( $entry['division'] )
                 : ( in_array( $entry['division'], array( 'Cub (8 - 11)', 'Youth (12 - 14)', 'Young Adult (15 - 17)' ), true ) ? 'Youth' : 'Adult' );
@@ -576,8 +625,15 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
                 'balance_due'       => 0.00,
                 'status'            => 'Pre-Reg',
                 'checked_in'        => 1,
-                'score'             => intval( $entry['score'] ),
-                'x_count'           => intval( $entry['xs'] ),
+                'round_days'        => $round_days,
+                'r1_score'          => $r1_score,
+                'r1_xs'             => $r1_xs,
+                'r2_score'          => $r2_score,
+                'r2_xs'             => $r2_xs,
+                'r3_score'          => $r3_score,
+                'r3_xs'             => $r3_xs,
+                'score'             => $tot_score,
+                'x_count'           => $tot_xs,
                 'is_inc'            => $is_inc,
                 'tfaa_origin'       => 1,
                 'historical_import' => 1,
@@ -585,10 +641,17 @@ if ( ! function_exists( 'sywat_history_build_score_records' ) ) {
             );
 
             $scores[ $reg_id ] = array(
-                'score'    => intval( $entry['score'] ),
-                'xs'       => intval( $entry['xs'] ),
-                'is_inc'   => $is_inc,
-                'saved_at' => $created_at,
+                'round_days' => $round_days,
+                'r1_score'   => $r1_score,
+                'r1_xs'      => $r1_xs,
+                'r2_score'   => $r2_score,
+                'r2_xs'      => $r2_xs,
+                'r3_score'   => $r3_score,
+                'r3_xs'      => $r3_xs,
+                'score'      => $tot_score,
+                'xs'         => $tot_xs,
+                'is_inc'     => $is_inc,
+                'saved_at'   => $created_at,
             );
         }
 
