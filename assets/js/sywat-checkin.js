@@ -222,20 +222,14 @@
      * Retrieve Localized Database Age Divisions
      */
     function getDeskDivisions() {
-        if (Array.isArray(window.sywatDeskDivisions)) {
-            return window.sywatDeskDivisions;
-        }
-        return [];
+        return Array.isArray(window.sywatDeskDivisions) ? window.sywatDeskDivisions : [];
     }
 
     /**
      * Retrieve Localized Active Tournament Pricing & Promoter Rules
      */
     function getDeskPricing() {
-        if (window.sywatDeskPricing && typeof window.sywatDeskPricing === 'object') {
-            return window.sywatDeskPricing;
-        }
-        return {};
+        return (window.sywatDeskPricing && typeof window.sywatDeskPricing === 'object') ? window.sywatDeskPricing : {};
     }
 
     /**
@@ -250,8 +244,7 @@
         if (pricing.defaultProfile) {
             return String(pricing.defaultProfile).trim();
         }
-        const profiles = pricing.profiles || {};
-        const keys = Object.keys(profiles);
+        const keys = Object.keys(pricing.profiles || {});
         return keys.length > 0 ? keys[0] : 'indoor';
     }
 
@@ -425,16 +418,11 @@
             }
 
             const origDue = parseFloat(balanceEl.dataset.origDue || '0');
-            if (Number.isNaN(origDue) || origDue <= 0) {
+            if (Number.isNaN(origDue) || origDue <= 0 || payVal === 'Family') {
                 return;
             }
 
-            if (payVal === 'Family') {
-                return;
-            }
-
-            const newFee = calculateDeskModalFee('edit');
-            balanceEl.value = newFee.toFixed(2);
+            balanceEl.value = calculateDeskModalFee('edit').toFixed(2);
             return;
         }
 
@@ -460,8 +448,7 @@
                 return;
             }
 
-            const newCheckinFee = calculateDeskModalFee('checkin');
-            amountEl.textContent = newCheckinFee.toFixed(2);
+            amountEl.textContent = calculateDeskModalFee('checkin').toFixed(2);
         }
     }
 
@@ -515,14 +502,24 @@
         selectEl.value = cleanVal;
     }
 
-    function updateCheckinFamilyOptions(lineIdx, selectedFamId) {
-        const famSelect = document.getElementById('checkin_family_group_id');
+    /**
+     * Shared family group dropdown builder across Check-In, Edit, and Walk-In modals.
+     */
+    function populateDeskFamilyOptions(selectId, lineIdx, defaultLabel, selectedFamId, allowFallbackOpt) {
+        const famSelect = document.getElementById(selectId);
         if (!famSelect) return;
 
         const targetVal = (selectedFamId !== undefined) ? String(selectedFamId || '') : famSelect.value;
-        famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+        famSelect.innerHTML = '';
 
-        const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = defaultLabel;
+        famSelect.appendChild(defaultOpt);
+
+        const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx])
+            ? window.existingFamiliesByLine[lineIdx]
+            : {};
 
         Object.keys(fams).forEach(function(fid) {
             const opt = document.createElement('option');
@@ -532,57 +529,25 @@
             famSelect.appendChild(opt);
         });
 
-        if (targetVal && !Object.prototype.hasOwnProperty.call(fams, targetVal)) {
+        if (allowFallbackOpt && targetVal && !Object.prototype.hasOwnProperty.call(fams, targetVal)) {
             const tempOpt = document.createElement('option');
             tempOpt.value = targetVal;
             tempOpt.textContent = 'Assigned Family Group';
             tempOpt.selected = true;
             famSelect.appendChild(tempOpt);
         }
+    }
+
+    function updateCheckinFamilyOptions(lineIdx, selectedFamId) {
+        populateDeskFamilyOptions('checkin_family_group_id', lineIdx, '[ + Start New Family Group for This Line ]', selectedFamId, true);
     }
 
     function updateWalkinFamilyOptions(lineIdx) {
-        const famSelect = document.getElementById('walkin_family_group_id');
-        if (!famSelect) return;
-
-        const currentVal = famSelect.value;
-        famSelect.innerHTML = '<option value="">[ Auto-Create Group for Primary Contact ]</option>';
-
-        const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
-
-        Object.keys(fams).forEach(function(fid) {
-            const opt = document.createElement('option');
-            opt.value = fid;
-            opt.textContent = fams[fid];
-            if (fid === currentVal) opt.selected = true;
-            famSelect.appendChild(opt);
-        });
+        populateDeskFamilyOptions('walkin_family_group_id', lineIdx, '[ Auto-Create Group for Primary Contact ]', undefined, false);
     }
 
     function updateEditFamilyOptions(lineIdx, selectedFamId) {
-        const famSelect = document.getElementById('edit_family_group_id');
-        if (!famSelect) return;
-
-        const targetVal = (selectedFamId !== undefined) ? String(selectedFamId || '') : '';
-        famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
-
-        const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
-
-        Object.keys(fams).forEach(function(fid) {
-            const opt = document.createElement('option');
-            opt.value = fid;
-            opt.textContent = fams[fid];
-            if (fid === targetVal) opt.selected = true;
-            famSelect.appendChild(opt);
-        });
-
-        if (targetVal && !Object.prototype.hasOwnProperty.call(fams, targetVal)) {
-            const tempOpt = document.createElement('option');
-            tempOpt.value = targetVal;
-            tempOpt.textContent = 'Assigned Family Group';
-            tempOpt.selected = true;
-            famSelect.appendChild(tempOpt);
-        }
+        populateDeskFamilyOptions('edit_family_group_id', lineIdx, '[ + Start New Family Group for This Line ]', selectedFamId !== undefined ? selectedFamId : '', true);
     }
 
     function toggleUnpaidBanner(isChecked) {
@@ -627,14 +592,14 @@
         }
 
         // Unpaid balance warning banner & verification gate
-        const effectiveDue   = parseFloat(archer.effective_due || 0);
-        const displayDue     = parseFloat(archer.display_due || 0);
-        const isFamilyBal    = !!archer.is_family_balance;
-        const banner         = document.getElementById('sywat_unpaid_warning_banner');
-        const titleDisp      = document.getElementById('checkin_unpaid_title_disp');
-        const subtextDisp    = document.getElementById('checkin_unpaid_subtext_disp');
-        const verifiedGroup  = document.getElementById('sywat_payment_verified_check_group');
-        const verifiedCheck  = document.getElementById('sywat_payment_verified_check');
+        const effectiveDue  = parseFloat(archer.effective_due || 0);
+        const displayDue    = parseFloat(archer.display_due || 0);
+        const isFamilyBal   = !!archer.is_family_balance;
+        const banner        = document.getElementById('sywat_unpaid_warning_banner');
+        const titleDisp     = document.getElementById('checkin_unpaid_title_disp');
+        const subtextDisp   = document.getElementById('checkin_unpaid_subtext_disp');
+        const verifiedGroup = document.getElementById('sywat_payment_verified_check_group');
+        const verifiedCheck = document.getElementById('sywat_payment_verified_check');
 
         if (banner) {
             banner.setAttribute('data-orig-due', displayDue.toFixed(2));
@@ -662,14 +627,14 @@
             if (verifiedCheck) verifiedCheck.required = false;
         }
 
-        // Division, Gender, Style (enforce style rules before selecting style)
+        // Division, Gender, Style (skip balance overwrite on initial open so exact DB balance is preserved)
         const divEl   = document.getElementById('checkin_division');
         const genEl   = document.getElementById('checkin_gender');
         const styleEl = document.getElementById('checkin_style');
 
         setDeskSelectValueWithFallback(divEl, archer.division || '', true);
         setDeskSelectValueWithFallback(genEl, archer.gender || '', false);
-        handleStyleRestrictions('checkin');
+        handleStyleRestrictions('checkin', true);
         setDeskSelectValueWithFallback(styleEl, archer.style || '', true);
 
         // Rate & Line Family Group
@@ -678,10 +643,10 @@
             payEl.value = archer.pay_option || 'Individual';
         }
         updateCheckinFamilyOptions(String(archer.line_index || '0'), archer.family_id || '');
-        toggleFamilyBox('checkin');
+        toggleFamilyBox('checkin', true);
 
         // Auto-fill missing metadata from Member DB / TFAA history & render validation badges
-        autoFillOnNameChange('checkin', true);
+        autoFillOnNameChange('checkin', true, true);
 
         modal.classList.add('active');
         if (nameInput) {
@@ -739,7 +704,7 @@
 
         setDeskSelectValueWithFallback(divEl, archer.division || '', true);
         setDeskSelectValueWithFallback(genEl, archer.gender || '', false);
-        handleStyleRestrictions('edit');
+        handleStyleRestrictions('edit', true);
         setDeskSelectValueWithFallback(styleEl, archer.style || '', true);
 
         const payEl = document.getElementById('edit_pay_option');
@@ -756,7 +721,7 @@
             delete balanceEl.dataset.manualOverride;
         }
 
-        toggleFamilyBox('edit');
+        toggleFamilyBox('edit', true);
 
         modal.classList.add('active');
         if (nameInput) {
@@ -774,8 +739,6 @@
 
     /**
      * Smart Shooter Match Engine querying BOTH the Member Database and 18-Month TFAA History.
-     * Supports exact match, First+Last (+ suffix) middle-initial folding ("Mark E. Tanner" -> "Mark Tanner"),
-     * safe fuzzy alias prefix matching ("Steven" -> "Steve"), and optional substring matching for autocomplete.
      */
     function getAllTfaaMatches(typedName, allowPartial) {
         if (!typedName) return [];
@@ -795,7 +758,6 @@
             const isFlMatch    = (qKeys.tokenCount >= 2 && qKeys.lastTokenLen >= 2 && qKeys.fl && sKeys.fl === qKeys.fl);
             const isPartial    = allowPartial && (sName.includes(clean) || clean.includes(sName));
 
-            // Safe Fuzzy Alias Prefix Match (e.g., "steven" vs "steve" + exact last name)
             let isFuzzyMatch = false;
             if (!isExactMatch && !isFlMatch && qKeys.tokenCount >= 2 && sKeys.tokenCount >= 2) {
                 if (qKeys.last === sKeys.last && qKeys.suffix === sKeys.suffix) {
@@ -873,8 +835,7 @@
             const targetLabel = styleCfg.label.trim().toLowerCase();
             for (let i = 0; i < selectEl.options.length; i++) {
                 const opt = selectEl.options[i];
-                if (!opt.value) continue;
-                if (opt.value.trim().toLowerCase() === targetLabel) {
+                if (opt.value && opt.value.trim().toLowerCase() === targetLabel) {
                     selectEl.value = opt.value;
                     return;
                 }
@@ -887,8 +848,7 @@
             const targetDiv = divCfg.label.trim().toLowerCase();
             for (let i = 0; i < selectEl.options.length; i++) {
                 const opt = selectEl.options[i];
-                if (!opt.value) continue;
-                if (opt.value.trim().toLowerCase() === targetDiv) {
+                if (opt.value && opt.value.trim().toLowerCase() === targetDiv) {
                     selectEl.value = opt.value;
                     return;
                 }
@@ -923,7 +883,7 @@
             'genesis': 'genesis'
         };
 
-        const cleanBase = clean.split(' –')[0].split(' - ')[0].trim();
+        const cleanBase    = clean.split(' –')[0].split(' - ')[0].trim();
         const mappedTarget = legacyStyleMap[clean] || legacyStyleMap[cleanBase] || '';
 
         for (let i = 0; i < selectEl.options.length; i++) {
@@ -938,19 +898,11 @@
         }
 
         // 4. Gender resolution ("M" / "Male", "F" / "Female")
-        if (clean === 'm' || clean === 'male') {
+        if (clean === 'm' || clean === 'male' || clean === 'f' || clean === 'female') {
+            const genderPrefix = (clean.charAt(0) === 'f') ? 'female' : 'male';
             for (let i = 0; i < selectEl.options.length; i++) {
                 const opt = selectEl.options[i];
-                if (opt.value && opt.value.toLowerCase().startsWith('male')) {
-                    selectEl.value = opt.value;
-                    return;
-                }
-            }
-        }
-        if (clean === 'f' || clean === 'female') {
-            for (let i = 0; i < selectEl.options.length; i++) {
-                const opt = selectEl.options[i];
-                if (opt.value && opt.value.toLowerCase().startsWith('female')) {
+                if (opt.value && opt.value.toLowerCase().startsWith(genderPrefix)) {
                     selectEl.value = opt.value;
                     return;
                 }
@@ -958,13 +910,12 @@
         }
 
         // 5. Fallback prefix/substring match
+        const cleanSanitized = cleanBase.replace(/[^a-z0-9]/gi, '');
         for (let i = 0; i < selectEl.options.length; i++) {
             const opt = selectEl.options[i];
             if (!opt.value) continue;
-            const optLower = opt.value.trim().toLowerCase();
-
-            const cleanSanitized = cleanBase.replace(/[^a-z0-9]/gi, '');
-            const optSanitized   = optLower.split(' –')[0].split(' - ')[0].replace(/[^a-z0-9]/gi, '');
+            const optLower     = opt.value.trim().toLowerCase();
+            const optSanitized = optLower.split(' –')[0].split(' - ')[0].replace(/[^a-z0-9]/gi, '');
 
             if (cleanSanitized && optSanitized && cleanSanitized === optSanitized) {
                 selectEl.value = opt.value;
@@ -1112,7 +1063,7 @@
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (nameInput && officialName) {
             nameInput.value = officialName;
-            autoFillOnNameChange(prefix, false);
+            autoFillOnNameChange(prefix, false, false);
         }
     }
 
@@ -1212,13 +1163,9 @@
                 pillBtn.type = 'button';
                 pillBtn.className = 'sywat-btn-pill';
 
-                let pillLabel = '';
-                if (hasMultipleMatches && catName) {
-                    pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(catName) + '</strong> (' + escapeHtmlDesk((styShort + ' ' + divShort + ' ' + genShort).trim()) + ')';
-                } else {
-                    pillLabel = '⚡ Load: <strong>' + escapeHtmlDesk(styShort) + '</strong> (' + escapeHtmlDesk((divShort + ' ' + genShort).trim()) + ')';
-                }
-                pillBtn.innerHTML = pillLabel;
+                pillBtn.innerHTML = (hasMultipleMatches && catName)
+                    ? '⚡ Load: <strong>' + escapeHtmlDesk(catName) + '</strong> (' + escapeHtmlDesk((styShort + ' ' + divShort + ' ' + genShort).trim()) + ')'
+                    : '⚡ Load: <strong>' + escapeHtmlDesk(styShort) + '</strong> (' + escapeHtmlDesk((divShort + ' ' + genShort).trim()) + ')';
 
                 pillBtn.addEventListener('click', function() {
                     loadTfaaCategory(prefix, cat.division, cat.gender, cat.style, catName);
@@ -1281,7 +1228,7 @@
         badgeEl.innerHTML = badgeText + promoBannerHtml;
     }
 
-    function autoFillOnNameChange(prefix, preserveExisting) {
+    function autoFillOnNameChange(prefix, preserveExisting, skipBalanceSync) {
         const nameInput = (prefix === 'walkin') ? document.getElementById('walkin_name_input') : document.getElementById('checkin_archer_name');
         if (!nameInput) return;
 
@@ -1295,7 +1242,7 @@
                 if (divEl) divEl.value = '';
                 if (genEl) genEl.value = '';
                 if (styleEl) styleEl.value = '';
-                handleStyleRestrictions('walkin');
+                handleStyleRestrictions('walkin', skipBalanceSync);
             }
             evaluateTfaaStatus(prefix);
             return;
@@ -1348,12 +1295,12 @@
             if (canSetDiv) matchDeskTfaaSelect(historyRecord.division, divEl);
             if (canSetGen) matchDeskTfaaSelect(historyRecord.gender, genEl);
 
-            handleStyleRestrictions(prefix);
+            handleStyleRestrictions(prefix, skipBalanceSync);
 
             if (canSetStyle) matchDeskTfaaSelect(historyRecord.style, styleEl);
         }
 
-        handleStyleRestrictions(prefix);
+        handleStyleRestrictions(prefix, skipBalanceSync);
         evaluateTfaaStatus(prefix);
     }
 
@@ -1416,7 +1363,7 @@
         if (walkinNameInput) walkinNameInput.focus();
     }
 
-    function toggleFamilyBox(type) {
+    function toggleFamilyBox(type, skipBalanceSync) {
         const paySelect = document.getElementById(type + '_pay_option');
         const box       = document.getElementById(type + '_family_box');
         if (box) {
@@ -1426,7 +1373,7 @@
                 box.classList.add('sywat-hidden');
             }
         }
-        if (type === 'edit' || type === 'checkin') {
+        if (!skipBalanceSync && (type === 'edit' || type === 'checkin')) {
             syncDeskBalanceDisplay(type);
         }
     }
@@ -1449,7 +1396,7 @@
     /**
      * Enforce Division vs. Shooting Style Restrictions (Database-Driven with Legacy Fallback)
      */
-    function handleStyleRestrictions(type) {
+    function handleStyleRestrictions(type, skipBalanceSync) {
         const divisionEl = document.getElementById(type + '_division');
         const styleEl    = document.getElementById(type + '_style');
         if (!divisionEl || !styleEl) return;
@@ -1460,7 +1407,7 @@
             for (let i = 0; i < styleEl.options.length; i++) {
                 styleEl.options[i].disabled = false;
             }
-            if (type === 'edit' || type === 'checkin') {
+            if (!skipBalanceSync && (type === 'edit' || type === 'checkin')) {
                 syncDeskBalanceDisplay(type);
             }
             return;
@@ -1473,7 +1420,7 @@
                     styleEl.options[i].disabled = false;
                 }
             }
-            if (type === 'edit' || type === 'checkin') {
+            if (!skipBalanceSync && (type === 'edit' || type === 'checkin')) {
                 syncDeskBalanceDisplay(type);
             }
             return;
@@ -1501,7 +1448,7 @@
             if (isDisabled && styleEl.value === val) styleEl.value = 'FS – Freestyle';
         }
 
-        if (type === 'edit' || type === 'checkin') {
+        if (!skipBalanceSync && (type === 'edit' || type === 'checkin')) {
             syncDeskBalanceDisplay(type);
         }
     }
@@ -1545,7 +1492,7 @@
             if (!archerNameInput.value || archerNameInput.value === prevVal) {
                 delete archerNameInput.dataset.normalizedFrom;
                 archerNameInput.value = input.value;
-                autoFillOnNameChange('walkin', false);
+                autoFillOnNameChange('walkin', false, false);
             }
         }
         input.setAttribute('data-prev-val', input.value);
@@ -1692,7 +1639,7 @@
         if (walkinInput) {
             walkinInput.addEventListener('input', function() {
                 delete this.dataset.normalizedFrom;
-                autoFillOnNameChange('walkin', false);
+                autoFillOnNameChange('walkin', false, false);
             });
         }
 
@@ -1707,11 +1654,11 @@
         if (checkinArcherNameEl) {
             checkinArcherNameEl.addEventListener('input', function() {
                 delete this.dataset.normalizedFrom;
-                autoFillOnNameChange('checkin', false);
+                autoFillOnNameChange('checkin', false, false);
             });
             if (checkinArcherNameEl.value.trim() !== '') {
-                autoFillOnNameChange('checkin', true);
-                toggleFamilyBox('checkin');
+                autoFillOnNameChange('checkin', true, true);
+                toggleFamilyBox('checkin', true);
             }
         }
 
@@ -1731,9 +1678,9 @@
 
         applyDeskLineAndSearchFilter();
 
-        if (document.getElementById('walkin_division')) handleStyleRestrictions('walkin');
-        if (document.getElementById('checkin_division')) handleStyleRestrictions('checkin');
-        if (document.getElementById('edit_division')) handleStyleRestrictions('edit');
+        if (document.getElementById('walkin_division')) handleStyleRestrictions('walkin', true);
+        if (document.getElementById('checkin_division')) handleStyleRestrictions('checkin', true);
+        if (document.getElementById('edit_division')) handleStyleRestrictions('edit', true);
 
         // Auto-dismiss standard top-level notices after 4 seconds
         setTimeout(function() {
@@ -1771,98 +1718,77 @@
 
         const action = actionEl.getAttribute('data-sywat-action');
 
-        if (action === 'open-desk-checkin-modal') {
-            e.preventDefault();
-            const archer = parseRowArcherPayload(actionEl);
-            if (archer) {
-                openDeskCheckinModal(archer);
-            }
-            return;
-        }
-
-        if (action === 'close-desk-checkin-modal') {
-            e.preventDefault();
-            closeDeskCheckinModal();
-            return;
-        }
-
-        if (action === 'open-desk-edit-modal') {
-            e.preventDefault();
-            const archer = parseRowArcherPayload(actionEl);
-            if (archer) {
-                openDeskEditModal(archer);
-            }
-            return;
-        }
-
-        if (action === 'close-desk-edit-modal') {
-            e.preventDefault();
-            closeDeskEditModal();
-            return;
-        }
-
-        if (action === 'open-desk-walkin-modal') {
-            e.preventDefault();
-            openWalkinModal();
-            return;
-        }
-
-        if (action === 'close-desk-walkin-modal') {
-            e.preventDefault();
-            closeWalkinModal();
-            return;
-        }
-
-        if (action === 'select-desk-line') {
-            e.preventDefault();
-            const targetLineIdx = actionEl.getAttribute('data-line-idx') || 'all';
-            const lineSelect    = document.getElementById('sywat_selected_line_idx');
-            if (lineSelect) {
-                lineSelect.value = targetLineIdx;
-            }
-            applyDeskLineAndSearchFilter();
-            const tableEl = document.getElementById('sywat_desk_archers_table');
-            if (tableEl && typeof tableEl.scrollIntoView === 'function') {
-                tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            return;
-        }
-
-        if (action === 'clear-desk-search') {
-            e.preventDefault();
-            applyDeskSearchFilter('');
-            return;
-        }
-
-        if (action === 'continue-family-loop') {
-            e.preventDefault();
-            const famId   = actionEl.getAttribute('data-family-id') || '';
-            const lineIdx = actionEl.getAttribute('data-line-idx') || '0';
-            continueFamilyLoop(famId, lineIdx);
-            return;
-        }
-
-        if (action === 'dismiss-family-banner') {
-            e.preventDefault();
-            const banner = actionEl.closest('.sywat-family-banner');
-            if (banner) {
-                banner.remove();
-            }
-            return;
-        }
-
-        if (action === 'use-official-desk-name') {
-            e.preventDefault();
-            const prefix       = actionEl.getAttribute('data-prefix') || 'checkin';
-            const officialName = actionEl.getAttribute('data-official-name') || '';
-            updateNameToOfficial(prefix, officialName);
-            return;
-        }
-
-        if (action === 'confirm-delete-archer') {
-            if (!window.confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?')) {
+        switch (action) {
+            case 'open-desk-checkin-modal': {
                 e.preventDefault();
+                const archer = parseRowArcherPayload(actionEl);
+                if (archer) openDeskCheckinModal(archer);
+                break;
             }
+            case 'close-desk-checkin-modal':
+                e.preventDefault();
+                closeDeskCheckinModal();
+                break;
+            case 'open-desk-edit-modal': {
+                e.preventDefault();
+                const archer = parseRowArcherPayload(actionEl);
+                if (archer) openDeskEditModal(archer);
+                break;
+            }
+            case 'close-desk-edit-modal':
+                e.preventDefault();
+                closeDeskEditModal();
+                break;
+            case 'open-desk-walkin-modal':
+                e.preventDefault();
+                openWalkinModal();
+                break;
+            case 'close-desk-walkin-modal':
+                e.preventDefault();
+                closeWalkinModal();
+                break;
+            case 'select-desk-line': {
+                e.preventDefault();
+                const lineSelect = document.getElementById('sywat_selected_line_idx');
+                if (lineSelect) {
+                    lineSelect.value = actionEl.getAttribute('data-line-idx') || 'all';
+                }
+                applyDeskLineAndSearchFilter();
+                const tableEl = document.getElementById('sywat_desk_archers_table');
+                if (tableEl && typeof tableEl.scrollIntoView === 'function') {
+                    tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                break;
+            }
+            case 'clear-desk-search':
+                e.preventDefault();
+                applyDeskSearchFilter('');
+                break;
+            case 'continue-family-loop':
+                e.preventDefault();
+                continueFamilyLoop(
+                    actionEl.getAttribute('data-family-id') || '',
+                    actionEl.getAttribute('data-line-idx') || '0'
+                );
+                break;
+            case 'dismiss-family-banner': {
+                e.preventDefault();
+                const banner = actionEl.closest('.sywat-family-banner');
+                if (banner) banner.remove();
+                break;
+            }
+            case 'use-official-desk-name':
+                e.preventDefault();
+                updateNameToOfficial(
+                    actionEl.getAttribute('data-prefix') || 'checkin',
+                    actionEl.getAttribute('data-official-name') || ''
+                );
+                break;
+            case 'confirm-delete-archer':
+                if (!window.confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?')) {
+                    e.preventDefault();
+                }
+                break;
         }
     });
 
@@ -1871,100 +1797,73 @@
         if (!e.target) return;
         const action = e.target.getAttribute('data-sywat-action') || '';
 
-        if (action === 'submit-desk-tournament') {
-            const filterForm = document.getElementById('sywat_filter_form');
-            if (filterForm) {
-                filterForm.submit();
+        if (!action) {
+            if (e.target.id === 'checkin_pricing_profile') syncDeskBalanceDisplay('checkin');
+            else if (e.target.id === 'edit_pricing_profile') syncDeskBalanceDisplay('edit');
+            return;
+        }
+
+        switch (action) {
+            case 'submit-desk-tournament': {
+                const filterForm = document.getElementById('sywat_filter_form');
+                if (filterForm) filterForm.submit();
+                break;
             }
-            return;
-        }
-
-        if (action === 'filter-desk-line') {
-            applyDeskLineAndSearchFilter();
-            return;
-        }
-
-        if (action === 'toggle-unpaid-banner') {
-            toggleUnpaidBanner(!!e.target.checked);
-            return;
-        }
-
-        if (action === 'sync-checkin-balance' || e.target.id === 'checkin_pricing_profile') {
-            syncDeskBalanceDisplay('checkin');
-            return;
-        }
-
-        if (action === 'checkin-division-change') {
-            handleStyleRestrictions('checkin');
-            evaluateTfaaStatus('checkin');
-            return;
-        }
-
-        if (action === 'checkin-gender-change') {
-            evaluateTfaaStatus('checkin');
-            return;
-        }
-
-        if (action === 'checkin-style-change') {
-            handleStyleChange('checkin');
-            evaluateTfaaStatus('checkin');
-            return;
-        }
-
-        if (action === 'checkin-pay-change') {
-            toggleFamilyBox('checkin');
-            return;
-        }
-
-        if (action === 'sync-edit-balance' || e.target.id === 'edit_pricing_profile') {
-            syncDeskBalanceDisplay('edit');
-            return;
-        }
-
-        if (action === 'edit-line-change') {
-            updateEditFamilyOptions(e.target.value);
-            return;
-        }
-
-        if (action === 'edit-division-change') {
-            handleStyleRestrictions('edit');
-            return;
-        }
-
-        if (action === 'edit-style-change') {
-            handleStyleChange('edit');
-            return;
-        }
-
-        if (action === 'edit-pay-change') {
-            toggleFamilyBox('edit');
-            return;
-        }
-
-        if (action === 'walkin-line-change') {
-            updateWalkinFamilyOptions(e.target.value);
-            return;
-        }
-
-        if (action === 'walkin-round-change') {
-            evaluateTfaaStatus('walkin');
-            return;
-        }
-
-        if (action === 'walkin-division-change') {
-            handleStyleRestrictions('walkin');
-            evaluateTfaaStatus('walkin');
-            return;
-        }
-
-        if (action === 'walkin-gender-change') {
-            evaluateTfaaStatus('walkin');
-            return;
-        }
-
-        if (action === 'walkin-style-change') {
-            handleStyleChange('walkin');
-            evaluateTfaaStatus('walkin');
+            case 'filter-desk-line':
+                applyDeskLineAndSearchFilter();
+                break;
+            case 'toggle-unpaid-banner':
+                toggleUnpaidBanner(!!e.target.checked);
+                break;
+            case 'sync-checkin-balance':
+                syncDeskBalanceDisplay('checkin');
+                break;
+            case 'checkin-division-change':
+                handleStyleRestrictions('checkin');
+                evaluateTfaaStatus('checkin');
+                break;
+            case 'checkin-gender-change':
+                evaluateTfaaStatus('checkin');
+                break;
+            case 'checkin-style-change':
+                handleStyleChange('checkin');
+                evaluateTfaaStatus('checkin');
+                break;
+            case 'checkin-pay-change':
+                toggleFamilyBox('checkin');
+                break;
+            case 'sync-edit-balance':
+                syncDeskBalanceDisplay('edit');
+                break;
+            case 'edit-line-change':
+                updateEditFamilyOptions(e.target.value);
+                break;
+            case 'edit-division-change':
+                handleStyleRestrictions('edit');
+                break;
+            case 'edit-style-change':
+                handleStyleChange('edit');
+                break;
+            case 'edit-pay-change':
+                toggleFamilyBox('edit');
+                break;
+            case 'walkin-line-change':
+                updateWalkinFamilyOptions(e.target.value);
+                break;
+            case 'walkin-round-change':
+                evaluateTfaaStatus('walkin');
+                break;
+            case 'walkin-division-change':
+                handleStyleRestrictions('walkin');
+                evaluateTfaaStatus('walkin');
+                break;
+            case 'walkin-gender-change':
+                evaluateTfaaStatus('walkin');
+                break;
+            case 'walkin-style-change':
+                handleStyleChange('walkin');
+                evaluateTfaaStatus('walkin');
+                break;
         }
     });
 
