@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
- * Description: Provides season/tournament retrieval (with automatic default active-season recovery if sywat_seasons_list was saved without an active season), live registration loading with automatic slug-to-title reconciliation (excluding archived "_hist_" migration records), TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
- * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, omitted closing PHP tag.
+ * Description: Provides season/tournament retrieval (with automatic default active-season recovery if sywat_seasons_list was saved without an active season), indexed non-historical registration loading (preventing full-table scans across 30,000+ archived "_hist_" rows in wp_options), automatic slug-to-title reconciliation, TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
+ * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, indexed prefix option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.5
+ * Version: 8.1.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -130,15 +130,79 @@ if ( ! function_exists( 'sywat_get_registrations' ) ) {
 }
 
 /**
- * Retrieves all individual archer registration records across active tournaments directly from wp_options,
- * excluding archived "_hist_" historical migration rows.
+ * Queries wp_options using indexed tournament slug prefixes (`sywat_t_{slug}_%`) strictly
+ * for non-historical tournaments (or a single target tournament), avoiding unindexed full-table
+ * scans across tens of thousands of archived historical TFAA scorecard records.
+ *
+ * @param array  $tournaments       Optional pre-fetched sywat_tournaments_list map.
+ * @param string $single_tournament Optional single tournament name to scope exclusively.
+ * @return array                    Raw database result rows with option_name and option_value.
  */
-if ( ! function_exists( 'sywat_get_all_registrations' ) ) {
-    function sywat_get_all_registrations() {
+if ( ! function_exists( 'sywat_query_active_tournament_option_rows' ) ) {
+    function sywat_query_active_tournament_option_rows( $tournaments = array(), $single_tournament = '' ) {
         global $wpdb;
 
+        if ( $single_tournament !== '' ) {
+            $single_slug = sanitize_title( $single_tournament );
+            if ( $single_slug !== '' ) {
+                $prefix = 'sywat_t_' . $single_slug . '_';
+                return $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                        $wpdb->esc_like( $prefix ) . '%'
+                    )
+                );
+            }
+        }
+
+        if ( empty( $tournaments ) || ! is_array( $tournaments ) ) {
+            $tournaments = get_option( 'sywat_tournaments_list', array() );
+        }
+
+        if ( is_array( $tournaments ) && ! empty( $tournaments ) ) {
+            $like_clauses = array();
+            $like_params  = array();
+            $seen_slugs   = array();
+
+            foreach ( $tournaments as $t_name => $t_data ) {
+                if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                    continue;
+                }
+                $t_slug = sanitize_title( (string) $t_name );
+                if ( $t_slug === '' || isset( $seen_slugs[ $t_slug ] ) ) {
+                    continue;
+                }
+                $seen_slugs[ $t_slug ] = true;
+                $like_clauses[]        = 'option_name LIKE %s';
+                $like_params[]         = $wpdb->esc_like( 'sywat_t_' . $t_slug . '_' ) . '%';
+            }
+
+            if ( empty( $like_clauses ) ) {
+                return array();
+            }
+
+            $sql = "SELECT option_name, option_value FROM {$wpdb->options} WHERE " . implode( ' OR ', $like_clauses );
+            return $wpdb->get_results( $wpdb->prepare( $sql, $like_params ) );
+        }
+
+        return $wpdb->get_results(
+            "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'"
+        );
+    }
+}
+
+/**
+ * Retrieves all individual archer registration records across active (non-historical) tournaments
+ * using indexed tournament prefix queries in wp_options.
+ *
+ * @param array  $tournaments       Optional pre-fetched sywat_tournaments_list map.
+ * @param string $single_tournament Optional single tournament name to scope exclusively.
+ * @return array                    List of active registration records.
+ */
+if ( ! function_exists( 'sywat_get_all_registrations' ) ) {
+    function sywat_get_all_registrations( $tournaments = array(), $single_tournament = '' ) {
         $registrations = array();
-        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'" );
+        $results       = sywat_query_active_tournament_option_rows( $tournaments, $single_tournament );
 
         if ( is_array( $results ) ) {
             foreach ( $results as $row ) {
@@ -149,7 +213,7 @@ if ( ! function_exists( 'sywat_get_all_registrations' ) ) {
             }
         }
 
-        if ( empty( $registrations ) ) {
+        if ( empty( $registrations ) && $single_tournament === '' ) {
             $registrations = sywat_get_registrations();
         }
 
@@ -332,6 +396,10 @@ if ( ! function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
 
         $updated_count = 0;
         foreach ( $all_tournaments as $t_name => &$t_data ) {
+            if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                continue;
+            }
+
             if ( $is_debug ) {
                 $debug_log[] = '--------------------------------------------------';
                 $debug_log[] = "Evaluating Local DB Tournament: '{$t_name}'";
@@ -460,6 +528,9 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
             $duplicate_name = '';
 
             foreach ( $all_existing_tournaments as $t_key => $ex ) {
+                if ( is_array( $ex ) && ! empty( $ex['historical_import'] ) ) {
+                    continue;
+                }
                 $ex_season = isset( $ex['season'] ) ? $ex['season'] : ( isset( $ex['season_slug'] ) ? $ex['season_slug'] : '' );
                 if ( $ex_season !== $target_season ) {
                     continue;
@@ -591,7 +662,8 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
 
 /**
  * Re-sequences tournaments chronologically for a specific shop and season,
- * migrating all associated archer registrations directly in wp_options.
+ * migrating all associated archer registrations directly in wp_options while skipping
+ * archived historical_import records.
  */
 if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
     function sywat_resequence_shop_tournaments( $shop_id, $season_slug, &$tournaments, &$active_tournaments, &$registrations ) {
@@ -600,7 +672,7 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
         }
 
         if ( empty( $registrations ) || ! is_array( $registrations ) ) {
-            $registrations = sywat_get_all_registrations();
+            $registrations = sywat_get_all_registrations( $tournaments );
         }
 
         $all_shops = function_exists( 'sywat_get_shops' ) ? sywat_get_shops() : ( function_exists( 'sywat_get_all_shops' ) ? sywat_get_all_shops() : array() );
@@ -618,6 +690,10 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
         $shop_tournaments = array();
         foreach ( $tournaments as $t_name => $t_data ) {
+            if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                continue;
+            }
+
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : '';
             if ( empty( $t_shop ) || ! isset( $all_shops[ $t_shop ] ) ) {
                 $raw_shop = ! empty( $t_data['shop_name'] ) ? $t_data['shop_name'] : ( ! empty( $t_data['official_shop_name'] ) ? $t_data['official_shop_name'] : '' );
@@ -727,12 +803,11 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
  * Master Data Retrieval Engine for Admin Portal & Views.
  * Automatically reconciles any active registration records whose tournament slug matches a configured
  * tournament whose display punctuation/spacing was normalized (e.g., space vs. hyphen),
- * while excluding archived "_hist_" historical migration rows from full-table scans.
+ * querying strictly non-historical tournament prefixes so archived TFAA scorecards never slow down
+ * portal paint or Roster modal rendering.
  */
 if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
     function sywat_get_master_portal_data() {
-        global $wpdb;
-
         $can_manage_seasons = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
         $can_access_desk    = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_edit_scores    = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
@@ -761,7 +836,7 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         }
 
         $registrations = array();
-        $results       = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'" );
+        $results       = sywat_query_active_tournament_option_rows( $tournaments );
 
         if ( is_array( $results ) ) {
             foreach ( $results as $row ) {
@@ -786,7 +861,7 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
 
         $scoped_tournaments = array();
         $filter_shops       = array();
-        $selected_season    = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( $_REQUEST['filter_season'] ) : '';
+        $selected_season    = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['filter_season'] ) ) : '';
 
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
