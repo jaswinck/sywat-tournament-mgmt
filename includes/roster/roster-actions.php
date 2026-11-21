@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Action Handlers (Edit, Remove & Line Purge)
  * Path: includes/roster/roster-actions.php
- * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, canonical archer name enforcement across comma-inverted/middle-initial/alias inputs, First+Last same-line duplicate guard, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
- * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, omitted closing PHP tag.
+ * Description: Handles editing archer registrations (including Pre-Reg / Waitlist status sync, canonical archer name enforcement across comma-inverted/middle-initial/alias inputs only when the name changes, First+Last same-line duplicate guard, round/pricing profile persistence, automatic fee recalculation on division/round changes, Promotional Free Entry handling, and database-driven shooting style & division rule enforcement), removing individual shooters, and clearing active line rosters while reconciling dynamic Household Family Cap fees and multi-store persistence.
+ * Compliance: Pure action layer — zero HTML echo at include time, zero script/style tags, O(N) tournament-scoped scans, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -152,10 +152,10 @@ if ( ! function_exists( 'sywat_roster_delete_record_storage' ) ) {
 /**
  * Action Handler: Save Edited Archer Registration from the Roster Modal.
  * Synchronizes Pre-Reg / Waitlist status, enforces canonical FirstName LastName formatting
- * across comma-inverted/middle-initial/alias inputs, validates normalized First+Last duplicates
- * on target lines, persists round/pricing profile selection and Promotional Free Entry status,
- * recalculates unpaid fees on division/round changes, enforces database-driven style & division rules,
- * enforces $0.00 balance due on Waitlist, and reconciles dynamic Household Family Cap fees.
+ * when the archer name changes, validates normalized First+Last duplicates on target lines
+ * using tournament-scoped records, persists round/pricing profile selection and Promotional Free Entry
+ * status, recalculates unpaid fees on division/round changes, enforces database-driven style &
+ * division rules, enforces $0.00 balance due on Waitlist, and reconciles dynamic Household Family Cap fees.
  *
  * @param array $tournaments   Master tournaments array.
  * @param array $registrations Reference to registrations array.
@@ -176,11 +176,18 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         $opt_key = 'sywat_t_' . $t_slug . '_' . $reg_id;
         $reg     = get_option( $opt_key, null );
 
-        if ( ! is_array( $reg ) && is_array( $registrations ) ) {
+        // Build tournament-scoped registration list once so downstream checks never iterate 25,000+ historical rows
+        $tourn_registrations = array();
+        if ( is_array( $registrations ) ) {
             foreach ( $registrations as $candidate ) {
-                if ( is_array( $candidate ) && isset( $candidate['id'] ) && (string) $candidate['id'] === $reg_id ) {
-                    $reg = $candidate;
-                    break;
+                if ( ! is_array( $candidate ) || ! isset( $candidate['tournament'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $candidate['tournament'] ), $tourn_name ) === 0 ) {
+                    $tourn_registrations[] = $candidate;
+                    if ( ! is_array( $reg ) && isset( $candidate['id'] ) && (string) $candidate['id'] === $reg_id ) {
+                        $reg = $candidate;
+                    }
                 }
             }
         }
@@ -218,7 +225,7 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             ? trim( preg_replace( '/[[:space:]]+/', ' ', sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) )
             : $orig_name;
 
-        // Enforce canonical "FirstName LastName" storage across comma-inverted, middle-initial, and alias inputs
+        // Enforce canonical "FirstName LastName" storage; run historical profile resolution ONLY if the name was modified
         $edit_name = $raw_edit_name;
         if ( $edit_name !== '' ) {
             if ( strpos( $edit_name, ',' ) !== false ) {
@@ -228,7 +235,7 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
                 }
             }
 
-            if ( function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
+            if ( strcasecmp( $edit_name, $orig_name ) !== 0 && function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
                 $resolved_profile = sywat_resolve_archer_intake_profile(
                     $edit_name,
                     $tourn_start_date,
@@ -276,8 +283,8 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $new_status = 'Pre-Reg';
         }
 
-        // Normalized exact & First+Last duplicate name-on-line guard for non-cancelled records
-        if ( $new_status !== 'Cancelled' && is_array( $registrations ) ) {
+        // Normalized exact & First+Last duplicate name-on-line guard across tournament-scoped records
+        if ( $new_status !== 'Cancelled' && ! empty( $tourn_registrations ) ) {
             $build_match_keys = function( $raw_val ) {
                 if ( function_exists( 'sywat_normalize_archer_match_keys' ) ) {
                     return sywat_normalize_archer_match_keys( $raw_val );
@@ -293,14 +300,8 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
             $cand_keys   = $build_match_keys( $edit_name );
             $has_fl_pair = ( $cand_keys['fl'] !== '' && strpos( $cand_keys['fl'], '___' ) !== false );
 
-            foreach ( $registrations as $other ) {
-                if ( ! is_array( $other ) || ! isset( $other['id'], $other['tournament'] ) ) {
-                    continue;
-                }
-                if ( (string) $other['id'] === $reg_id ) {
-                    continue;
-                }
-                if ( strcasecmp( trim( (string) $other['tournament'] ), $tourn_name ) !== 0 ) {
+            foreach ( $tourn_registrations as $other ) {
+                if ( ! isset( $other['id'] ) || (string) $other['id'] === $reg_id ) {
                     continue;
                 }
 
@@ -376,14 +377,13 @@ if ( ! function_exists( 'sywat_handle_save_edit' ) ) {
         $reg['style']           = $style;
         $reg['status']          = $new_status;
 
-        // Resolve line-scoped family group assignment
+        // Resolve line-scoped family group assignment (build family map only when attaching to an existing group)
         if ( $pay_opt === 'Family' ) {
-            $families_by_line = function_exists( 'sywat_waitlist_build_family_labels_by_line' )
-                ? sywat_waitlist_build_family_labels_by_line( $tourn_name, $t_lines, $registrations )
-                : array();
-            $line_families = isset( $families_by_line[ $new_line_idx ] ) ? $families_by_line[ $new_line_idx ] : array();
-
             if ( $sel_fam_id !== '' ) {
+                $families_by_line = function_exists( 'sywat_waitlist_build_family_labels_by_line' )
+                    ? sywat_waitlist_build_family_labels_by_line( $tourn_name, $t_lines, $tourn_registrations )
+                    : array();
+                $line_families      = isset( $families_by_line[ $new_line_idx ] ) ? $families_by_line[ $new_line_idx ] : array();
                 $reg['family_id']   = $sel_fam_id;
                 $reg['family_name'] = isset( $line_families[ $sel_fam_id ] )
                     ? $line_families[ $sel_fam_id ]
