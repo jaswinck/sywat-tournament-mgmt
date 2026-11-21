@@ -3,20 +3,22 @@
  * Path: assets/js/sywat-history-import.js
  * Description: Vanilla JS client controller for permanently persisted TFAA seasons and per-season
  *              tournament manifests, live import status tracking (#sywat_history_events_modal),
- *              chunked single-event and multi-season AJAX imports (#sywat_history_progress_modal),
+ *              concurrent 8-event batch AJAX imports (#sywat_history_progress_modal),
  *              and archived season purging.
  * Compliance: Zero jQuery, namespaced under window.SYWAT.historyImport, delegated data-sywat-action
  *             listeners across document (survives modal relocation to <body>), Modal Markup Contract
  *             compliant (.active class + data-sywat-static="true" while running), zero element.style.*
  *             mutations except progress bar width.
  * Author: SYWAT Archery
- * Version: 1.2.1
+ * Version: 1.3.0
  */
 
 (function () {
     'use strict';
 
     window.SYWAT = window.SYWAT || {};
+
+    var BATCH_SIZE = 8;
 
     var state = {
         seasons: [],
@@ -464,7 +466,37 @@
     }
 
     /**
-     * Sequentially import an array of normalized event descriptors (1 event per AJAX tick).
+     * Apply per-event batch import outcome to in-memory season & event state.
+     */
+    function applyImportedEventState(ev, archerCount) {
+        var sSlug = String(ev.season_slug || '');
+        var eid = parseInt(ev.event_id, 10) || 0;
+
+        if (sSlug && Array.isArray(state.eventsBySeason[sSlug])) {
+            state.eventsBySeason[sSlug].forEach(function (item) {
+                if ((parseInt(item.event_id, 10) || 0) === eid) {
+                    item.already_imported = true;
+                    item.archer_count = archerCount;
+                }
+            });
+        }
+
+        var seasonObj = state.seasonSlugMap[sSlug] || state.seasonMap[String(ev._rowKey || '')];
+        if (seasonObj) {
+            var evList = state.eventsBySeason[sSlug] || [];
+            var impCnt = evList.filter(function (item) { return Boolean(item.already_imported); }).length;
+            seasonObj.imported = true;
+            seasonObj.existing_events = impCnt > 0 ? impCnt : (parseInt(seasonObj.existing_events, 10) || 0) + 1;
+            if (evList.length > 0) {
+                seasonObj.discovered_events = evList.length;
+            }
+            seasonObj.local_status = 'archived';
+        }
+    }
+
+    /**
+     * Import an array of normalized event descriptors in concurrent batches of BATCH_SIZE (8)
+     * per AJAX call, committing sequentially inside PHP to avoid wp_options race conditions.
      */
     function runEventQueue(eventQueue, priorErrors) {
         var totalImportedEvents = 0;
@@ -476,53 +508,76 @@
             return Promise.resolve({ events: 0, archers: 0, errors: totalErrors });
         }
 
-        updateProgress('Importing historical tournaments...', 0, eventQueue.length);
+        var chunks = [];
+        for (var i = 0; i < eventQueue.length; i += BATCH_SIZE) {
+            chunks.push(eventQueue.slice(i, i + BATCH_SIZE));
+        }
+
+        var processedCount = 0;
+        updateProgress('Importing historical tournaments (batches of ' + BATCH_SIZE + ')...', 0, eventQueue.length);
 
         var chain = Promise.resolve();
-        eventQueue.forEach(function (ev, idx) {
+        chunks.forEach(function (chunk) {
             chain = chain.then(function () {
                 if (state.stopRequested) {
                     return;
                 }
-                updateProgress('Importing: ' + ev.title, idx, eventQueue.length);
 
-                return postAjax('sywat_history_import_tournament', {
-                    event_id: ev.event_id,
-                    raw_title: ev.raw_title || ev.title,
-                    title: ev.title,
-                    season_id: ev.season_id || 0,
-                    season_name: ev.season_name || ev.season_slug,
-                    season_slug: ev.season_slug,
-                    start_date: ev.start_date || '',
-                    end_date: ev.end_date || ev.start_date || '',
-                    event_type: ev.event_type || 'SYWAT'
+                var firstTitle = chunk[0] ? chunk[0].title : '';
+                var batchLabel = chunk.length > 1
+                    ? ('Batch (' + chunk.length + ' events): ' + firstTitle + '...')
+                    : ('Importing: ' + firstTitle);
+                updateProgress(batchLabel, processedCount, eventQueue.length);
+
+                var payloadItems = chunk.map(function (ev) {
+                    return {
+                        event_id: ev.event_id,
+                        raw_title: ev.raw_title || ev.title,
+                        title: ev.title,
+                        season_id: ev.season_id || 0,
+                        season_name: ev.season_name || ev.season_slug,
+                        season_slug: ev.season_slug,
+                        start_date: ev.start_date || '',
+                        end_date: ev.end_date || ev.start_date || '',
+                        event_type: ev.event_type || 'SYWAT'
+                    };
+                });
+
+                return postAjax('sywat_history_import_tournament_batch', {
+                    events_json: JSON.stringify(payloadItems)
                 }).then(function (res) {
-                    totalImportedEvents++;
-                    var archers = parseInt(res.archer_count, 10) || 0;
-                    totalImportedArchers += archers;
-
-                    var sSlug = String(res.season_slug || ev.season_slug || '');
-                    if (sSlug && Array.isArray(res.events)) {
-                        state.eventsBySeason[sSlug] = res.events;
-                    }
-                    var seasonObj = state.seasonSlugMap[sSlug] || state.seasonMap[String(ev._rowKey || '')];
-                    if (seasonObj) {
-                        var evList = state.eventsBySeason[sSlug] || [];
-                        var impCnt = evList.filter(function (item) { return Boolean(item.already_imported); }).length;
-                        seasonObj.imported = true;
-                        seasonObj.existing_events = impCnt > 0 ? impCnt : (parseInt(seasonObj.existing_events, 10) || 0) + 1;
-                        if (evList.length > 0) {
-                            seasonObj.discovered_events = evList.length;
+                    var batchResults = Array.isArray(res.results) ? res.results : [];
+                    var resultById = {};
+                    batchResults.forEach(function (item) {
+                        if (item && item.event_id) {
+                            resultById[String(item.event_id)] = item;
                         }
-                        seasonObj.local_status = 'archived';
-                    }
+                    });
 
-                    appendLog('success', 'Imported "' + (res.title || ev.title) + '" (' + archers + ' archer scorecards).');
-                    updateProgress('Imported ' + (idx + 1) + ' of ' + eventQueue.length + ' tournaments', idx + 1, eventQueue.length);
+                    chunk.forEach(function (ev, idx) {
+                        var itemRes = resultById[String(ev.event_id)] || batchResults[idx] || null;
+                        if (itemRes && itemRes.success) {
+                            totalImportedEvents++;
+                            var archers = parseInt(itemRes.archer_count, 10) || 0;
+                            totalImportedArchers += archers;
+                            applyImportedEventState(ev, archers);
+                            appendLog('success', 'Imported "' + (itemRes.title || ev.title) + '" (' + archers + ' archer scorecards).');
+                        } else {
+                            totalErrors++;
+                            var errMsg = (itemRes && itemRes.message) ? itemRes.message : 'Unknown error';
+                            appendLog('error', 'Error importing "' + ev.title + '": ' + errMsg);
+                        }
+                    });
+
+                    processedCount += chunk.length;
+                    updateProgress('Processed ' + processedCount + ' of ' + eventQueue.length + ' tournaments', processedCount, eventQueue.length);
                 }).catch(function (err) {
-                    totalErrors++;
-                    appendLog('error', 'Error importing "' + ev.title + '": ' + (err.message || 'Unknown error'));
-                    updateProgress('Processed ' + (idx + 1) + ' of ' + eventQueue.length + ' tournaments', idx + 1, eventQueue.length);
+                    totalErrors += chunk.length;
+                    chunk.forEach(function (ev) {
+                        appendLog('error', 'Error importing "' + ev.title + '": ' + (err.message || 'Batch request failed'));
+                    });
+                    processedCount += chunk.length;
+                    updateProgress('Processed ' + processedCount + ' of ' + eventQueue.length + ' tournaments', processedCount, eventQueue.length);
                 });
             });
         });
@@ -538,7 +593,7 @@
 
         if (state.stopRequested) {
             showBanner('info', 'Migration stopped by user. Imported ' + summary.events + ' tournament(s) and ' + summary.archers + ' archer scorecards before stopping.', true);
-            appendLog('info', 'Batch stopped cleanly after current event.');
+            appendLog('info', 'Batch stopped cleanly after current batch.');
         } else if (summary.errors > 0) {
             showBanner('danger', 'Migration finished with ' + summary.errors + ' error(s). Imported ' + summary.events + ' tournament(s) and ' + summary.archers + ' archer scorecards. Review the log below.', true);
         } else {
@@ -559,8 +614,9 @@
 
         var eventQueue = [];
         var scanErrors = 0;
+        var useSavedManifests = targetSeasons.length > 1;
 
-        updateProgress('Scanning selected season schedules...', 0, targetSeasons.length);
+        updateProgress('Preparing selected season schedules...', 0, targetSeasons.length);
         appendLog('info', 'Starting migration for ' + targetSeasons.length + ' season(s)...');
 
         var scanChain = Promise.resolve();
@@ -569,6 +625,27 @@
                 if (state.stopRequested) {
                     return;
                 }
+
+                var sSlug = String(season.slug || '');
+                var rowKey = getSeasonRowKey(season);
+                var cachedEvents = (useSavedManifests && sSlug && Array.isArray(state.eventsBySeason[sSlug]))
+                    ? state.eventsBySeason[sSlug]
+                    : [];
+
+                if (cachedEvents.length > 0) {
+                    cachedEvents.forEach(function (ev) {
+                        eventQueue.push(Object.assign({}, ev, {
+                            season_id: season.season_id,
+                            season_slug: sSlug,
+                            season_name: season.name,
+                            _rowKey: rowKey
+                        }));
+                    });
+                    appendLog('info', 'Using saved manifest for "' + season.name + '": ' + cachedEvents.length + ' tournament(s) queued.');
+                    updateProgress('Prepared ' + (idx + 1) + ' of ' + targetSeasons.length + ' season(s)...', idx + 1, targetSeasons.length);
+                    return;
+                }
+
                 updateProgress('Scanning season: ' + season.name + '...', idx, targetSeasons.length);
 
                 return postAjax('sywat_history_scan_season', {
@@ -577,11 +654,10 @@
                 }).then(function (scanData) {
                     var events = Array.isArray(scanData.events) ? scanData.events : [];
                     var savedSeason = scanData.season || season;
-                    var sSlug = String(savedSeason.slug || season.slug || '');
-                    var rowKey = getSeasonRowKey(season);
+                    var resolvedSlug = String(savedSeason.slug || sSlug);
 
-                    if (sSlug) {
-                        state.eventsBySeason[sSlug] = events;
+                    if (resolvedSlug) {
+                        state.eventsBySeason[resolvedSlug] = events;
                     }
                     if (state.seasonMap[rowKey]) {
                         state.seasonMap[rowKey].discovered_events = events.length;
@@ -589,7 +665,7 @@
 
                     events.forEach(function (ev) {
                         ev.season_id = season.season_id;
-                        ev.season_slug = sSlug;
+                        ev.season_slug = resolvedSlug;
                         ev.season_name = savedSeason.name || season.name;
                         ev._rowKey = rowKey;
                         eventQueue.push(ev);
@@ -784,7 +860,7 @@
             if (state.isRunning) {
                 state.stopRequested = true;
                 trigger.disabled = true;
-                showBanner('info', 'Stopping after the current tournament finishes...', true);
+                showBanner('info', 'Stopping after the current batch finishes...', true);
             }
         } else if (action === 'clear-log') {
             event.preventDefault();
