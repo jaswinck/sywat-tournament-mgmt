@@ -2,9 +2,10 @@
 /**
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
- * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, public online registration On/Off & lead-time overrides (inheriting host shop defaults), external registration links, and promoter flags, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, public online registration On/Off & lead-time overrides (inheriting host shop defaults), external registration links, and promoter flags, excludes historical_import archives from weekend bulk sync/push operations, avoids redundant remote TFAA scrapes during capacity/metadata-only edits, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Compliance: Pure action layer — zero HTML echo at include time, indexed active-tournament registration lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.17.0
+ * Version: 7.18.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -332,7 +333,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             // Re-sequence all host shops affected by bulk import
             if ( function_exists( 'sywat_resequence_shop_tournaments' ) ) {
                 if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                    $registrations = sywat_get_all_registrations();
+                    $registrations = sywat_get_all_registrations( $tournaments );
                 }
                 foreach ( $affected_shops as $s_id ) {
                     sywat_resequence_shop_tournaments( $s_id, $target_season, $tournaments, $active_tournaments, $registrations );
@@ -375,7 +376,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 $res = sywat_sync_tfaa_event_scores( $target_t );
                 if ( ! empty( $res['success'] ) ) {
                     $tournaments   = get_option( 'sywat_tournaments_list', array() );
-                    $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : get_option( 'sywat_registrations', array() );
+                    $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations( $tournaments ) : get_option( 'sywat_registrations', array() );
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🟢 ' . $res['message'] . '</div>';
                 } else {
                     return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ <strong>Sync Failed:</strong> ' . esc_html( $res['message'] ) . '</div>';
@@ -383,12 +384,15 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
         }
 
-        // Action: Bulk Sync All Tournament Scores with Populated TFAA Results Links (Fallback)
+        // Action: Bulk Sync All Active Tournament Scores with Populated TFAA Results Links (Excludes historical_import)
         if ( $action === 'sync_all_tfaa_weekend' ) {
             $target_tournaments = array();
 
             if ( is_array( $tournaments ) ) {
                 foreach ( $tournaments as $t_name => $t_data ) {
+                    if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                        continue;
+                    }
                     $has_url = ! empty( $t_data['tfaa_results_url'] );
                     $has_id  = ! empty( $t_data['tfaa_event_id'] );
                     if ( $has_url || $has_id ) {
@@ -398,7 +402,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             if ( empty( $target_tournaments ) ) {
-                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No tournaments with configured TFAA result links were found. Please run <strong>"Sync TFAA Links"</strong> first or set valid TFAA Event IDs.</div>';
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">⚠️ No active tournaments with configured TFAA result links were found. Please run <strong>"Sync TFAA Links"</strong> first or set valid TFAA Event IDs.</div>';
             }
 
             $tfaa_sync_file = dirname( __DIR__ ) . '/common/sywat-tfaa-sync.php';
@@ -425,7 +429,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
 
             $tournaments   = get_option( 'sywat_tournaments_list', array() );
-            $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : get_option( 'sywat_registrations', array() );
+            $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations( $tournaments ) : get_option( 'sywat_registrations', array() );
 
             $msg = '';
             if ( ! empty( $synced_names ) ) {
@@ -451,7 +455,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Updated Volunteer Hub status for <strong>' . esc_html( $target_t ) . '</strong>.</div>';
         }
 
-        // Action: Global Push All Weekend Scores to Season Standings
+        // Action: Global Push All Active Weekend Scores to Season Standings (Excludes historical_import)
         if ( $action === 'global_push_standings' ) {
             if ( ! $can_manage_seasons ) {
                 return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators and TFAA webmasters can push global standings.</div>';
@@ -461,6 +465,9 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $now_time     = current_time( 'mysql' );
 
             foreach ( $tournaments as $t_name => &$t_data ) {
+                if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                    continue;
+                }
                 $t_data['scores_published'] = true;
                 $t_data['published_at']     = $now_time;
                 $pushed_count++;
@@ -473,7 +480,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 sywat_recalculate_season_standings();
             }
 
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Weekend Standings Pushed!</strong> Successfully published scores across ' . $pushed_count . ' tournament(s) to Season Standings.</div>';
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">🚀 <strong>Weekend Standings Pushed!</strong> Successfully published scores across ' . $pushed_count . ' active tournament(s) to Season Standings.</div>';
         }
 
         // Action: Toggle Push / Publish Scores to Season Standings (Single Event Fallback)
@@ -597,6 +604,9 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             // -------------------------------------------------------------
             $target_shop_norm = strtolower( trim( $resolved_shop_name ) );
             foreach ( $tournaments as $ex_key => $ex_data ) {
+                if ( is_array( $ex_data ) && ! empty( $ex_data['historical_import'] ) ) {
+                    continue;
+                }
                 if ( ! empty( $old_name ) && $ex_key === $old_name ) {
                     continue; // Skip self when editing
                 }
@@ -686,10 +696,11 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             $existing_notes    = isset( $existing_record['notes'] ) ? $existing_record['notes'] : '';
             $existing_reg_en   = isset( $existing_record['registration_enabled'] ) ? $existing_record['registration_enabled'] : true;
             $existing_created  = isset( $existing_record['created_at'] ) ? $existing_record['created_at'] : current_time( 'mysql' );
+            $is_historical     = ! empty( $existing_record['historical_import'] );
 
             if ( ! empty( $old_name ) && $old_name !== $t_name && isset( $tournaments[ $old_name ] ) ) {
                 if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                    $registrations = sywat_get_all_registrations();
+                    $registrations = sywat_get_all_registrations( $tournaments, $old_name );
                 }
 
                 unset( $tournaments[ $old_name ] );
@@ -769,7 +780,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
 
                 if ( $needs_remap ) {
                     if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                        $registrations = sywat_get_all_registrations();
+                        $registrations = sywat_get_all_registrations( $tournaments, $t_name );
                     }
 
                     foreach ( $registrations as &$reg ) {
@@ -863,6 +874,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 'created_at'             => $existing_created,
             );
 
+            if ( $is_historical ) {
+                $tournaments[ $storage_key ]['historical_import'] = 1;
+            }
+
             if ( ! empty( $published_at ) ) {
                 $tournaments[ $storage_key ]['published_at'] = $published_at;
             }
@@ -882,20 +897,25 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 || ( $orig_shop_id !== $assigned_shop_id )
                 || ( $orig_season !== $season_slug );
 
-            if ( $should_resequence && function_exists( 'sywat_resequence_shop_tournaments' ) ) {
+            if ( $should_resequence && ! $is_historical && function_exists( 'sywat_resequence_shop_tournaments' ) ) {
                 if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                    $registrations = sywat_get_all_registrations();
+                    $registrations = sywat_get_all_registrations( $tournaments );
                 }
                 sywat_resequence_shop_tournaments( $assigned_shop_id, $season_slug, $tournaments, $active_tournaments, $registrations );
             }
 
-            // Auto-trigger immediate season TFAA link sync post-save
-            if ( function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
+            // Trigger season TFAA link sync only on new event creation or date/season change when no link is configured yet
+            $needs_tfaa_link_sync = ! $is_historical
+                && $should_resequence
+                && empty( $existing_tfaa_url )
+                && empty( $tfaa_event_id );
+
+            if ( $needs_tfaa_link_sync && function_exists( 'sywat_sync_season_tfaa_urls' ) ) {
                 sywat_sync_season_tfaa_urls( $season_slug );
                 $tournaments = get_option( 'sywat_tournaments_list', array() );
             }
 
-            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully! Automatically synced TFAA links.</div>';
+            $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Tournament <strong>' . esc_html( $t_name ) . '</strong> saved successfully!</div>';
         }
 
         // Action: Delete Tournament
@@ -904,9 +924,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             if ( isset( $tournaments[ $del_tournament ] ) ) {
                 $del_shop_id     = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $tournaments[ $del_tournament ] ) : '';
                 $del_season_slug = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $tournaments[ $del_tournament ] ) : '';
+                $del_is_hist     = ! empty( $tournaments[ $del_tournament ]['historical_import'] );
 
                 if ( empty( $registrations ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                    $registrations = sywat_get_all_registrations();
+                    $registrations = sywat_get_all_registrations( $tournaments, $del_tournament );
                 }
 
                 unset( $tournaments[ $del_tournament ] );
@@ -928,9 +949,10 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                     return ! ( isset( $reg['tournament'] ) && ( strcasecmp( $reg['tournament'], $del_tournament ) === 0 || sanitize_title( $reg['tournament'] ) === $del_slug ) );
                 } ) );
 
-                // Re-sequence remaining shop tournaments to collapse sequence gaps
-                if ( ! empty( $del_shop_id ) && function_exists( 'sywat_resequence_shop_tournaments' ) ) {
-                    sywat_resequence_shop_tournaments( $del_shop_id, $del_season_slug, $tournaments, $active_tournaments, $registrations );
+                // Re-sequence remaining active shop tournaments to collapse sequence gaps
+                if ( ! $del_is_hist && ! empty( $del_shop_id ) && function_exists( 'sywat_resequence_shop_tournaments' ) ) {
+                    $active_regs = sywat_get_all_registrations( $tournaments );
+                    sywat_resequence_shop_tournaments( $del_shop_id, $del_season_slug, $tournaments, $active_tournaments, $active_regs );
                 }
 
                 $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Successfully deleted tournament <strong>' . esc_html( $del_tournament ) . '</strong> and purged all archers.</div>';
