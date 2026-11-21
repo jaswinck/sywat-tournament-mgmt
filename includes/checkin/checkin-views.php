@@ -1,11 +1,11 @@
 <?php
 /**
  * Sub-Module: Check-In Desk Visual Views
- * File: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with clickable Waitlist badges/buttons, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
- * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Path: includes/checkin/checkin-views.php
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and clickable Waitlist badges/buttons, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.5.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -77,8 +77,9 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
         $can_manage_seasons     = function_exists( 'sywat_can_manage_seasons' ) && sywat_can_manage_seasons();
         $selected_t             = isset( $data['selected_tournament'] ) ? $data['selected_tournament'] : '';
 
-        $all_tournaments = get_option( 'sywat_tournaments_list', array() );
-        $t_master        = ( is_array( $all_tournaments ) && isset( $all_tournaments[ $selected_t ] ) ) ? $all_tournaments[ $selected_t ] : array();
+        $t_master = ( isset( $data['selected_tournament_data'] ) && is_array( $data['selected_tournament_data'] ) )
+            ? $data['selected_tournament_data']
+            : ( ( isset( $data['tournaments_full'][ $selected_t ] ) && is_array( $data['tournaments_full'][ $selected_t ] ) ) ? $data['tournaments_full'][ $selected_t ] : array() );
 
         $t_shop_id = 'shop_ccr';
         if ( is_array( $t_master ) && isset( $t_master['shop_id'] ) && ! empty( $t_master['shop_id'] ) ) {
@@ -163,7 +164,8 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
 }
 
 /**
- * Render chronologically ordered Line Capacity Tracker cards with Walk-In & Waitlist triggers.
+ * Render chronologically ordered Line Capacity Tracker cards with single-pass O(R)
+ * pre-indexed line counters and Walk-In & Waitlist triggers.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -176,11 +178,9 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
         $selected_line_idx   = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
         $is_admin            = $data['is_admin'];
 
-        $active_t_slug    = isset( $data['active_t_slug'] ) ? $data['active_t_slug'] : sanitize_title( $selected_tournament );
-        $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
-
-        $raw_closed   = get_option( $closed_lines_key, array() );
-        $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
+        $closed_lines = ( isset( $data['closed_lines'] ) && is_array( $data['closed_lines'] ) )
+            ? array_map( 'trim', array_map( 'strval', $data['closed_lines'] ) )
+            : array();
 
         $desk_base_url = function_exists( 'sywat_page_url' )
             ? add_query_arg(
@@ -192,14 +192,79 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
             )
             : '';
 
-        // Count total waitlisted archers across the selected tournament for header quick-action button
+        if ( ! empty( $lines ) && is_array( $lines ) && function_exists( 'sywat_compare_tournament_lines' ) ) {
+            uasort( $lines, 'sywat_compare_tournament_lines' );
+        }
+
+        // Pre-index line lookup keys and counters in a single O(R) pass
+        $line_stats           = array();
+        $line_name_to_idx     = array();
         $total_tourn_waitlist = 0;
+
+        if ( ! empty( $lines ) && is_array( $lines ) ) {
+            foreach ( $lines as $raw_idx => $line ) {
+                $idx_str                = (string) $raw_idx;
+                $l_name                 = isset( $line['name'] ) ? trim( (string) $line['name'] ) : '';
+                $line_stats[ $idx_str ] = array(
+                    'booked_20yd' => 0,
+                    'booked_cub'  => 0,
+                    'total_reg'   => 0,
+                    'checked_in'  => 0,
+                    'waitlist'    => 0,
+                );
+                if ( $l_name !== '' && ! isset( $line_name_to_idx[ $l_name ] ) ) {
+                    $line_name_to_idx[ $l_name ] = $idx_str;
+                }
+            }
+        }
+
         if ( is_array( $registrations ) ) {
-            foreach ( $registrations as $r ) {
-                if ( isset( $r['tournament'], $r['status'] )
-                    && strcasecmp( trim( (string) $r['tournament'] ), trim( (string) $selected_tournament ) ) === 0
-                    && strcasecmp( trim( (string) $r['status'] ), 'Waitlist' ) === 0 ) {
+            foreach ( $registrations as $reg ) {
+                if ( ! is_array( $reg ) || ! isset( $reg['tournament'] ) ) {
+                    continue;
+                }
+                if ( strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                    continue;
+                }
+
+                $status_str = isset( $reg['status'] ) ? trim( (string) $reg['status'] ) : '';
+                if ( strcasecmp( $status_str, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+
+                $is_wait = ( strcasecmp( $status_str, 'Waitlist' ) === 0 );
+                if ( $is_wait ) {
                     $total_tourn_waitlist++;
+                }
+
+                $resolved_idx = '';
+                if ( isset( $reg['line_index'] ) ) {
+                    $raw_l_idx = (string) $reg['line_index'];
+                    if ( isset( $line_stats[ $raw_l_idx ] ) ) {
+                        $resolved_idx = $raw_l_idx;
+                    }
+                }
+                if ( $resolved_idx === '' && isset( $reg['line_name'] ) ) {
+                    $raw_l_name = trim( (string) $reg['line_name'] );
+                    if ( $raw_l_name !== '' && isset( $line_name_to_idx[ $raw_l_name ] ) ) {
+                        $resolved_idx = $line_name_to_idx[ $raw_l_name ];
+                    }
+                }
+
+                if ( $resolved_idx !== '' && isset( $line_stats[ $resolved_idx ] ) ) {
+                    if ( $is_wait ) {
+                        $line_stats[ $resolved_idx ]['waitlist']++;
+                    } else {
+                        $line_stats[ $resolved_idx ]['total_reg']++;
+                        if ( ! empty( $reg['checked_in'] ) ) {
+                            $line_stats[ $resolved_idx ]['checked_in']++;
+                        }
+                        if ( isset( $reg['distance'] ) && $reg['distance'] === '20yd' ) {
+                            $line_stats[ $resolved_idx ]['booked_20yd']++;
+                        } elseif ( isset( $reg['distance'] ) && $reg['distance'] === 'Cub' ) {
+                            $line_stats[ $resolved_idx ]['booked_cub']++;
+                        }
+                    }
                 }
             }
         }
@@ -216,53 +281,20 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                 </div>
             </div>
             <?php if ( ! empty( $lines ) && is_array( $lines ) ) : ?>
-                <?php
-                    if ( function_exists( 'sywat_compare_tournament_lines' ) ) {
-                        uasort( $lines, 'sywat_compare_tournament_lines' );
-                    }
-                ?>
-
                 <div class="sywat-tracker-grid">
                     <?php foreach ( $lines as $raw_idx => $line ) : ?>
                         <?php
                             $idx       = (string) $raw_idx;
                             $line_name = isset( $line['name'] ) ? trim( $line['name'] ) : '';
+                            $stats     = isset( $line_stats[ $idx ] )
+                                ? $line_stats[ $idx ]
+                                : array( 'booked_20yd' => 0, 'booked_cub' => 0, 'total_reg' => 0, 'checked_in' => 0, 'waitlist' => 0 );
 
-                            $booked_20yd     = 0;
-                            $booked_cub      = 0;
-                            $total_reg_line  = 0;
-                            $checked_in_line = 0;
-                            $waitlist_line   = 0;
-
-                            foreach ( $registrations as $reg ) {
-                                if ( isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament ) {
-                                    $match_index = isset( $reg['line_index'] ) && (string) $reg['line_index'] === $idx;
-                                    $match_name  = isset( $reg['line_name'] ) && $line_name !== '' && trim( $reg['line_name'] ) === $line_name;
-
-                                    if ( $match_index || $match_name ) {
-                                        $status_str = isset( $reg['status'] ) ? trim( $reg['status'] ) : '';
-                                        if ( strcasecmp( $status_str, 'Cancelled' ) === 0 ) {
-                                            continue;
-                                        }
-
-                                        $is_wait = ( strcasecmp( $status_str, 'Waitlist' ) === 0 );
-                                        if ( $is_wait ) {
-                                            $waitlist_line++;
-                                        } else {
-                                            $total_reg_line++;
-                                            if ( ! empty( $reg['checked_in'] ) ) {
-                                                $checked_in_line++;
-                                            }
-                                            if ( isset( $reg['distance'] ) && $reg['distance'] === '20yd' ) {
-                                                $booked_20yd++;
-                                            }
-                                            if ( isset( $reg['distance'] ) && $reg['distance'] === 'Cub' ) {
-                                                $booked_cub++;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            $booked_20yd     = $stats['booked_20yd'];
+                            $booked_cub      = $stats['booked_cub'];
+                            $total_reg_line  = $stats['total_reg'];
+                            $checked_in_line = $stats['checked_in'];
+                            $waitlist_line   = $stats['waitlist'];
 
                             $cap_20yd_num = max( 0, intval( isset( $line['cap_20yd'] ) ? $line['cap_20yd'] : 0 ) - $booked_20yd );
                             $cap_cub_num  = max( 0, intval( isset( $line['cap_cub'] ) ? $line['cap_cub'] : 0 ) - $booked_cub );
@@ -340,7 +372,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 
 /**
  * Render Active Registered Archers table with "LastName, FirstName" display, dual-format live search,
- * Check-In, Edit, and household OWE badges.
+ * Check-In, Edit, and O(1) household OWE badges.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -355,6 +387,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         $lines               = $data['lines'];
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
         $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
+        $has_household_fn    = function_exists( 'sywat_get_household_balance_info' );
 
         $t_profiles     = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
         $is_multi_round = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
@@ -373,11 +406,32 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
             }
         }
 
-        $active_t_slug    = isset( $data['active_t_slug'] ) ? $data['active_t_slug'] : sanitize_title( $selected_tournament );
-        $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
+        $closed_lines = ( isset( $data['closed_lines'] ) && is_array( $data['closed_lines'] ) )
+            ? array_map( 'trim', array_map( 'strval', $data['closed_lines'] ) )
+            : array();
 
-        $raw_closed   = get_option( $closed_lines_key, array() );
-        $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
+        // Pre-index household max unpaid balances in O(R) when shared helper is unavailable
+        $fallback_group_due = array();
+        if ( ! $has_household_fn && is_array( $all_tourn_regs ) ) {
+            foreach ( $all_tourn_regs as $other_r ) {
+                if ( ! is_array( $other_r ) ) {
+                    continue;
+                }
+                $o_status = isset( $other_r['status'] ) ? trim( (string) $other_r['status'] ) : '';
+                if ( strcasecmp( $o_status, 'Waitlist' ) === 0 || strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
+                    continue;
+                }
+                $o_due  = isset( $other_r['balance_due'] ) ? floatval( $other_r['balance_due'] ) : 0.0;
+                $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
+                $o_book = ! empty( $other_r['booking_id'] ) ? trim( (string) $other_r['booking_id'] ) : '';
+                if ( $o_fam !== '' ) {
+                    $fallback_group_due[ $o_fam ] = isset( $fallback_group_due[ $o_fam ] ) ? max( $fallback_group_due[ $o_fam ], $o_due ) : $o_due;
+                }
+                if ( $o_book !== '' ) {
+                    $fallback_group_due[ $o_book ] = isset( $fallback_group_due[ $o_book ] ) ? max( $fallback_group_due[ $o_book ], $o_due ) : $o_due;
+                }
+            }
+        }
 
         // Filter out Waitlisted & Cancelled archers from the active check-in table
         // (Waitlisted archers are managed on-demand via the Dedicated Waitlist Management Modal)
@@ -480,7 +534,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $is_family_due = ! $is_no_show && ( ( isset( $reg['paid'] ) && strcasecmp( $reg['paid'], 'Family' ) === 0 ) || ( isset( $reg['rate_type'] ) && strtolower( $reg['rate_type'] ) === 'family' ) );
 
                                     // Evaluate household-wide unpaid balance so every family member reflects an open family balance
-                                    $household_info = function_exists( 'sywat_get_household_balance_info' )
+                                    $household_info = $has_household_fn
                                         ? sywat_get_household_balance_info( $reg, $all_tourn_regs, $lines )
                                         : null;
 
@@ -489,18 +543,8 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
 
                                     if ( ! $household_info && $is_family_due ) {
                                         $fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : ( ! empty( $reg['booking_id'] ) ? trim( (string) $reg['booking_id'] ) : '' );
-                                        if ( $fam_id !== '' ) {
-                                            foreach ( $all_tourn_regs as $other_r ) {
-                                                $o_status = isset( $other_r['status'] ) ? trim( (string) $other_r['status'] ) : '';
-                                                if ( strcasecmp( $o_status, 'Waitlist' ) === 0 || strcasecmp( $o_status, 'Cancelled' ) === 0 ) {
-                                                    continue;
-                                                }
-                                                $o_fam  = ! empty( $other_r['family_id'] ) ? trim( (string) $other_r['family_id'] ) : '';
-                                                $o_book = ! empty( $other_r['booking_id'] ) ? trim( (string) $other_r['booking_id'] ) : '';
-                                                if ( $o_fam === $fam_id || $o_book === $fam_id ) {
-                                                    $effective_due = max( $effective_due, isset( $other_r['balance_due'] ) ? floatval( $other_r['balance_due'] ) : 0 );
-                                                }
-                                            }
+                                        if ( $fam_id !== '' && isset( $fallback_group_due[ $fam_id ] ) ) {
+                                            $effective_due = max( $effective_due, $fallback_group_due[ $fam_id ] );
                                         }
                                         $is_true_family_cap = ( $effective_due >= $active_cap_amount );
                                     }
