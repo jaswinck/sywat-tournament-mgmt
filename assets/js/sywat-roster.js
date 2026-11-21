@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Archer Roster Management & Edit Modal Engine
  * Path: assets/js/sywat-roster.js
- * Description: Manages the Registered Archer Roster modal, live search filtering, line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, single-prompt confirmations, and database-driven shooting style & age division rule enforcement.
- * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.sywat-hidden).
- * Version: 7.2.2
+ * Description: Manages the Registered Archer Roster workspace with flicker-free client-side shooting line & live name search filtering, instantaneous client-side Edit Archer modal population from serialized row JSON payloads (eliminating HTTP page-reload flashes), line-scoped family group assignments, multi-round pricing & live balance synchronization, Promotional Free Entry status display, single-prompt confirmations, and database-driven shooting style & age division rule enforcement.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, delegated event listeners, class-based visibility (.active / .sywat-hidden).
+ * Version: 7.3.0
  */
 
 (function() {
@@ -294,15 +294,170 @@
     }
 
     /**
+     * Ensure a <select> contains a given value option (adding a temporary fallback option if needed)
+     * and set its active value cleanly.
+     */
+    function setSelectValueWithFallback(selectEl, targetValue, fallbackLabel) {
+        if (!selectEl) return;
+        const val = String(targetValue || '');
+        let found = false;
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].value === val) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && val !== '') {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = fallbackLabel || (val + ' (Retired)');
+            selectEl.appendChild(opt);
+        }
+        selectEl.value = val;
+    }
+
+    /**
+     * Open Edit Archer Modal instantaneously from a roster row's serialized JSON payload
+     * without triggering a full HTTP page reload.
+     */
+    function openEditArcherModal(triggerEl) {
+        const row = triggerEl ? triggerEl.closest('.sywat-manage-row') : null;
+        const modal = document.getElementById('sywat_edit_archer_modal');
+        if (!row || !modal) return;
+
+        let archer = null;
+        try {
+            archer = JSON.parse(row.getAttribute('data-archer') || 'null');
+        } catch (err) {
+            archer = null;
+        }
+        if (!archer || !archer.id) return;
+
+        const regIdInput     = document.getElementById('edit_registration_id');
+        const nameInput      = document.getElementById('edit_name');
+        const roundSelect    = document.getElementById('edit_pricing_profile');
+        const roundHidden    = document.getElementById('edit_pricing_profile_hidden');
+        const lineSelect     = document.getElementById('edit_line_index');
+        const statusSelect   = document.getElementById('edit_status');
+        const cancelledOpt   = document.getElementById('edit_status_cancelled_opt');
+        const divisionSelect = document.getElementById('edit_division');
+        const genderSelect   = document.getElementById('edit_gender');
+        const styleSelect    = document.getElementById('edit_style');
+        const paySelect      = document.getElementById('edit_pay_option');
+        const famSelect      = document.getElementById('edit_family_group_id');
+        const balanceInput   = document.getElementById('edit_balance_due');
+        const distDisplay    = document.getElementById('edit_distance_display');
+        const filterLineEl   = document.getElementById('filter_line_idx');
+        const editFilterEl   = document.getElementById('edit_filter_line_idx');
+
+        if (regIdInput) regIdInput.value = String(archer.id || '');
+        if (nameInput) nameInput.value = String(archer.name || '');
+
+        const activeFilterLine = filterLineEl ? String(filterLineEl.value || 'all') : 'all';
+        if (editFilterEl) editFilterEl.value = activeFilterLine;
+
+        const roundSlug = String(archer.pricing_profile || getDefaultProfileKey());
+        if (roundSelect) {
+            setSelectValueWithFallback(roundSelect, roundSlug, roundSlug);
+            updatePayOptionLabelsForRound('edit');
+        }
+        if (roundHidden) {
+            roundHidden.value = roundSlug;
+        }
+
+        const lineIdxStr = String(archer.line_index !== undefined && archer.line_index !== '' ? archer.line_index : '0');
+        if (lineSelect) {
+            lineSelect.value = lineIdxStr;
+        }
+        updateRosterEditFamilyOptions(lineIdxStr);
+
+        const normStatus = String(archer.status || 'Pre-Reg');
+        if (cancelledOpt) {
+            cancelledOpt.classList.toggle('sywat-hidden', normStatus !== 'Cancelled');
+        }
+        if (statusSelect) {
+            statusSelect.value = normStatus;
+        }
+
+        const divVal = String(archer.division || 'Adult (18 - 49)');
+        if (divisionSelect) {
+            setSelectValueWithFallback(divisionSelect, divVal, divVal + ' (Retired)');
+        }
+
+        if (genderSelect) {
+            genderSelect.value = String(archer.gender || 'Male');
+        }
+
+        const styleVal = String(archer.style || '');
+        if (styleSelect) {
+            setSelectValueWithFallback(styleSelect, styleVal, styleVal ? (styleVal + ' (Retired)') : '-- Select Style --');
+        }
+
+        const rawPaid       = String(archer.paid || '').trim();
+        const famIdVal      = String(archer.family_id || '').trim();
+        const isPromoFree   = Boolean(archer.is_promo_free) || rawPaid.toLowerCase() === 'promo (free)' || rawPaid.toLowerCase().indexOf('promo') === 0;
+        const isFamilyGroup = (rawPaid.toLowerCase() === 'family') || (normStatus === 'Waitlist' && famIdVal !== '');
+
+        let payOptVal = 'Individual';
+        if (isPromoFree) {
+            payOptVal = 'Promo (Free)';
+        } else if (isFamilyGroup) {
+            payOptVal = 'Family';
+        } else if (rawPaid.toLowerCase() === 'field governor') {
+            payOptVal = 'Field Governor';
+        }
+
+        if (paySelect) {
+            paySelect.value = payOptVal;
+        }
+
+        if (famSelect) {
+            if (famIdVal !== '') {
+                setSelectValueWithFallback(famSelect, famIdVal, 'Current Family Group');
+            } else {
+                famSelect.value = '';
+            }
+        }
+
+        const dueStr = String(archer.balance_due || '0.00');
+        if (balanceInput) {
+            balanceInput.value = dueStr;
+            balanceInput.dataset.origDue = dueStr;
+            delete balanceInput.dataset.manualOverride;
+        }
+
+        if (distDisplay && divisionSelect) {
+            distDisplay.value = getDivisionDistance(divisionSelect);
+        }
+
+        updatePaidStatusDisplay('edit', false);
+        handleStyleRestrictions('edit');
+
+        modal.classList.add('active');
+
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('edit_archer', String(archer.id));
+            window.history.replaceState({}, document.title, url.toString());
+        } catch (err) {
+            /* ignore history state errors */
+        }
+    }
+
+    /**
      * Close Roster Management Modal & Navigate to Clean Manage Tournaments URL
      */
     function closeRosterModal(triggerEl) {
         const modal = document.getElementById('sywat_roster_modal');
+        const parentModal = document.getElementById('sywat_modal');
         const closeUrl = (triggerEl && triggerEl.getAttribute('data-close-url'))
             || (modal && modal.getAttribute('data-sywat-close-url'));
 
         if (modal) {
             modal.classList.remove('active');
+        }
+        if (parentModal) {
+            parentModal.classList.remove('active');
         }
 
         if (closeUrl) {
@@ -328,10 +483,14 @@
         if (modal) {
             modal.classList.remove('active');
         }
-        const url = new URL(window.location.href);
-        url.searchParams.delete('edit_archer');
-        url.searchParams.delete('open_edit_id');
-        window.history.replaceState({}, document.title, url.toString());
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit_archer');
+            url.searchParams.delete('open_edit_id');
+            window.history.replaceState({}, document.title, url.toString());
+        } catch (err) {
+            /* ignore history state errors */
+        }
     }
 
     /**
@@ -465,24 +624,120 @@
     }
 
     /**
-     * Filter Archer Roster Table Rows via CSS Class Toggle
+     * Filter Archer Roster Table Rows client-side by Shooting Line and Name Search
+     * (zero HTTP reload, updates counts, Clear Line button, Waitlist badge, and URL state).
      */
-    function applyRosterSearchFilter(rawQuery) {
-        const filter = (rawQuery || '').toLowerCase().trim();
+    function applyRosterFilters(updateHistoryState) {
+        const lineSelect  = document.getElementById('filter_line_idx');
+        const searchInput = document.getElementById('search_shooter');
+
+        const selectedLine = lineSelect ? String(lineSelect.value || 'all') : 'all';
+        const searchFilter = searchInput ? String(searchInput.value || '').toLowerCase().trim() : '';
+
+        let visibleCount     = 0;
+        let lineTotalActive  = 0;
+
         document.querySelectorAll('.sywat-manage-row').forEach(function(row) {
-            const name = row.getAttribute('data-name') || '';
-            if (!filter || name.includes(filter)) {
+            const rowLine = String(row.getAttribute('data-line-idx') || '');
+            const rowName = String(row.getAttribute('data-name') || '').toLowerCase();
+
+            const lineMatch   = (selectedLine === 'all' || rowLine === selectedLine);
+            const searchMatch = (!searchFilter || rowName.includes(searchFilter));
+
+            if (lineMatch) {
+                lineTotalActive++;
+            }
+
+            if (lineMatch && searchMatch) {
                 row.classList.remove('sywat-hidden');
+                visibleCount++;
             } else {
                 row.classList.add('sywat-hidden');
             }
         });
+
+        const activeCountEl = document.getElementById('sywat_roster_active_count');
+        if (activeCountEl) {
+            activeCountEl.textContent = String(visibleCount);
+        }
+
+        const emptyMsgEl = document.getElementById('sywat_roster_empty_filter_msg');
+        if (emptyMsgEl) {
+            emptyMsgEl.classList.toggle('sywat-hidden', visibleCount > 0);
+        }
+
+        // Synchronize hidden filter_line_idx inputs across row Remove/Purge/Edit forms
+        document.querySelectorAll('.sywat-roster-hidden-line').forEach(function(inp) {
+            inp.value = selectedLine;
+        });
+
+        const purgeWrap       = document.getElementById('sywat_roster_purge_wrap');
+        const purgeTargetLine = document.getElementById('sywat_roster_purge_target_line');
+        const purgeFilterLine = document.getElementById('sywat_roster_purge_filter_line');
+        const isSpecificLine  = (selectedLine !== 'all' && selectedLine !== '');
+
+        if (purgeTargetLine) purgeTargetLine.value = isSpecificLine ? selectedLine : '';
+        if (purgeFilterLine) purgeFilterLine.value = selectedLine;
+        if (purgeWrap) {
+            purgeWrap.classList.toggle('sywat-hidden', !(isSpecificLine && lineTotalActive > 0));
+        }
+
+        // Update Waitlist badge count & modal URL for the active line filter
+        const waitlistWrap  = document.getElementById('sywat_roster_waitlist_wrap');
+        const waitlistCount = document.getElementById('sywat_roster_waitlist_count');
+        const waitlistLink  = document.getElementById('sywat_roster_waitlist_link');
+
+        if (waitlistWrap) {
+            let countsMap = {};
+            try {
+                countsMap = JSON.parse(waitlistWrap.getAttribute('data-waitlist-counts') || '{}');
+            } catch (err) {
+                countsMap = {};
+            }
+            const wlCount = parseInt(countsMap[selectedLine] || 0, 10) || 0;
+            if (waitlistCount) {
+                waitlistCount.textContent = String(wlCount);
+            }
+            if (waitlistLink && waitlistLink.href) {
+                try {
+                    const wlUrl = new URL(waitlistLink.href, window.location.origin);
+                    wlUrl.searchParams.set('waitlist_line', selectedLine);
+                    waitlistLink.href = wlUrl.toString();
+                } catch (err) {
+                    /* ignore URL parse errors */
+                }
+            }
+            waitlistWrap.classList.toggle('sywat-hidden', wlCount <= 0);
+        }
+
+        if (updateHistoryState) {
+            try {
+                const url = new URL(window.location.href);
+                if (selectedLine === 'all') {
+                    url.searchParams.delete('filter_line_idx');
+                } else {
+                    url.searchParams.set('filter_line_idx', selectedLine);
+                }
+                window.history.replaceState({}, document.title, url.toString());
+            } catch (err) {
+                /* ignore history state errors */
+            }
+        }
+    }
+
+    function applyRosterSearchFilter(rawQuery) {
+        const searchInput = document.getElementById('search_shooter');
+        if (searchInput && typeof rawQuery === 'string' && searchInput.value !== rawQuery) {
+            searchInput.value = rawQuery;
+        }
+        applyRosterFilters(false);
     }
 
     // Namespaced Module API (Section IV.1)
     window.SYWAT.roster = {
         updateEditFamilyOptions: updateRosterEditFamilyOptions,
         updatePayOptionLabelsForRound: updatePayOptionLabelsForRound,
+        openEditArcherModal: openEditArcherModal,
         closeRosterModal: closeRosterModal,
         closeEditArcherModal: closeEditArcherModal,
         updatePaidStatusDisplay: updatePaidStatusDisplay,
@@ -490,11 +745,13 @@
         handleStyleRestrictions: handleStyleRestrictions,
         handleStyleChange: handleStyleChange,
         handleDivisionChange: handleDivisionChange,
+        applyFilters: applyRosterFilters,
         applySearchFilter: applyRosterSearchFilter
     };
 
     // Legacy global aliases for backward compatibility with existing modal markup
     window.updateRosterEditFamilyOptions      = updateRosterEditFamilyOptions;
+    window.openEditArcherModal                = openEditArcherModal;
     window.closeEditArcherModal               = closeEditArcherModal;
     window.updatePaidStatusDisplay            = updatePaidStatusDisplay;
     window.sywatRosterHandleStyleRestrictions = handleStyleRestrictions;
@@ -508,7 +765,10 @@
 
         const action = actionEl.getAttribute('data-sywat-action');
 
-        if (action === 'close-roster-modal') {
+        if (action === 'open-edit-archer-modal') {
+            event.preventDefault();
+            openEditArcherModal(actionEl);
+        } else if (action === 'close-roster-modal') {
             event.preventDefault();
             closeRosterModal(actionEl);
         } else if (action === 'close-edit-archer-modal') {
@@ -519,7 +779,7 @@
             const searchInput = document.getElementById('search_shooter');
             if (searchInput) {
                 searchInput.value = '';
-                applyRosterSearchFilter('');
+                applyRosterFilters(false);
                 searchInput.focus();
             }
         }
@@ -541,9 +801,7 @@
         const action = actionEl.getAttribute('data-sywat-action');
 
         if (action === 'filter-roster-line') {
-            if (actionEl.form) {
-                actionEl.form.submit();
-            }
+            applyRosterFilters(true);
         } else if (action === 'roster-edit-round-change') {
             updatePayOptionLabelsForRound('edit');
             updatePaidStatusDisplay('edit', true);
@@ -558,10 +816,21 @@
         }
     });
 
-    // Delegated Input Listener: Mark manual balance override when user edits #edit_balance_due directly
+    // Delegated Input Listener: Live search & manual balance override tracking
     document.addEventListener('input', function(event) {
-        if (event.target && event.target.id === 'edit_balance_due') {
+        if (!event.target) return;
+
+        if (event.target.id === 'search_shooter') {
+            applyRosterFilters(false);
+        } else if (event.target.id === 'edit_balance_due') {
             event.target.dataset.manualOverride = '1';
+        }
+    });
+
+    // Prevent Enter key inside #sywat_roster_filter_form from triggering a full-page GET reload
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && event.target && event.target.id === 'search_shooter') {
+            event.preventDefault();
         }
     });
 
@@ -586,7 +855,7 @@
     });
 
     /**
-     * DOM Initialization & Live Search Input Wiring
+     * DOM Initialization & Initial Filter Synchronization
      */
     function initRosterModule() {
         const editBalanceEl = document.getElementById('edit_balance_due');
@@ -602,14 +871,8 @@
             handleDivisionChange('edit', false);
         }
 
-        const manageSearchInput = document.getElementById('search_shooter');
-        if (manageSearchInput) {
-            if (manageSearchInput.value) {
-                applyRosterSearchFilter(manageSearchInput.value);
-            }
-            manageSearchInput.addEventListener('input', function() {
-                applyRosterSearchFilter(this.value);
-            });
+        if (document.getElementById('filter_line_idx') || document.getElementById('search_shooter')) {
+            applyRosterFilters(false);
         }
     }
 
