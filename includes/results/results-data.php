@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries (including 1-day, 2-day, and 3-day round breakdowns), and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries (including 1-day, 2-day, and 3-day round breakdowns and legacy TFAA class-code stripping), and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.4
+ * Version: 1.3.5
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -120,9 +120,9 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
 
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
- * labels via O(1) lookup maps and preserving registration 'type' (e.g., 'Guest'), 'is_inc',
- * and multi-day round score breakdowns (r1/r2/r3).
- * Defaults blank/unset score fields to 0 so every roster entry is included.
+ * labels via O(1) lookup maps, stripping legacy TFAA class codes from imported names,
+ * and preserving registration 'type' (e.g., 'Guest'), 'is_inc', and multi-day round score
+ * breakdowns (r1/r2/r3). Defaults blank/unset score fields to 0 so every roster entry is included.
  *
  * @param string $t_name Tournament title.
  * @return array         Normalized list of score entries for the tournament.
@@ -131,10 +131,11 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
     function sywat_get_tournament_scores( $t_name ) {
         global $wpdb;
 
-        $t_slug        = sanitize_title( $t_name );
-        $scores        = array();
-        $has_div_res   = function_exists( 'sywat_results_resolve_division_record' );
-        $has_style_res = function_exists( 'sywat_results_resolve_style_record' );
+        $t_slug         = sanitize_title( $t_name );
+        $scores         = array();
+        $has_div_res    = function_exists( 'sywat_results_resolve_division_record' );
+        $has_style_res  = function_exists( 'sywat_results_resolve_style_record' );
+        $has_clean_name = function_exists( 'sywat_results_clean_archer_name' );
 
         $results = $wpdb->get_results( $wpdb->prepare(
             "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
@@ -167,6 +168,9 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                 $norm_style = ( $style_rec && ! empty( $style_rec['label'] ) ) ? $style_rec['label'] : $raw_style;
 
                 $raw_name = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
+                if ( $has_clean_name && $raw_name !== '' ) {
+                    $raw_name = sywat_results_clean_archer_name( $raw_name );
+                }
 
                 $scores[] = array(
                     'id'         => isset( $reg['id'] ) ? $reg['id'] : '',
@@ -221,6 +225,7 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
         $alias_map        = function_exists( 'sywat_get_given_name_alias_map' ) ? sywat_get_given_name_alias_map() : array();
         $has_div_res      = function_exists( 'sywat_results_resolve_division_record' );
         $has_style_res    = function_exists( 'sywat_results_resolve_style_record' );
+        $has_clean_name   = function_exists( 'sywat_results_clean_archer_name' );
         $has_heading_fn   = function_exists( 'sywat_format_div_gen_heading' );
         $has_dg_weight_fn = function_exists( 'sywat_get_div_gen_sort_weight' );
         $has_st_weight_fn = function_exists( 'sywat_get_style_sort_weight' );
@@ -303,6 +308,9 @@ if ( ! function_exists( 'sywat_aggregate_season_standings' ) ) {
                 }
 
                 $raw_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : 'Archer';
+                if ( $has_clean_name && $raw_name !== '' ) {
+                    $raw_name = sywat_results_clean_archer_name( $raw_name );
+                }
                 $raw_style = isset( $reg['style'] ) && trim( (string) $reg['style'] ) !== '' ? trim( (string) $reg['style'] ) : 'FS – Freestyle';
                 $raw_type  = isset( $reg['type'] ) ? trim( (string) $reg['type'] ) : '';
 
