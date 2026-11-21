@@ -2,10 +2,10 @@
 /**
  * Module: Check-In Desk Portal Controller
  * Path: includes/checkin/class-sywat-checkin.php
- * Description: Main entry point and shortcode definition for the Check-In Desk portal, enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, and active tournament pricing/promoter data.
+ * Description: Main entry point and shortcode definition for the Check-In Desk portal, skipping redundant state reloads on non-mutating modal open/cancel POSTs, and enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, and active tournament pricing/promoter data.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -45,8 +45,9 @@ if ( ! function_exists( 'render_sywat_desk_app' ) ) {
         // 3. Process Form Actions
         $action_notice = sywat_desk_handle_actions( $data );
 
-        // Re-fetch dataset if actions mutated state
-        if ( ! empty( $_POST['sywat_action'] ) ) {
+        // Re-fetch dataset only when a mutating action was submitted (skip modal open & cancel POSTs)
+        $posted_action = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
+        if ( $posted_action !== '' && $posted_action !== 'cancel' ) {
             $data = sywat_desk_get_data();
         }
 
@@ -138,7 +139,7 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
 
         $handle  = 'sywat-checkin-js';
         $js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin.js';
-        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.2.0' );
+        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.2.1' );
         $deps    = ( wp_script_is( 'sywat-shooting-styles-js', 'registered' ) || wp_script_is( 'sywat-shooting-styles-js', 'enqueued' ) )
             ? array( 'sywat-shooting-styles-js' )
             : array();
