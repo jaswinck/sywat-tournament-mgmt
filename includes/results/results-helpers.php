@@ -2,14 +2,41 @@
 /**
  * Sub-Module: Results & Standings Formatting & Sort Helpers
  * Path: includes/results/results-helpers.php
- * Description: Pure helper layer providing O(1) static per-request lookup maps for Age Divisions and Shooting Styles, database-driven tournament directory host/location resolution, category heading formatters, and sort-weight calculators.
+ * Description: Pure helper layer providing O(1) static per-request lookup maps for Age Divisions and Shooting Styles, database-driven tournament directory host/location resolution, archer name sanitization (stripping legacy TFAA class codes), category heading formatters, and sort-weight calculators.
  * Compliance: Pure helper layer — zero direct SQL queries, zero get_option() calls, zero hardcoded shop names, zero HTML echo, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
+}
+
+/**
+ * Strip embedded or trailing uppercase TFAA class codes (e.g. "CMFS", "CMBHFS", "AMFS",
+ * "YAMFSLR", "SSMTRAD") from archer names imported from multi-day TFAA State scorecards.
+ * Handles both "First CMFS Last" and "Last, First CMFS" forms safely using case-sensitive
+ * matching so ordinary names are never altered.
+ *
+ * @param string $raw_name Raw archer name string.
+ * @return string          Cleaned archer name without TFAA class code tokens.
+ */
+if ( ! function_exists( 'sywat_results_clean_archer_name' ) ) {
+    function sywat_results_clean_archer_name( $raw_name ) {
+        $clean = trim( preg_replace( '/\s+/u', ' ', (string) $raw_name ) );
+        if ( $clean === '' ) {
+            return '';
+        }
+
+        $clean = preg_replace(
+            '/\s*\b(?:MS|SS|YA|C|Y|A|S|P)[MF](?:BHFS|FSL-R|FSLR|FSL|FSPRO|FS|MBH|BBC|BBR|BB|TRAD|LB|GEN)\b/',
+            '',
+            $clean
+        );
+        $clean = preg_replace( '/\s+,/', ',', (string) $clean );
+
+        return trim( preg_replace( '/\s+/u', ' ', (string) $clean ) );
+    }
 }
 
 /**
