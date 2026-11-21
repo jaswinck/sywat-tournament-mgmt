@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Action Handlers
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, early template_redirect JSON AJAX autosave endpoints, transaction-batched score saves (with multi-scorekeeper concurrency protection and incomplete round "is_inc" persistence), transaction-batched score resets, and line lock management.
- * Compliance: Pure action layer — zero output at include time, early template_redirect JSON handling before theme headers, atomic MySQL transaction batching on multi-row option writes, omitted closing PHP tag.
+ * Description: Pure POST request processing, early template_redirect JSON AJAX autosave endpoints, bulk-indexed transaction-batched score saves (eliminating N+1 option lookups while preserving multi-scorekeeper concurrency protection and incomplete round "is_inc" persistence), transaction-batched score resets, and line lock management.
+ * Compliance: Pure action layer — zero output at include time, early template_redirect JSON handling before theme headers, bulk single-tournament option pre-fetch + atomic MySQL transaction batching on multi-row option writes, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 11.3.1
+ * Version: 11.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -95,7 +95,7 @@ if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
 
 /**
  * Processes batch score save, incomplete round flags, line locks, and score reset POST requests
- * using explicit MySQL transactions for multi-row disk writes.
+ * using a single bulk option pre-fetch and explicit MySQL transactions for multi-row disk writes.
  *
  * @param string $selected_tournament Active tournament name.
  * @param string $selected_line_idx   Active shooting line index or 'all'.
@@ -173,10 +173,11 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                             foreach ( $all_rows as $row ) {
                                 $reg = maybe_unserialize( $row->option_value );
                                 if ( is_array( $reg ) && isset( $reg['id'] ) ) {
+                                    $r_line        = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
                                     $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
-                                    $match_line    = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
+                                    $match_line    = ( $selected_line_idx === 'all' ) || ( $r_line === (string) $selected_line_idx );
                                     $is_checked_in = ! empty( $reg['checked_in'] );
-                                    $is_locked     = ! empty( $locked_lines[ $reg['line_index'] ] );
+                                    $is_locked     = ! empty( $locked_lines[ $r_line ] );
 
                                     if ( $match_tourn && $match_line && $is_checked_in && ! $is_locked ) {
                                         $opt_key        = 'sywat_t_' . $active_t_slug . '_' . $reg['id'];
@@ -217,7 +218,7 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                 }
             }
 
-            // Action: Save Batch Scores & INC Flags inside an atomic transaction
+            // Action: Save Batch Scores & INC Flags using single bulk pre-fetch + atomic transaction
             if ( $action === 'save_scores' ) {
                 $has_invalid_data = false;
 
@@ -258,6 +259,25 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                 } elseif ( empty( $submitted_ids ) ) {
                     $notice = '<div class="sywat-alert sywat-alert-success">No changes were made.</div>';
                 } else {
+                    // Single bulk query pre-fetching all tournament registrations to eliminate N+1 get_option() calls
+                    $prefetched_regs = array();
+                    if ( $active_t_slug !== '' ) {
+                        $bulk_rows = $wpdb->get_results(
+                            $wpdb->prepare(
+                                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                                $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
+                            )
+                        );
+                        if ( is_array( $bulk_rows ) ) {
+                            foreach ( $bulk_rows as $brow ) {
+                                $unser = maybe_unserialize( $brow->option_value );
+                                if ( is_array( $unser ) && isset( $unser['id'] ) ) {
+                                    $prefetched_regs[ (string) $unser['id'] ] = $unser;
+                                }
+                            }
+                        }
+                    }
+
                     $saved_count = 0;
                     $scores_map  = get_option( 'sywat_scores_' . $active_t_slug, array() );
                     if ( ! is_array( $scores_map ) ) {
@@ -276,10 +296,11 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                         foreach ( $submitted_ids as $id ) {
                             $clean_id = sanitize_text_field( wp_unslash( $id ) );
                             $opt_key  = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
-                            $reg      = get_option( $opt_key );
+                            $reg      = isset( $prefetched_regs[ $clean_id ] ) ? $prefetched_regs[ $clean_id ] : get_option( $opt_key );
 
                             if ( $reg && is_array( $reg ) ) {
-                                if ( ! empty( $locked_lines[ $reg['line_index'] ] ) ) {
+                                $r_line = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
+                                if ( ! empty( $locked_lines[ $r_line ] ) ) {
                                     continue;
                                 }
 
