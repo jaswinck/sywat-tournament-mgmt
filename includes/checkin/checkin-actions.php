@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, indexed First-Time/Lapsed Shooter promoter evaluation, server-side canonical name enforcement (Member DB + 18-month TFAA history) when names are entered or modified, First+Last same-line duplicate lockout, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance, and archer edits/deletions with Family Cap reconciliation.
+ * Description: Handles Check-In Desk POST actions including dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, indexed First-Time/Lapsed Shooter promoter evaluation, server-side canonical name enforcement (Member DB + 18-month TFAA history) while preserving intentional capitalization edits (e.g., "McBride"), First+Last same-line duplicate lockout, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance, and archer edits/deletions with Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero style tags, indexed non-historical registration lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.1
+ * Version: 7.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -46,6 +46,27 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
         $script_optout_attrs = defined( 'SYWAT_SCRIPT_OPTOUT_ATTRS' ) ? SYWAT_SCRIPT_OPTOUT_ATTRS : '';
 
+        $sync_tourn_registrations = function() use ( &$data, &$registrations, $selected_tournament, $lines ) {
+            if ( ! isset( $data['tourn_registrations'] ) || ! is_array( $data['tourn_registrations'] ) ) {
+                return;
+            }
+            $sel_line = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
+            $data['tourn_registrations'] = array_values( array_filter( $registrations, function( $reg ) use ( $selected_tournament, $sel_line, $lines ) {
+                if ( ! is_array( $reg ) || ! isset( $reg['tournament'] ) || strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                    return false;
+                }
+                if ( $sel_line !== 'all' && $sel_line !== '' ) {
+                    $r_lidx = function_exists( 'sywat_desk_resolve_line_idx' )
+                        ? sywat_desk_resolve_line_idx( $reg, $lines )
+                        : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+                    if ( (string) $r_lidx !== $sel_line ) {
+                        return false;
+                    }
+                }
+                return true;
+            } ) );
+        };
+
         // Resolve offered Pricing & Round Profiles for this tournament
         $t_profiles       = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] )
             ? $data['pricing_profiles']
@@ -68,25 +89,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
         // Delegate Waitlist Modal actions (promote_waitlist, move_waitlist_line, modal delete_shooter) to central Waitlist engine
         if ( function_exists( 'sywat_waitlist_is_supported_action' ) && sywat_waitlist_is_supported_action( $action ) && function_exists( 'sywat_waitlist_dispatch_post_action' ) ) {
             $waitlist_notice = sywat_waitlist_dispatch_post_action( $tournaments_map, $registrations );
-
-            if ( isset( $data['tourn_registrations'] ) && is_array( $data['tourn_registrations'] ) ) {
-                $sel_line = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
-                $data['tourn_registrations'] = array_values( array_filter( $registrations, function( $reg ) use ( $selected_tournament, $sel_line, $lines ) {
-                    if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
-                        return false;
-                    }
-                    if ( $sel_line !== 'all' && $sel_line !== '' ) {
-                        $r_lidx = function_exists( 'sywat_desk_resolve_line_idx' )
-                            ? sywat_desk_resolve_line_idx( $reg, $lines )
-                            : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-                        if ( (string) $r_lidx !== $sel_line ) {
-                            return false;
-                        }
-                    }
-                    return true;
-                } ) );
-            }
-
+            $sync_tourn_registrations();
             return $waitlist_notice;
         }
 
@@ -103,16 +106,21 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             );
         };
 
-        $canonicalize_archer_name = function( $raw_name, $email = '', $phone = '' ) use ( $tourn_start_date ) {
+        $normalize_comma_name = function( $raw_name ) {
             $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $raw_name ) );
-            if ( $clean_name === '' ) {
-                return '';
-            }
-            if ( strpos( $clean_name, ',' ) !== false ) {
+            if ( $clean_name !== '' && strpos( $clean_name, ',' ) !== false ) {
                 $comma_parts = array_map( 'trim', explode( ',', $clean_name, 2 ) );
                 if ( count( $comma_parts ) === 2 && $comma_parts[0] !== '' && $comma_parts[1] !== '' ) {
                     $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', $comma_parts[1] . ' ' . $comma_parts[0] ) );
                 }
+            }
+            return $clean_name;
+        };
+
+        $canonicalize_archer_name = function( $raw_name, $email = '', $phone = '' ) use ( $tourn_start_date, $normalize_comma_name ) {
+            $clean_name = $normalize_comma_name( $raw_name );
+            if ( $clean_name === '' ) {
+                return '';
             }
             if ( function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
                 $resolved = sywat_resolve_archer_intake_profile(
@@ -124,7 +132,12 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     )
                 );
                 if ( ! empty( $resolved['canonical_name'] ) ) {
-                    return trim( (string) $resolved['canonical_name'] );
+                    $canonical = trim( (string) $resolved['canonical_name'] );
+                    // Preserve intentional mixed-case capitalization (e.g., "McBride" vs cached "Mcbride")
+                    if ( strcasecmp( $canonical, $clean_name ) === 0 ) {
+                        return $clean_name;
+                    }
+                    return $canonical;
                 }
             }
             return $clean_name;
@@ -364,6 +377,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 }
             }
             unset( $r );
+            $sync_tourn_registrations();
             return '<div class="sywat-alert sywat-alert-success"><strong>Line closed successfully.</strong> ' . $update_count . ' absent archer(s) marked as No Show.</div>';
         }
 
@@ -606,6 +620,8 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 unset( $r );
             }
 
+            $sync_tourn_registrations();
+
             // Fast-Loop Context Persistence: Accumulate session archers and total balance
             $prev_session_archers = array();
             if ( isset( $_POST['walkin_session_archers_json'] ) && ! empty( $_POST['walkin_session_archers_json'] ) ) {
@@ -655,7 +671,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return '<div class="sywat-alert sywat-alert-success">✅ Walk-in archer <strong>' . esc_html( $name_val ) . '</strong> registered and checked in successfully.' . $promo_note . ' Total Due: $' . number_format( $session_total, 2 ) . '</div>';
         }
 
-        // Check-In (Enforces household-wide unpaid family balance block, canonical name standardization when modified, same-line duplicate guard & clears linked balances when verified)
+        // Check-In (Enforces household-wide unpaid family balance block, canonical name standardization when modified while preserving casing edits, same-line duplicate guard & clears linked balances when verified)
         if ( $action === 'save_checkin' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -705,18 +721,19 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     }
                     return '<div class="sywat-alert sywat-alert-danger"><strong>⚠️ Check-In Blocked!</strong> Archer has an unpaid balance ($' . number_format( $effective_due, 2 ) . '). Please see event staff for payment and check the verification box.</div>';
                 } else {
-                    $orig_checkin_name = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
-                    $raw_checkin_name  = ! empty( $_POST['checkin_name'] )
+                    $orig_checkin_name  = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+                    $raw_checkin_name   = ! empty( $_POST['checkin_name'] )
                         ? trim( preg_replace( '/[[:space:]]+/', ' ', sanitize_text_field( wp_unslash( $_POST['checkin_name'] ) ) ) )
                         : $orig_checkin_name;
+                    $clean_checkin_name = $normalize_comma_name( $raw_checkin_name );
 
-                    $resolved_name = ( strcasecmp( $raw_checkin_name, $orig_checkin_name ) !== 0 || strpos( $raw_checkin_name, ',' ) !== false )
+                    $resolved_name = ( $clean_checkin_name !== '' && strcasecmp( $clean_checkin_name, $orig_checkin_name ) !== 0 )
                         ? $canonicalize_archer_name(
-                            $raw_checkin_name,
+                            $clean_checkin_name,
                             isset( $reg['email'] ) ? (string) $reg['email'] : '',
                             isset( $reg['phone'] ) ? (string) $reg['phone'] : ''
                         )
-                        : $orig_checkin_name;
+                        : ( $clean_checkin_name !== '' ? $clean_checkin_name : $orig_checkin_name );
 
                     $reg_line_idx = function_exists( 'sywat_desk_resolve_line_idx' )
                         ? sywat_desk_resolve_line_idx( $reg, $lines )
@@ -808,6 +825,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
 
                     // Clear unpaid balances across all linked household / booking members
                     $clear_linked_group_balances( $reg );
+                    $sync_tourn_registrations();
                 }
             }
         }
@@ -830,25 +848,27 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     }
                     unset( $r );
                 }
+                $sync_tourn_registrations();
             }
         }
 
-        // Save Edit (Standardizes name only when changed, checks First+Last same-line duplicates, recalculates fee on division change, clears group balances & reconciles Family Cap)
+        // Save Edit (Standardizes name only when changed while preserving casing edits, checks First+Last same-line duplicates, recalculates fee on division change, clears group balances & reconciles Family Cap)
         if ( $action === 'save_edit' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
             $reg       = get_option( $opt_key );
 
             if ( $reg ) {
-                $orig_name     = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
-                $raw_edit_name = trim( preg_replace( '/[[:space:]]+/', ' ', sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) );
-                $edit_name     = ( strcasecmp( $raw_edit_name, $orig_name ) !== 0 || strpos( $raw_edit_name, ',' ) !== false )
+                $orig_name       = isset( $reg['name'] ) ? trim( (string) $reg['name'] ) : '';
+                $raw_edit_name   = trim( preg_replace( '/[[:space:]]+/', ' ', sanitize_text_field( wp_unslash( $_POST['edit_name'] ) ) ) );
+                $clean_edit_name = $normalize_comma_name( $raw_edit_name );
+                $edit_name       = ( $clean_edit_name !== '' && strcasecmp( $clean_edit_name, $orig_name ) !== 0 )
                     ? $canonicalize_archer_name(
-                        $raw_edit_name,
+                        $clean_edit_name,
                         isset( $reg['email'] ) ? (string) $reg['email'] : '',
                         isset( $reg['phone'] ) ? (string) $reg['phone'] : ''
                     )
-                    : $orig_name;
+                    : ( $clean_edit_name !== '' ? $clean_edit_name : $orig_name );
 
                 $line_idx    = sanitize_text_field( wp_unslash( $_POST['edit_line_index'] ) );
                 $orig_line   = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
@@ -969,6 +989,9 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                         }
                     }
                 }
+
+                $sync_tourn_registrations();
+                return '<div class="sywat-alert sywat-alert-success">Updated registration details for <strong>' . esc_html( $edit_name ) . '</strong>.</div>';
             }
         }
 
@@ -1004,6 +1027,8 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             if ( $del_fam_id !== '' && $del_line_idx !== '' && function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
                 sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $del_line_idx, $del_fam_id, $registrations, $lines );
             }
+
+            $sync_tourn_registrations();
         }
 
         return '';
