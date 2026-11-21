@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Client Scripts Enqueuer
  * Path: includes/registration/registration-scripts.php
- * Description: Enqueues registration portal client scripts and localizes the unified Member Directory + 18-Month TFAA shooter index, canonical given-name/nickname alias map, cached phone numbers, database-configured age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility maps.
- * Compliance: Pure script enqueuer — zero HTML echo, zero direct SQL queries, omitted closing PHP tag.
+ * Description: Enqueues registration portal client scripts and localizes the unified Member Directory + 18-Month TFAA shooter index, canonical given-name/nickname alias map, cached phone numbers, database-configured age divisions, active tournament pricing/round profiles, and O(1) First-Time/Lapsed Shooter promoter eligibility maps (skipping cross-tournament registration queries when promos are inactive and using indexed active-tournament lookups when active).
+ * Compliance: Pure script enqueuer — zero HTML echo, zero direct SQL queries, indexed active-tournament lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -50,6 +50,7 @@ if ( ! function_exists( 'sywat_registration_resolve_script_tournament' ) ) {
 /**
  * Build an O(1) client-side Promoter eligibility lookup map per offered round profile
  * for the active tournament so intake rows reflect $0.00 First-Time/Lapsed Shooter promos live.
+ * Skips cross-tournament registration queries entirely when promos are inactive.
  *
  * @param string $tournament_name Active tournament name.
  * @param array  $t_profiles      Ordered map of pricing profiles offered by the tournament.
@@ -63,10 +64,10 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
             return $payload;
         }
 
-        $ctx         = function_exists( 'sywat_pricing_get_context_maps' ) ? sywat_pricing_get_context_maps() : array( 'tournaments' => array(), 'seasons' => array() );
-        $all_t       = isset( $ctx['tournaments'] ) ? $ctx['tournaments'] : array();
-        $all_s       = isset( $ctx['seasons'] ) ? $ctx['seasons'] : array();
-        $t_data      = isset( $all_t[ $tournament_name ] ) ? $all_t[ $tournament_name ] : null;
+        $ctx    = function_exists( 'sywat_pricing_get_context_maps' ) ? sywat_pricing_get_context_maps() : array( 'tournaments' => array(), 'seasons' => array() );
+        $all_t  = isset( $ctx['tournaments'] ) ? $ctx['tournaments'] : array();
+        $all_s  = isset( $ctx['seasons'] ) ? $ctx['seasons'] : array();
+        $t_data = isset( $all_t[ $tournament_name ] ) ? $all_t[ $tournament_name ] : null;
 
         if ( ! is_array( $t_data ) ) {
             foreach ( $all_t as $k => $v ) {
@@ -84,20 +85,34 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
         $season_rec      = ( $season_slug !== '' && isset( $all_s[ $season_slug ] ) ) ? $all_s[ $season_slug ] : null;
         $season_promo_on = is_array( $season_rec ) && ! empty( $season_rec['promo_enabled'] );
 
-        $registrations = function_exists( 'sywat_get_all_registrations' ) ? sywat_get_all_registrations() : array();
+        // Only load cross-tournament active registration history when promo is active on both season and at least one offered profile
+        $any_prof_promo = false;
+        if ( $season_promo_on ) {
+            foreach ( $t_profiles as $prof ) {
+                if ( ! empty( $prof['promo_enabled'] ) ) {
+                    $any_prof_promo = true;
+                    break;
+                }
+            }
+        }
 
-        // Collect unique shooter names across registrations
+        $registrations   = array();
         $candidate_names = array();
-        if ( is_array( $registrations ) ) {
-            foreach ( $registrations as $reg ) {
-                if ( is_array( $reg ) && ! empty( $reg['name'] ) ) {
-                    $norm = strtolower( trim( (string) $reg['name'] ) );
-                    if ( $norm !== '' ) {
-                        $candidate_names[ $norm ] = trim( (string) $reg['name'] );
+        if ( $any_prof_promo && function_exists( 'sywat_get_all_registrations' ) ) {
+            $registrations = sywat_get_all_registrations( $all_t );
+            if ( is_array( $registrations ) ) {
+                foreach ( $registrations as $reg ) {
+                    if ( is_array( $reg ) && ! empty( $reg['name'] ) ) {
+                        $norm = strtolower( trim( (string) $reg['name'] ) );
+                        if ( $norm !== '' ) {
+                            $candidate_names[ $norm ] = trim( (string) $reg['name'] );
+                        }
                     }
                 }
             }
         }
+
+        $t_context = is_array( $t_data ) ? $t_data : $tournament_name;
 
         foreach ( $t_profiles as $p_slug => $prof ) {
             $is_active      = $season_promo_on && ! empty( $prof['promo_enabled'] );
@@ -107,7 +122,7 @@ if ( ! function_exists( 'sywat_registration_build_promo_rules_payload' ) ) {
                 foreach ( $candidate_names as $norm_name => $orig_name ) {
                     $check = sywat_check_archer_promo_eligibility(
                         $orig_name,
-                        is_array( $t_data ) ? $t_data : $tournament_name,
+                        $t_context,
                         $p_slug,
                         $registrations
                     );
