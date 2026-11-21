@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Public Tournament Results View
  * Path: includes/results/results-tournaments.php
- * Description: Pure presentation and quick-edit controller for the season-scoped public tournament directory and single-tournament category leaderboards. Includes an inline Season selector in the directory header bar (defaulting to the active season while preserving season selection across directory, detail, and standings views), delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
+ * Description: Pure presentation and quick-edit controller for the season-scoped public tournament directory and single-tournament category leaderboards. Includes an inline Season selector in the directory header bar (defaulting to the active season while preserving season selection across directory, detail, and standings views), delegates host/location resolution to results-helpers.php (zero hardcoded shop names), URL-encodes tournament query parameters (preserving "&" in tournament titles), renders 1-day scoreboards as well as multi-day (Day 1 / Day 2 / Day 3 + Total) State Championship scoreboards, formats and tie-sorts archers as "LastName, FirstName" with dual-format live search indexing, preserves incomplete "[INC]" rounds in their primary division/style with "[INC]" displayed next to the archer's name (while stripping tags in the Quick Edit modal), routes explicit Guest entries, and wires the staff Quick Edit modal strictly to database-configured Age Divisions and Shooting Styles.
  * Compliance: Pure View layer — zero hardcoded shop/division/style lists, zero inline style attributes, zero element.style.* mutations, opt-out shielded script blocks, class-based visibility toggling, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -88,10 +88,10 @@ if ( ! function_exists( 'sywat_handle_results_quick_edit' ) ) {
                 }
 
                 if ( isset( $_POST['score'] ) ) {
-                    $reg['score'] = max( 0, min( 300, intval( wp_unslash( $_POST['score'] ) ) ) );
+                    $reg['score'] = max( 0, min( 900, intval( wp_unslash( $_POST['score'] ) ) ) );
                 }
                 if ( isset( $_POST['x_count'] ) ) {
-                    $reg['x_count'] = max( 0, min( 60, intval( wp_unslash( $_POST['x_count'] ) ) ) );
+                    $reg['x_count'] = max( 0, min( 180, intval( wp_unslash( $_POST['x_count'] ) ) ) );
                 }
 
                 update_option( $opt_key, $reg, false );
@@ -342,10 +342,11 @@ if ( ! function_exists( 'sywat_render_public_tournament_directory' ) ) {
 
 /**
  * Render Single Tournament Results Breakdown
- * Routes explicit Guest records (type === 'Guest', style === 'Guest', or '[Guest]' tags),
- * completed-round 0-score cards, and secondary re-entries into the Guest category while
- * preserving incomplete ("[INC]") rounds in their primary division/style with "[INC]"
- * displayed next to the archer's name and deduplicating official entries via normalized
+ * Supports 1-day scoreboards as well as multi-day (Day 1 / Day 2 / Day 3 + Total) State
+ * Championship scoreboards. Routes explicit Guest records (type === 'Guest', style === 'Guest',
+ * or '[Guest]' tags), completed-round 0-score cards, and secondary re-entries into the Guest
+ * category while preserving incomplete ("[INC]") rounds in their primary division/style with
+ * "[INC]" displayed next to the archer's name and deduplicating official entries via normalized
  * First+Last (+ suffix) keys.
  *
  * @param string $tournament_name      Target tournament name.
@@ -475,11 +476,17 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
             }
         }
 
-        $groups        = array();
-        $all_divisions = array();
-        $all_styles    = array();
+        $groups         = array();
+        $all_divisions  = array();
+        $all_styles     = array();
+        $max_round_days = 1;
 
         foreach ( $processed_scores as $s ) {
+            $entry_days = isset( $s['round_days'] ) ? max( 1, intval( $s['round_days'] ) ) : 1;
+            if ( $entry_days > $max_round_days ) {
+                $max_round_days = $entry_days;
+            }
+
             $div_gen_key = $s['division'] . '|||' . $s['gender'];
             $style_key   = $s['style'];
 
@@ -502,6 +509,7 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
         }
 
         $total_tourn_shooters = count( $processed_scores );
+        $is_multi_day         = ( $max_round_days >= 2 );
 
         // Sort Division filter options using database-configured NFAA age progression
         uasort( $all_divisions, function( $divA, $divB ) {
@@ -602,6 +610,15 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                 $quick_edit_styles = array_values( $all_styles );
             }
         }
+
+        $format_round_cell = function( $r_score, $r_xs ) {
+            $rs = intval( $r_score );
+            $rx = intval( $r_xs );
+            if ( $rs <= 0 && $rx <= 0 ) {
+                return '<span class="sywat-score-null">&mdash;</span>';
+            }
+            return '<strong>' . $rs . ' / ' . $rx . 'X</strong>';
+        };
         ?>
 
         <div class="sywat-public-card">
@@ -681,7 +698,16 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                             <tr>
                                                 <th class="sywat-col-center">Place</th>
                                                 <th>Archer Name</th>
-                                                <th class="sywat-col-right">Score / X</th>
+                                                <?php if ( $is_multi_day ) : ?>
+                                                    <th class="sywat-col-center">Day 1</th>
+                                                    <th class="sywat-col-center">Day 2</th>
+                                                    <?php if ( $max_round_days >= 3 ) : ?>
+                                                        <th class="sywat-col-center">Day 3</th>
+                                                    <?php endif; ?>
+                                                    <th class="sywat-col-right">Total Score / X</th>
+                                                <?php else : ?>
+                                                    <th class="sywat-col-right">Score / X</th>
+                                                <?php endif; ?>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -728,6 +754,13 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
                                                             <?php endif; ?>
                                                         </div>
                                                     </td>
+                                                    <?php if ( $is_multi_day ) : ?>
+                                                        <td class="sywat-col-center"><?php echo $format_round_cell( isset( $a['r1_score'] ) ? $a['r1_score'] : $s_val, isset( $a['r1_xs'] ) ? $a['r1_xs'] : $x_val ); ?></td>
+                                                        <td class="sywat-col-center"><?php echo $format_round_cell( isset( $a['r2_score'] ) ? $a['r2_score'] : 0, isset( $a['r2_xs'] ) ? $a['r2_xs'] : 0 ); ?></td>
+                                                        <?php if ( $max_round_days >= 3 ) : ?>
+                                                            <td class="sywat-col-center"><?php echo $format_round_cell( isset( $a['r3_score'] ) ? $a['r3_score'] : 0, isset( $a['r3_xs'] ) ? $a['r3_xs'] : 0 ); ?></td>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
                                                     <td class="sywat-col-right sywat-score-cell">
                                                         <strong><?php echo $s_val . ' / ' . $x_val . 'X'; ?></strong>
                                                     </td>
@@ -793,12 +826,12 @@ if ( ! function_exists( 'sywat_render_public_tournament_results' ) ) {
 
                             <div class="sywat-form-grid-2">
                                 <div class="sywat-field-group">
-                                    <label for="edit_modal_score">Score (0–300)</label>
-                                    <input type="number" name="score" id="edit_modal_score" min="0" max="300" required>
+                                    <label for="edit_modal_score">Score (0–900)</label>
+                                    <input type="number" name="score" id="edit_modal_score" min="0" max="900" required>
                                 </div>
                                 <div class="sywat-field-group">
-                                    <label for="edit_modal_x_count">X Count (0–60)</label>
-                                    <input type="number" name="x_count" id="edit_modal_x_count" min="0" max="60" required>
+                                    <label for="edit_modal_x_count">X Count (0–180)</label>
+                                    <input type="number" name="x_count" id="edit_modal_x_count" min="0" max="180" required>
                                 </div>
                             </div>
                         </div>
