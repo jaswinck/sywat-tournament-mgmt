@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Historical TFAA Results Data Access & Atomic Batch Persistence
  * Path: includes/history/history-data.php
- * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Validates TFAA HTTPS hosts via wp_parse_url(), persists permanent discovered season manifests (sywat_history_discovered_seasons) sorted strictly by start_date descending and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() so active/default seasons are never overwritten, and executes atomic MySQL transactions with chunked multi-row SQL upserts (autoload = 'no').
+ * Description: Pure data access and remote HTTP fetching layer for historical TFAA season/tournament migration. Validates TFAA HTTPS hosts via wp_parse_url(), supports single and concurrent multi-URL fetching via WpOrg\Requests\Requests::request_multiple(), persists permanent discovered season manifests (sywat_history_discovered_seasons) sorted strictly by start_date descending and per-season tournament manifests (sywat_history_discovered_events) in wp_options (autoload = 'no') hydrated with live import status and scorecard counts, seeds sywat_seasons_list via sywat_get_seasons() so active/default seasons are never overwritten, and executes atomic MySQL transactions with chunked multi-row SQL upserts (autoload = 'no').
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, O(1) hashtable lookups, explicit MySQL transactions, chunked batch SQL writes, object cache invalidation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.2
+ * Version: 1.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -76,6 +76,127 @@ if ( ! function_exists( 'sywat_history_fetch_remote_html' ) ) {
             'html'    => $body,
             'error'   => '',
         );
+    }
+}
+
+/**
+ * Fetch multiple remote HTML pages from texasfieldarchery.org concurrently in a single batch
+ * via WordPress core's Requests::request_multiple() (curl_multi), validating every host via wp_parse_url().
+ *
+ * @param array $urls_by_key Associative map of item_key => TFAA HTTPS URL.
+ * @return array             Associative map of item_key => array( 'success' => bool, 'html' => string, 'error' => string ).
+ */
+if ( ! function_exists( 'sywat_history_fetch_remote_html_batch' ) ) {
+    function sywat_history_fetch_remote_html_batch( $urls_by_key ) {
+        $results          = array();
+        $requests_payload = array();
+
+        if ( ! is_array( $urls_by_key ) || empty( $urls_by_key ) ) {
+            return $results;
+        }
+
+        $headers = array(
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept'     => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        );
+
+        foreach ( $urls_by_key as $key => $raw_url ) {
+            $clean_url = esc_url_raw( trim( (string) $raw_url ) );
+            $parsed    = wp_parse_url( $clean_url );
+            $scheme    = isset( $parsed['scheme'] ) ? strtolower( (string) $parsed['scheme'] ) : '';
+            $host      = isset( $parsed['host'] ) ? strtolower( (string) $parsed['host'] ) : '';
+
+            if ( $clean_url === '' || $scheme !== 'https' || $host !== 'texasfieldarchery.org' ) {
+                $results[ $key ] = array(
+                    'success' => false,
+                    'html'    => '',
+                    'error'   => 'Invalid TFAA source URL.',
+                );
+                continue;
+            }
+
+            $requests_payload[ $key ] = array(
+                'url'     => $clean_url,
+                'headers' => $headers,
+                'type'    => 'GET',
+            );
+        }
+
+        if ( empty( $requests_payload ) ) {
+            return $results;
+        }
+
+        $options = array(
+            'timeout'          => 25,
+            'connect_timeout'  => 15,
+            'verify'           => false,
+            'follow_redirects' => true,
+            'redirects'        => 5,
+        );
+
+        $responses = null;
+        if ( class_exists( '\WpOrg\Requests\Requests' ) ) {
+            $responses = \WpOrg\Requests\Requests::request_multiple( $requests_payload, $options );
+        } elseif ( class_exists( '\Requests' ) ) {
+            $responses = \Requests::request_multiple( $requests_payload, $options );
+        }
+
+        if ( ! is_array( $responses ) ) {
+            foreach ( $requests_payload as $key => $req ) {
+                $results[ $key ] = sywat_history_fetch_remote_html( $req['url'] );
+            }
+            return $results;
+        }
+
+        foreach ( $requests_payload as $key => $req ) {
+            $resp = isset( $responses[ $key ] ) ? $responses[ $key ] : null;
+            if ( null === $resp ) {
+                $results[ $key ] = array(
+                    'success' => false,
+                    'html'    => '',
+                    'error'   => 'No response received from TFAA.',
+                );
+                continue;
+            }
+
+            if ( $resp instanceof \Exception || is_wp_error( $resp ) ) {
+                $err_msg         = is_wp_error( $resp ) ? $resp->get_error_message() : $resp->getMessage();
+                $results[ $key ] = array(
+                    'success' => false,
+                    'html'    => '',
+                    'error'   => 'HTTP request failed: ' . $err_msg,
+                );
+                continue;
+            }
+
+            $status_code = isset( $resp->status_code ) ? intval( $resp->status_code ) : 0;
+            if ( $status_code < 200 || $status_code >= 300 ) {
+                $results[ $key ] = array(
+                    'success' => false,
+                    'html'    => '',
+                    'error'   => 'TFAA server returned HTTP ' . $status_code . '.',
+                );
+                continue;
+            }
+
+            $body = isset( $resp->body ) ? (string) $resp->body : '';
+            if ( trim( $body ) === '' ) {
+                $results[ $key ] = array(
+                    'success' => false,
+                    'html'    => '',
+                    'error'   => 'Empty HTML body returned from TFAA.',
+                );
+                continue;
+            }
+
+            $results[ $key ] = array(
+                'success' => true,
+                'html'    => $body,
+                'error'   => '',
+            );
+        }
+
+        return $results;
     }
 }
 
@@ -270,12 +391,13 @@ if ( ! function_exists( 'sywat_history_get_discovered_seasons' ) ) {
  * Persist a season's discovered tournament manifest permanently in wp_options (autoload = 'no'),
  * keyed by season slug and event_id so individual tournaments and their import status survive page reloads.
  *
- * @param string $season_slug Canonical season slug.
- * @param array  $events_list Array of parsed event manifest items from sywat_history_parse_season_events_html().
- * @return array              Hydrated list of events for the target season.
+ * @param string $season_slug  Canonical season slug.
+ * @param array  $events_list  Array of parsed event manifest items from sywat_history_parse_season_events_html().
+ * @param bool   $skip_hydrate Optional flag to skip full-season option scan during high-speed batch commits.
+ * @return array               Hydrated list of events for the target season (or empty array when $skip_hydrate is true).
  */
 if ( ! function_exists( 'sywat_history_save_discovered_events' ) ) {
-    function sywat_history_save_discovered_events( $season_slug, $events_list ) {
+    function sywat_history_save_discovered_events( $season_slug, $events_list, $skip_hydrate = false ) {
         $clean_slug = sanitize_title( (string) $season_slug );
         if ( $clean_slug === '' ) {
             return array();
@@ -321,6 +443,10 @@ if ( ! function_exists( 'sywat_history_save_discovered_events' ) ) {
         $all_saved[ $clean_slug ] = $bucket;
         update_option( 'sywat_history_discovered_events', $all_saved, false );
         wp_cache_delete( 'sywat_history_discovered_events', 'options' );
+
+        if ( $skip_hydrate ) {
+            return array();
+        }
 
         return sywat_history_get_discovered_events( $clean_slug );
     }
@@ -624,7 +750,7 @@ if ( ! function_exists( 'sywat_history_save_event_scores_atomic' ) ) {
         wp_cache_delete( 'sywat_scores_' . $t_slug, 'options' );
         wp_cache_delete( 'sywat_locks_' . $t_slug, 'options' );
 
-        // 5. Ensure discovered events manifest reflects this tournament permanently
+        // 5. Ensure discovered events manifest reflects this tournament permanently (skip O(N^2) re-hydrate)
         $season_slug_val = isset( $season_record['slug'] ) ? (string) $season_record['slug'] : '';
         if ( $season_slug_val !== '' ) {
             sywat_history_save_discovered_events(
@@ -641,7 +767,8 @@ if ( ! function_exists( 'sywat_history_save_event_scores_atomic' ) ) {
                         'end_date'    => $end_date,
                         'event_type'  => isset( $event_item['event_type'] ) ? $event_item['event_type'] : 'SYWAT',
                     ),
-                )
+                ),
+                true
             );
         }
 
