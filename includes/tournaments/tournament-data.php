@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Tournament Data Access, Calculation & Scraping Engines
  * Path: includes/tournaments/tournament-data.php
- * Description: Provides season/tournament retrieval (with automatic default active-season recovery if sywat_seasons_list was saved without an active season), indexed non-historical registration loading (preventing full-table scans across 30,000+ archived "_hist_" rows in wp_options), automatic slug-to-title reconciliation, TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
+ * Description: Provides season/tournament retrieval (with automatic default active-season recovery if sywat_seasons_list was saved without an active season), normalized season slug/title filtering in sywat_get_master_portal_data() so initial load and Season dropdown selections filter reliably across slug and display-name formats, indexed non-historical registration loading (preventing full-table scans across 30,000+ archived "_hist_" rows in wp_options), automatic slug-to-title reconciliation, TFAA schedule scraping, deterministic chronological/shop event sorting, and safe chronological re-sequencing.
  * Compliance: Zero HTML output at include time, O(N) hoisted sorting via shared helper, indexed prefix option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.6
+ * Version: 8.1.7
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -532,7 +532,7 @@ if ( ! function_exists( 'sywat_process_schedule_import_rows' ) ) {
                     continue;
                 }
                 $ex_season = isset( $ex['season'] ) ? $ex['season'] : ( isset( $ex['season_slug'] ) ? $ex['season_slug'] : '' );
-                if ( $ex_season !== $target_season ) {
+                if ( sanitize_title( (string) $ex_season ) !== sanitize_title( (string) $target_season ) ) {
                     continue;
                 }
 
@@ -688,7 +688,9 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
             }
         }
 
-        $shop_tournaments = array();
+        $target_season_slug = sanitize_title( (string) $season_slug );
+        $shop_tournaments   = array();
+
         foreach ( $tournaments as $t_name => $t_data ) {
             if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
                 continue;
@@ -703,10 +705,11 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
                 }
             }
 
-            $t_season   = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
-            $event_type = isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT';
+            $t_season      = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : '';
+            $t_season_slug = sanitize_title( (string) $t_season );
+            $event_type    = isset( $t_data['event_type'] ) ? $t_data['event_type'] : 'SYWAT';
 
-            if ( $t_shop === $shop_id && ( empty( $season_slug ) || $t_season === $season_slug ) && strcasecmp( $event_type, 'SYWAT' ) === 0 ) {
+            if ( $t_shop === $shop_id && ( $target_season_slug === '' || $t_season_slug === $target_season_slug ) && strcasecmp( $event_type, 'SYWAT' ) === 0 ) {
                 $shop_tournaments[] = array(
                     'old_name'   => $t_name,
                     'start_date' => isset( $t_data['start_date'] ) ? $t_data['start_date'] : '',
@@ -801,10 +804,10 @@ if ( ! function_exists( 'sywat_resequence_shop_tournaments' ) ) {
 
 /**
  * Master Data Retrieval Engine for Admin Portal & Views.
- * Automatically reconciles any active registration records whose tournament slug matches a configured
- * tournament whose display punctuation/spacing was normalized (e.g., space vs. hyphen),
- * querying strictly non-historical tournament prefixes so archived TFAA scorecards never slow down
- * portal paint or Roster modal rendering.
+ * Resolves the active or requested competition season (supporting both canonical slug keys
+ * and display names such as "2026–2027 Indoor"), reconciles any active registration records
+ * whose tournament slug matches a configured tournament, and queries strictly non-historical
+ * tournament prefixes so archived TFAA scorecards never slow down portal paint.
  */
 if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
     function sywat_get_master_portal_data() {
@@ -824,6 +827,62 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
         $active_tournaments = get_option( 'sywat_active_tournaments', array() );
         if ( ! is_array( $active_tournaments ) ) {
             $active_tournaments = array();
+        }
+
+        // Resolve target season slug (explicit filter_season -> modal tournament season -> active season -> first season)
+        $raw_season_req  = isset( $_REQUEST['filter_season'] ) ? trim( sanitize_text_field( wp_unslash( $_REQUEST['filter_season'] ) ) ) : '';
+        $selected_season = '';
+
+        if ( $raw_season_req === '' ) {
+            $ctx_tourn = isset( $_REQUEST['view_tournament'] )
+                ? trim( sanitize_text_field( wp_unslash( $_REQUEST['view_tournament'] ) ) )
+                : ( isset( $_REQUEST['edit_tournament_modal'] ) ? trim( sanitize_text_field( wp_unslash( $_REQUEST['edit_tournament_modal'] ) ) ) : '' );
+            if ( $ctx_tourn !== '' && isset( $tournaments[ $ctx_tourn ] ) && function_exists( 'sywat_get_tournament_season_slug' ) ) {
+                $raw_season_req = trim( (string) sywat_get_tournament_season_slug( $tournaments[ $ctx_tourn ] ) );
+            }
+        }
+
+        if ( $raw_season_req !== '' && ! empty( $seasons ) ) {
+            if ( isset( $seasons[ $raw_season_req ] ) ) {
+                $selected_season = $raw_season_req;
+            } else {
+                $req_slug = sanitize_title( $raw_season_req );
+                foreach ( $seasons as $s_slug => $s_data ) {
+                    $s_name = ( is_array( $s_data ) && ! empty( $s_data['name'] ) ) ? (string) $s_data['name'] : (string) $s_slug;
+                    if ( sanitize_title( $s_slug ) === $req_slug || sanitize_title( $s_name ) === $req_slug ) {
+                        $selected_season = $s_slug;
+                        break;
+                    }
+                }
+            }
+            if ( $selected_season === '' ) {
+                $selected_season = $raw_season_req;
+            }
+        }
+
+        if ( $selected_season === '' && ! empty( $seasons ) ) {
+            foreach ( $seasons as $s_slug => $s_data ) {
+                if ( is_array( $s_data ) && isset( $s_data['status'] ) && $s_data['status'] === 'active' ) {
+                    $selected_season = $s_slug;
+                    break;
+                }
+            }
+            if ( $selected_season === '' ) {
+                reset( $seasons );
+                $selected_season = key( $seasons );
+            }
+        }
+
+        // Build normalized season match tokens so both slug keys ("indoor-2026-2027") and display titles ("2026–2027 Indoor") match
+        $allowed_season_tokens = array();
+        if ( $selected_season !== '' ) {
+            $allowed_season_tokens[ strtolower( $selected_season ) ]       = true;
+            $allowed_season_tokens[ sanitize_title( $selected_season ) ]   = true;
+            if ( isset( $seasons[ $selected_season ] ) && is_array( $seasons[ $selected_season ] ) && ! empty( $seasons[ $selected_season ]['name'] ) ) {
+                $sel_s_name                                                = trim( (string) $seasons[ $selected_season ]['name'] );
+                $allowed_season_tokens[ strtolower( $sel_s_name ) ]        = true;
+                $allowed_season_tokens[ sanitize_title( $sel_s_name ) ]    = true;
+            }
         }
 
         // Map normalized tournament slugs to their canonical key in $tournaments
@@ -861,14 +920,17 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
 
         $scoped_tournaments = array();
         $filter_shops       = array();
-        $selected_season    = isset( $_REQUEST['filter_season'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['filter_season'] ) ) : '';
 
         foreach ( $tournaments as $t_name => $t_data ) {
             $t_shop   = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
-            $t_season = function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : 'indoor-2026-2027';
+            $t_season = trim( (string) ( function_exists( 'sywat_get_tournament_season_slug' ) ? sywat_get_tournament_season_slug( $t_data ) : 'indoor-2026-2027' ) );
 
-            if ( ! empty( $selected_season ) && $t_season !== $selected_season ) {
-                continue;
+            if ( ! empty( $allowed_season_tokens ) ) {
+                $t_season_low  = strtolower( $t_season );
+                $t_season_slug = sanitize_title( $t_season );
+                if ( ! isset( $allowed_season_tokens[ $t_season_low ] ) && ! isset( $allowed_season_tokens[ $t_season_slug ] ) ) {
+                    continue;
+                }
             }
 
             if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
@@ -912,6 +974,7 @@ if ( ! function_exists( 'sywat_get_master_portal_data' ) ) {
             'user_shop_id'       => $user_shop_id,
             'all_shops'          => $all_shops,
             'seasons'            => $seasons,
+            'selected_season'    => $selected_season,
             'tournaments'        => $tournaments,
             'active_tournaments' => $active_tournaments,
             'registrations'      => $registrations,
