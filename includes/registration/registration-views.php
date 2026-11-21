@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Views Renderer
  * Path: includes/registration/registration-views.php
- * Description: Renders the [sywat_register] Registration Desk portal with role-gated capability checks and desk tabs, persists sticky tournament selection across desk portals, computes single-pass O(R) per-line capacity and waitlist metrics ($line_stats) after POST action execution so Current Line Slot Usage and the multi-line intake matrix stay strictly synchronized without view-layer option queries, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the [sywat_register] Registration Desk portal with role-gated capability checks and desk tabs, excludes archived historical_import TFAA records from active tournament dropdowns, persists sticky tournament selection across desk portals, computes single-pass O(R) per-line capacity and waitlist metrics ($line_stats) after POST action execution so Current Line Slot Usage and the multi-line intake matrix stay strictly synchronized without view-layer option queries, renders the header Bulk Upload trigger and top-level Import Modal (#sywat_import_modal), dispatches waitlist modal POST actions, and renders the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view/orchestration layer — zero output at include time, zero inline styles, zero inline JS event handlers (delegated data-sywat-action attributes), single-pass O(R) line stats computation, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,8 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Helper: Filter scoped tournaments to active season(s) and build an ordered option map
- * with the currently selected tournament at the top and all remaining tournaments sorted A–Z.
+ * Helper: Filter scoped tournaments to active season(s) (excluding historical_import archives)
+ * and build an ordered option map with the currently selected tournament at the top and all
+ * remaining tournaments sorted A–Z.
  *
  * Priority order when no explicit tournament is requested:
  * 1. User's last-selected tournament (sywat_desk_selected_tournament user meta)
@@ -54,10 +55,14 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
         $uid          = get_current_user_id();
         $saved_user_t = $uid ? trim( (string) get_user_meta( $uid, 'sywat_desk_selected_tournament', true ) ) : '';
 
-        // Filter pool to active season(s), always preserving an explicitly requested or saved tournament if valid
+        // Filter pool to active season(s), excluding historical_import archives unless explicitly requested
         $pool = array();
         foreach ( $scoped_tournaments as $t_name => $t_data ) {
-            if ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 ) {
+            $is_explicitly_requested = ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 );
+            if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) && ! $is_explicitly_requested ) {
+                continue;
+            }
+            if ( $is_explicitly_requested ) {
                 $pool[ $t_name ] = $t_data;
                 continue;
             }
@@ -78,8 +83,15 @@ if ( ! function_exists( 'sywat_registration_build_tournament_dropdown' ) ) {
             }
         }
 
+        // Fallback to non-historical shop-scoped tournaments if active season has no events yet
         if ( empty( $pool ) ) {
-            $pool = $scoped_tournaments;
+            foreach ( $scoped_tournaments as $t_name => $t_data ) {
+                $is_explicitly_requested = ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 );
+                if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) && ! $is_explicitly_requested ) {
+                    continue;
+                }
+                $pool[ $t_name ] = $t_data;
+            }
         }
 
         // Sort all pool keys alphabetically (A–Z, natural case-insensitive)
@@ -232,20 +244,11 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
         $can_access_desk        = function_exists( 'sywat_can_access_desk' ) && sywat_can_access_desk();
         $can_edit_scores        = function_exists( 'sywat_can_edit_scores' ) && sywat_can_edit_scores();
 
-        $user_shop_id           = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
+        $user_shop_id = function_exists( 'sywat_get_current_user_shop_id' ) ? sywat_get_current_user_shop_id() : 'shop_ccr';
 
         $tournaments = get_option( 'sywat_tournaments_list', array() );
         if ( ! is_array( $tournaments ) ) {
             $tournaments = array();
-        }
-
-        // Scope Tournaments to User's Assigned Shop
-        $scoped_tournaments = array();
-        foreach ( $tournaments as $t_name => $t_data ) {
-            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
-            if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
-                $scoped_tournaments[ $t_name ] = $t_data;
-            }
         }
 
         // Unslash GET/POST tournament names so apostrophes (e.g., "Buck & Doe's - 1") match exact keys
@@ -258,14 +261,30 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
             $requested_tourn = sanitize_text_field( wp_unslash( $_GET['view_tournament'] ) );
         }
 
+        // Scope Tournaments to User's Assigned Shop (excluding historical_import archives unless explicitly requested)
+        $scoped_tournaments = array();
+        foreach ( $tournaments as $t_name => $t_data ) {
+            $is_explicitly_requested = ( $requested_tourn !== '' && strcasecmp( $t_name, $requested_tourn ) === 0 );
+            if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) && ! $is_explicitly_requested ) {
+                continue;
+            }
+            $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
+            if ( $can_manage_seasons || $t_shop === $user_shop_id ) {
+                $scoped_tournaments[ $t_name ] = $t_data;
+            }
+        }
+
         $dropdown_data       = sywat_registration_build_tournament_dropdown( $scoped_tournaments, $requested_tourn, $user_shop_id );
         $ordered_tournaments = $dropdown_data['ordered'];
         $selected_tournament = $dropdown_data['selected'];
 
-        // Persist active selection to user meta so Check-In and Enter Scores stay synchronized
+        // Persist active selection to user meta only when changed so Check-In and Enter Scores stay synchronized
         $uid = get_current_user_id();
         if ( $uid && ! empty( $selected_tournament ) ) {
-            update_user_meta( $uid, 'sywat_desk_selected_tournament', $selected_tournament );
+            $prev_saved_t = trim( (string) get_user_meta( $uid, 'sywat_desk_selected_tournament', true ) );
+            if ( $prev_saved_t !== $selected_tournament ) {
+                update_user_meta( $uid, 'sywat_desk_selected_tournament', $selected_tournament );
+            }
         }
 
         $available_lines = ( ! empty( $selected_tournament ) && isset( $tournaments[ $selected_tournament ] ) && function_exists( 'sywat_get_tournament_lines' ) )
@@ -440,7 +459,7 @@ if ( ! function_exists( 'sywat_render_registration_desk' ) ) {
 
         // Enqueue Client Logic & Localize Data
         if ( function_exists( 'sywat_render_registration_scripts' ) ) {
-            sywat_render_registration_scripts();
+            sywat_render_registration_scripts( $selected_tournament );
         }
 
         $tab_query_args   = ! empty( $selected_tournament ) ? array( 'selected_tournament' => $selected_tournament ) : array();
