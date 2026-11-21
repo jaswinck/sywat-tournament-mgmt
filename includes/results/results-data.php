@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Results & Standings Data Access & Aggregation Engine
  * Path: includes/results/results-data.php
- * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries (including 1-day, 2-day, and 3-day round breakdowns and legacy TFAA class-code stripping), and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
+ * Description: Pure database retrieval and batch aggregation layer for historical shooter lookups (excluding archived "_hist_" migration records), single-tournament score queries (including 1-day, 2-day, and 3-day round breakdowns, Inside-Out "I/Os" tie-breaker counts, and legacy TFAA class-code stripping), and multi-tournament Season Standings (single-query season batching, incomplete "[INC]" round and Guest-entry exclusion, single-pass O(1) canonical identity resolution via sywat_normalize_archer_match_keys() and sywat_get_given_name_alias_map(), sequential Score 1 -> Score 2 -> Score 3 -> State X-count tie-breaking, and surname tie-breaker sorting).
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting, zero duplicated alias maps, single-pass O(1) computational hoisting, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.3.5
+ * Version: 1.3.6
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -121,8 +121,9 @@ if ( ! function_exists( 'sywat_get_historical_shooters' ) ) {
 /**
  * Fetch all registered score records for a given tournament, normalizing division and style
  * labels via O(1) lookup maps, stripping legacy TFAA class codes from imported names,
- * and preserving registration 'type' (e.g., 'Guest'), 'is_inc', and multi-day round score
- * breakdowns (r1/r2/r3). Defaults blank/unset score fields to 0 so every roster entry is included.
+ * and preserving registration 'type' (e.g., 'Guest'), 'is_inc', Inside-Out ('io_count' / 'has_io'),
+ * and multi-day round score breakdowns (r1/r2/r3). Defaults blank/unset score fields to 0
+ * so every roster entry is included.
  *
  * @param string $t_name Tournament title.
  * @return array         Normalized list of score entries for the tournament.
@@ -151,6 +152,8 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
             if ( is_array( $reg ) ) {
                 $score_val  = ( isset( $reg['score'] ) && $reg['score'] !== '' && $reg['score'] !== null ) ? intval( $reg['score'] ) : 0;
                 $x_val      = ( isset( $reg['x_count'] ) && $reg['x_count'] !== '' && $reg['x_count'] !== null ) ? intval( $reg['x_count'] ) : 0;
+                $io_val     = ( isset( $reg['io_count'] ) && $reg['io_count'] !== '' && $reg['io_count'] !== null ) ? max( 0, intval( $reg['io_count'] ) ) : 0;
+                $has_io     = ( ! empty( $reg['has_io'] ) || $io_val > 0 ) ? 1 : 0;
                 $round_days = isset( $reg['round_days'] ) ? max( 1, intval( $reg['round_days'] ) ) : 1;
                 $r1_score   = isset( $reg['r1_score'] ) ? intval( $reg['r1_score'] ) : $score_val;
                 $r1_xs      = isset( $reg['r1_xs'] ) ? intval( $reg['r1_xs'] ) : $x_val;
@@ -189,6 +192,8 @@ if ( ! function_exists( 'sywat_get_tournament_scores' ) ) {
                     'r3_xs'      => $r3_xs,
                     'score'      => $score_val,
                     'x_count'    => $x_val,
+                    'io_count'   => $io_val,
+                    'has_io'     => $has_io,
                     'is_inc'     => ! empty( $reg['is_inc'] ) ? 1 : 0,
                     'tournament' => $t_name,
                 );
