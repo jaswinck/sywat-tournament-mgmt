@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Action Handlers
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, early template_redirect JSON AJAX autosave endpoints, batch score saves (with multi-scorekeeper concurrency protection and incomplete round "is_inc" persistence), score resets, and line lock management.
- * Compliance: Pure action layer — zero output at include time, early template_redirect JSON handling before theme headers, omitted closing PHP tag.
+ * Description: Pure POST request processing, early template_redirect JSON AJAX autosave endpoints, transaction-batched score saves (with multi-scorekeeper concurrency protection and incomplete round "is_inc" persistence), transaction-batched score resets, and line lock management.
+ * Compliance: Pure action layer — zero output at include time, early template_redirect JSON handling before theme headers, atomic MySQL transaction batching on multi-row option writes, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 11.3.0
+ * Version: 11.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -94,7 +94,8 @@ if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
 }
 
 /**
- * Processes batch score save, incomplete round flags, line locks, and score reset POST requests.
+ * Processes batch score save, incomplete round flags, line locks, and score reset POST requests
+ * using explicit MySQL transactions for multi-row disk writes.
  *
  * @param string $selected_tournament Active tournament name.
  * @param string $selected_line_idx   Active shooting line index or 'all'.
@@ -141,7 +142,7 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                 }
             }
 
-            // Action: Reset All Scores to 0 (and clear INC flags)
+            // Action: Reset All Scores to 0 (and clear INC flags) inside an atomic transaction
             if ( $action === 'reset_scores' ) {
                 if ( ! $is_admin ) {
                     $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator privileges required to reset scores.</div>';
@@ -164,46 +165,59 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                         $master_regs = array();
                     }
 
-                    foreach ( $all_rows as $row ) {
-                        $reg = maybe_unserialize( $row->option_value );
-                        if ( is_array( $reg ) && isset( $reg['id'] ) ) {
-                            $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
-                            $match_line    = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
-                            $is_checked_in = ! empty( $reg['checked_in'] );
-                            $is_locked     = ! empty( $locked_lines[ $reg['line_index'] ] );
+                    $now_mysql = current_time( 'mysql' );
+                    $wpdb->query( 'START TRANSACTION' );
 
-                            if ( $match_tourn && $match_line && $is_checked_in && ! $is_locked ) {
-                                $opt_key        = 'sywat_t_' . $active_t_slug . '_' . $reg['id'];
-                                $reg['score']   = 0;
-                                $reg['x_count'] = 0;
-                                $reg['is_inc']  = 0;
-                                update_option( $opt_key, $reg, false );
+                    try {
+                        if ( is_array( $all_rows ) ) {
+                            foreach ( $all_rows as $row ) {
+                                $reg = maybe_unserialize( $row->option_value );
+                                if ( is_array( $reg ) && isset( $reg['id'] ) ) {
+                                    $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
+                                    $match_line    = ( $selected_line_idx === 'all' ) || ( isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $selected_line_idx );
+                                    $is_checked_in = ! empty( $reg['checked_in'] );
+                                    $is_locked     = ! empty( $locked_lines[ $reg['line_index'] ] );
 
-                                $scores_map[ $reg['id'] ] = array(
-                                    'score'    => 0,
-                                    'xs'       => 0,
-                                    'is_inc'   => 0,
-                                    'saved_at' => current_time( 'mysql' ),
-                                );
+                                    if ( $match_tourn && $match_line && $is_checked_in && ! $is_locked ) {
+                                        $opt_key        = 'sywat_t_' . $active_t_slug . '_' . $reg['id'];
+                                        $reg['score']   = 0;
+                                        $reg['x_count'] = 0;
+                                        $reg['is_inc']  = 0;
+                                        update_option( $opt_key, $reg, false );
 
-                                if ( isset( $master_regs[ $reg['id'] ] ) ) {
-                                    $master_regs[ $reg['id'] ] = $reg;
+                                        $scores_map[ $reg['id'] ] = array(
+                                            'score'    => 0,
+                                            'xs'       => 0,
+                                            'is_inc'   => 0,
+                                            'saved_at' => $now_mysql,
+                                        );
+
+                                        if ( isset( $master_regs[ $reg['id'] ] ) ) {
+                                            $master_regs[ $reg['id'] ] = $reg;
+                                        }
+
+                                        $reset_count++;
+                                    }
                                 }
-
-                                $reset_count++;
                             }
                         }
+
+                        update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
+                        if ( ! empty( $master_regs ) ) {
+                            update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
+                        }
+
+                        $wpdb->query( 'COMMIT' );
+                    } catch ( \Throwable $e ) {
+                        $wpdb->query( 'ROLLBACK' );
+                        throw $e;
                     }
 
-                    update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
-                    if ( ! empty( $master_regs ) ) {
-                        update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
-                    }
                     $notice = '<div class="sywat-alert sywat-alert-success">Successfully reset scores, X counts, and INC flags to 0 for <strong>' . $reset_count . '</strong> unlocked, checked-in archer(s).</div>';
                 }
             }
 
-            // Action: Save Batch Scores & INC Flags
+            // Action: Save Batch Scores & INC Flags inside an atomic transaction
             if ( $action === 'save_scores' ) {
                 $has_invalid_data = false;
 
@@ -255,54 +269,64 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
                         $master_regs = array();
                     }
 
-                    foreach ( $submitted_ids as $id ) {
-                        $clean_id = sanitize_text_field( wp_unslash( $id ) );
-                        $opt_key  = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
-                        $reg      = get_option( $opt_key );
+                    $now_mysql = current_time( 'mysql' );
+                    $wpdb->query( 'START TRANSACTION' );
 
-                        if ( $reg && is_array( $reg ) ) {
-                            if ( ! empty( $locked_lines[ $reg['line_index'] ] ) ) {
-                                continue;
+                    try {
+                        foreach ( $submitted_ids as $id ) {
+                            $clean_id = sanitize_text_field( wp_unslash( $id ) );
+                            $opt_key  = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
+                            $reg      = get_option( $opt_key );
+
+                            if ( $reg && is_array( $reg ) ) {
+                                if ( ! empty( $locked_lines[ $reg['line_index'] ] ) ) {
+                                    continue;
+                                }
+
+                                if ( isset( $_POST['scores'][ $id ] ) ) {
+                                    $raw_score    = trim( wp_unslash( $_POST['scores'][ $id ] ) );
+                                    $reg['score'] = ( $raw_score !== '' ) ? intval( $raw_score ) : 0;
+                                }
+                                if ( isset( $_POST['x_counts'][ $id ] ) ) {
+                                    $raw_x          = trim( wp_unslash( $_POST['x_counts'][ $id ] ) );
+                                    $reg['x_count'] = ( $raw_x !== '' ) ? intval( $raw_x ) : 0;
+                                }
+
+                                if ( ! empty( $_POST['is_inc'][ $id ] ) ) {
+                                    $reg['is_inc'] = 1;
+                                } elseif ( isset( $_POST['inc_state'][ $id ] ) ) {
+                                    $raw_inc       = sanitize_text_field( wp_unslash( $_POST['inc_state'][ $id ] ) );
+                                    $reg['is_inc'] = ( '1' === $raw_inc ) ? 1 : 0;
+                                } else {
+                                    $reg['is_inc'] = ! empty( $reg['is_inc'] ) ? 1 : 0;
+                                }
+
+                                update_option( $opt_key, $reg, false );
+
+                                $scores_map[ $clean_id ] = array(
+                                    'score'    => isset( $reg['score'] ) ? intval( $reg['score'] ) : 0,
+                                    'xs'       => isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0,
+                                    'is_inc'   => isset( $reg['is_inc'] ) ? intval( $reg['is_inc'] ) : 0,
+                                    'saved_at' => $now_mysql,
+                                );
+
+                                if ( isset( $master_regs[ $clean_id ] ) ) {
+                                    $master_regs[ $clean_id ] = $reg;
+                                }
+
+                                $saved_count++;
                             }
-
-                            if ( isset( $_POST['scores'][ $id ] ) ) {
-                                $raw_score    = trim( wp_unslash( $_POST['scores'][ $id ] ) );
-                                $reg['score'] = ( $raw_score !== '' ) ? intval( $raw_score ) : 0;
-                            }
-                            if ( isset( $_POST['x_counts'][ $id ] ) ) {
-                                $raw_x          = trim( wp_unslash( $_POST['x_counts'][ $id ] ) );
-                                $reg['x_count'] = ( $raw_x !== '' ) ? intval( $raw_x ) : 0;
-                            }
-
-                            if ( ! empty( $_POST['is_inc'][ $id ] ) ) {
-                                $reg['is_inc'] = 1;
-                            } elseif ( isset( $_POST['inc_state'][ $id ] ) ) {
-                                $raw_inc       = sanitize_text_field( wp_unslash( $_POST['inc_state'][ $id ] ) );
-                                $reg['is_inc'] = ( '1' === $raw_inc ) ? 1 : 0;
-                            } else {
-                                $reg['is_inc'] = ! empty( $reg['is_inc'] ) ? 1 : 0;
-                            }
-
-                            update_option( $opt_key, $reg, false );
-
-                            $scores_map[ $clean_id ] = array(
-                                'score'    => isset( $reg['score'] ) ? intval( $reg['score'] ) : 0,
-                                'xs'       => isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0,
-                                'is_inc'   => isset( $reg['is_inc'] ) ? intval( $reg['is_inc'] ) : 0,
-                                'saved_at' => current_time( 'mysql' ),
-                            );
-
-                            if ( isset( $master_regs[ $clean_id ] ) ) {
-                                $master_regs[ $clean_id ] = $reg;
-                            }
-
-                            $saved_count++;
                         }
-                    }
 
-                    update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
-                    if ( ! empty( $master_regs ) ) {
-                        update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
+                        update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
+                        if ( ! empty( $master_regs ) ) {
+                            update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
+                        }
+
+                        $wpdb->query( 'COMMIT' );
+                    } catch ( \Throwable $e ) {
+                        $wpdb->query( 'ROLLBACK' );
+                        throw $e;
                     }
 
                     if ( $saved_count > 0 ) {
