@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and compact header status pills/badges, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and compact header status pills/badges, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search & client-side line filtering, serialized row JSON payloads for instantaneous client-side Check-In & Edit modal opening (eliminating full-page reload delays), responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.2
+ * Version: 7.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,7 +24,7 @@ if ( ! function_exists( 'sywat_desk_render_hidden_context' ) ) {
     function sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ) {
         ?>
         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
-        <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $selected_line_idx ); ?>">
+        <input type="hidden" name="selected_line_idx" class="sywat-desk-hidden-line" value="<?php echo esc_attr( $selected_line_idx ); ?>">
         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
         <?php
     }
@@ -143,7 +143,7 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
                         <!-- Stacked Shooting Line Select -->
                         <div class="sywat-field-group sywat-field-auto">
                             <label for="sywat_selected_line_idx">Shooting Line:</label>
-                            <select id="sywat_selected_line_idx" name="selected_line_idx" class="sywat-select-line" onchange="document.getElementById('sywat_filter_form').submit();">
+                            <select id="sywat_selected_line_idx" name="selected_line_idx" class="sywat-select-line" data-sywat-action="filter-desk-line">
                                 <option value="all" <?php selected( $data['selected_line_idx'], 'all' ); ?>>All Lines</option>
                                 <?php foreach ( $data['lines'] as $idx => $line ) : ?>
                                     <option value="<?php echo esc_attr( $idx ); ?>" <?php selected( (string) $data['selected_line_idx'], (string) $idx ); ?>>
@@ -329,9 +329,9 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                             
                             <div class="sywat-tracker-card-actions">
                                 <?php if ( ! $is_closed_line ) : ?>
-                                    <form method="post">
+                                    <form method="post" class="sywat-desk-line-filter-form">
                                         <?php sywat_desk_render_hidden_context( $selected_tournament, $idx, $data['search_query'] ); ?>
-                                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin">Check In Line</button>
+                                        <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-checkin" data-sywat-action="select-desk-line" data-line-idx="<?php echo esc_attr( $idx ); ?>">Check In Line</button>
                                     </form>
                                 <?php endif; ?>
 
@@ -372,7 +372,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 
 /**
  * Render Active Registered Archers table with "LastName, FirstName" display, dual-format live search,
- * Check-In, Edit, and O(1) household OWE badges.
+ * instantaneous client-side Check-In & Edit modal triggers, and O(1) household OWE badges.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -386,11 +386,21 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         $selected_line_idx   = $data['selected_line_idx'];
         $lines               = $data['lines'];
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
+        $t_context           = ! empty( $data['selected_tournament_data'] ) ? $data['selected_tournament_data'] : $selected_tournament;
+        $legacy_div_map      = isset( $data['legacy_div_map'] ) && is_array( $data['legacy_div_map'] ) ? $data['legacy_div_map'] : array();
         $has_lf_formatter    = function_exists( 'sywat_format_name_last_first' );
         $has_household_fn    = function_exists( 'sywat_get_household_balance_info' );
+        $has_norm_div        = function_exists( 'sywat_shooting_styles_normalize_division' );
+        $has_norm_style      = function_exists( 'sywat_shooting_styles_normalize_style' );
+        $has_rate_tier_fn    = function_exists( 'sywat_shooting_styles_get_division_rate_tier' );
+        $has_dist_fn         = function_exists( 'sywat_shooting_styles_get_division_distance' );
+        $has_ind_fee_fn      = function_exists( 'sywat_get_archer_individual_fee' );
 
-        $t_profiles     = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
-        $is_multi_round = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
+        $t_profiles       = isset( $data['pricing_profiles'] ) && is_array( $data['pricing_profiles'] ) ? $data['pricing_profiles'] : array();
+        $default_prof_key = ! empty( $data['default_pricing_profile'] )
+            ? (string) $data['default_pricing_profile']
+            : ( ! empty( $t_profiles ) ? (string) key( $t_profiles ) : 'indoor' );
+        $is_multi_round   = ! empty( $data['is_multi_round'] ) || count( $t_profiles ) > 1;
 
         // Resolve active tournament Family Cap threshold for fallback evaluations
         $active_cap_amount = 75.00;
@@ -456,7 +466,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         <!-- Nested Section: Registered Archers Table -->
         <div>
             <div class="sywat-table-header-bar">
-                <h2>Registered Archers (<?php echo intval( count( $active_checkins ) ); ?>)</h2>
+                <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( count( $active_checkins ) ); ?></span>)</h2>
                 <div class="sywat-table-header-controls">
                     <div class="sywat-search-input-group">
                         <input type="text" id="sywat_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search name..." autocomplete="off" onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
@@ -467,7 +477,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
 
             <?php if ( ! empty( $active_checkins ) ) : ?>
                 <div class="sywat-table-responsive">
-                    <table class="sywat-table sywat-table-mobile-cards">
+                    <table class="sywat-table sywat-table-mobile-cards" id="sywat_desk_archers_table" data-all-lines-loaded="<?php echo ( $selected_line_idx === 'all' ) ? '1' : '0'; ?>">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -512,6 +522,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $paid_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['paid'] ) ? $reg['paid'] : '—' );
                                     $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? $reg['distance'] : 'N/A' );
 
+                                    $raw_paid_str  = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
                                     $is_promo_free = ! $is_no_show && (
                                         ! empty( $reg['is_promo_free'] )
                                         || strcasecmp( $paid_disp, 'Promo (Free)' ) === 0
@@ -548,8 +559,82 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                         }
                                         $is_true_family_cap = ( $effective_due >= $active_cap_amount );
                                     }
+
+                                    // Pre-compute normalized modal values & JSON payload for instantaneous client-side modal open
+                                    $norm_div = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+                                    if ( $norm_div === '—' ) {
+                                        $norm_div = '';
+                                    }
+                                    if ( isset( $legacy_div_map[ $norm_div ] ) ) {
+                                        $norm_div = $legacy_div_map[ $norm_div ];
+                                    }
+                                    if ( $norm_div !== '' && strcasecmp( $norm_div, 'No Show' ) !== 0 && $has_norm_div ) {
+                                        $norm_div = sywat_shooting_styles_normalize_division( $norm_div );
+                                    }
+
+                                    $norm_sty = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+                                    if ( $norm_sty === '—' ) {
+                                        $norm_sty = '';
+                                    }
+                                    if ( $norm_sty !== '' && strcasecmp( $norm_sty, 'No Show' ) !== 0 && $has_norm_style ) {
+                                        $norm_sty = sywat_shooting_styles_normalize_style( $norm_sty );
+                                    }
+
+                                    $modal_round_slug = $round_slug !== '' ? $round_slug : $default_prof_key;
+                                    if ( $norm_div !== '' && $has_rate_tier_fn ) {
+                                        $is_youth_row = ( sywat_shooting_styles_get_division_rate_tier( $norm_div ) === 'Youth' );
+                                    } else {
+                                        $is_youth_row = ( stripos( $norm_div, 'Cub' ) !== false || stripos( $norm_div, 'Youth' ) !== false || stripos( $norm_div, 'Young Adult' ) !== false );
+                                    }
+                                    $calc_dist_row = $has_dist_fn
+                                        ? sywat_shooting_styles_get_division_distance( $norm_div )
+                                        : ( ( stripos( $norm_div, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
+
+                                    $fallback_ind_fee = 0.00;
+                                    if ( ! $is_promo_free && strcasecmp( $raw_paid_str, 'Field Governor' ) !== 0 ) {
+                                        $fallback_ind_fee = $has_ind_fee_fn
+                                            ? sywat_get_archer_individual_fee( $t_context, $norm_div, $calc_dist_row, $norm_sty, $modal_round_slug, '' )
+                                            : ( $is_youth_row ? 25.00 : 30.00 );
+                                    }
+
+                                    $is_family_balance = ( strcasecmp( $raw_paid_str, 'Family' ) === 0 ) || ( $household_info && ! empty( $household_info['has_family'] ) );
+                                    $display_due       = $is_family_balance ? $effective_due : ( $balance_due > 0 ? $balance_due : $fallback_ind_fee );
+
+                                    if ( $is_promo_free ) {
+                                        $pay_opt_val = 'Promo (Free)';
+                                    } elseif ( strcasecmp( $raw_paid_str, 'Family' ) === 0 ) {
+                                        $pay_opt_val = 'Family';
+                                    } elseif ( strcasecmp( $raw_paid_str, 'Field Governor' ) === 0 ) {
+                                        $pay_opt_val = 'Field Governor';
+                                    } else {
+                                        $pay_opt_val = 'Individual';
+                                    }
+
+                                    $archer_payload = array(
+                                        'id'                => isset( $reg['id'] ) ? (string) $reg['id'] : '',
+                                        'name'              => isset( $reg['name'] ) ? (string) $reg['name'] : '',
+                                        'display_name'      => $disp_archer_name,
+                                        'line_index'        => (string) $resolved_l_idx,
+                                        'line_name'         => $reg_line_name,
+                                        'division'          => $norm_div,
+                                        'gender'            => isset( $reg['gender'] ) ? (string) $reg['gender'] : '',
+                                        'style'             => $norm_sty,
+                                        'pricing_profile'   => $modal_round_slug,
+                                        'paid'              => $raw_paid_str,
+                                        'pay_option'        => $pay_opt_val,
+                                        'is_promo_free'     => $is_promo_free,
+                                        'family_id'         => isset( $reg['family_id'] ) ? (string) $reg['family_id'] : '',
+                                        'balance_due'       => round( $balance_due, 2 ),
+                                        'effective_due'     => round( $effective_due, 2 ),
+                                        'display_due'       => round( $display_due, 2 ),
+                                        'is_family_balance' => $is_family_balance,
+                                        'checked_in'        => $is_checked_in,
+                                    );
                                 ?>
-                                <tr class="sywat-archer-row" data-name="<?php echo esc_attr( $search_tokens ); ?>">
+                                <tr class="sywat-archer-row"
+                                    data-line-idx="<?php echo esc_attr( (string) $resolved_l_idx ); ?>"
+                                    data-name="<?php echo esc_attr( $search_tokens ); ?>"
+                                    data-archer="<?php echo esc_attr( wp_json_encode( $archer_payload ) ); ?>">
                                     <td>
                                         <div class="sywat-archer-name">
                                             <?php echo esc_html( $disp_archer_name ); ?>
@@ -602,19 +687,11 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                                     <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                                 </form>
                                             <?php else : ?>
-                                                <form method="post" class="sywat-table-action-form">
-                                                    <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
-                                                    <input type="hidden" name="open_checkin_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
-                                                    <button type="submit" class="sywat-btn sywat-btn-success-solid sywat-btn-icon-checkin">Check In Archer</button>
-                                                </form>
+                                                <button type="button" class="sywat-btn sywat-btn-success-solid sywat-btn-icon-checkin" data-sywat-action="open-desk-checkin-modal">Check In Archer</button>
                                             <?php endif; ?>
 
-                                            <!-- Edit Form -->
-                                            <form method="post" class="sywat-table-action-form">
-                                                <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
-                                                <input type="hidden" name="open_edit_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
-                                                <button type="submit" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit">Edit</button>
-                                            </form>
+                                            <!-- Instant Client-Side Edit Trigger -->
+                                            <button type="button" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit" data-sywat-action="open-desk-edit-modal">Edit</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -622,6 +699,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                         </tbody>
                     </table>
                 </div>
+                <p id="sywat_desk_empty_filter_msg" class="sywat-empty-text sywat-hidden">No active archers match the selected line or search filter.</p>
             <?php else : ?>
                 <p class="sywat-empty-text">No active archers registered for this selection.</p>
             <?php endif; ?>
