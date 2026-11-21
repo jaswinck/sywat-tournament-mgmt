@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Archer Roster Views Renderer
  * Path: includes/roster/roster-views.php
- * Description: Renders the Registered Archer Roster modal with surname-sorted active shooters formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), Type / Rate indicators, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
- * Compliance: Pure view layer — zero output at include time, zero inline styles, omitted closing PHP tag.
+ * Description: Renders the Registered Archer Roster modal with single-pass tournament pre-scoping (preventing O(N) scans across archived historical tournaments), conditional line-scoped family map construction, surname-sorted active shooters formatted as "LastName, FirstName", dual-format live search indexing ("Last, First" and "First Last"), Type / Rate indicators, multi-round format & promotional entry indicators, and a direct header trigger to open the dedicated Waitlist Management Modal (#sywat_waitlist_modal) without scrolling.
+ * Compliance: Pure view layer — zero output at include time, zero inline styles, O(N) tournament-scoped filtering, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -110,91 +110,111 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
             : array();
         $is_multi_round = count( $t_profiles ) > 1;
 
-        // Build Tournament- & Line-Scoped Family Groups array for JS dynamic dropdowns & labels
-        if ( function_exists( 'sywat_waitlist_build_family_labels_by_line' ) ) {
-            $existing_families_by_line = sywat_waitlist_build_family_labels_by_line( $selected_tournament, $available_lines, $registrations );
-        } else {
-            $existing_families_by_line = array();
-            $family_members_by_id      = array();
+        // Single-pass pre-scope to active tournament so downstream family, line, and edit lookups never scan historical events
+        $tournament_registrations = array();
+        $has_family_entries       = false;
+        $target_tourn_norm        = trim( (string) $selected_tournament );
 
+        if ( is_array( $registrations ) && $target_tourn_norm !== '' ) {
             foreach ( $registrations as $r ) {
-                if ( ! isset( $r['tournament'] ) || strcasecmp( trim( (string) $r['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
+                if ( ! is_array( $r ) || ! isset( $r['tournament'] ) ) {
                     continue;
                 }
-
-                $fid = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
-                if ( empty( $fid ) ) {
+                if ( strcasecmp( trim( (string) $r['tournament'] ), $target_tourn_norm ) !== 0 ) {
                     continue;
                 }
+                $tournament_registrations[] = $r;
 
-                $is_fam = ( isset( $r['paid'] ) && strcasecmp( $r['paid'], 'Family' ) === 0 )
-                       || ( ! empty( $r['rate_type'] ) && stripos( $r['rate_type'], 'family' ) !== false );
-
-                if ( ! $is_fam ) {
-                    continue;
-                }
-
-                $resolved_l_idx = function_exists( 'sywat_roster_resolve_line_idx' )
-                    ? sywat_roster_resolve_line_idx( $r, $available_lines )
-                    : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
-
-                if ( ! isset( $family_members_by_id[ $fid ] ) ) {
-                    $family_members_by_id[ $fid ] = array(
-                        'line_idx'    => $resolved_l_idx,
-                        'family_name' => ! empty( $r['family_name'] ) ? trim( (string) $r['family_name'] ) : '',
-                        'names'       => array(),
-                    );
-                }
-                if ( ! empty( $r['name'] ) ) {
-                    $family_members_by_id[ $fid ]['names'][] = trim( $r['name'] );
-                }
-            }
-
-            foreach ( $family_members_by_id as $fid => $fam_info ) {
-                $l_idx     = $fam_info['line_idx'];
-                $raw_fname = $fam_info['family_name'];
-                $names     = $fam_info['names'];
-
-                if ( ! empty( $raw_fname ) && stripos( $raw_fname, 'fam_' ) === false && stripos( $raw_fname, 'Booking' ) === false && strlen( $raw_fname ) > 2 ) {
-                    $label = $raw_fname;
-                } elseif ( ! empty( $names ) ) {
-                    if ( count( $names ) === 1 ) {
-                        $label = $names[0] . ' Group';
-                    } elseif ( count( $names ) <= 3 ) {
-                        $last_names = array_map( function( $n ) {
-                            $p = explode( ' ', trim( $n ) );
-                            return end( $p );
-                        }, $names );
-                        $label = implode( ' / ', array_unique( $last_names ) ) . ' Group';
-                    } else {
-                        $p     = explode( ' ', trim( $names[0] ) );
-                        $label = end( $p ) . ' Family Group (' . count( $names ) . ' Archers)';
+                if ( ! $has_family_entries ) {
+                    $is_fam_row = ( isset( $r['paid'] ) && strcasecmp( trim( (string) $r['paid'] ), 'Family' ) === 0 )
+                               || ( ! empty( $r['rate_type'] ) && stripos( (string) $r['rate_type'], 'family' ) !== false )
+                               || ! empty( $r['family_id'] );
+                    if ( $is_fam_row ) {
+                        $has_family_entries = true;
                     }
-                } else {
-                    $label = 'Family Group (' . substr( $fid, -6 ) . ')';
                 }
-
-                if ( ! isset( $existing_families_by_line[ $l_idx ] ) ) {
-                    $existing_families_by_line[ $l_idx ] = array();
-                }
-                $existing_families_by_line[ $l_idx ][ $fid ] = $label;
             }
         }
 
-        // Filter registrations for this tournament & line filter
-        $filtered_registrations = array_filter( $registrations, function( $reg ) use ( $selected_tournament, $filter_line_idx, $available_lines ) {
-            if ( ! isset( $reg['tournament'] ) || strcasecmp( trim( (string) $reg['tournament'] ), trim( (string) $selected_tournament ) ) !== 0 ) {
-                return false;
-            }
-            if ( (string) $filter_line_idx !== 'all' && (string) $filter_line_idx !== '' ) {
-                $match_idx  = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $filter_line_idx;
-                $match_name = isset( $available_lines[ $filter_line_idx ]['name'] ) && isset( $reg['line_name'] ) && strcasecmp( trim( $reg['line_name'] ), trim( $available_lines[ $filter_line_idx ]['name'] ) ) === 0;
-                if ( ! $match_idx && ! $match_name ) {
-                    return false;
+        // Build Tournament- & Line-Scoped Family Groups array only when family entries exist on this tournament
+        $existing_families_by_line = array();
+        if ( $has_family_entries ) {
+            if ( function_exists( 'sywat_waitlist_build_family_labels_by_line' ) ) {
+                $existing_families_by_line = sywat_waitlist_build_family_labels_by_line( $selected_tournament, $available_lines, $tournament_registrations );
+            } else {
+                $family_members_by_id = array();
+
+                foreach ( $tournament_registrations as $r ) {
+                    $fid = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
+                    if ( empty( $fid ) ) {
+                        continue;
+                    }
+
+                    $is_fam = ( isset( $r['paid'] ) && strcasecmp( $r['paid'], 'Family' ) === 0 )
+                           || ( ! empty( $r['rate_type'] ) && stripos( $r['rate_type'], 'family' ) !== false );
+
+                    if ( ! $is_fam ) {
+                        continue;
+                    }
+
+                    $resolved_l_idx = function_exists( 'sywat_roster_resolve_line_idx' )
+                        ? sywat_roster_resolve_line_idx( $r, $available_lines )
+                        : ( isset( $r['line_index'] ) ? (string) $r['line_index'] : '0' );
+
+                    if ( ! isset( $family_members_by_id[ $fid ] ) ) {
+                        $family_members_by_id[ $fid ] = array(
+                            'line_idx'    => $resolved_l_idx,
+                            'family_name' => ! empty( $r['family_name'] ) ? trim( (string) $r['family_name'] ) : '',
+                            'names'       => array(),
+                        );
+                    }
+                    if ( ! empty( $r['name'] ) ) {
+                        $family_members_by_id[ $fid ]['names'][] = trim( $r['name'] );
+                    }
+                }
+
+                foreach ( $family_members_by_id as $fid => $fam_info ) {
+                    $l_idx     = $fam_info['line_idx'];
+                    $raw_fname = $fam_info['family_name'];
+                    $names     = $fam_info['names'];
+
+                    if ( ! empty( $raw_fname ) && stripos( $raw_fname, 'fam_' ) === false && stripos( $raw_fname, 'Booking' ) === false && strlen( $raw_fname ) > 2 ) {
+                        $label = $raw_fname;
+                    } elseif ( ! empty( $names ) ) {
+                        if ( count( $names ) === 1 ) {
+                            $label = $names[0] . ' Group';
+                        } elseif ( count( $names ) <= 3 ) {
+                            $last_names = array_map( function( $n ) {
+                                $p = explode( ' ', trim( $n ) );
+                                return end( $p );
+                            }, $names );
+                            $label = implode( ' / ', array_unique( $last_names ) ) . ' Group';
+                        } else {
+                            $p     = explode( ' ', trim( $names[0] ) );
+                            $label = end( $p ) . ' Family Group (' . count( $names ) . ' Archers)';
+                        }
+                    } else {
+                        $label = 'Family Group (' . substr( $fid, -6 ) . ')';
+                    }
+
+                    if ( ! isset( $existing_families_by_line[ $l_idx ] ) ) {
+                        $existing_families_by_line[ $l_idx ] = array();
+                    }
+                    $existing_families_by_line[ $l_idx ][ $fid ] = $label;
                 }
             }
-            return true;
-        } );
+        }
+
+        // Filter pre-scoped tournament registrations by selected line
+        if ( (string) $filter_line_idx !== 'all' && (string) $filter_line_idx !== '' ) {
+            $filtered_registrations = array_filter( $tournament_registrations, function( $reg ) use ( $filter_line_idx, $available_lines ) {
+                $match_idx  = isset( $reg['line_index'] ) && (string) $reg['line_index'] === (string) $filter_line_idx;
+                $match_name = isset( $available_lines[ $filter_line_idx ]['name'] ) && isset( $reg['line_name'] ) && strcasecmp( trim( $reg['line_name'] ), trim( $available_lines[ $filter_line_idx ]['name'] ) ) === 0;
+                return ( $match_idx || $match_name );
+            } );
+        } else {
+            $filtered_registrations = $tournament_registrations;
+        }
 
         // Resolve Target Archer record for the Edit Modal (supports both active & waitlisted records)
         $target_archer = null;
@@ -205,6 +225,14 @@ if ( ! function_exists( 'sywat_render_roster_modal' ) ) {
                 if ( isset( $reg['id'] ) && (string) $reg['id'] === (string) $modal_edit_archer ) {
                     $target_archer = $reg;
                     break;
+                }
+            }
+            if ( null === $target_archer ) {
+                foreach ( $tournament_registrations as $reg ) {
+                    if ( isset( $reg['id'] ) && (string) $reg['id'] === (string) $modal_edit_archer ) {
+                        $target_archer = $reg;
+                        break;
+                    }
                 }
             }
         }
