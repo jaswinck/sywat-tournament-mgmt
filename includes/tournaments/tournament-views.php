@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
- * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), single-pass O(R) pre-indexed tournament and line occupancy counters, live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), canonical active/selected season resolution from sywat_get_master_portal_data(), explicit front-end Season filter form routing with filter_season preservation across row action links, single-pass O(R) pre-indexed tournament and line occupancy counters, live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
  * Compliance: Pure view layer — zero output at include time, zero inline style attributes, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.21.0
+ * Version: 7.21.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -63,8 +63,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
         $filter_shops       = $data['filter_shops'];
         $tfaa_count         = $data['tfaa_count'];
 
-        // Enforce active season selection (No "All Seasons" option)
-        $selected_season = isset( $_GET['filter_season'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_season'] ) ) : '';
+        // Use canonical selected season resolved by sywat_get_master_portal_data()
+        $selected_season = ! empty( $data['selected_season'] )
+            ? (string) $data['selected_season']
+            : ( isset( $_GET['filter_season'] ) ? sanitize_text_field( wp_unslash( $_GET['filter_season'] ) ) : '' );
         if ( empty( $selected_season ) && ! empty( $seasons ) ) {
             foreach ( $seasons as $s_slug => $s_data ) {
                 if ( is_array( $s_data ) && isset( $s_data['status'] ) && $s_data['status'] === 'active' ) {
@@ -214,12 +216,12 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
             }
         }
 
-        $manage_base_url = function_exists( 'sywat_page_url' )
-            ? sywat_page_url( 'manage_tournaments' )
-            : '';
+        $manage_page_url = function_exists( 'sywat_page_url' ) ? sywat_page_url( 'manage_tournaments' ) : '';
+        $manage_base_url = $manage_page_url;
         if ( ! empty( $selected_season ) && ! empty( $manage_base_url ) ) {
             $manage_base_url = add_query_arg( 'filter_season', $selected_season, $manage_base_url );
         }
+        $season_query_suffix = ! empty( $selected_season ) ? '&filter_season=' . urlencode( $selected_season ) : '';
         ?>
 
         <div class="sywat-wrap">
@@ -227,7 +229,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
             <!-- Operational Navigation Tabs (Card-Docked) -->
             <div class="sywat-nav-tabs no-print">
-                <a href="<?php echo esc_url( sywat_page_url( 'manage_tournaments' ) ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ( $active_tab === 'manage' ) ? 'active' : ''; ?>">Manage Tournaments</a>
+                <a href="<?php echo esc_url( $manage_page_url ); ?>" class="sywat-tab-item sywat-tab-icon-tournament <?php echo ( $active_tab === 'manage' ) ? 'active' : ''; ?>">Manage Tournaments</a>
                 <?php if ( $can_access_desk ) : ?>
                     <a href="<?php echo esc_url( sywat_page_url( 'register' ) ); ?>" class="sywat-tab-item sywat-tab-icon-register">Register Shooters</a>
                     <a href="<?php echo esc_url( sywat_page_url( 'desk' ) ); ?>" class="sywat-tab-item sywat-tab-icon-checkin">Check In Archers</a>
@@ -236,7 +238,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     <a href="<?php echo esc_url( sywat_page_url( 'enter_scores' ) ); ?>" class="sywat-tab-item sywat-tab-icon-edit">Enter Scores</a>
                 <?php endif; ?>
                 <?php if ( $can_manage_seasons ) : ?>
-                    <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', sywat_page_url( 'manage_tournaments' ) ) ); ?>" class="sywat-tab-item sywat-tab-icon-season <?php echo ( $active_tab === 'seasons' ) ? 'active' : ''; ?>">Manage Seasons</a>
+                    <a href="<?php echo esc_url( add_query_arg( 'tab', 'seasons', $manage_page_url ) ); ?>" class="sywat-tab-item sywat-tab-icon-season <?php echo ( $active_tab === 'seasons' ) ? 'active' : ''; ?>">Manage Seasons</a>
                 <?php endif; ?>
             </div>
 
@@ -258,8 +260,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <!-- Sub-wrapper 1: Filters (Season Dropdown) -->
                             <div class="sywat-table-header-filters">
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ) : ?>
-                                    <form method="get">
-                                        <input type="hidden" name="page" value="sywat-manage-tournaments">
+                                    <form method="get" action="<?php echo esc_url( $manage_page_url ); ?>">
                                         <div class="sywat-field-group">
                                             <label for="sywat_select_season">Season:</label>
                                             <select id="sywat_select_season" name="filter_season" class="sywat-select-season" onchange="this.form.submit();">
@@ -283,7 +284,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                 <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
 
                                 <?php if ( $can_manage_seasons && ! empty( $seasons ) ) : ?>
-                                    <form method="post">
+                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="sync_season_tfaa_urls">
                                         <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
@@ -330,7 +331,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                             <div class="sywat-table-header-actions">
                                 <!-- Option 1: Deactivate All Hubs Form -->
                                 <?php if ( $can_manage_seasons ) : ?>
-                                    <form method="post" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
+                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" onsubmit="return confirm('Are you sure you want to deactivate Volunteer Hub visibility across ALL tournaments?');">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="deactivate_all_hubs">
                                         <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-icon-reset">Deactivate All Hubs</button>
@@ -339,7 +340,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                 <!-- Push Standings Form -->
                                 <?php if ( $can_manage_seasons ) : ?>
-                                    <form method="post" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="global_push_standings">
                                         <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
@@ -350,7 +351,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                     </div>
 
                     <?php if ( empty( $scoped_tournaments ) ) : ?>
-                        <p class="sywat-score-null">No tournaments created yet for this location. Click on <strong>"Add Tournament"</strong> to configure your first tournament.</p>
+                        <p class="sywat-score-null">No tournaments found for the selected season. Click on <strong>"Add Tournament"</strong> to configure an event.</p>
                     <?php else : ?>
                         <div class="sywat-table-responsive">
                             <table class="sywat-table">
@@ -368,7 +369,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $t_lines       = isset( $scoped_lines_by_tourn[ $t_name ] ) ? $scoped_lines_by_tourn[ $t_name ] : sywat_get_tournament_lines( $t_data );
                                             $t_shop_id     = sywat_get_tournament_shop_id( $t_data );
                                             $t_season_slug = sywat_get_tournament_season_slug( $t_data );
-                                            $t_season_name = isset( $seasons[ $t_season_slug ]['name'] ) ? $seasons[ $t_season_slug ]['name'] : 'Active Season';
+                                            $t_season_name = isset( $seasons[ $t_season_slug ]['name'] ) ? $seasons[ $t_season_slug ]['name'] : $t_season_slug;
 
                                             // Dynamic Host Shop Name Resolution via 4-Tier Waterfall
                                             $t_shop_name = function_exists( 'sywat_get_tournament_shop_name' )
@@ -446,7 +447,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                                 <!-- Volunteer Hub Toggle Chip (Available to All Host Shops, Hidden by Default) -->
                                                 <div class="sywat-table-action-form">
-                                                    <form method="post" class="sywat-table-action-form">
+                                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" class="sywat-table-action-form">
                                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                         <input type="hidden" name="sywat_action" value="toggle_active_tournament">
                                                         <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
@@ -504,18 +505,18 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             <!-- Column 3: Stacked Tournament Action Buttons -->
                                             <td class="sywat-col-center">
                                                 <div class="sywat-table-actions-vertical">
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=manage<?php echo esc_attr( $season_query_suffix ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-manage sywat-btn-full">Manage Shooters</a>
                                                     <?php if ( $total_tourn_waitlist > 0 && ! empty( $tourn_waitlist_url ) ) : ?>
                                                         <a href="<?php echo esc_url( $tourn_waitlist_url ); ?>" class="sywat-btn sywat-btn-warning sywat-btn-full sywat-waitlist-trigger-btn" title="Open Waitlist Management Window">
                                                             <?php echo function_exists( 'sywat_waitlist_clock_svg' ) ? sywat_waitlist_clock_svg() : ''; ?>
                                                             <span>Waitlist (<?php echo intval( $total_tourn_waitlist ); ?>)</span>
                                                         </a>
                                                     <?php endif; ?>
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
-                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=print<?php echo esc_attr( $season_query_suffix ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-print sywat-btn-full">Print Roster</a>
+                                                    <a href="?tab=manage&view_tournament=<?php echo urlencode( $t_name ); ?>&modal_action=invoice<?php echo esc_attr( $season_query_suffix ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-invoice sywat-btn-full">Generate Invoice</a>
 
                                                     <?php if ( ! empty( $tfaa_link ) && $can_manage_seasons ) : ?>
-                                                        <form method="post" class="sywat-table-action-form">
+                                                        <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" class="sywat-table-action-form">
                                                             <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                             <input type="hidden" name="sywat_action" value="sync_tfaa_single">
                                                             <input type="hidden" name="target_tournament" value="<?php echo esc_attr( $t_name ); ?>">
@@ -523,9 +524,9 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                         </form>
                                                     <?php endif; ?>
 
-                                                    <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Tournament</a>
+                                                    <a href="?edit_tournament_modal=<?php echo urlencode( $t_name ); ?><?php echo esc_attr( $season_query_suffix ); ?>" class="sywat-btn sywat-btn-primary sywat-btn-icon-edit sywat-btn-full">Edit Tournament</a>
 
-                                                    <form method="post" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
+                                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" class="sywat-table-action-form" onsubmit="return confirm('Are you sure you want to delete \'<?php echo esc_js( $t_name ); ?>\'? This permanently purges all registered archers.');">
                                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                         <input type="hidden" name="sywat_action" value="delete_tournament">
                                                         <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
