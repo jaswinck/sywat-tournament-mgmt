@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages Check-In Desk live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
- * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden).
- * Version: 7.3.5
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active), delegated data-sywat-action listeners, zero document-level keydown listeners.
+ * Version: 7.4.0
  */
 
 (function() {
@@ -60,7 +60,7 @@
 
         const coreExact = tokens.join(' ');
         const exactKey  = suffix ? (coreExact + ' ' + suffix) : coreExact;
-        
+
         const firstTok  = tokens.length > 0 ? tokens[0] : '';
         const lastTok   = tokens.length > 1 ? tokens[tokens.length - 1] : (tokens.length === 1 ? tokens[0] : '');
         let flKey       = (tokens.length >= 2) ? (firstTok + '___' + lastTok) : coreExact;
@@ -135,15 +135,15 @@
             const mName = (m.full_name || m.name || '').trim();
             if (!mName) continue;
 
-            const mKeys     = buildDeskNameMatchKeys(mName);
-            const tfaaHits  = (mKeys.exact && tfaaByExact[mKeys.exact])
+            const mKeys    = buildDeskNameMatchKeys(mName);
+            const tfaaHits = (mKeys.exact && tfaaByExact[mKeys.exact])
                 ? tfaaByExact[mKeys.exact]
                 : ((mKeys.fl && tfaaByFl[mKeys.fl]) ? tfaaByFl[mKeys.fl] : []);
 
             if (tfaaHits.length > 0) {
                 for (let j = 0; j < tfaaHits.length; j++) {
                     const th     = tfaaHits[j];
-                    const divStr = (th.division || m.division || '').trim(); // TFAA History wins over Member DB default
+                    const divStr = (th.division || m.division || '').trim();
                     const genStr = (th.gender || m.gender || '').trim();
                     const styStr = (th.style || m.style || '').trim();
                     const dedup  = (mKeys.exact + '___' + divStr + '___' + styStr + '___' + genStr).toLowerCase();
@@ -479,6 +479,68 @@
         }
     }
 
+    /**
+     * Populate a <select> element cleanly, adding a temporary retired/archived option
+     * if the record holds a legacy value not present in the active list.
+     */
+    function setDeskSelectValueWithFallback(selectEl, val, showRetiredSuffix) {
+        if (!selectEl) return;
+
+        selectEl.querySelectorAll('option[data-temp-retired="1"]').forEach(function(opt) {
+            opt.remove();
+        });
+
+        const cleanVal = (val === null || val === undefined) ? '' : String(val).trim();
+        if (!cleanVal) {
+            selectEl.value = '';
+            return;
+        }
+
+        let found = false;
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].value === cleanVal) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            const tempOpt = document.createElement('option');
+            tempOpt.value = cleanVal;
+            tempOpt.textContent = (showRetiredSuffix && cleanVal !== 'No Show') ? (cleanVal + ' (Retired)') : cleanVal;
+            tempOpt.setAttribute('data-temp-retired', '1');
+            selectEl.appendChild(tempOpt);
+        }
+
+        selectEl.value = cleanVal;
+    }
+
+    function updateCheckinFamilyOptions(lineIdx, selectedFamId) {
+        const famSelect = document.getElementById('checkin_family_group_id');
+        if (!famSelect) return;
+
+        const targetVal = (selectedFamId !== undefined) ? String(selectedFamId || '') : famSelect.value;
+        famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
+
+        const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
+
+        Object.keys(fams).forEach(function(fid) {
+            const opt = document.createElement('option');
+            opt.value = fid;
+            opt.textContent = fams[fid];
+            if (fid === targetVal) opt.selected = true;
+            famSelect.appendChild(opt);
+        });
+
+        if (targetVal && !Object.prototype.hasOwnProperty.call(fams, targetVal)) {
+            const tempOpt = document.createElement('option');
+            tempOpt.value = targetVal;
+            tempOpt.textContent = 'Assigned Family Group';
+            tempOpt.selected = true;
+            famSelect.appendChild(tempOpt);
+        }
+    }
+
     function updateWalkinFamilyOptions(lineIdx) {
         const famSelect = document.getElementById('walkin_family_group_id');
         if (!famSelect) return;
@@ -497,10 +559,11 @@
         });
     }
 
-    function updateEditFamilyOptions(lineIdx) {
+    function updateEditFamilyOptions(lineIdx, selectedFamId) {
         const famSelect = document.getElementById('edit_family_group_id');
         if (!famSelect) return;
 
+        const targetVal = (selectedFamId !== undefined) ? String(selectedFamId || '') : '';
         famSelect.innerHTML = '<option value="">[ + Start New Family Group for This Line ]</option>';
 
         const fams = (window.existingFamiliesByLine && window.existingFamiliesByLine[lineIdx]) ? window.existingFamiliesByLine[lineIdx] : {};
@@ -509,8 +572,17 @@
             const opt = document.createElement('option');
             opt.value = fid;
             opt.textContent = fams[fid];
+            if (fid === targetVal) opt.selected = true;
             famSelect.appendChild(opt);
         });
+
+        if (targetVal && !Object.prototype.hasOwnProperty.call(fams, targetVal)) {
+            const tempOpt = document.createElement('option');
+            tempOpt.value = targetVal;
+            tempOpt.textContent = 'Assigned Family Group';
+            tempOpt.selected = true;
+            famSelect.appendChild(tempOpt);
+        }
     }
 
     function toggleUnpaidBanner(isChecked) {
@@ -522,6 +594,182 @@
                 banner.classList.remove('sywat-hidden');
             }
         }
+    }
+
+    /**
+     * Populate and open #sywat_checkin_modal instantaneously from row JSON payload.
+     */
+    function openDeskCheckinModal(archer) {
+        if (!archer || typeof archer !== 'object') return;
+        const modal = document.getElementById('sywat_checkin_modal');
+        if (!modal) return;
+
+        closeAllDeskTfaaAutocompletes();
+
+        const regIdEl = document.getElementById('checkin_reg_id');
+        if (regIdEl) regIdEl.value = archer.id || '';
+
+        const nameInput = document.getElementById('checkin_archer_name');
+        if (nameInput) {
+            nameInput.value = archer.name || '';
+            delete nameInput.dataset.normalizedFrom;
+        }
+
+        const pricing   = getDeskPricing();
+        const roundSlug = archer.pricing_profile || pricing.defaultProfile || 'indoor';
+        const roundEl   = document.getElementById('checkin_pricing_profile');
+        if (roundEl) {
+            if (roundEl.tagName === 'SELECT') {
+                setDeskSelectValueWithFallback(roundEl, roundSlug, false);
+            } else {
+                roundEl.value = roundSlug;
+            }
+        }
+
+        // Unpaid balance warning banner & verification gate
+        const effectiveDue   = parseFloat(archer.effective_due || 0);
+        const displayDue     = parseFloat(archer.display_due || 0);
+        const isFamilyBal    = !!archer.is_family_balance;
+        const banner         = document.getElementById('sywat_unpaid_warning_banner');
+        const titleDisp      = document.getElementById('checkin_unpaid_title_disp');
+        const subtextDisp    = document.getElementById('checkin_unpaid_subtext_disp');
+        const verifiedGroup  = document.getElementById('sywat_payment_verified_check_group');
+        const verifiedCheck  = document.getElementById('sywat_payment_verified_check');
+
+        if (banner) {
+            banner.setAttribute('data-orig-due', displayDue.toFixed(2));
+            banner.setAttribute('data-is-family-balance', isFamilyBal ? '1' : '0');
+        }
+        if (titleDisp) {
+            titleDisp.innerHTML = '⚠️ ' + (isFamilyBal ? 'UNPAID FAMILY BALANCE' : 'UNPAID BALANCE') + ': $<span id="checkin_unpaid_amount_disp">' + displayDue.toFixed(2) + '</span>';
+        }
+        if (subtextDisp) {
+            subtextDisp.textContent = isFamilyBal
+                ? 'Family Cap Group Outstanding Balance. Collect Payment Onsite.'
+                : 'Please See Event Staff for Payment';
+        }
+        if (verifiedCheck) {
+            verifiedCheck.checked = false;
+        }
+
+        if (effectiveDue > 0) {
+            if (banner) banner.classList.remove('sywat-hidden');
+            if (verifiedGroup) verifiedGroup.classList.remove('sywat-hidden');
+            if (verifiedCheck) verifiedCheck.required = true;
+        } else {
+            if (banner) banner.classList.add('sywat-hidden');
+            if (verifiedGroup) verifiedGroup.classList.add('sywat-hidden');
+            if (verifiedCheck) verifiedCheck.required = false;
+        }
+
+        // Division, Gender, Style (enforce style rules before selecting style)
+        const divEl   = document.getElementById('checkin_division');
+        const genEl   = document.getElementById('checkin_gender');
+        const styleEl = document.getElementById('checkin_style');
+
+        setDeskSelectValueWithFallback(divEl, archer.division || '', true);
+        setDeskSelectValueWithFallback(genEl, archer.gender || '', false);
+        handleStyleRestrictions('checkin');
+        setDeskSelectValueWithFallback(styleEl, archer.style || '', true);
+
+        // Rate & Line Family Group
+        const payEl = document.getElementById('checkin_pay_option');
+        if (payEl) {
+            payEl.value = archer.pay_option || 'Individual';
+        }
+        updateCheckinFamilyOptions(String(archer.line_index || '0'), archer.family_id || '');
+        toggleFamilyBox('checkin');
+
+        // Auto-fill missing metadata from Member DB / TFAA history & render validation badges
+        autoFillOnNameChange('checkin', true);
+
+        modal.classList.add('active');
+        if (nameInput) {
+            nameInput.focus();
+        }
+    }
+
+    function closeDeskCheckinModal() {
+        const modal = document.getElementById('sywat_checkin_modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        closeAllDeskTfaaAutocompletes();
+    }
+
+    /**
+     * Populate and open #sywat_desk_edit_modal instantaneously from row JSON payload.
+     */
+    function openDeskEditModal(archer) {
+        if (!archer || typeof archer !== 'object') return;
+        const modal = document.getElementById('sywat_desk_edit_modal');
+        if (!modal) return;
+
+        closeAllDeskTfaaAutocompletes();
+
+        const regIdEl = document.getElementById('edit_reg_id');
+        if (regIdEl) regIdEl.value = archer.id || '';
+
+        const nameInput = document.getElementById('edit_archer_name');
+        if (nameInput) {
+            nameInput.value = archer.name || '';
+            delete nameInput.dataset.normalizedFrom;
+        }
+
+        const pricing   = getDeskPricing();
+        const roundSlug = archer.pricing_profile || pricing.defaultProfile || 'indoor';
+        const roundEl   = document.getElementById('edit_pricing_profile');
+        if (roundEl) {
+            if (roundEl.tagName === 'SELECT') {
+                setDeskSelectValueWithFallback(roundEl, roundSlug, false);
+            } else {
+                roundEl.value = roundSlug;
+            }
+        }
+
+        const lineIdxStr = String(archer.line_index || '0');
+        const lineEl     = document.getElementById('edit_line_index');
+        if (lineEl) {
+            lineEl.value = lineIdxStr;
+        }
+
+        const divEl   = document.getElementById('edit_division');
+        const genEl   = document.getElementById('edit_gender');
+        const styleEl = document.getElementById('edit_style');
+
+        setDeskSelectValueWithFallback(divEl, archer.division || '', true);
+        setDeskSelectValueWithFallback(genEl, archer.gender || '', false);
+        handleStyleRestrictions('edit');
+        setDeskSelectValueWithFallback(styleEl, archer.style || '', true);
+
+        const payEl = document.getElementById('edit_pay_option');
+        if (payEl) {
+            payEl.value = archer.pay_option || 'Individual';
+        }
+        updateEditFamilyOptions(lineIdxStr, archer.family_id || '');
+
+        const balanceEl = document.getElementById('edit_balance_due');
+        if (balanceEl) {
+            const balDue = parseFloat(archer.balance_due || 0);
+            balanceEl.value = balDue.toFixed(2);
+            balanceEl.dataset.origDue = balDue.toFixed(2);
+            delete balanceEl.dataset.manualOverride;
+        }
+
+        toggleFamilyBox('edit');
+
+        modal.classList.add('active');
+        if (nameInput) {
+            nameInput.focus();
+        }
+    }
+
+    function closeDeskEditModal() {
+        const modal = document.getElementById('sywat_desk_edit_modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        closeAllDeskTfaaAutocompletes();
     }
 
     /**
@@ -575,7 +823,6 @@
             }
         }
 
-        // Sort: Exact matches first, First+Last canonical, Fuzzy alias, Member DB/Pro styles
         matches.sort(function(a, b) {
             if (a.matchRank !== b.matchRank) return b.matchRank - a.matchRank;
 
@@ -973,9 +1220,9 @@
                 }
                 pillBtn.innerHTML = pillLabel;
 
-                pillBtn.onclick = function() {
+                pillBtn.addEventListener('click', function() {
                     loadTfaaCategory(prefix, cat.division, cat.gender, cat.style, catName);
-                };
+                });
                 buttonContainer.appendChild(pillBtn);
             }
         });
@@ -1028,7 +1275,7 @@
             badgeText += '<br><span class="sywat-badge-subtext">↳ Standardized from "<strong>' + escapeHtmlDesk(normalizedFrom) + '</strong>"</span>';
         } else if (!isNameMatch && officialName !== '') {
             badgeText += '<br><span class="sywat-badge-subtext">↳ Official Member Name: <strong>' + escapeHtmlDesk(officialName) + '</strong></span>';
-            badgeText += '<button type="button" class="sywat-btn-use-official" onclick="updateNameToOfficial(\'' + prefix + '\', \'' + officialName.replace(/'/g, "\\'") + '\')">✏️ Use Official Name</button>';
+            badgeText += '<button type="button" class="sywat-btn-use-official" data-sywat-action="use-official-desk-name" data-prefix="' + escapeHtmlDesk(prefix) + '" data-official-name="' + escapeHtmlDesk(officialName) + '">✏️ Use Official Name</button>';
         }
 
         badgeEl.innerHTML = badgeText + promoBannerHtml;
@@ -1057,7 +1304,6 @@
         const tfaaMatches = findTfaaMatch(typedName);
         let distinctStylesCount = 0;
 
-        // Automatic Canonical Name Enforcement & Distinct Style Counting
         if (tfaaMatches && tfaaMatches.length > 0) {
             const distinctNames = new Set();
             const styleCodes    = new Set();
@@ -1065,7 +1311,7 @@
             tfaaMatches.forEach(function(m) {
                 const cName = (m.full_name || m.name || '').trim();
                 if (cName) distinctNames.add(cleanDeskName(cName));
-                
+
                 if (m.style) {
                     const sCfg = findDeskStyleConfig(m.style);
                     const code = (sCfg && sCfg.code) ? sCfg.code : m.style.split(/\s+[\u2013\u2014-]\s+/)[0].trim();
@@ -1080,7 +1326,7 @@
                 if (canonicalOfficial && cleanDeskName(canonicalOfficial) !== cleanDeskName(typedName)) {
                     nameInput.dataset.normalizedFrom = typedName;
                     nameInput.value = canonicalOfficial;
-                    preserveExisting = false; // Aggressively overwrite dropdowns if we successfully auto-corrected the name (e.g., Steve vs Steven)
+                    preserveExisting = false;
                 }
             }
         }
@@ -1097,14 +1343,11 @@
 
             const canSetDiv   = divEl && historyRecord.division && (!preserveExisting || !divEl.value || divEl.value === 'No Show');
             const canSetGen   = genEl && historyRecord.gender && (!preserveExisting || !genEl.value || genEl.value === 'No Show');
-            
-            // Only auto-fill the style if the archer has exactly ONE known distinct style to prevent masking multi-style options
             const canSetStyle = styleEl && historyRecord.style && (distinctStylesCount <= 1) && (!preserveExisting || !styleEl.value || styleEl.value === 'No Show');
 
             if (canSetDiv) matchDeskTfaaSelect(historyRecord.division, divEl);
             if (canSetGen) matchDeskTfaaSelect(historyRecord.gender, genEl);
 
-            // Enforce division style restrictions BEFORE selecting style so valid options are enabled
             handleStyleRestrictions(prefix);
 
             if (canSetStyle) matchDeskTfaaSelect(historyRecord.style, styleEl);
@@ -1236,7 +1479,6 @@
             return;
         }
 
-        // Legacy fallback if shared shooting styles rule controller is unavailable
         for (let i = 0; i < styleEl.options.length; i++) {
             const opt = styleEl.options[i];
             const val = opt.value;
@@ -1310,29 +1552,83 @@
     }
 
     /**
-     * Filter Active Registered Archers Table Rows & Persist Search Query
+     * Filter Active Registered Archers Table Rows by Line & Search Query instantaneously
+     * without a full-page reload, and keep hidden form inputs synchronized.
      */
-    function applyDeskSearchFilter(query) {
-        const cleanQuery = (query || '').trim().toLowerCase();
-        const rows = document.querySelectorAll('.sywat-archer-row');
+    function applyDeskLineAndSearchFilter() {
+        const lineSelect   = document.getElementById('sywat_selected_line_idx');
+        const searchInput  = document.getElementById('sywat_search_input');
+        const selectedLine = lineSelect ? String(lineSelect.value || 'all') : 'all';
+        const rawQuery     = searchInput ? String(searchInput.value || '') : '';
+        const cleanQuery   = rawQuery.trim().toLowerCase();
+        const rows         = document.querySelectorAll('#sywat_desk_archers_table .sywat-archer-row');
+
+        let visibleCount = 0;
 
         rows.forEach(function(row) {
+            const rowLine    = row.getAttribute('data-line-idx') || '';
             const archerName = row.getAttribute('data-name') || '';
-            if (!cleanQuery || archerName.includes(cleanQuery)) {
+            const lineOk     = (!selectedLine || selectedLine === 'all' || rowLine === selectedLine);
+            const queryOk    = (!cleanQuery || archerName.includes(cleanQuery));
+
+            if (lineOk && queryOk) {
                 row.classList.remove('sywat-hidden');
+                visibleCount++;
             } else {
                 row.classList.add('sywat-hidden');
             }
         });
 
-        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
-            hiddenInput.value = query || '';
+        const countEl = document.getElementById('sywat_desk_visible_count');
+        if (countEl) {
+            countEl.textContent = String(visibleCount);
+        }
+
+        const emptyMsg = document.getElementById('sywat_desk_empty_filter_msg');
+        if (emptyMsg) {
+            if (visibleCount === 0) {
+                emptyMsg.classList.remove('sywat-hidden');
+            } else {
+                emptyMsg.classList.add('sywat-hidden');
+            }
+        }
+
+        document.querySelectorAll('.sywat-desk-hidden-line').forEach(function(hiddenLine) {
+            hiddenLine.value = selectedLine || 'all';
         });
 
-        if (query) {
-            sessionStorage.setItem('sywat_checkin_search_query', query);
+        document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
+            hiddenInput.value = rawQuery;
+        });
+
+        if (rawQuery) {
+            sessionStorage.setItem('sywat_checkin_search_query', rawQuery);
         } else {
             sessionStorage.removeItem('sywat_checkin_search_query');
+        }
+    }
+
+    function applyDeskSearchFilter(query) {
+        const searchInput = document.getElementById('sywat_search_input');
+        if (searchInput && query !== undefined) {
+            searchInput.value = query;
+        }
+        applyDeskLineAndSearchFilter();
+    }
+
+    /**
+     * Parse serialized archer JSON payload from a table row element.
+     */
+    function parseRowArcherPayload(triggerEl) {
+        if (!triggerEl) return null;
+        const row = triggerEl.closest('.sywat-archer-row');
+        if (!row) return null;
+        const rawJson = row.getAttribute('data-archer');
+        if (!rawJson) return null;
+        try {
+            return JSON.parse(rawJson);
+        } catch (err) {
+            return null;
         }
     }
 
@@ -1346,9 +1642,14 @@
         handleStyleChange: handleStyleChange,
         evaluateTfaaStatus: evaluateTfaaStatus,
         isWalkinPromoEligible: isWalkinPromoEligible,
+        openCheckinModal: openDeskCheckinModal,
+        closeCheckinModal: closeDeskCheckinModal,
+        openEditModal: openDeskEditModal,
+        closeEditModal: closeDeskEditModal,
         openWalkinModal: openWalkinModal,
         closeWalkinModal: closeWalkinModal,
         continueFamilyLoop: continueFamilyLoop,
+        applyLineAndSearchFilter: applyDeskLineAndSearchFilter,
         applySearchFilter: applyDeskSearchFilter
     };
 
@@ -1402,48 +1703,39 @@
             });
         }
 
-        const walkinRoundSel = document.getElementById('walkin_pricing_profile');
-        if (walkinRoundSel && walkinRoundSel.tagName === 'SELECT') {
-            walkinRoundSel.addEventListener('change', function() {
-                evaluateTfaaStatus('walkin');
-            });
-        }
-
         const checkinArcherNameEl = document.getElementById('checkin_archer_name');
         if (checkinArcherNameEl) {
             checkinArcherNameEl.addEventListener('input', function() {
                 delete this.dataset.normalizedFrom;
                 autoFillOnNameChange('checkin', false);
             });
-            autoFillOnNameChange('checkin', true);
-            toggleFamilyBox('checkin');
+            if (checkinArcherNameEl.value.trim() !== '') {
+                autoFillOnNameChange('checkin', true);
+                toggleFamilyBox('checkin');
+            }
         }
 
         const searchInput = document.getElementById('sywat_search_input');
         if (searchInput) {
-            let initialQuery = searchInput.value;
-            if (!initialQuery) {
+            if (!searchInput.value) {
                 const savedQuery = sessionStorage.getItem('sywat_checkin_search_query');
                 if (savedQuery) {
-                    initialQuery = savedQuery;
                     searchInput.value = savedQuery;
                 }
             }
 
-            if (initialQuery) {
-                applyDeskSearchFilter(initialQuery);
-            }
-
             searchInput.addEventListener('input', function() {
-                applyDeskSearchFilter(this.value);
+                applyDeskLineAndSearchFilter();
             });
         }
+
+        applyDeskLineAndSearchFilter();
 
         if (document.getElementById('walkin_division')) handleStyleRestrictions('walkin');
         if (document.getElementById('checkin_division')) handleStyleRestrictions('checkin');
         if (document.getElementById('edit_division')) handleStyleRestrictions('edit');
 
-        // Auto-dismiss standard notices after 4 seconds
+        // Auto-dismiss standard top-level notices after 4 seconds
         setTimeout(function() {
             const notices = document.querySelectorAll('.sywat-wrap .sywat-alert, .sywat-wrap .sywat-notice, .sywat-wrap .notice');
             notices.forEach(function(notice) {
@@ -1468,29 +1760,239 @@
         initSywatCheckin();
     }
 
-    document.addEventListener('change', function(e) {
-        if (!e.target) return;
-        if (e.target.id === 'edit_pricing_profile') {
-            syncDeskBalanceDisplay('edit');
-        } else if (e.target.id === 'checkin_pricing_profile') {
-            syncDeskBalanceDisplay('checkin');
+    // Delegated Click Listener for Optimizer-Safe Actions (Zero Inline onclick)
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.sywat-desk-tfaa-dropdown')) {
+            closeAllDeskTfaaAutocompletes();
+        }
+
+        const actionEl = e.target.closest('[data-sywat-action]');
+        if (!actionEl) return;
+
+        const action = actionEl.getAttribute('data-sywat-action');
+
+        if (action === 'open-desk-checkin-modal') {
+            e.preventDefault();
+            const archer = parseRowArcherPayload(actionEl);
+            if (archer) {
+                openDeskCheckinModal(archer);
+            }
+            return;
+        }
+
+        if (action === 'close-desk-checkin-modal') {
+            e.preventDefault();
+            closeDeskCheckinModal();
+            return;
+        }
+
+        if (action === 'open-desk-edit-modal') {
+            e.preventDefault();
+            const archer = parseRowArcherPayload(actionEl);
+            if (archer) {
+                openDeskEditModal(archer);
+            }
+            return;
+        }
+
+        if (action === 'close-desk-edit-modal') {
+            e.preventDefault();
+            closeDeskEditModal();
+            return;
+        }
+
+        if (action === 'open-desk-walkin-modal') {
+            e.preventDefault();
+            openWalkinModal();
+            return;
+        }
+
+        if (action === 'close-desk-walkin-modal') {
+            e.preventDefault();
+            closeWalkinModal();
+            return;
+        }
+
+        if (action === 'select-desk-line') {
+            e.preventDefault();
+            const targetLineIdx = actionEl.getAttribute('data-line-idx') || 'all';
+            const lineSelect    = document.getElementById('sywat_selected_line_idx');
+            if (lineSelect) {
+                lineSelect.value = targetLineIdx;
+            }
+            applyDeskLineAndSearchFilter();
+            const tableEl = document.getElementById('sywat_desk_archers_table');
+            if (tableEl && typeof tableEl.scrollIntoView === 'function') {
+                tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+
+        if (action === 'clear-desk-search') {
+            e.preventDefault();
+            applyDeskSearchFilter('');
+            return;
+        }
+
+        if (action === 'continue-family-loop') {
+            e.preventDefault();
+            const famId   = actionEl.getAttribute('data-family-id') || '';
+            const lineIdx = actionEl.getAttribute('data-line-idx') || '0';
+            continueFamilyLoop(famId, lineIdx);
+            return;
+        }
+
+        if (action === 'dismiss-family-banner') {
+            e.preventDefault();
+            const banner = actionEl.closest('.sywat-family-banner');
+            if (banner) {
+                banner.remove();
+            }
+            return;
+        }
+
+        if (action === 'use-official-desk-name') {
+            e.preventDefault();
+            const prefix       = actionEl.getAttribute('data-prefix') || 'checkin';
+            const officialName = actionEl.getAttribute('data-official-name') || '';
+            updateNameToOfficial(prefix, officialName);
+            return;
+        }
+
+        if (action === 'confirm-delete-archer') {
+            if (!window.confirm('⚠️ Are you sure you want to PERMANENTLY delete this archer?')) {
+                e.preventDefault();
+            }
         }
     });
 
+    // Delegated Change Listener for Selects & Checkboxes (Zero Inline onchange)
+    document.addEventListener('change', function(e) {
+        if (!e.target) return;
+        const action = e.target.getAttribute('data-sywat-action') || '';
+
+        if (action === 'submit-desk-tournament') {
+            const filterForm = document.getElementById('sywat_filter_form');
+            if (filterForm) {
+                filterForm.submit();
+            }
+            return;
+        }
+
+        if (action === 'filter-desk-line') {
+            applyDeskLineAndSearchFilter();
+            return;
+        }
+
+        if (action === 'toggle-unpaid-banner') {
+            toggleUnpaidBanner(!!e.target.checked);
+            return;
+        }
+
+        if (action === 'sync-checkin-balance' || e.target.id === 'checkin_pricing_profile') {
+            syncDeskBalanceDisplay('checkin');
+            return;
+        }
+
+        if (action === 'checkin-division-change') {
+            handleStyleRestrictions('checkin');
+            evaluateTfaaStatus('checkin');
+            return;
+        }
+
+        if (action === 'checkin-gender-change') {
+            evaluateTfaaStatus('checkin');
+            return;
+        }
+
+        if (action === 'checkin-style-change') {
+            handleStyleChange('checkin');
+            evaluateTfaaStatus('checkin');
+            return;
+        }
+
+        if (action === 'checkin-pay-change') {
+            toggleFamilyBox('checkin');
+            return;
+        }
+
+        if (action === 'sync-edit-balance' || e.target.id === 'edit_pricing_profile') {
+            syncDeskBalanceDisplay('edit');
+            return;
+        }
+
+        if (action === 'edit-line-change') {
+            updateEditFamilyOptions(e.target.value);
+            return;
+        }
+
+        if (action === 'edit-division-change') {
+            handleStyleRestrictions('edit');
+            return;
+        }
+
+        if (action === 'edit-style-change') {
+            handleStyleChange('edit');
+            return;
+        }
+
+        if (action === 'edit-pay-change') {
+            toggleFamilyBox('edit');
+            return;
+        }
+
+        if (action === 'walkin-line-change') {
+            updateWalkinFamilyOptions(e.target.value);
+            return;
+        }
+
+        if (action === 'walkin-round-change') {
+            evaluateTfaaStatus('walkin');
+            return;
+        }
+
+        if (action === 'walkin-division-change') {
+            handleStyleRestrictions('walkin');
+            evaluateTfaaStatus('walkin');
+            return;
+        }
+
+        if (action === 'walkin-gender-change') {
+            evaluateTfaaStatus('walkin');
+            return;
+        }
+
+        if (action === 'walkin-style-change') {
+            handleStyleChange('walkin');
+            evaluateTfaaStatus('walkin');
+        }
+    });
+
+    // Delegated Input Listener for Autocomplete, Phone Formatting & Balance Overrides
     document.addEventListener('input', function(e) {
         if (!e.target) return;
+
         if (e.target.id === 'edit_balance_due') {
             e.target.dataset.manualOverride = '1';
             return;
         }
-        if (e.target.id === 'walkin_name_input' || e.target.id === 'checkin_archer_name' || e.target.id === 'edit_archer_name' || e.target.name === 'edit_name' || e.target.name === 'walkin_name' || e.target.name === 'checkin_name' || e.target.id === 'walkin_group_name' || e.target.name === 'walkin_group_name') {
-            handleDeskTfaaAutocomplete(e.target);
-        }
-    });
 
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.sywat-desk-tfaa-dropdown')) {
-            closeAllDeskTfaaAutocompletes();
+        if (e.target.getAttribute('data-sywat-action') === 'format-desk-phone' || e.target.id === 'walkin_group_phone') {
+            formatDeskPhoneNumber(e.target);
+            return;
+        }
+
+        if (
+            e.target.id === 'walkin_name_input' ||
+            e.target.id === 'checkin_archer_name' ||
+            e.target.id === 'edit_archer_name' ||
+            e.target.name === 'edit_name' ||
+            e.target.name === 'walkin_name' ||
+            e.target.name === 'checkin_name' ||
+            e.target.id === 'walkin_group_name' ||
+            e.target.name === 'walkin_group_name'
+        ) {
+            handleDeskTfaaAutocomplete(e.target);
         }
     });
 
