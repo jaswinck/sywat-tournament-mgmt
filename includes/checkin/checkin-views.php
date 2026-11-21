@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and clickable Waitlist badges/buttons, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Renders the Check-In Desk navigation with role-gated desk tabs and sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and compact header status pills/badges, Active Registered Archers table formatted as "LastName, FirstName" with dual-format live search indexing, responsive mobile card labels, Rate column, multi-round & promotional badges and O(1) household-wide OWE: FAMILY badges, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero output at include time, zero inline styles, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.5.1
+ * Version: 7.5.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -308,7 +308,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                             <div>
                                 <div class="sywat-tracker-card-header">
                                     <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
-                                    <div class="sywat-tracker-header-badges sywat-table-actions-vertical">
+                                    <div class="sywat-tracker-header-badges">
                                         <span class="sywat-badge sywat-badge-prereg">
                                             <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                         </span>
