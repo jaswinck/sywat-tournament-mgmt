@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Registration Engine Actions Handler
  * Path: includes/registration/registration-actions.php
- * Description: Handles multi-archer phone intake with per-archer multi-line checkbox matrix support (archers[i][line_indices][], with backward-compatible single-line line_idx fallback), enforces that every named archer selects at least one shooting line (zero silent default-line fallbacks), expands multi-line entries in chronological tournament line order, resolves Member Directory DOB & history profiles via sywat_resolve_archer_intake_profile() without guessing divisions for unmatched shooters, evaluates round/pricing profiles, First-Time/Lapsed Shooter promoter free-entry rules, and dynamic Household Family Caps (line or tournament scope), handles waitlist triage ('all' vs. 'remainder') with full line_indices[] preservation, and persists records atomically.
- * Compliance: Pure action layer — zero output at include time, zero inline style attributes, zero inline JS event handlers (delegated data-sywat-action attributes only), hoisted O(1) capacity & duplicate maps, omitted closing PHP tag.
+ * Description: Handles multi-archer phone intake with per-archer multi-line checkbox matrix support (archers[i][line_indices][], with backward-compatible single-line line_idx fallback), enforces that every named archer selects at least one shooting line (zero silent default-line fallbacks), expands multi-line entries in chronological tournament line order, resolves Member Directory DOB & history profiles via sywat_resolve_archer_intake_profile() without guessing divisions for unmatched shooters, evaluates round/pricing profiles, indexed First-Time/Lapsed Shooter promoter free-entry rules, and dynamic Household Family Caps (line or tournament scope), handles waitlist triage ('all' vs. 'remainder') with full line_indices[] preservation, and persists multi-archer/multi-line records inside an atomic MySQL transaction.
+ * Compliance: Pure action layer — zero output at include time, zero inline style attributes, zero inline JS event handlers (delegated data-sywat-action attributes only), hoisted O(1) capacity & duplicate maps, indexed non-historical registration queries, atomic MySQL transaction batching, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -134,7 +134,7 @@ if ( ! function_exists( 'sywat_registration_extract_row_line_indices' ) ) {
  * Handles multi-archer phone intake with per-archer multi-line checkbox matrices,
  * Member Directory & history profile lookup, round/pricing profile fee calculation,
  * First-Time/Lapsed Shooter promoter evaluation, active-only household family capping,
- * waitlists, and persistence.
+ * waitlists, and atomic transactional persistence.
  *
  * @param array $tournaments   Master tournament configuration array.
  * @param array $registrations Master registration state array reference.
@@ -142,6 +142,8 @@ if ( ! function_exists( 'sywat_registration_extract_row_line_indices' ) ) {
  */
 if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
     function sywat_handle_register_shooter( $tournaments, &$registrations ) {
+        global $wpdb;
+
         $group_name       = trim( sanitize_text_field( wp_unslash( $_POST['group_name'] ?? '' ) ) );
         $group_phone      = trim( sanitize_text_field( wp_unslash( $_POST['group_phone'] ?? '' ) ) );
         $legacy_def_line  = trim( sanitize_text_field( wp_unslash( $_POST['default_line_idx'] ?? '' ) ) );
@@ -475,12 +477,20 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             }
         }
 
-        // Load full registration history once if promo checks are active on any offered profile
+        // Load active-tournament registration history once via indexed prefix query only if season & profile promos are enabled
+        $season_slug = is_array( $t_data )
+            ? ( ! empty( $t_data['season_slug'] ) ? $t_data['season_slug'] : ( ! empty( $t_data['season'] ) ? $t_data['season'] : '' ) )
+            : '';
+        $seasons_map     = function_exists( 'sywat_get_seasons' ) ? sywat_get_seasons() : get_option( 'sywat_seasons_list', array() );
+        $season_promo_on = ( $season_slug !== '' && is_array( $seasons_map ) && isset( $seasons_map[ $season_slug ] ) && ! empty( $seasons_map[ $season_slug ]['promo_enabled'] ) );
+
         $all_regs_for_promo = null;
-        foreach ( $t_profiles as $tp ) {
-            if ( ! empty( $tp['promo_enabled'] ) && function_exists( 'sywat_get_all_registrations' ) ) {
-                $all_regs_for_promo = sywat_get_all_registrations();
-                break;
+        if ( $season_promo_on ) {
+            foreach ( $t_profiles as $tp ) {
+                if ( ! empty( $tp['promo_enabled'] ) && function_exists( 'sywat_get_all_registrations' ) ) {
+                    $all_regs_for_promo = sywat_get_all_registrations( $tournaments );
+                    break;
+                }
             }
         }
 
@@ -530,7 +540,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
 
             // Evaluate First-Time / Lapsed Shooter Promotional Free Entry eligibility (at most once per shooter)
             $is_promo_free = false;
-            if ( ! $is_waitlist && ! isset( $claimed_promo_names[ $name_low ] ) && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
+            if ( ! $is_waitlist && $season_promo_on && ! isset( $claimed_promo_names[ $name_low ] ) && function_exists( 'sywat_check_archer_promo_eligibility' ) ) {
                 $promo_check = sywat_check_archer_promo_eligibility(
                     $name,
                     ! empty( $t_data ) ? $t_data : $tourn_name,
@@ -593,7 +603,7 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
             $triaged_archers[]       = $archer;
         }
 
-        // Pass 2: Assign fees, apply dynamic Household Family Cap, and persist
+        // Pass 2: Assign fees, apply dynamic Household Family Cap, and persist atomically inside a MySQL transaction
         $added_count             = 0;
         $waitlisted_count        = 0;
         $promo_applied_names     = array();
@@ -603,128 +613,137 @@ if ( ! function_exists( 'sywat_handle_register_shooter' ) ) {
         $shared_tourn_fam_id     = 'fam_' . $t_slug . '_' . sanitize_title( $family_base_name );
         $has_persist_fn          = function_exists( 'sywat_waitlist_persist_record' );
 
-        foreach ( $triaged_archers as $archer ) {
-            $l_idx         = $archer['line_idx'];
-            $dist          = $archer['distance'];
-            $name          = $archer['name'];
-            $line_name     = $archer['line_name'];
-            $round_slug    = $archer['pricing_profile'];
-            $is_waitlist   = $archer['is_waitlist'];
-            $is_promo_free = $archer['is_promo_free'];
-            $ind_rate      = $archer['ind_rate'];
-            $cap_bucket    = $archer['cap_bucket'];
+        $wpdb->query( 'START TRANSACTION' );
 
-            $bucket_stat = isset( $active_group_stats[ $cap_bucket ] ) ? $active_group_stats[ $cap_bucket ] : null;
-            $min_needed  = ( is_array( $bucket_stat ) && $bucket_stat['min_archers'] !== 99 ) ? $bucket_stat['min_archers'] : 3;
+        try {
+            foreach ( $triaged_archers as $archer ) {
+                $l_idx         = $archer['line_idx'];
+                $dist          = $archer['distance'];
+                $name          = $archer['name'];
+                $line_name     = $archer['line_name'];
+                $round_slug    = $archer['pricing_profile'];
+                $is_waitlist   = $archer['is_waitlist'];
+                $is_promo_free = $archer['is_promo_free'];
+                $ind_rate      = $archer['ind_rate'];
+                $cap_bucket    = $archer['cap_bucket'];
 
-            $is_family_eligible = (
-                ! $is_waitlist &&
-                ! $is_promo_free &&
-                is_array( $bucket_stat ) &&
-                ! empty( $bucket_stat['cap_enabled'] ) &&
-                $bucket_stat['count'] >= $min_needed &&
-                $bucket_stat['raw_sum'] > $bucket_stat['cap_amount']
-            );
+                $bucket_stat = isset( $active_group_stats[ $cap_bucket ] ) ? $active_group_stats[ $cap_bucket ] : null;
+                $min_needed  = ( is_array( $bucket_stat ) && $bucket_stat['min_archers'] !== 99 ) ? $bucket_stat['min_archers'] : 3;
 
-            if ( $is_waitlist ) {
-                $reg_status      = 'Waitlist';
-                $paid_status     = 'Waitlist';
-                $initial_fee     = 0.00;
-                $due_amount      = 0.00;
-                $paid_for_archer = 0.00;
-            } elseif ( $is_promo_free ) {
-                $reg_status            = 'Pre-Reg';
-                $paid_status           = 'Promo (Free)';
-                $initial_fee           = 0.00;
-                $due_amount            = 0.00;
-                $paid_for_archer       = 0.00;
-                $promo_applied_names[] = $name;
-            } else {
-                $reg_status = 'Pre-Reg';
-                if ( $is_family_eligible ) {
-                    $paid_status = 'Family';
-                    if ( empty( $family_primary_assigned[ $cap_bucket ] ) ) {
-                        $initial_fee                            = floatval( $bucket_stat['cap_amount'] );
-                        $family_primary_assigned[ $cap_bucket ] = true;
+                $is_family_eligible = (
+                    ! $is_waitlist &&
+                    ! $is_promo_free &&
+                    is_array( $bucket_stat ) &&
+                    ! empty( $bucket_stat['cap_enabled'] ) &&
+                    $bucket_stat['count'] >= $min_needed &&
+                    $bucket_stat['raw_sum'] > $bucket_stat['cap_amount']
+                );
+
+                if ( $is_waitlist ) {
+                    $reg_status      = 'Waitlist';
+                    $paid_status     = 'Waitlist';
+                    $initial_fee     = 0.00;
+                    $due_amount      = 0.00;
+                    $paid_for_archer = 0.00;
+                } elseif ( $is_promo_free ) {
+                    $reg_status            = 'Pre-Reg';
+                    $paid_status           = 'Promo (Free)';
+                    $initial_fee           = 0.00;
+                    $due_amount            = 0.00;
+                    $paid_for_archer       = 0.00;
+                    $promo_applied_names[] = $name;
+                } else {
+                    $reg_status = 'Pre-Reg';
+                    if ( $is_family_eligible ) {
+                        $paid_status = 'Family';
+                        if ( empty( $family_primary_assigned[ $cap_bucket ] ) ) {
+                            $initial_fee                            = floatval( $bucket_stat['cap_amount'] );
+                            $family_primary_assigned[ $cap_bucket ] = true;
+                        } else {
+                            $initial_fee = 0.00;
+                        }
                     } else {
-                        $initial_fee = 0.00;
+                        $paid_status = $archer['paid_tier'];
+                        $initial_fee = $ind_rate;
                     }
+
+                    if ( $remaining_payment >= $initial_fee ) {
+                        $paid_for_archer   = $initial_fee;
+                        $due_amount        = 0.00;
+                        $remaining_payment = round( $remaining_payment - $initial_fee, 2 );
+                    } else {
+                        $paid_for_archer   = $remaining_payment;
+                        $due_amount        = round( $initial_fee - $remaining_payment, 2 );
+                        $remaining_payment = 0.00;
+                    }
+                }
+
+                $fam_id_val = $use_tourn_wide_cap
+                    ? $shared_tourn_fam_id
+                    : ( 'fam_' . $t_slug . '_l' . sanitize_title( $l_idx ) . '_' . sanitize_title( $family_base_name ) );
+
+                $new_reg = array(
+                    'id'              => uniqid( 'reg_' ),
+                    'tournament'      => $tourn_name,
+                    'line_index'      => $l_idx,
+                    'line_name'       => $line_name,
+                    'name'            => $name,
+                    'phone'           => $archer['phone'],
+                    'email'           => $archer['email'],
+                    'distance'        => $dist,
+                    'division'        => $archer['division'],
+                    'pricing_profile' => $round_slug,
+                    'is_promo_free'   => $is_promo_free,
+                    'gender'          => $archer['gender'],
+                    'style'           => $archer['style'],
+                    'paid'            => $paid_status,
+                    'rate_type'       => $archer['paid_tier'],
+                    'family_id'       => $fam_id_val,
+                    'family_name'     => $family_base_name,
+                    'amount_paid'     => $paid_for_archer,
+                    'balance_due'     => $due_amount,
+                    'status'          => $reg_status,
+                    'created_at'      => $created_timestamp,
+                );
+
+                if ( $has_persist_fn ) {
+                    sywat_waitlist_persist_record( $new_reg, $registrations );
                 } else {
-                    $paid_status = $archer['paid_tier'];
-                    $initial_fee = $ind_rate;
+                    update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
+                    $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
+                    if ( ! is_array( $master_regs ) ) {
+                        $master_regs = array();
+                    }
+                    $master_regs[ $new_reg['id'] ] = $new_reg;
+                    update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
+                    $registrations[] = $new_reg;
                 }
 
-                if ( $remaining_payment >= $initial_fee ) {
-                    $paid_for_archer   = $initial_fee;
-                    $due_amount        = 0.00;
-                    $remaining_payment = round( $remaining_payment - $initial_fee, 2 );
+                if ( $is_waitlist ) {
+                    $waitlisted_count++;
                 } else {
-                    $paid_for_archer   = $remaining_payment;
-                    $due_amount        = round( $initial_fee - $remaining_payment, 2 );
-                    $remaining_payment = 0.00;
+                    $added_count++;
                 }
             }
 
-            $fam_id_val = $use_tourn_wide_cap
-                ? $shared_tourn_fam_id
-                : ( 'fam_' . $t_slug . '_l' . sanitize_title( $l_idx ) . '_' . sanitize_title( $family_base_name ) );
-
-            $new_reg = array(
-                'id'              => uniqid( 'reg_' ),
-                'tournament'      => $tourn_name,
-                'line_index'      => $l_idx,
-                'line_name'       => $line_name,
-                'name'            => $name,
-                'phone'           => $archer['phone'],
-                'email'           => $archer['email'],
-                'distance'        => $dist,
-                'division'        => $archer['division'],
-                'pricing_profile' => $round_slug,
-                'is_promo_free'   => $is_promo_free,
-                'gender'          => $archer['gender'],
-                'style'           => $archer['style'],
-                'paid'            => $paid_status,
-                'rate_type'       => $archer['paid_tier'],
-                'family_id'       => $fam_id_val,
-                'family_name'     => $family_base_name,
-                'amount_paid'     => $paid_for_archer,
-                'balance_due'     => $due_amount,
-                'status'          => $reg_status,
-                'created_at'      => $created_timestamp,
-            );
-
-            if ( $has_persist_fn ) {
-                sywat_waitlist_persist_record( $new_reg, $registrations );
-            } else {
-                update_option( 'sywat_t_' . $t_slug . '_' . $new_reg['id'], $new_reg, false );
-                $master_regs = get_option( 'sywat_registrations_' . $t_slug, array() );
-                if ( ! is_array( $master_regs ) ) {
-                    $master_regs = array();
+            if ( ! empty( $group_phone ) && ( $added_count + $waitlisted_count ) > 0 ) {
+                $phone_cache = get_option( 'sywat_shooter_phones_cache', array() );
+                if ( ! is_array( $phone_cache ) ) {
+                    $phone_cache = array();
                 }
-                $master_regs[ $new_reg['id'] ] = $new_reg;
-                update_option( 'sywat_registrations_' . $t_slug, $master_regs, false );
-                $registrations[] = $new_reg;
-            }
-
-            if ( $is_waitlist ) {
-                $waitlisted_count++;
-            } else {
-                $added_count++;
-            }
-        }
-
-        if ( ! empty( $group_phone ) && ( $added_count + $waitlisted_count ) > 0 ) {
-            $phone_cache = get_option( 'sywat_shooter_phones_cache', array() );
-            if ( ! is_array( $phone_cache ) ) {
-                $phone_cache = array();
-            }
-            foreach ( $valid_entries as $archer ) {
-                if ( ! empty( $archer['name'] ) ) {
-                    $norm_name                 = strtolower( trim( $archer['name'] ) );
-                    $phone_cache[ $norm_name ] = $group_phone;
+                foreach ( $valid_entries as $archer ) {
+                    if ( ! empty( $archer['name'] ) ) {
+                        $norm_name                 = strtolower( trim( $archer['name'] ) );
+                        $phone_cache[ $norm_name ] = $group_phone;
+                    }
                 }
+                update_option( 'sywat_shooter_phones_cache', $phone_cache, false );
             }
-            update_option( 'sywat_shooter_phones_cache', $phone_cache, false );
+
+            $wpdb->query( 'COMMIT' );
+        } catch ( \Throwable $e ) {
+            $wpdb->query( 'ROLLBACK' );
+            throw $e;
         }
 
         $GLOBALS['sywat_last_added_count']   = $added_count;
