@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Data Layer
  * Path: includes/checkin/checkin-data.php
- * Description: Fetches and prepares Check-In Desk state datasets, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, hoisted "LastName, FirstName" display labels with surname alphabetical sorting, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with zero extra database queries per loop.
- * Compliance: Pure data layer — zero HTML echo, zero POST mutations, omitted closing PHP tag.
+ * Description: Fetches and prepares Check-In Desk state datasets, gating legacy option migrations behind a one-time completion flag, excluding historical_import archives and "_hist_" rows from dropdowns and shooter history caches, integrating database-configured NFAA shooting styles, age divisions, active tournament pricing/round profiles, hoisted "LastName, FirstName" display labels with surname alphabetical sorting, and O(1) First-Time/Lapsed Shooter promoter eligibility rules with indexed active-tournament queries.
+ * Compliance: Pure data layer — zero HTML echo, zero POST mutations, indexed non-historical option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -44,12 +44,17 @@ if ( ! function_exists( 'sywat_desk_resolve_line_idx' ) ) {
 }
 
 /**
- * Runs legacy database migrations for registration option keys.
+ * Runs one-time legacy database migrations for registration option keys.
+ * Gated behind an autoloaded completion flag so wp_options is not scanned on every page load.
  *
  * @return void
  */
 if ( ! function_exists( 'sywat_desk_run_migrations' ) ) {
     function sywat_desk_run_migrations() {
+        if ( get_option( 'sywat_desk_migrations_v1_done' ) === '1' ) {
+            return;
+        }
+
         global $wpdb;
 
         $legacy_data = get_option( 'sywat_registrations' );
@@ -75,23 +80,26 @@ if ( ! function_exists( 'sywat_desk_run_migrations' ) ) {
                 delete_option( $row->option_name );
             }
         }
+
+        update_option( 'sywat_desk_migrations_v1_done', '1', true );
     }
 }
 
 /**
  * Build an O(1) client-side Promoter eligibility lookup map per offered round profile
  * for the active Check-In Desk tournament so walk-in intake surfaces $0.00 promotional
- * eligibility live.
+ * eligibility live without scanning archived historical scorecards.
  *
  * @param string     $selected_tournament Active tournament name.
  * @param array|null $t_data              Full tournament config array (or null).
  * @param array      $t_profiles          Ordered map of pricing profiles offered by the tournament.
  * @param array      $seasons             Seasons master list.
  * @param array      $current_tourn_regs  Current tournament registrations.
+ * @param array      $all_tournaments     Optional master tournaments map for indexed prefix queries.
  * @return array                          Map keyed by profile slug ('active', 'label', 'ineligible').
  */
 if ( ! function_exists( 'sywat_desk_build_promo_rules_payload' ) ) {
-    function sywat_desk_build_promo_rules_payload( $selected_tournament, $t_data, $t_profiles, $seasons, $current_tourn_regs ) {
+    function sywat_desk_build_promo_rules_payload( $selected_tournament, $t_data, $t_profiles, $seasons, $current_tourn_regs, $all_tournaments = array() ) {
         $payload = array();
 
         if ( empty( $selected_tournament ) || ! is_array( $t_profiles ) || empty( $t_profiles ) ) {
@@ -105,7 +113,7 @@ if ( ! function_exists( 'sywat_desk_build_promo_rules_payload' ) ) {
         $season_rec      = ( $season_slug !== '' && is_array( $seasons ) && isset( $seasons[ $season_slug ] ) ) ? $seasons[ $season_slug ] : null;
         $season_promo_on = is_array( $season_rec ) && ! empty( $season_rec['promo_enabled'] );
 
-        // Only load full cross-tournament registration history if promo is active on season + at least one profile
+        // Only load cross-tournament active registration history if promo is active on season + at least one profile
         $any_prof_promo = false;
         if ( $season_promo_on ) {
             foreach ( $t_profiles as $prof ) {
@@ -120,7 +128,7 @@ if ( ! function_exists( 'sywat_desk_build_promo_rules_payload' ) ) {
         $candidate_names = array();
         if ( $any_prof_promo ) {
             $all_regs = function_exists( 'sywat_get_all_registrations' )
-                ? sywat_get_all_registrations()
+                ? sywat_get_all_registrations( $all_tournaments )
                 : ( is_array( $current_tourn_regs ) ? $current_tourn_regs : array() );
 
             if ( is_array( $all_regs ) ) {
@@ -207,16 +215,20 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             }
         }
 
-        // Scope Tournaments to User's Assigned Shop & Active Season(s)
+        // Scope Tournaments to User's Assigned Shop & Active Season(s), excluding historical_import archives
         $scoped_raw = array();
         foreach ( $all_tournaments as $t_name => $t_data ) {
+            $is_explicitly_requested = ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 );
+            if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) && ! $is_explicitly_requested ) {
+                continue;
+            }
+
             $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
             if ( ! $is_admin && $t_shop !== $user_shop_id ) {
                 continue;
             }
 
-            $is_explicitly_requested = ( ! empty( $requested_tourn ) && strcasecmp( $t_name, $requested_tourn ) === 0 );
-            $is_saved_preference     = ( $saved_user_t !== '' && strcasecmp( $t_name, $saved_user_t ) === 0 );
+            $is_saved_preference = ( $saved_user_t !== '' && strcasecmp( $t_name, $saved_user_t ) === 0 );
 
             if ( ! $is_explicitly_requested && ! $is_saved_preference && ! empty( $active_season_keys ) ) {
                 $t_season = '';
@@ -233,6 +245,9 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
 
         if ( empty( $scoped_raw ) ) {
             foreach ( $all_tournaments as $t_name => $t_data ) {
+                if ( is_array( $t_data ) && ! empty( $t_data['historical_import'] ) ) {
+                    continue;
+                }
                 $t_shop = function_exists( 'sywat_get_tournament_shop_id' ) ? sywat_get_tournament_shop_id( $t_data ) : 'shop_ccr';
                 if ( $is_admin || $t_shop === $user_shop_id ) {
                     $scoped_raw[ $t_name ] = $t_data;
@@ -346,7 +361,7 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             }
         }
 
-        if ( $user->ID && ! empty( $selected_tournament ) ) {
+        if ( $user->ID && ! empty( $selected_tournament ) && $selected_tournament !== $saved_user_t ) {
             update_user_meta( $user->ID, 'sywat_desk_selected_tournament', $selected_tournament );
         }
 
@@ -391,56 +406,62 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         $closed_lines = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
 
         $registrations = array();
-        $results       = $wpdb->get_results( $wpdb->prepare(
-            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-            $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
-        ) );
+        if ( $active_t_slug !== '' ) {
+            $results = $wpdb->get_results( $wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
+            ) );
 
-        foreach ( $results as $row ) {
-            $reg_data = maybe_unserialize( $row->option_value );
-            if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
-                $registrations[] = $reg_data;
+            if ( is_array( $results ) ) {
+                foreach ( $results as $row ) {
+                    $reg_data = maybe_unserialize( $row->option_value );
+                    if ( is_array( $reg_data ) && isset( $reg_data['id'] ) ) {
+                        $registrations[] = $reg_data;
+                    }
+                }
             }
         }
 
-        // High Concurrency Caching: Wrap DB history lookup in Transient to optimize performance
+        // High Concurrency Caching: Wrap active-tournament DB history lookup in Transient (excluding archived "_hist_" rows)
         $history_profiles = get_transient( 'sywat_history_profiles_cache' );
         if ( false === $history_profiles || ! is_array( $history_profiles ) ) {
-            $all_db_results   = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%'" );
+            $all_db_results   = $wpdb->get_results( "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'sywat_t_%' AND option_name NOT LIKE '%\\_hist\\_%'" );
             $history_profiles = array( 'exact' => array(), 'fl' => array() );
 
-            foreach ( $all_db_results as $row ) {
-                $r = maybe_unserialize( $row->option_value );
-                if ( is_array( $r ) && ! empty( $r['name'] ) ) {
-                    $clean_name = trim( $r['name'] );
-                    if ( empty( $clean_name ) ) {
-                        continue;
-                    }
+            if ( is_array( $all_db_results ) ) {
+                foreach ( $all_db_results as $row ) {
+                    $r = maybe_unserialize( $row->option_value );
+                    if ( is_array( $r ) && ! empty( $r['name'] ) && empty( $r['historical_import'] ) ) {
+                        $clean_name = trim( $r['name'] );
+                        if ( empty( $clean_name ) ) {
+                            continue;
+                        }
 
-                    $div_val   = isset( $r['division'] ) ? $r['division'] : '';
-                    $gen_val   = isset( $r['gender'] ) ? $r['gender'] : '';
-                    $style_val = isset( $r['style'] ) ? $r['style'] : '';
-                    $paid_val  = isset( $r['paid'] ) ? $r['paid'] : '';
+                        $div_val   = isset( $r['division'] ) ? $r['division'] : '';
+                        $gen_val   = isset( $r['gender'] ) ? $r['gender'] : '';
+                        $style_val = isset( $r['style'] ) ? $r['style'] : '';
+                        $paid_val  = isset( $r['paid'] ) ? $r['paid'] : '';
 
-                    if ( $div_val === 'No Show' || $style_val === 'No Show' || empty( $div_val ) || empty( $style_val ) ) {
-                        continue;
-                    }
+                        if ( $div_val === 'No Show' || $style_val === 'No Show' || empty( $div_val ) || empty( $style_val ) ) {
+                            continue;
+                        }
 
-                    $norm_key = strtolower( preg_replace( '/[[:space:]]+/', ' ', $clean_name ) );
-                    $parts    = explode( ' ', $norm_key );
-                    $fl_key   = ( count( $parts ) > 1 ) ? reset( $parts ) . '___' . end( $parts ) : $norm_key;
+                        $norm_key = strtolower( preg_replace( '/[[:space:]]+/', ' ', $clean_name ) );
+                        $parts    = explode( ' ', $norm_key );
+                        $fl_key   = ( count( $parts ) > 1 ) ? reset( $parts ) . '___' . end( $parts ) : $norm_key;
 
-                    $profile_data = array(
-                        'full_name' => $clean_name,
-                        'division'  => $div_val,
-                        'gender'    => $gen_val,
-                        'style'     => $style_val,
-                        'paid'      => $paid_val,
-                    );
+                        $profile_data = array(
+                            'full_name' => $clean_name,
+                            'division'  => $div_val,
+                            'gender'    => $gen_val,
+                            'style'     => $style_val,
+                            'paid'      => $paid_val,
+                        );
 
-                    $history_profiles['exact'][ $norm_key ] = $profile_data;
-                    if ( ! isset( $history_profiles['fl'][ $fl_key ] ) ) {
-                        $history_profiles['fl'][ $fl_key ] = $profile_data;
+                        $history_profiles['exact'][ $norm_key ] = $profile_data;
+                        if ( ! isset( $history_profiles['fl'][ $fl_key ] ) ) {
+                            $history_profiles['fl'][ $fl_key ] = $profile_data;
+                        }
                     }
                 }
             }
@@ -458,7 +479,7 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         $family_members_by_id      = array();
 
         foreach ( $registrations as $r ) {
-            $fid = ! empty( $r['family_id'] ) ? trim( $r['family_id'] ) : '';
+            $fid = ! empty( $r['family_id'] ) ? trim( (string) $r['family_id'] ) : '';
             if ( empty( $fid ) ) {
                 continue;
             }
@@ -475,7 +496,7 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             if ( ! isset( $family_members_by_id[ $fid ] ) ) {
                 $family_members_by_id[ $fid ] = array(
                     'line_idx'    => $resolved_l_idx,
-                    'family_name' => ! empty( $r['family_name'] ) ? trim( $r['family_name'] ) : '',
+                    'family_name' => ! empty( $r['family_name'] ) ? trim( (string) $r['family_name'] ) : '',
                     'names'       => array(),
                 );
             }
@@ -682,7 +703,8 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             $selected_t_data,
             $t_profiles,
             $seasons,
-            $registrations
+            $registrations,
+            $all_tournaments
         );
 
         return array(
