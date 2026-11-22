@@ -3,7 +3,7 @@
  * Plugin Name: SYWAT Archery Manager
  * Plugin URI:  https://ccrstaffshooters.com
  * Description: Unified portal for tournament management, check-in desk, score entry, season tracking, and historical results lookup.
- * Version:     7.7.10
+ * Version:     7.7.11
  * Author:      SYWAT Archery
  * Text Domain: sywat-archery
  */
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Define Plugin Constants
 define( 'SYWAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SYWAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SYWAT_PLUGIN_VERSION', '7.7.10' );
+define( 'SYWAT_PLUGIN_VERSION', '7.7.11' );
 
 // Toggleable Historical TFAA Importer Module (set to false once historical migration is complete)
 if ( ! defined( 'SYWAT_ENABLE_HISTORY_IMPORTER' ) ) {
