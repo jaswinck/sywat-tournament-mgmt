@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Data Layer
  * Path: includes/checkin/checkin-data.php
- * Description: Pure data access and raw aggregation layer for the Check-In Desk portal. Gates legacy option migrations behind a one-time completion flag, excludes historical_import archives and "_hist_" rows from dropdowns and shooter history caches, queries active-tournament registrations via indexed wp_options prefixes, resolves database-configured NFAA shooting styles, age divisions, and tournament pricing/round profiles, and exposes raw family membership and tournament registration datasets for formatting by includes/checkin/checkin-helpers.php.
+ * Description: Pure data access and raw aggregation layer for the Check-In Desk portal. Gates legacy option migrations behind a one-time completion flag, excludes historical_import archives and "_hist_" rows from dropdowns and shooter history caches, queries active-tournament registrations via indexed wp_options prefixes, resolves database-configured NFAA shooting styles, age divisions, and tournament pricing/round profiles, defaults the active Shooting Line selection to the first open (non-closed) shooting line when no explicit line filter is requested, and exposes raw family membership and tournament registration datasets for formatting by includes/checkin/checkin-helpers.php.
  * Compliance: Pure data layer — zero HTML echo, zero presentation formatting strings, zero POST mutations, indexed non-historical option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.3.0
+ * Version: 7.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -197,7 +197,9 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         }
 
         $requested_tourn   = isset( $_REQUEST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['selected_tournament'] ) ) : '';
-        $selected_line_idx = isset( $_REQUEST['selected_line_idx'] )   ? sanitize_text_field( wp_unslash( $_REQUEST['selected_line_idx'] ) )   : 'all';
+        $raw_req_line      = isset( $_REQUEST['selected_line_idx'] )   ? trim( sanitize_text_field( wp_unslash( $_REQUEST['selected_line_idx'] ) ) ) : '';
+        $has_explicit_line = ( $raw_req_line !== '' );
+        $selected_line_idx = $has_explicit_line ? $raw_req_line : 'all';
         $search_query      = isset( $_REQUEST['search_query'] )        ? sanitize_text_field( wp_unslash( $_REQUEST['search_query'] ) )        : '';
         $saved_user_t      = $user->ID ? trim( (string) get_user_meta( $user->ID, 'sywat_desk_selected_tournament', true ) ) : '';
 
@@ -361,6 +363,14 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             }
         }
 
+        $tournament_switched = (
+            ! empty( $requested_tourn ) &&
+            $saved_user_t !== '' &&
+            ! empty( $selected_tournament ) &&
+            strcasecmp( $selected_tournament, $saved_user_t ) !== 0 &&
+            ! isset( $_POST['sywat_action'] )
+        );
+
         if ( $user->ID && ! empty( $selected_tournament ) && $selected_tournament !== $saved_user_t ) {
             update_user_meta( $user->ID, 'sywat_desk_selected_tournament', $selected_tournament );
         }
@@ -385,7 +395,12 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
             ? $scoped_raw[ $selected_tournament ]
             : ( isset( $all_tournaments[ $selected_tournament ] ) ? $all_tournaments[ $selected_tournament ] : array() );
 
-        $lines         = isset( $tournaments[ $selected_tournament ] ) ? $tournaments[ $selected_tournament ] : array();
+        $lines = isset( $tournaments[ $selected_tournament ] ) && is_array( $tournaments[ $selected_tournament ] )
+            ? $tournaments[ $selected_tournament ]
+            : array();
+        if ( ! empty( $lines ) && function_exists( 'sywat_compare_tournament_lines' ) ) {
+            uasort( $lines, 'sywat_compare_tournament_lines' );
+        }
         $active_t_slug = sanitize_title( $selected_tournament );
 
         // Resolve active Pricing & Round Profiles for the selected tournament
@@ -403,6 +418,32 @@ if ( ! function_exists( 'sywat_desk_get_data' ) ) {
         $closed_lines_key = 'sywat_closed_lines_' . $active_t_slug;
         $raw_closed       = get_option( $closed_lines_key, array() );
         $closed_lines     = is_array( $raw_closed ) ? array_map( 'trim', array_map( 'strval', $raw_closed ) ) : array();
+
+        // Default Shooting Line dropdown to the first open (non-closed) line unless explicitly specified
+        $is_valid_explicit_line = (
+            $has_explicit_line &&
+            ! $tournament_switched &&
+            ( $selected_line_idx === 'all' || isset( $lines[ $selected_line_idx ] ) )
+        );
+
+        if ( ! $is_valid_explicit_line ) {
+            $first_open_line_idx = 'all';
+            foreach ( $lines as $raw_idx => $line_cfg ) {
+                $idx_str       = (string) $raw_idx;
+                $l_name        = is_array( $line_cfg ) && isset( $line_cfg['name'] ) ? trim( (string) $line_cfg['name'] ) : '';
+                $is_closed_opt = in_array( $idx_str, $closed_lines, true ) || ( $l_name !== '' && in_array( $l_name, $closed_lines, true ) );
+                $is_cfg_closed = is_array( $line_cfg ) && (
+                    ! empty( $line_cfg['closed'] ) ||
+                    ( isset( $line_cfg['status'] ) && strcasecmp( trim( (string) $line_cfg['status'] ), 'closed' ) === 0 )
+                );
+
+                if ( ! $is_closed_opt && ! $is_cfg_closed ) {
+                    $first_open_line_idx = $idx_str;
+                    break;
+                }
+            }
+            $selected_line_idx = $first_open_line_idx;
+        }
 
         $registrations = array();
         if ( $active_t_slug !== '' ) {
