@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, Needs Check-In status & live search filtering with a one-click Show All reset trigger, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active / .sywat-btn-filter-active / .sywat-btn-secondary), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.6.1
+ * Version: 7.6.2
  */
 
 (function() {
@@ -1500,38 +1500,31 @@
     }
 
     /**
-     * Synchronize the one-click Needs Check-In toggle button classes, count, and ARIA state.
+     * Synchronize the single Needs Check-In / Show All view toggle button label, state class, and ARIA state.
      */
     function syncNeedsCheckinButton(needsCount) {
-        const btn     = document.getElementById('sywat_desk_needs_checkin_btn');
-        const countEl = document.getElementById('sywat_desk_needs_checkin_count');
+        const btn = document.getElementById('sywat_desk_needs_checkin_btn');
+        if (!btn) return;
 
-        if (countEl) {
-            countEl.textContent = String(needsCount);
-        }
-
-        if (btn) {
-            btn.classList.toggle('sywat-btn-filter-active', needsCheckinOnly);
-            btn.classList.toggle('sywat-btn-secondary', !needsCheckinOnly);
-            btn.setAttribute('aria-pressed', needsCheckinOnly ? 'true' : 'false');
-        }
+        btn.textContent = needsCheckinOnly ? 'Show All' : ('Needs Check-In (' + needsCount + ')');
+        btn.classList.toggle('sywat-btn-filter-active', needsCheckinOnly);
+        btn.classList.toggle('sywat-btn-secondary', !needsCheckinOnly);
+        btn.setAttribute('aria-pressed', needsCheckinOnly ? 'true' : 'false');
     }
 
     /**
      * Filter Active Registered Archers Table Rows by Line, Needs Check-In Status, & Search Query
-     * instantaneously without a full-page reload, and keep hidden form inputs & Show All button synchronized.
+     * instantaneously without a full-page reload, and keep hidden form inputs synchronized.
      */
     function applyDeskLineAndSearchFilter() {
         const lineSelect      = document.getElementById('sywat_selected_line_idx');
         const searchInput     = document.getElementById('sywat_search_input');
-        const resetBtn        = document.getElementById('sywat_desk_reset_view_btn');
         const selectedLine    = lineSelect ? String(lineSelect.value || 'all') : 'all';
         const rawQuery        = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery      = rawQuery.trim().toLowerCase();
         const rows            = document.querySelectorAll('#sywat_desk_archers_table .sywat-archer-row');
         const isLineFiltered  = Boolean(selectedLine && selectedLine !== 'all');
         const isQueryFiltered = cleanQuery.length > 0;
-        const isAnyFiltered   = (isLineFiltered || needsCheckinOnly || isQueryFiltered);
 
         let visibleCount      = 0;
         let needsCheckinCount = 0;
@@ -1564,10 +1557,6 @@
 
         syncNeedsCheckinButton(needsCheckinCount);
 
-        if (resetBtn) {
-            resetBtn.classList.toggle('sywat-hidden', !isAnyFiltered);
-        }
-
         const emptyMsg = document.getElementById('sywat_desk_empty_filter_msg');
         if (emptyMsg) {
             emptyMsg.classList.toggle('sywat-hidden', visibleCount > 0);
@@ -1595,24 +1584,6 @@
         } else {
             sessionStorage.removeItem('sywat_checkin_needs_only');
         }
-        applyDeskLineAndSearchFilter();
-    }
-
-    function resetDeskViewFilters() {
-        needsCheckinOnly = false;
-        sessionStorage.removeItem('sywat_checkin_needs_only');
-        sessionStorage.removeItem('sywat_checkin_search_query');
-
-        const lineSelect  = document.getElementById('sywat_selected_line_idx');
-        const searchInput = document.getElementById('sywat_search_input');
-
-        if (lineSelect) {
-            lineSelect.value = 'all';
-        }
-        if (searchInput) {
-            searchInput.value = '';
-        }
-
         applyDeskLineAndSearchFilter();
     }
 
@@ -1658,7 +1629,6 @@
         closeWalkinModal: closeWalkinModal,
         continueFamilyLoop: continueFamilyLoop,
         toggleNeedsCheckinFilter: toggleDeskNeedsCheckinFilter,
-        resetViewFilters: resetDeskViewFilters,
         applyLineAndSearchFilter: applyDeskLineAndSearchFilter,
         applySearchFilter: applyDeskSearchFilter
     };
@@ -1787,10 +1757,6 @@
             case 'toggle-desk-needs-checkin':
                 e.preventDefault();
                 toggleDeskNeedsCheckinFilter();
-                break;
-            case 'reset-desk-view':
-                e.preventDefault();
-                resetDeskViewFilters();
                 break;
             case 'open-desk-checkin-modal': {
                 e.preventDefault();
