@@ -2,14 +2,118 @@
 /**
  * Shared Common Helper: Unified Archer Identity & Historical Profile Resolution Engine
  * Path: includes/common/sywat-archer-identity-helpers.php
- * Description: Single-source-of-truth identity normalization (supporting both "First Last" and "Last, First" inputs), idempotent "LastName, FirstName" display & surname-sort formatting, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), highest-category division resolution (max of History vs. DOB so mid-season "shooting up" and birthday "aging up" both resolve accurately), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, Check-In, and Results.
+ * Description: Single-source-of-truth identity normalization (supporting both "First Last" and "Last, First" inputs), smart person-name capitalization (normalizing all-lowercase/all-uppercase name tokens like "W ryan Smith" -> "W Ryan Smith" while preserving intentional mixed-case surnames like "McBride", generational suffixes, and bracketed tags), idempotent "LastName, FirstName" display & surname-sort formatting, given-name/nickname equivalence and stem matching, contact-verified disambiguation (with parent/child first-name protection), highest-category division resolution (max of History vs. DOB so mid-season "shooting up" and birthday "aging up" both resolve accurately), and ambiguity-safe canonical shooter resolution across Member Directory, 18-Month TFAA Standings, and Shop Registration History for Bulk Import, Phone Intake, Online Self-Registration, Walk-Ins, Check-In, and Results.
  * Compliance: Pure helper layer — zero HTML echo, zero direct SQL queries (delegates Member Directory lookup to sywat_get_bulk_member_directory_records()), O(1) request-cached hashtables, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.2.0
+ * Version: 1.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
+}
+
+/**
+ * Normalize capitalization across person-name tokens (converting all-lowercase or all-uppercase
+ * words like "W ryan Smith" into "W Ryan Smith", including hyphenated and apostrophe names)
+ * while preserving intentional mixed-case surnames ("McBride", "MacLeod", "DeLaCruz", "O'Connor"),
+ * generational suffixes ("Jr.", "Sr.", "II", "III", "IV"), and bracketed tags ("[GUEST]").
+ *
+ * @param string $raw_name Raw person name string.
+ * @return string          Properly cased person name string.
+ */
+if ( ! function_exists( 'sywat_format_person_name_case' ) ) {
+    function sywat_format_person_name_case( $raw_name ) {
+        $trimmed = trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( "\xC2\xA0", ' ', (string) $raw_name ) ) );
+        if ( $trimmed === '' ) {
+            return '';
+        }
+
+        // Preserve non-person placeholders and status sentinels unchanged
+        $sentinels = array( '—', '-', 'n/a', 'no show', 'unassigned', 'unknown', 'tbd' );
+        if ( in_array( strtolower( $trimmed ), $sentinels, true ) ) {
+            return $trimmed;
+        }
+
+        // Detach any trailing bracketed/parenthesized tag (e.g., "[GUEST]", "[INC]") so it stays untouched
+        $base         = $trimmed;
+        $trailing_tag = '';
+        if ( preg_match( '/^(.*?)(\s*(?:\[[^\]]*\]|\([^\)]*\))\s*)$/', $trimmed, $tag_matches ) ) {
+            $candidate_base = trim( $tag_matches[1] );
+            if ( $candidate_base !== '' ) {
+                $base         = $candidate_base;
+                $trailing_tag = ' ' . trim( $tag_matches[2] );
+            }
+        }
+
+        $roman_suffixes   = array( 'ii', 'iii', 'iv', 'v', 'vi' );
+        $ordinal_suffixes = array( '2nd', '3rd', '4th' );
+
+        $tokens     = explode( ' ', $base );
+        $formatted  = array();
+        $token_last = count( $tokens ) - 1;
+
+        foreach ( $tokens as $idx => $token ) {
+            if ( $token === '' ) {
+                continue;
+            }
+
+            $trailing_comma = '';
+            if ( substr( $token, -1 ) === ',' ) {
+                $trailing_comma = ',';
+                $token          = substr( $token, 0, -1 );
+            }
+
+            if ( $token === '' ) {
+                $formatted[] = $trailing_comma;
+                continue;
+            }
+
+            $lower_no_dot    = rtrim( strtolower( $token ), '.' );
+            $has_dot         = ( substr( $token, -1 ) === '.' );
+            $is_suffix_place = ( $idx === $token_last || $trailing_comma !== '' );
+
+            if ( $idx > 0 && $is_suffix_place && in_array( $lower_no_dot, $roman_suffixes, true ) ) {
+                $formatted[] = strtoupper( $lower_no_dot ) . ( $has_dot ? '.' : '' ) . $trailing_comma;
+                continue;
+            }
+
+            if ( $idx > 0 && $is_suffix_place && in_array( $lower_no_dot, $ordinal_suffixes, true ) ) {
+                $formatted[] = $lower_no_dot . ( $has_dot ? '.' : '' ) . $trailing_comma;
+                continue;
+            }
+
+            if ( $idx > 0 && $is_suffix_place && ( $lower_no_dot === 'jr' || $lower_no_dot === 'sr' ) ) {
+                $formatted[] = ucfirst( $lower_no_dot ) . ( $has_dot ? '.' : '' ) . $trailing_comma;
+                continue;
+            }
+
+            $has_upper = (bool) preg_match( '/[A-Z]/', $token );
+            $has_lower = (bool) preg_match( '/[a-z]/', $token );
+
+            // Preserve intentional mixed-case tokens (e.g., "McBride", "MacLeod", "DeLaCruz", "O'Connor")
+            if ( $has_upper && $has_lower ) {
+                $formatted[] = $token . $trailing_comma;
+                continue;
+            }
+
+            // Normalize all-lowercase or all-uppercase tokens (including hyphenated and apostrophe names)
+            $sub_parts = preg_split( '/([\'\-])/', $token, -1, PREG_SPLIT_DELIM_CAPTURE );
+            $rebuilt   = '';
+            foreach ( $sub_parts as $part ) {
+                if ( $part === '\'' || $part === '-' || $part === '' ) {
+                    $rebuilt .= $part;
+                } elseif ( preg_match( '/^mc([a-z]{2,})$/i', $part, $mc_match ) ) {
+                    $rebuilt .= 'Mc' . ucfirst( strtolower( $mc_match[1] ) );
+                } else {
+                    $rebuilt .= ucfirst( strtolower( $part ) );
+                }
+            }
+
+            $formatted[] = $rebuilt . $trailing_comma;
+        }
+
+        return implode( ' ', $formatted ) . $trailing_tag;
+    }
 }
 
 /**
@@ -100,8 +204,12 @@ if ( ! function_exists( 'sywat_normalize_archer_match_keys' ) ) {
 if ( ! function_exists( 'sywat_normalize_name_first_last' ) ) {
     function sywat_normalize_name_first_last( $raw_name ) {
         $trimmed = trim( preg_replace( '/[[:space:]]+/', ' ', str_replace( "\xC2\xA0", ' ', (string) $raw_name ) ) );
-        if ( $trimmed === '' || strpos( $trimmed, ',' ) === false ) {
-            return $trimmed;
+        if ( $trimmed === '' ) {
+            return '';
+        }
+
+        if ( strpos( $trimmed, ',' ) === false ) {
+            return sywat_format_person_name_case( $trimmed );
         }
 
         $suffixes    = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
@@ -110,15 +218,15 @@ if ( ! function_exists( 'sywat_normalize_name_first_last' ) ) {
         $right_part  = trim( $comma_parts[1] );
 
         if ( $left_part === '' || $right_part === '' ) {
-            return $trimmed;
+            return sywat_format_person_name_case( $trimmed );
         }
 
         $right_norm = rtrim( strtolower( $right_part ), '.' );
         if ( in_array( $right_norm, $suffixes, true ) ) {
-            return trim( $left_part . ' ' . $right_part );
+            return sywat_format_person_name_case( trim( $left_part . ' ' . $right_part ) );
         }
 
-        return trim( $right_part . ' ' . $left_part );
+        return sywat_format_person_name_case( trim( $right_part . ' ' . $left_part ) );
     }
 }
 
@@ -128,6 +236,7 @@ if ( ! function_exists( 'sywat_normalize_name_first_last' ) ) {
  *
  * Examples:
  * - "Steve Bergh"       -> "Bergh, Steve"
+ * - "W ryan Smith"      -> "Smith, W Ryan"
  * - "Louis Woojin Shin" -> "Shin, Louis Woojin"
  * - "Mark E. Tanner"    -> "Tanner, Mark E."
  * - "John Smith Jr"     -> "Smith Jr, John"
@@ -160,6 +269,7 @@ if ( ! function_exists( 'sywat_format_name_last_first' ) ) {
             }
         }
 
+        $base     = sywat_format_person_name_case( $base );
         $suffixes = array( 'jr', 'sr', 'ii', 'iii', 'iv', 'v', '2nd', '3rd', '4th' );
 
         // Handle strings that already contain a comma
@@ -751,7 +861,7 @@ if ( ! function_exists( 'sywat_find_unified_shooter_matches' ) ) {
  */
 if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
     function sywat_resolve_archer_intake_profile( $archer_name, $tournament_date = '', $contact_hints = array() ) {
-        $clean_name = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $archer_name ) );
+        $clean_name = sywat_format_person_name_case( $archer_name );
         $profile    = array(
             'canonical_name' => $clean_name,
             'was_normalized' => false,
@@ -805,7 +915,7 @@ if ( ! function_exists( 'sywat_resolve_archer_intake_profile' ) ) {
         };
 
         $primary_hit               = $top_tier[0];
-        $official_name             = trim( preg_replace( '/[[:space:]]+/', ' ', (string) $primary_hit['full_name'] ) );
+        $official_name             = sywat_format_person_name_case( $primary_hit['full_name'] );
         $profile['matched']        = true;
         $profile['source']         = $primary_hit['source'];
         $profile['canonical_name'] = $official_name;
