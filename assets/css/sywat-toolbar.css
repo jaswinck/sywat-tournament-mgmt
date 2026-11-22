@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Toolbars, Auth Header & Inline Filter Controls
    Path: assets/css/sywat-toolbar.css
-   Version: 7.1.0
+   Version: 7.1.1
    ========================================================================== */
 
 /* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
@@ -164,39 +164,8 @@
 .sywat-table-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--sywat-border-light); width: 100%; box-sizing: border-box; }
 .sywat-table-header-bar h2 { margin: 0; white-space: nowrap; }
 
-/* Left Toolbar Group (Heading + Active View Scope Pill + Show All Trigger) */
-.sywat-table-header-left { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-/* Active View Scope Indicator Pill & Compact Reset Trigger */
-.sywat-view-scope-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.3;
-    background-color: var(--sywat-surface-alt);
-    border: 1px solid var(--sywat-border-light);
-    color: var(--sywat-text-muted);
-}
-
-.sywat-view-scope-pill.sywat-view-scope-filtered {
-    background-color: var(--sywat-primary-tint);
-    border-color: var(--sywat-primary);
-    color: var(--sywat-navy);
-}
-
-:is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-btn.sywat-btn-reset-view {
-    height: 28px;
-    min-height: 28px;
-    padding: 3px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    border-radius: 999px;
-    line-height: 1;
-}
+/* Left Toolbar Group (Stacked Status Filter + Inline Stat Badges) */
+.sywat-table-header-left { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 /* Right Toolbar Group (Search Input + Action Buttons) */
 .sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-left: auto; box-sizing: border-box; }
@@ -220,10 +189,8 @@
 :is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active,
 :is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active:focus:not(:focus-visible) {
     background-color: var(--sywat-primary);
-    border-color: var(--sywat-primary);
+    border: 1px solid var(--sywat-primary);
     color: #ffffff;
-    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.18);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sywat-primary) 18%, transparent);
 }
 
 :is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active:hover {
@@ -276,22 +243,11 @@
 
 /* Line Capacity Tracker Grid */
 .sywat-tracker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 10px; }
-.sywat-tracker-card { background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border-light); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease; }
-.sywat-tracker-card.sywat-tracker-card-active {
-    background-color: var(--sywat-primary-tint);
-    border-color: var(--sywat-primary);
-    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.16);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sywat-primary) 16%, transparent);
-}
+.sywat-tracker-card { background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border-light); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
 .sywat-tracker-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--sywat-border-light); padding-bottom: 6px; }
 .sywat-tracker-card-title { color: var(--sywat-navy); font-size: 14px; font-weight: 700; }
 .sywat-tracker-header-badges { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .sywat-tracker-header-badges .sywat-badge { margin: 0 !important; }
-.sywat-badge.sywat-badge-viewing {
-    background-color: var(--sywat-primary);
-    border: 1px solid var(--sywat-primary);
-    color: #ffffff;
-}
 .sywat-tracker-card-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--sywat-text-muted); }
 .sywat-tracker-card-actions { margin-top: 4px; border-top: 1px dashed var(--sywat-border); padding-top: 8px; display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .sywat-tracker-card-actions form,
@@ -401,8 +357,6 @@
     }
 
     .sywat-card-header-bar { align-items: flex-start; }
-    .sywat-table-header-left { width: 100%; }
-    .sywat-view-scope-pill { white-space: normal; }
     .sywat-header-inline-controls, .sywat-table-header-controls { width: 100%; justify-content: flex-start; margin-left: 0 !important; }
     .sywat-header-inline-controls form,
     .sywat-header-inline-controls .sywat-field-group,
