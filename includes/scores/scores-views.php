@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with one-click Unentered score filter toggle button and Show All reset trigger, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.2.1
+ * Version: 8.2.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -87,8 +87,6 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                 }
             }
         }
-
-        $is_initial_filtered = ( ( $selected_line_idx !== 'all' && $selected_line_idx !== '' ) || $clean_search_init !== '' );
 
         // Enqueue client score interactive JavaScript asset with filemtime cache-busting
         $scores_js_rel  = 'assets/js/sywat-scores.js';
@@ -248,21 +246,13 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             <h2>Archer Scores (<span id="sywat_scores_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
 
                             <div class="sywat-table-header-controls">
-                                <!-- One-Click Unentered Scores Filter Toggle -->
+                                <!-- Single-Button Unentered / Show All View Toggle -->
                                 <button type="button"
                                         id="sywat_scores_unentered_btn"
                                         class="sywat-btn sywat-btn-secondary"
                                         data-sywat-action="toggle-scores-unentered"
                                         aria-pressed="false">
-                                    Unentered (<span id="sywat_scores_unentered_count"><?php echo intval( $initial_unentered_count ); ?></span>)
-                                </button>
-
-                                <!-- One-Click Reset All Filters Trigger -->
-                                <button type="button"
-                                        id="sywat_scores_reset_view_btn"
-                                        class="sywat-btn sywat-btn-secondary<?php echo $is_initial_filtered ? '' : ' sywat-hidden'; ?>"
-                                        data-sywat-action="reset-scores-view">
-                                    Show All
+                                    Unentered (<?php echo intval( $initial_unentered_count ); ?>)
                                 </button>
 
                                 <!-- Live Search Input Group -->
