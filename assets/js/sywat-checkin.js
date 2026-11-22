@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, Needs Check-In status & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
- * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.5.0
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, Needs Check-In status & live search filtering with live Active View Scope indicator pill, one-click Show All reset, self-describing Needs Check-In toggle button, and active Line Capacity Tracker card highlighting; Walk-In fast-loop intake; live unpaid balance synchronization on Edit/Check-In modals; live First-Time/Lapsed Shooter promo eligibility badges; unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement; and database-driven shooting style & age division rule enforcement.
+ * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active / .sywat-btn-filter-active / .sywat-view-scope-filtered / .sywat-tracker-card-active), delegated data-sywat-action listeners, zero document-level keydown listeners.
+ * Version: 7.6.0
  */
 
 (function() {
@@ -1500,17 +1500,23 @@
     }
 
     /**
-     * Synchronize the one-click Needs Check-In toggle button classes, count, and ARIA state.
+     * Synchronize the one-click Needs Check-In toggle button label, active state, count, and ARIA state.
      */
     function syncNeedsCheckinButton(needsCount) {
         const btn     = document.getElementById('sywat_desk_needs_checkin_btn');
+        const labelEl = document.getElementById('sywat_desk_needs_checkin_label');
         const countEl = document.getElementById('sywat_desk_needs_checkin_count');
+
+        if (labelEl) {
+            labelEl.textContent = needsCheckinOnly ? '✓ Showing: Needs Check-In' : 'Needs Check-In';
+        }
 
         if (countEl) {
             countEl.textContent = String(needsCount);
         }
 
         if (btn) {
+            btn.classList.toggle('sywat-btn-filter-active', needsCheckinOnly);
             btn.classList.toggle('sywat-btn-primary', needsCheckinOnly);
             btn.classList.toggle('sywat-btn-secondary', !needsCheckinOnly);
             btn.setAttribute('aria-pressed', needsCheckinOnly ? 'true' : 'false');
@@ -1518,8 +1524,77 @@
     }
 
     /**
+     * Highlight the active Line Capacity Tracker card and show its Viewing pill when filtered to a single line.
+     */
+    function syncDeskTrackerActiveCard(selectedLine) {
+        const isLineFiltered = Boolean(selectedLine && selectedLine !== 'all');
+        document.querySelectorAll('.sywat-tracker-card').forEach(function(card) {
+            const cardLine = card.getAttribute('data-line-idx') || '';
+            const isActive = (isLineFiltered && cardLine === selectedLine);
+            card.classList.toggle('sywat-tracker-card-active', isActive);
+
+            const viewingBadge = card.querySelector('.sywat-badge-viewing');
+            if (viewingBadge) {
+                viewingBadge.classList.toggle('sywat-hidden', !isActive);
+            }
+        });
+    }
+
+    /**
+     * Update the table header Active View Scope pill, total count display, and Show All reset trigger.
+     */
+    function syncDeskViewScopeUI(selectedLine, rawQuery, visibleCount, totalCount) {
+        const lineSelect      = document.getElementById('sywat_selected_line_idx');
+        const scopePill       = document.getElementById('sywat_desk_view_scope_pill');
+        const totalWrap       = document.getElementById('sywat_desk_total_count_wrap');
+        const totalEl         = document.getElementById('sywat_desk_total_count');
+        const resetBtn        = document.getElementById('sywat_desk_reset_view_btn');
+        const isLineFiltered  = Boolean(selectedLine && selectedLine !== 'all');
+        const trimmedQuery    = String(rawQuery || '').trim();
+        const isQueryFiltered = trimmedQuery.length > 0;
+        const isAnyFiltered   = (isLineFiltered || needsCheckinOnly || isQueryFiltered);
+
+        if (totalEl) {
+            totalEl.textContent = String(totalCount);
+        }
+        if (totalWrap) {
+            totalWrap.classList.toggle('sywat-hidden', !isAnyFiltered);
+        }
+
+        if (scopePill) {
+            const scopeParts = [];
+            if (isLineFiltered) {
+                let lineLabel = 'Line ' + (parseInt(selectedLine, 10) + 1);
+                if (lineSelect && lineSelect.selectedIndex >= 0) {
+                    const optText = (lineSelect.options[lineSelect.selectedIndex].textContent || '').trim();
+                    if (optText) {
+                        lineLabel = optText;
+                    }
+                }
+                scopeParts.push(lineLabel);
+            } else {
+                scopeParts.push('All Lines');
+            }
+
+            if (needsCheckinOnly) {
+                scopeParts.push('Needs Check-In Only');
+            }
+            if (isQueryFiltered) {
+                scopeParts.push('Search: "' + trimmedQuery + '"');
+            }
+
+            scopePill.textContent = 'Viewing: ' + scopeParts.join(' · ');
+            scopePill.classList.toggle('sywat-view-scope-filtered', isAnyFiltered);
+        }
+
+        if (resetBtn) {
+            resetBtn.classList.toggle('sywat-hidden', !isAnyFiltered);
+        }
+    }
+
+    /**
      * Filter Active Registered Archers Table Rows by Line, Needs Check-In Status, & Search Query
-     * instantaneously without a full-page reload, and keep hidden form inputs synchronized.
+     * instantaneously without a full-page reload, and keep hidden form inputs & view indicators synchronized.
      */
     function applyDeskLineAndSearchFilter() {
         const lineSelect   = document.getElementById('sywat_selected_line_idx');
@@ -1528,6 +1603,7 @@
         const rawQuery     = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery   = rawQuery.trim().toLowerCase();
         const rows         = document.querySelectorAll('#sywat_desk_archers_table .sywat-archer-row');
+        const totalCount   = rows.length;
 
         let visibleCount      = 0;
         let needsCheckinCount = 0;
@@ -1559,6 +1635,8 @@
         }
 
         syncNeedsCheckinButton(needsCheckinCount);
+        syncDeskViewScopeUI(selectedLine, rawQuery, visibleCount, totalCount);
+        syncDeskTrackerActiveCard(selectedLine);
 
         const emptyMsg = document.getElementById('sywat_desk_empty_filter_msg');
         if (emptyMsg) {
@@ -1587,6 +1665,24 @@
         } else {
             sessionStorage.removeItem('sywat_checkin_needs_only');
         }
+        applyDeskLineAndSearchFilter();
+    }
+
+    function resetDeskViewFilters() {
+        needsCheckinOnly = false;
+        sessionStorage.removeItem('sywat_checkin_needs_only');
+        sessionStorage.removeItem('sywat_checkin_search_query');
+
+        const lineSelect  = document.getElementById('sywat_selected_line_idx');
+        const searchInput = document.getElementById('sywat_search_input');
+
+        if (lineSelect) {
+            lineSelect.value = 'all';
+        }
+        if (searchInput) {
+            searchInput.value = '';
+        }
+
         applyDeskLineAndSearchFilter();
     }
 
@@ -1632,6 +1728,7 @@
         closeWalkinModal: closeWalkinModal,
         continueFamilyLoop: continueFamilyLoop,
         toggleNeedsCheckinFilter: toggleDeskNeedsCheckinFilter,
+        resetViewFilters: resetDeskViewFilters,
         applyLineAndSearchFilter: applyDeskLineAndSearchFilter,
         applySearchFilter: applyDeskSearchFilter
     };
@@ -1760,6 +1857,10 @@
             case 'toggle-desk-needs-checkin':
                 e.preventDefault();
                 toggleDeskNeedsCheckinFilter();
+                break;
+            case 'reset-desk-view':
+                e.preventDefault();
+                resetDeskViewFilters();
                 break;
             case 'open-desk-checkin-modal': {
                 e.preventDefault();
