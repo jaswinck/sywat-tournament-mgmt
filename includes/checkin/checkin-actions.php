@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Actions Handler
  * Path: includes/checkin/checkin-actions.php
- * Description: Handles Check-In Desk synchronous POST actions and exposes shared, transaction-safe check-in / undo-check-in processors (sywat_desk_process_checkin_submission and sywat_desk_process_undo_checkin_submission) for both traditional POST fallback and the admin-ajax.php JSON endpoint. Includes dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, indexed First-Time/Lapsed Shooter promoter evaluation, server-side canonical name enforcement (Member DB + 18-month TFAA history) while preserving intentional capitalization edits (e.g., "McBride"), First+Last same-line duplicate lockout, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance inside atomic MySQL transactions, and archer edits/deletions with Family Cap reconciliation.
+ * Description: Handles Check-In Desk synchronous POST actions and exposes shared, transaction-safe check-in / undo-check-in processors (sywat_desk_process_checkin_submission and sywat_desk_process_undo_checkin_submission) for both traditional POST fallback and the admin-ajax.php JSON endpoint. Preserves explicit manual Balance Due ($) overrides in save_edit without being overwritten by household cap recalculation while propagating $0.00 balance clearances across linked household/booking members. Includes dedicated Waitlist Modal delegation (promote, multi-select move, remove) with live tourn_registrations sync, line closure/reopening (preserving waitlisted records), walk-in registration with round/pricing profile selection, indexed First-Time/Lapsed Shooter promoter evaluation, server-side canonical name enforcement (Member DB + 18-month TFAA history) while preserving intentional capitalization edits (e.g., "McBride"), First+Last same-line duplicate lockout, database-driven style/division rule enforcement and dynamic Household Family Cap evaluation (line or tournament scope), household-wide check-in and edit balance verification/clearance inside atomic MySQL transactions, and archer edits/deletions with Family Cap reconciliation.
  * Compliance: Pure action layer — zero HTML echo at include time, zero style tags, indexed non-historical registration lookups, atomic MySQL transaction batching, DRY shared POST/AJAX processors, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.4.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -1134,7 +1134,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
             return ! empty( $res['notice_html'] ) ? $res['notice_html'] : '';
         }
 
-        // Save Edit (Standardizes name only when changed while preserving casing edits, checks First+Last same-line duplicates, recalculates fee on division change, clears group balances & reconciles Family Cap)
+        // Save Edit (Preserves explicit manual Balance Due overrides while propagating $0.00 group clearances and Family Cap changes)
         if ( $action === 'save_edit' ) {
             $target_id = sanitize_text_field( wp_unslash( $_POST['reg_id'] ) );
             $opt_key   = 'sywat_t_' . $active_t_slug . '_' . $target_id;
@@ -1157,6 +1157,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $orig_line   = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
                 $orig_div    = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
                 $orig_round  = isset( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+                $orig_paid   = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
                 $orig_due    = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.00;
                 $orig_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
 
@@ -1190,8 +1191,9 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                 $style       = $resolved_sd['style'];
                 $distance    = $resolve_division_distance( $division );
 
-                $submitted_due = isset( $_POST['edit_balance_due'] ) ? max( 0.00, floatval( wp_unslash( $_POST['edit_balance_due'] ) ) ) : 0.00;
-                $div_changed   = ( strcasecmp( $orig_div, $division ) !== 0 || $orig_round !== $round_slug );
+                $submitted_due       = isset( $_POST['edit_balance_due'] ) ? max( 0.00, round( floatval( wp_unslash( $_POST['edit_balance_due'] ) ), 2 ) ) : 0.00;
+                $manual_due_adjusted = ( abs( $submitted_due - $orig_due ) >= 0.01 );
+                $div_changed         = ( strcasecmp( $orig_div, $division ) !== 0 || $orig_round !== $round_slug );
 
                 $reg['name']            = $edit_name;
                 $reg['line_index']      = $line_idx;
@@ -1219,7 +1221,7 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     $reg['is_promo_free'] = false;
 
                     // Automatically recalculate unpaid fee if division or round changed and balance wasn't manually adjusted
-                    if ( $orig_due > 0 && abs( $submitted_due - $orig_due ) < 0.01 && $div_changed ) {
+                    if ( $orig_due > 0 && ! $manual_due_adjusted && $div_changed ) {
                         $reg['balance_due'] = round( $calculate_individual_fee( $division, $style, $round_slug ), 2 );
                     } else {
                         $reg['balance_due'] = $submitted_due;
@@ -1239,10 +1241,13 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     }
                 }
 
-                $balance_was_cleared = ( $reg['balance_due'] <= 0.00 ) && ( $orig_due > 0 || $submitted_due <= 0.00 );
-                if ( $balance_was_cleared && $orig_due > 0 ) {
+                $cleared_to_zero = ( $reg['balance_due'] <= 0.00 ) && ( $orig_due > 0.00 || $manual_due_adjusted );
+                if ( $cleared_to_zero && $orig_due > 0.00 ) {
                     $prior_paid         = isset( $reg['amount_paid'] ) ? floatval( $reg['amount_paid'] ) : 0.00;
                     $reg['amount_paid'] = round( $prior_paid + $orig_due, 2 );
+                } elseif ( $reg['balance_due'] > $orig_due && isset( $reg['amount_paid'] ) ) {
+                    $added_due          = round( $reg['balance_due'] - $orig_due, 2 );
+                    $reg['amount_paid'] = max( 0.00, round( floatval( $reg['amount_paid'] ) - $added_due, 2 ) );
                 }
 
                 if ( function_exists( 'sywat_waitlist_persist_record' ) ) {
@@ -1257,8 +1262,11 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                     unset( $r );
                 }
 
-                // If balance was cleared to $0.00, propagate Paid clearance across all linked household/booking members
-                if ( $balance_was_cleared && $orig_due > 0 ) {
+                // Propagate $0.00 Paid clearance across linked household/booking members, or reconcile Family Cap on group/rate changes
+                $new_fam_id         = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
+                $group_rule_changed = ( $new_fam_id !== $orig_fam_id || (string) $line_idx !== (string) $orig_line || strcasecmp( $orig_paid, $reg['paid'] ) !== 0 );
+
+                if ( $cleared_to_zero ) {
                     sywat_desk_clear_linked_group_balances(
                         $reg,
                         $registrations,
@@ -1267,16 +1275,12 @@ if ( ! function_exists( 'sywat_desk_handle_actions' ) ) {
                         $lines,
                         $use_tourn_wide_cap
                     );
-                } else {
-                    // Reconcile dynamic Household Family Cap fees if family membership or line changed
-                    $new_fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
-                    if ( function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
-                        if ( $orig_fam_id !== '' ) {
-                            sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $orig_line, $orig_fam_id, $registrations, $lines );
-                        }
-                        if ( $new_fam_id !== '' && ( $new_fam_id !== $orig_fam_id || $line_idx !== $orig_line ) ) {
-                            sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $line_idx, $new_fam_id, $registrations, $lines );
-                        }
+                } elseif ( ! $manual_due_adjusted && $group_rule_changed && function_exists( 'sywat_waitlist_recalculate_line_family_fees' ) ) {
+                    if ( $orig_fam_id !== '' ) {
+                        sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $orig_line, $orig_fam_id, $registrations, $lines );
+                    }
+                    if ( $new_fam_id !== '' && ( $new_fam_id !== $orig_fam_id || $line_idx !== $orig_line ) ) {
+                        sywat_waitlist_recalculate_line_family_fees( $selected_tournament, $line_idx, $new_fam_id, $registrations, $lines );
                     }
                 }
 
