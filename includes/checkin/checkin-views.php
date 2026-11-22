@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, one-click Needs Check-In filter toggle button and Show All reset trigger, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, single-button Needs Check-In / Show All view toggle, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.1
+ * Version: 7.8.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -372,8 +372,8 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 
 /**
  * Render Active Registered Archers table consuming pre-computed presentation & modal payloads
- * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals,
- * one-click Needs Check-In filter toggle button, and Show All reset trigger.
+ * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals
+ * and a single-button Needs Check-In / Show All view toggle.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -407,8 +407,6 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
             }
         }
 
-        $is_initial_filtered = ( ( $selected_line_idx !== 'all' && $selected_line_idx !== '' ) || $clean_search_init !== '' );
-
         $desk_clean_url = function_exists( 'sywat_page_url' )
             ? add_query_arg(
                 array(
@@ -430,14 +428,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                             class="sywat-btn sywat-btn-secondary"
                             data-sywat-action="toggle-desk-needs-checkin"
                             aria-pressed="false">
-                        Needs Check-In (<span id="sywat_desk_needs_checkin_count"><?php echo intval( $initial_needs_checkin_cnt ); ?></span>)
-                    </button>
-
-                    <button type="button"
-                            id="sywat_desk_reset_view_btn"
-                            class="sywat-btn sywat-btn-secondary<?php echo $is_initial_filtered ? '' : ' sywat-hidden'; ?>"
-                            data-sywat-action="reset-desk-view">
-                        Show All
+                        Needs Check-In (<?php echo intval( $initial_needs_checkin_cnt ); ?>)
                     </button>
 
                     <div class="sywat-search-input-group">
