@@ -1,10 +1,10 @@
 /**
  * Client Script: Score Engine Interactivity & Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Instantaneous zero-reload shooting line and live search filtering with sessionStorage persistence, dynamic TFAA target URL switcher, range validation, local draft recovery (score, X count, and incomplete round "INC" flag), per-archer serialized AJAX auto-save (eliminating concurrent field-overwrite race conditions), offline sync, optimizer-safe delegated data-sywat-action listeners, and multi-scorekeeper batch concurrency protection.
- * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
+ * Description: Instantaneous zero-reload shooting line, one-click Unentered score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering with sessionStorage persistence; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; local draft recovery; per-archer serialized AJAX auto-save; offline sync; optimizer-safe delegated data-sywat-action listeners; and multi-scorekeeper batch concurrency protection.
+ * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden / .sywat-btn-* class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
  * Author: SYWAT Archery
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -26,9 +26,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentTourn = currentTournInput ? currentTournInput.value : '';
     const nonceVal     = nonceInput ? nonceInput.value : '';
 
-    // Per-archer auto-save concurrency guards (prevents overlapping Score & X Count requests)
-    const inFlightSaves = new Set();
-    const queuedSaves   = new Set();
+    // Filter & concurrency state
+    let unenteredOnly        = (sessionStorage.getItem('sywat_scores_unentered_only') === '1');
+    const editedInActivePass = new Set();
+    const inFlightSaves      = new Set();
+    const queuedSaves        = new Set();
 
     // Parse locked line state map for instant view lock-button synchronization
     let lockedLinesMap = {};
@@ -59,7 +61,78 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Synchronize Header Line Lock Button on Client-Side Line Filter
+    // 3. Helper: Row State Readers & Live Unentered Evaluator
+    function getRowIncValue(row) {
+        if (!row) return '0';
+        const incCheckbox   = row.querySelector('.sywat-inc-val');
+        const incStateInput = row.querySelector('.sywat-inc-state');
+        if (incCheckbox) {
+            const val = incCheckbox.checked ? '1' : '0';
+            if (incStateInput) {
+                incStateInput.value = val;
+            }
+            return val;
+        }
+        return incStateInput ? (incStateInput.value === '1' ? '1' : '0') : '0';
+    }
+
+    function isRowCurrentlyUnentered(row) {
+        if (!row) return true;
+        const scoreInput = row.querySelector('.score-val');
+        const xInput     = row.querySelector('.x-val');
+        const scoreVal   = scoreInput ? (parseInt(scoreInput.value.trim(), 10) || 0) : 0;
+        const xVal       = xInput ? (parseInt(xInput.value.trim(), 10) || 0) : 0;
+        const isInc      = (getRowIncValue(row) === '1');
+        const unentered  = (scoreVal === 0 && xVal === 0 && !isInc);
+
+        row.setAttribute('data-unentered', unentered ? '1' : '0');
+        return unentered;
+    }
+
+    // 4. Live Line Score Tracker Card Counter & Status Badge Synchronizer (Includes INC)
+    function syncLineTrackerCounts() {
+        const rows          = document.querySelectorAll('.sywat-score-row');
+        const enteredByLine = Object.create(null);
+        const totalByLine   = Object.create(null);
+
+        rows.forEach(function(row) {
+            const lidx      = row.getAttribute('data-line-idx') || '';
+            const isEntered = !isRowCurrentlyUnentered(row);
+
+            totalByLine[lidx] = (totalByLine[lidx] || 0) + 1;
+            if (isEntered) {
+                enteredByLine[lidx] = (enteredByLine[lidx] || 0) + 1;
+            }
+        });
+
+        document.querySelectorAll('.sywat-tracker-card').forEach(function(card) {
+            const lidx     = card.getAttribute('data-line-idx') || '';
+            const total    = Object.prototype.hasOwnProperty.call(totalByLine, lidx)
+                ? totalByLine[lidx]
+                : (parseInt(card.getAttribute('data-total'), 10) || 0);
+            const entered  = enteredByLine[lidx] || 0;
+            const isLocked = card.getAttribute('data-is-locked') === '1';
+
+            const enteredEl = card.querySelector('.sywat-tracker-entered-count');
+            if (enteredEl) {
+                enteredEl.textContent = String(entered);
+            }
+
+            const statusWrap = card.querySelector('.sywat-tracker-status-wrap');
+            if (statusWrap) {
+                if (isLocked) {
+                    statusWrap.innerHTML = '<span class="sywat-badge sywat-badge-full">🔒 Locked</span>';
+                } else if (total > 0 && entered >= total) {
+                    statusWrap.innerHTML = '<span class="sywat-badge sywat-badge-open">✅ Complete</span>';
+                } else {
+                    const pending = Math.max(0, total - entered);
+                    statusWrap.innerHTML = '<span class="sywat-badge sywat-badge-prereg">' + pending + ' Pending</span>';
+                }
+            }
+        });
+    }
+
+    // 5. Synchronize Header Line Lock Button & One-Click Unentered Toggle Button
     function syncViewLockButton(selectedLine) {
         const viewLockBtn = document.getElementById('sywat_scores_view_lock_btn');
         if (!viewLockBtn) return;
@@ -80,21 +153,46 @@ document.addEventListener('DOMContentLoaded', function() {
         viewLockBtn.textContent = isLineLocked ? 'Unlock Line' : 'Lock Line';
     }
 
-    // 4. Instant Client-Side Line + Live Search Filter (Zero Page Reload)
+    function syncUnenteredButton(unenteredCount) {
+        const btn     = document.getElementById('sywat_scores_unentered_btn');
+        const countEl = document.getElementById('sywat_scores_unentered_count');
+
+        if (countEl) {
+            countEl.textContent = String(unenteredCount);
+        }
+
+        if (btn) {
+            btn.classList.toggle('sywat-btn-primary', unenteredOnly);
+            btn.classList.toggle('sywat-btn-secondary', !unenteredOnly);
+            btn.setAttribute('aria-pressed', unenteredOnly ? 'true' : 'false');
+        }
+    }
+
+    // 6. Instant Client-Side Line + Unentered Status + Live Search Filter (Zero Page Reload)
     function applyScoresLineAndSearchFilter() {
         const selectedLine = lineSelect ? String(lineSelect.value || 'all') : 'all';
         const rawQuery     = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery   = rawQuery.trim().toLowerCase();
         const rows         = document.querySelectorAll('.sywat-score-row');
 
-        let visibleCount = 0;
+        let visibleCount   = 0;
+        let unenteredCount = 0;
 
         rows.forEach(function(row) {
-            const rowLine  = row.getAttribute('data-line-idx') || '';
-            const dataName = (row.getAttribute('data-name') || '').toLowerCase();
-            const lineOk   = (!selectedLine || selectedLine === 'all' || rowLine === selectedLine);
-            const queryOk  = (!cleanQuery || dataName.includes(cleanQuery));
-            const isMatch  = (lineOk && queryOk);
+            const regId              = row.getAttribute('data-id') || '';
+            const rowLine            = row.getAttribute('data-line-idx') || '';
+            const dataName           = (row.getAttribute('data-name') || '').toLowerCase();
+            const currentlyUnentered = isRowCurrentlyUnentered(row);
+            const lineOk             = (!selectedLine || selectedLine === 'all' || rowLine === selectedLine);
+            const queryOk            = (!cleanQuery || dataName.includes(cleanQuery));
+
+            if (lineOk && queryOk && currentlyUnentered) {
+                unenteredCount++;
+            }
+
+            // Keep rows edited during the active unentered filter pass visible until toggled off/on
+            const statusOk = (!unenteredOnly || currentlyUnentered || editedInActivePass.has(regId));
+            const isMatch  = (lineOk && queryOk && statusOk);
 
             row.classList.toggle('sywat-hidden', !isMatch);
             if (isMatch) {
@@ -106,6 +204,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (countEl) {
             countEl.textContent = String(visibleCount);
         }
+
+        syncUnenteredButton(unenteredCount);
 
         const emptyMsg = document.getElementById('sywat_scores_empty_filter_msg');
         if (emptyMsg) {
@@ -129,28 +229,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (searchInput) {
-        if (!searchInput.value) {
-            const savedQuery = sessionStorage.getItem('sywat_score_search_query');
-            if (savedQuery) {
-                searchInput.value = savedQuery;
-            }
+    function toggleScoresUnenteredFilter() {
+        unenteredOnly = !unenteredOnly;
+        editedInActivePass.clear();
+
+        if (unenteredOnly) {
+            sessionStorage.setItem('sywat_scores_unentered_only', '1');
+        } else {
+            sessionStorage.removeItem('sywat_scores_unentered_only');
         }
 
-        searchInput.addEventListener('input', function() {
-            applyScoresLineAndSearchFilter();
-        });
-
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-            }
-        });
+        applyScoresLineAndSearchFilter();
     }
 
-    applyScoresLineAndSearchFilter();
-
-    // 5. Helper: Status Badge Class & Text Updater
+    // 7. Helper: Status Badge Class & Text Updater
     function setRowStatus(regId, state, customMsg) {
         const badge = document.getElementById('status_' + regId);
         if (!badge) return;
@@ -171,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 6. Helper: Input Range & Format Validator
+    // 8. Helper: Input Range & Format Validator
     function validateInput(input) {
         if (!input) return true;
         const min    = parseInt(input.getAttribute('min'), 10) || 0;
@@ -193,26 +285,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return true;
     }
 
-    // 7. Helper: Local Storage Key Generator & Row State Reader
+    // 9. Helper: Local Storage Key Generator
     function getStorageKey(regId) {
         return 'sywat_draft_' + currentTourn.replace(/[^a-z0-9]/gi, '_') + '_' + regId;
     }
 
-    function getRowIncValue(row) {
-        if (!row) return '0';
-        const incCheckbox   = row.querySelector('.sywat-inc-val');
-        const incStateInput = row.querySelector('.sywat-inc-state');
-        if (incCheckbox) {
-            const val = incCheckbox.checked ? '1' : '0';
-            if (incStateInput) {
-                incStateInput.value = val;
-            }
-            return val;
-        }
-        return incStateInput ? (incStateInput.value === '1' ? '1' : '0') : '0';
-    }
-
-    // 8. Restore Unsaved Local Drafts on Page Load
+    // 10. Restore Unsaved Local Drafts on Page Load & Sync Counters
     document.querySelectorAll('.sywat-score-row').forEach(function(row) {
         const regId      = row.getAttribute('data-id');
         const savedDraft = localStorage.getItem(getStorageKey(regId));
@@ -242,7 +320,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 9. Serialized Background Asynchronous Single-Score & INC Saver
+    if (searchInput) {
+        if (!searchInput.value) {
+            const savedQuery = sessionStorage.getItem('sywat_score_search_query');
+            if (savedQuery) {
+                searchInput.value = savedQuery;
+            }
+        }
+
+        searchInput.addEventListener('input', function() {
+            applyScoresLineAndSearchFilter();
+        });
+
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+    }
+
+    syncLineTrackerCounts();
+    applyScoresLineAndSearchFilter();
+
+    // 11. Serialized Background Asynchronous Single-Score & INC Saver
     function performBackgroundSave(regId) {
         const row = document.querySelector('.sywat-score-row[data-id="' + regId + '"]');
         if (!row || row.classList.contains('locked-row')) return;
@@ -263,6 +363,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const scoreVal = scoreInput ? scoreInput.value : '0';
         const xVal     = xInput ? xInput.value : '0';
         const incVal   = getRowIncValue(row);
+
+        if (unenteredOnly) {
+            editedInActivePass.add(regId);
+        }
+
+        syncLineTrackerCounts();
+        applyScoresLineAndSearchFilter();
 
         localStorage.setItem(getStorageKey(regId), JSON.stringify({ score: scoreVal, x_count: xVal, is_inc: incVal }));
 
@@ -321,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 10. Dynamic Event Listeners for User Input, INC Checkbox Toggle, & Blur
+    // 12. Dynamic Event Listeners for User Input, INC Checkbox Toggle, & Blur
     document.addEventListener('input', function(e) {
         if (e.target && e.target.classList.contains('sywat-score-input') && !e.target.disabled) {
             const regId = e.target.getAttribute('data-id');
@@ -336,8 +443,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const xVal       = xInput ? xInput.value : '0';
                 const incVal     = getRowIncValue(row);
 
+                if (unenteredOnly) {
+                    editedInActivePass.add(regId);
+                }
+
                 localStorage.setItem(getStorageKey(regId), JSON.stringify({ score: sVal, x_count: xVal, is_inc: incVal }));
                 setRowStatus(regId, 'draft', '⚡ Local Draft');
+                syncLineTrackerCounts();
+                applyScoresLineAndSearchFilter();
             } else {
                 setRowStatus(regId, 'error', '⚠️ Range Error');
             }
@@ -374,7 +487,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const action = actionEl.getAttribute('data-sywat-action');
 
-        if (action === 'select-scores-line') {
+        if (action === 'toggle-scores-unentered') {
+            e.preventDefault();
+            toggleScoresUnenteredFilter();
+        } else if (action === 'select-scores-line') {
             e.preventDefault();
             if (lineSelect) {
                 lineSelect.value = actionEl.getAttribute('data-line-idx') || 'all';
@@ -405,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 11. Sync Unsaved Local Drafts Automatically When Reconnecting Online
+    // 13. Sync Unsaved Local Drafts Automatically When Reconnecting Online
     window.addEventListener('online', function() {
         document.querySelectorAll('.sywat-score-row:not(.locked-row)').forEach(function(row) {
             const regId = row.getAttribute('data-id');
@@ -415,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 12. Multi-Scorekeeper Concurrency Protection & Local Storage Clear on Full Batch Submit
+    // 14. Multi-Scorekeeper Concurrency Protection & Local Storage Clear on Full Batch Submit
     if (batchForm) {
         batchForm.addEventListener('submit', function(e) {
             const submitterVal = e.submitter ? e.submitter.value : '';
@@ -490,6 +606,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.SYWAT.scores = {
         applyLineAndSearchFilter: applyScoresLineAndSearchFilter,
+        toggleUnenteredFilter: toggleScoresUnenteredFilter,
+        syncLineTrackerCounts: syncLineTrackerCounts,
         performBackgroundSave: performBackgroundSave
     };
 });
