@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, live AJAX status notice container (#sywat_desk_ajax_notice) and deterministic data-reg-id / data-tracker-* attributes for zero-reload Check-In & Undo Check-In DOM updates, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, single-button Needs Check-In / Show All view toggle, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, live AJAX status notice container (#sywat_desk_ajax_notice) and deterministic data-reg-id / data-tracker-* attributes for zero-reload Check-In & Undo Check-In DOM updates, Active Registered Archers section (#sywat_desk_archers_section) keeping the search & Needs Check-In toolbar visible on line selection, table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, single-button Needs Check-In / Show All view toggle, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.3
+ * Version: 7.8.4
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -420,8 +420,8 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
             )
             : '';
         ?>
-        <!-- Nested Section: Registered Archers Table -->
-        <div>
+        <!-- Nested Section: Registered Archers Table & Search Toolbar -->
+        <div id="sywat_desk_archers_section">
             <div class="sywat-table-header-bar">
                 <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
 
