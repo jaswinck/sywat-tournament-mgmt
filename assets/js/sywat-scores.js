@@ -1,10 +1,10 @@
 /**
  * Client Script: Score Engine Interactivity & Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Instantaneous zero-reload shooting line, one-click Unentered score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering with sessionStorage persistence; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; local draft recovery; per-archer serialized AJAX auto-save; offline sync; optimizer-safe delegated data-sywat-action listeners; and multi-scorekeeper batch concurrency protection.
- * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden / .sywat-btn-* class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
+ * Description: Instantaneous zero-reload shooting line, one-click self-describing Unentered score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering with sessionStorage persistence; live Active View Scope pill with one-click Show All reset; active Line Score Tracker card highlighting and real-time counter/badge synchronization (counting scores, X counts, and incomplete round "INC" flags); dynamic TFAA target URL switcher; range validation; local draft recovery; per-archer serialized AJAX auto-save; offline sync; optimizer-safe delegated data-sywat-action listeners; and multi-scorekeeper batch concurrency protection.
+ * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden / .sywat-btn-* / .sywat-view-scope-filtered / .sywat-tracker-card-active class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
  * Author: SYWAT Archery
- * Version: 7.5.0
+ * Version: 7.6.0
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 5. Synchronize Header Line Lock Button & One-Click Unentered Toggle Button
+    // 5. Synchronize Header Line Lock Button, Self-Describing Unentered Button & Active View Scope UI
     function syncViewLockButton(selectedLine) {
         const viewLockBtn = document.getElementById('sywat_scores_view_lock_btn');
         if (!viewLockBtn) return;
@@ -155,16 +155,84 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function syncUnenteredButton(unenteredCount) {
         const btn     = document.getElementById('sywat_scores_unentered_btn');
+        const labelEl = document.getElementById('sywat_scores_unentered_label');
         const countEl = document.getElementById('sywat_scores_unentered_count');
+
+        if (labelEl) {
+            labelEl.textContent = unenteredOnly ? '✓ Showing: Unentered' : 'Unentered';
+        }
 
         if (countEl) {
             countEl.textContent = String(unenteredCount);
         }
 
         if (btn) {
+            btn.classList.toggle('sywat-btn-filter-active', unenteredOnly);
             btn.classList.toggle('sywat-btn-primary', unenteredOnly);
             btn.classList.toggle('sywat-btn-secondary', !unenteredOnly);
             btn.setAttribute('aria-pressed', unenteredOnly ? 'true' : 'false');
+        }
+    }
+
+    function syncScoresTrackerActiveCard(selectedLine) {
+        const isLineFiltered = Boolean(selectedLine && selectedLine !== 'all');
+        document.querySelectorAll('.sywat-tracker-card').forEach(function(card) {
+            const cardLine = card.getAttribute('data-line-idx') || '';
+            const isActive = (isLineFiltered && cardLine === selectedLine);
+            card.classList.toggle('sywat-tracker-card-active', isActive);
+
+            const viewingBadge = card.querySelector('.sywat-badge-viewing');
+            if (viewingBadge) {
+                viewingBadge.classList.toggle('sywat-hidden', !isActive);
+            }
+        });
+    }
+
+    function syncScoresViewScopeUI(selectedLine, rawQuery, visibleCount, totalCount) {
+        const scopePill       = document.getElementById('sywat_scores_view_scope_pill');
+        const totalWrap       = document.getElementById('sywat_scores_total_count_wrap');
+        const totalEl         = document.getElementById('sywat_scores_total_count');
+        const resetBtn        = document.getElementById('sywat_scores_reset_view_btn');
+        const isLineFiltered  = Boolean(selectedLine && selectedLine !== 'all');
+        const trimmedQuery    = String(rawQuery || '').trim();
+        const isQueryFiltered = trimmedQuery.length > 0;
+        const isAnyFiltered   = (isLineFiltered || unenteredOnly || isQueryFiltered);
+
+        if (totalEl) {
+            totalEl.textContent = String(totalCount);
+        }
+        if (totalWrap) {
+            totalWrap.classList.toggle('sywat-hidden', !isAnyFiltered);
+        }
+
+        if (scopePill) {
+            const scopeParts = [];
+            if (isLineFiltered) {
+                let lineLabel = 'Line ' + (parseInt(selectedLine, 10) + 1);
+                if (lineSelect && lineSelect.selectedIndex >= 0) {
+                    const optText = (lineSelect.options[lineSelect.selectedIndex].textContent || '').trim();
+                    if (optText) {
+                        lineLabel = optText;
+                    }
+                }
+                scopeParts.push(lineLabel);
+            } else {
+                scopeParts.push('All Lines');
+            }
+
+            if (unenteredOnly) {
+                scopeParts.push('Unentered Only');
+            }
+            if (isQueryFiltered) {
+                scopeParts.push('Search: "' + trimmedQuery + '"');
+            }
+
+            scopePill.textContent = 'Viewing: ' + scopeParts.join(' · ');
+            scopePill.classList.toggle('sywat-view-scope-filtered', isAnyFiltered);
+        }
+
+        if (resetBtn) {
+            resetBtn.classList.toggle('sywat-hidden', !isAnyFiltered);
         }
     }
 
@@ -174,6 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const rawQuery     = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery   = rawQuery.trim().toLowerCase();
         const rows         = document.querySelectorAll('.sywat-score-row');
+        const totalCount   = rows.length;
 
         let visibleCount   = 0;
         let unenteredCount = 0;
@@ -206,6 +275,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         syncUnenteredButton(unenteredCount);
+        syncScoresViewScopeUI(selectedLine, rawQuery, visibleCount, totalCount);
+        syncScoresTrackerActiveCard(selectedLine);
 
         const emptyMsg = document.getElementById('sywat_scores_empty_filter_msg');
         if (emptyMsg) {
@@ -237,6 +308,22 @@ document.addEventListener('DOMContentLoaded', function() {
             sessionStorage.setItem('sywat_scores_unentered_only', '1');
         } else {
             sessionStorage.removeItem('sywat_scores_unentered_only');
+        }
+
+        applyScoresLineAndSearchFilter();
+    }
+
+    function resetScoresViewFilters() {
+        unenteredOnly = false;
+        editedInActivePass.clear();
+        sessionStorage.removeItem('sywat_scores_unentered_only');
+        sessionStorage.removeItem('sywat_score_search_query');
+
+        if (lineSelect) {
+            lineSelect.value = 'all';
+        }
+        if (searchInput) {
+            searchInput.value = '';
         }
 
         applyScoresLineAndSearchFilter();
@@ -490,6 +577,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (action === 'toggle-scores-unentered') {
             e.preventDefault();
             toggleScoresUnenteredFilter();
+        } else if (action === 'reset-scores-view') {
+            e.preventDefault();
+            resetScoresViewFilters();
         } else if (action === 'select-scores-line') {
             e.preventDefault();
             if (lineSelect) {
@@ -607,6 +697,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.SYWAT.scores = {
         applyLineAndSearchFilter: applyScoresLineAndSearchFilter,
         toggleUnenteredFilter: toggleScoresUnenteredFilter,
+        resetViewFilters: resetScoresViewFilters,
         syncLineTrackerCounts: syncLineTrackerCounts,
         performBackgroundSave: performBackgroundSave
     };
