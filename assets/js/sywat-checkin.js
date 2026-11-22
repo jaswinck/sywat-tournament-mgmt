@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering, Walk-In fast-loop intake (automatically syncing Default Shooting Line and Line Family Group options to the active Check-In Desk Shooting Line filter), live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering (persisting the active Shooting Line selection per tournament across page refreshes via sessionStorage), Walk-In fast-loop intake (automatically syncing Default Shooting Line and Line Family Group options to the active Check-In Desk Shooting Line filter), live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active / .sywat-btn-filter-active / .sywat-btn-secondary), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.6.3
+ * Version: 7.6.4
  */
 
 (function() {
@@ -1538,11 +1538,14 @@
 
     /**
      * Filter Active Registered Archers Table Rows by Line, Needs Check-In Status, & Search Query
-     * instantaneously without a full-page reload, and keep hidden form inputs synchronized.
+     * instantaneously without a full-page reload, persist active filter state in sessionStorage,
+     * and keep hidden form inputs synchronized.
      */
     function applyDeskLineAndSearchFilter() {
+        const tournSelect     = document.getElementById('sywat_selected_tournament');
         const lineSelect      = document.getElementById('sywat_selected_line_idx');
         const searchInput     = document.getElementById('sywat_search_input');
+        const activeTourn     = tournSelect ? String(tournSelect.value || '').trim() : '';
         const selectedLine    = lineSelect ? String(lineSelect.value || 'all') : 'all';
         const rawQuery        = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery      = rawQuery.trim().toLowerCase();
@@ -1593,6 +1596,16 @@
         document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
             hiddenInput.value = rawQuery;
         });
+
+        if (isLineFiltered) {
+            sessionStorage.setItem('sywat_checkin_selected_line_idx', selectedLine);
+            if (activeTourn) {
+                sessionStorage.setItem('sywat_checkin_selected_line_tourn', activeTourn);
+            }
+        } else {
+            sessionStorage.removeItem('sywat_checkin_selected_line_idx');
+            sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
+        }
 
         if (rawQuery) {
             sessionStorage.setItem('sywat_checkin_search_query', rawQuery);
@@ -1676,10 +1689,34 @@
     }
 
     /**
-     * Initializes Check-In Desk event listeners and pre-fills active forms.
+     * Initializes Check-In Desk event listeners and restores saved session filter state.
      */
     function initSywatCheckin() {
         needsCheckinOnly = (sessionStorage.getItem('sywat_checkin_needs_only') === '1');
+
+        const lineSelect  = document.getElementById('sywat_selected_line_idx');
+        const tournSelect = document.getElementById('sywat_selected_tournament');
+        if (lineSelect && String(lineSelect.value || 'all') === 'all') {
+            const savedLineIdx   = sessionStorage.getItem('sywat_checkin_selected_line_idx');
+            const savedLineTourn = sessionStorage.getItem('sywat_checkin_selected_line_tourn') || '';
+            const currTourn      = tournSelect ? String(tournSelect.value || '').trim() : '';
+
+            if (savedLineIdx && savedLineIdx !== 'all' && (!savedLineTourn || !currTourn || savedLineTourn === currTourn)) {
+                let hasMatchingOpt = false;
+                for (let i = 0; i < lineSelect.options.length; i++) {
+                    if (lineSelect.options[i].value === savedLineIdx) {
+                        hasMatchingOpt = true;
+                        break;
+                    }
+                }
+                if (hasMatchingOpt) {
+                    lineSelect.value = savedLineIdx;
+                } else {
+                    sessionStorage.removeItem('sywat_checkin_selected_line_idx');
+                    sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
+                }
+            }
+        }
 
         const editBalanceEl = document.getElementById('edit_balance_due');
         if (editBalanceEl && typeof editBalanceEl.dataset.origDue === 'undefined') {
@@ -1868,6 +1905,8 @@
 
         switch (action) {
             case 'submit-desk-tournament': {
+                sessionStorage.removeItem('sywat_checkin_selected_line_idx');
+                sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
                 const filterForm = document.getElementById('sywat_filter_form');
                 if (filterForm) filterForm.submit();
                 break;
