@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering, Walk-In fast-loop intake (automatically syncing Default Shooting Line and Line Family Group options to the active Check-In Desk Shooting Line filter), live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active / .sywat-btn-filter-active / .sywat-btn-secondary), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.6.2
+ * Version: 7.6.3
  */
 
 (function() {
@@ -1350,8 +1350,32 @@
         const modal = document.getElementById('walkinModal');
         if (modal) modal.classList.add('active');
 
-        const lineSel = document.getElementById('walkin_line_index');
+        const deskLineSel = document.getElementById('sywat_selected_line_idx');
+        const lineSel     = document.getElementById('walkin_line_index');
         if (lineSel) {
+            const activeDeskLine = deskLineSel ? String(deskLineSel.value || 'all') : 'all';
+            let matchedOpenOpt   = null;
+            let firstOpenOpt     = null;
+
+            for (let i = 0; i < lineSel.options.length; i++) {
+                const opt = lineSel.options[i];
+                if (!opt.disabled && opt.value !== '') {
+                    if (!firstOpenOpt) {
+                        firstOpenOpt = opt;
+                    }
+                    if (activeDeskLine !== 'all' && activeDeskLine !== '' && opt.value === activeDeskLine) {
+                        matchedOpenOpt = opt;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedOpenOpt) {
+                lineSel.value = matchedOpenOpt.value;
+            } else if (firstOpenOpt) {
+                lineSel.value = firstOpenOpt.value;
+            }
+
             updateWalkinFamilyOptions(lineSel.value);
         }
 
