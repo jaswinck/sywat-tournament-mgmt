@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters, active line highlighting, and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, live Active View Scope pill with one-click Show All reset, self-describing Needs Check-In filter toggle button, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, one-click Needs Check-In filter toggle button and Show All reset trigger, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.0
+ * Version: 7.8.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -165,7 +165,7 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
 
 /**
  * Render chronologically ordered Line Capacity Tracker cards with single-pass O(R)
- * pre-indexed line counters, active line card highlighting, and Walk-In & Waitlist triggers.
+ * pre-indexed line counters and Walk-In & Waitlist triggers.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -302,15 +302,13 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                             $disp_20yd = ( $cap_20yd_num === 0 ) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_20yd_num . ' Open';
                             $disp_cub  = ( $cap_cub_num === 0 ) ? '<span class="sywat-badge sywat-badge-full">FULL</span>' : $cap_cub_num . ' Open';
 
-                            $is_closed_line      = in_array( $idx, $closed_lines, true ) || ( $line_name !== '' && in_array( $line_name, $closed_lines, true ) );
-                            $is_active_line_card = ( $selected_line_idx !== 'all' && $selected_line_idx !== '' && $selected_line_idx === $idx );
+                            $is_closed_line = in_array( $idx, $closed_lines, true ) || ( $line_name !== '' && in_array( $line_name, $closed_lines, true ) );
                         ?>
-                        <div class="sywat-tracker-card<?php echo $is_active_line_card ? ' sywat-tracker-card-active' : ''; ?>" data-line-idx="<?php echo esc_attr( $idx ); ?>">
+                        <div class="sywat-tracker-card">
                             <div>
                                 <div class="sywat-tracker-card-header">
                                     <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
                                     <div class="sywat-tracker-header-badges">
-                                        <span class="sywat-badge sywat-badge-viewing<?php echo $is_active_line_card ? '' : ' sywat-hidden'; ?>">Viewing</span>
                                         <span class="sywat-badge sywat-badge-prereg">
                                             <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                         </span>
@@ -375,7 +373,7 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 /**
  * Render Active Registered Archers table consuming pre-computed presentation & modal payloads
  * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals,
- * live Active View Scope pill with one-click Show All reset, and self-describing Needs Check-In filter.
+ * one-click Needs Check-In filter toggle button, and Show All reset trigger.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -384,14 +382,12 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
     function sywat_desk_render_archers_table( $data ) {
         $active_checkins     = isset( $data['active_checkins'] ) && is_array( $data['active_checkins'] ) ? $data['active_checkins'] : array();
         $all_tourn_regs      = isset( $data['registrations'] ) ? $data['registrations'] : $active_checkins;
-        $lines               = isset( $data['lines'] ) && is_array( $data['lines'] ) ? $data['lines'] : array();
         $search_query        = isset( $data['search_query'] ) ? (string) $data['search_query'] : '';
         $selected_tournament = isset( $data['selected_tournament'] ) ? (string) $data['selected_tournament'] : '';
         $selected_line_idx   = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
 
         $clean_search_init         = strtolower( trim( $search_query ) );
-        $total_active_count        = count( $active_checkins );
         $initial_visible_count     = 0;
         $initial_needs_checkin_cnt = 0;
 
@@ -411,21 +407,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
             }
         }
 
-        $is_line_filtered    = ( $selected_line_idx !== 'all' && $selected_line_idx !== '' );
-        $is_initial_filtered = ( $is_line_filtered || $clean_search_init !== '' );
-
-        $scope_parts = array();
-        if ( $is_line_filtered ) {
-            $scope_parts[] = ( isset( $lines[ $selected_line_idx ]['name'] ) && trim( (string) $lines[ $selected_line_idx ]['name'] ) !== '' )
-                ? trim( (string) $lines[ $selected_line_idx ]['name'] )
-                : 'Line ' . ( intval( $selected_line_idx ) + 1 );
-        } else {
-            $scope_parts[] = 'All Lines';
-        }
-        if ( $clean_search_init !== '' ) {
-            $scope_parts[] = 'Search: "' . trim( $search_query ) . '"';
-        }
-        $initial_scope_text = 'Viewing: ' . implode( ' · ', $scope_parts );
+        $is_initial_filtered = ( ( $selected_line_idx !== 'all' && $selected_line_idx !== '' ) || $clean_search_init !== '' );
 
         $desk_clean_url = function_exists( 'sywat_page_url' )
             ? add_query_arg(
@@ -440,11 +422,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         <!-- Nested Section: Registered Archers Table -->
         <div>
             <div class="sywat-table-header-bar">
-                <div class="sywat-table-header-left">
-                    <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( $initial_visible_count ); ?></span><span id="sywat_desk_total_count_wrap" class="<?php echo $is_initial_filtered ? '' : 'sywat-hidden'; ?>"> of <span id="sywat_desk_total_count"><?php echo intval( $total_active_count ); ?></span></span>)</h2>
-                    <span id="sywat_desk_view_scope_pill" class="sywat-view-scope-pill<?php echo $is_initial_filtered ? ' sywat-view-scope-filtered' : ''; ?>"><?php echo esc_html( $initial_scope_text ); ?></span>
-                    <button type="button" id="sywat_desk_reset_view_btn" class="sywat-btn sywat-btn-secondary sywat-btn-reset-view<?php echo $is_initial_filtered ? '' : ' sywat-hidden'; ?>" data-sywat-action="reset-desk-view">Show All</button>
-                </div>
+                <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
 
                 <div class="sywat-table-header-controls">
                     <button type="button"
@@ -452,7 +430,14 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                             class="sywat-btn sywat-btn-secondary"
                             data-sywat-action="toggle-desk-needs-checkin"
                             aria-pressed="false">
-                        <span id="sywat_desk_needs_checkin_label">Needs Check-In</span> (<span id="sywat_desk_needs_checkin_count"><?php echo intval( $initial_needs_checkin_cnt ); ?></span>)
+                        Needs Check-In (<span id="sywat_desk_needs_checkin_count"><?php echo intval( $initial_needs_checkin_cnt ); ?></span>)
+                    </button>
+
+                    <button type="button"
+                            id="sywat_desk_reset_view_btn"
+                            class="sywat-btn sywat-btn-secondary<?php echo $is_initial_filtered ? '' : ' sywat-hidden'; ?>"
+                            data-sywat-action="reset-desk-view">
+                        Show All
                     </button>
 
                     <div class="sywat-search-input-group">
