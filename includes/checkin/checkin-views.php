@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, single-button Needs Check-In / Show All view toggle, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, live AJAX status notice container (#sywat_desk_ajax_notice) and deterministic data-reg-id / data-tracker-* attributes for zero-reload Check-In & Undo Check-In DOM updates, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, single-button Needs Check-In / Show All view toggle, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.8.2
+ * Version: 7.8.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -96,6 +96,9 @@ if ( ! function_exists( 'sywat_desk_render_filter_bar' ) ) {
         $is_hub_enabled = ( $t_shop_id === 'shop_ccr' ) && in_array( $selected_t, $active_hubs, true );
         $tab_query_args = ! empty( $selected_t ) ? array( 'selected_tournament' => $selected_t ) : array();
         ?>
+        <!-- Live AJAX Feedback Container -->
+        <div id="sywat_desk_ajax_notice" class="no-print" aria-live="polite"></div>
+
         <!-- Master Navigation Tabs (Card-Docked, Role-Gated) -->
         <div class="sywat-nav-tabs no-print">
             <?php if ( $can_manage_tournaments ) : ?>
@@ -304,12 +307,12 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 
                             $is_closed_line = in_array( $idx, $closed_lines, true ) || ( $line_name !== '' && in_array( $line_name, $closed_lines, true ) );
                         ?>
-                        <div class="sywat-tracker-card">
+                        <div class="sywat-tracker-card" data-tracker-line-idx="<?php echo esc_attr( $idx ); ?>">
                             <div>
                                 <div class="sywat-tracker-card-header">
                                     <strong class="sywat-tracker-card-title"><?php echo esc_html( $line['name'] ); ?></strong>
                                     <div class="sywat-tracker-header-badges">
-                                        <span class="sywat-badge sywat-badge-prereg">
+                                        <span class="sywat-badge sywat-badge-prereg" data-tracker-checkedin>
                                             <?php echo $checked_in_line . ' / ' . $total_reg_line . ' Checked In'; ?>
                                         </span>
                                         <?php if ( $waitlist_line > 0 ) : ?>
@@ -322,8 +325,8 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
                                     </div>
                                 </div>
                                 <div class="sywat-tracker-card-stats">
-                                    <span><strong>20yd:</strong> <?php echo $disp_20yd; ?></span>
-                                    <span><strong>Cub:</strong> <?php echo $disp_cub; ?></span>
+                                    <span><strong>20yd:</strong> <span data-tracker-20yd><?php echo $disp_20yd; ?></span></span>
+                                    <span><strong>Cub:</strong> <span data-tracker-cub><?php echo $disp_cub; ?></span></span>
                                 </div>
                             </div>
                             
@@ -457,6 +460,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                         <tbody>
                             <?php foreach ( $active_checkins as $reg ) : ?>
                                 <?php
+                                    $reg_id_str       = isset( $reg['id'] ) ? (string) $reg['id'] : '';
                                     $disp_archer_name = isset( $reg['display_name'] ) ? $reg['display_name'] : ( isset( $reg['name'] ) ? $reg['name'] : '' );
                                     $search_tokens    = isset( $reg['search_tokens'] ) ? $reg['search_tokens'] : strtolower( trim( $disp_archer_name ) );
                                     $resolved_l_idx   = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : '0';
@@ -483,6 +487,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $is_row_visible     = ( $is_row_line_match && $is_row_query_match );
                                 ?>
                                 <tr class="sywat-archer-row<?php echo $is_row_visible ? '' : ' sywat-hidden'; ?>"
+                                    data-reg-id="<?php echo esc_attr( $reg_id_str ); ?>"
                                     data-line-idx="<?php echo esc_attr( $resolved_l_idx ); ?>"
                                     data-needs-checkin="<?php echo $needs_checkin ? '1' : '0'; ?>"
                                     data-name="<?php echo esc_attr( $search_tokens ); ?>"
@@ -529,7 +534,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                                     <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                     <?php sywat_desk_render_hidden_context( $selected_tournament, $selected_line_idx, $search_query ); ?>
                                                     <input type="hidden" name="sywat_action" value="undo_checkin">
-                                                    <input type="hidden" name="reg_id" value="<?php echo esc_attr( $reg['id'] ); ?>">
+                                                    <input type="hidden" name="reg_id" value="<?php echo esc_attr( $reg_id_str ); ?>">
                                                     <button type="submit" class="sywat-btn sywat-btn-checkedin sywat-btn-icon-checkedin">Checked In</button>
                                                 </form>
                                             <?php else : ?>
