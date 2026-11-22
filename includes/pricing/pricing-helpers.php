@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Pricing Profiles, Promoter Eligibility & Household Cap Calculation Helpers
  * Path: includes/pricing/pricing-helpers.php
- * Description: Centralized helpers for Season/Tournament pricing inheritance, individual entry rate calculation, O(1)-indexed First-Time/Lapsed Shooter Promoter eligibility checks, mixed-round Household Family Cap reconciliation, and client JS localization payloads.
+ * Description: Centralized helpers for Season/Tournament pricing inheritance, individual entry rate calculation (honoring database Age Division rate tiers as well as explicit Youth/Cub category hints when division is unset), O(1)-indexed First-Time/Lapsed Shooter Promoter eligibility checks, mixed-round Household Family Cap reconciliation, and client JS localization payloads.
  * Compliance: Pure helper layer — zero direct database queries, zero get_option() calls, zero HTML echo at include time, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -296,20 +296,22 @@ if ( ! function_exists( 'sywat_resolve_active_pricing_profile' ) ) {
 
 /**
  * Resolve the standard individual entry fee for an archer from database-configured
- * Pricing Profiles and Age Division rate tiers (with zero hardcoded prices).
+ * Pricing Profiles and Age Division rate tiers (honoring explicit 'Youth' / 'Cub'
+ * rate-tier hints when an archer's division has not been assigned yet).
  *
  * @param string|array $tournament_name_or_data Tournament title or config array.
  * @param string       $division                Archer age division label.
  * @param string       $distance                Optional target distance ('Cub' or '20yd').
  * @param string       $style                   Optional shooting style label (for Pro rate check).
  * @param string       $round_slug              Optional archer-selected round slug (e.g., 'field' vs 'field-50').
- * @param string       $paid_status             Optional existing paid tier ('Field Governor', 'Promo (Free)', etc.).
+ * @param string       $paid_status             Optional existing paid tier ('Field Governor', 'Promo (Free)', 'Youth', 'Adult', etc.).
  * @return float                                Calculated individual entry fee.
  */
 if ( ! function_exists( 'sywat_get_archer_individual_fee' ) ) {
     function sywat_get_archer_individual_fee( $tournament_name_or_data, $division, $distance = '', $style = '', $round_slug = '', $paid_status = '' ) {
         $clean_div  = trim( (string) $division );
         $clean_paid = trim( (string) $paid_status );
+        $clean_dist = trim( (string) $distance );
 
         if ( strcasecmp( $clean_div, 'No Show' ) === 0 ) {
             return 0.00;
@@ -321,7 +323,15 @@ if ( ! function_exists( 'sywat_get_archer_individual_fee' ) ) {
 
         $profile = sywat_resolve_active_pricing_profile( $tournament_name_or_data, $round_slug );
         if ( empty( $profile ) ) {
-            return 30.00;
+            $is_fallback_youth = (
+                strcasecmp( $clean_paid, 'Youth' ) === 0 ||
+                strcasecmp( $clean_paid, 'Cub' ) === 0 ||
+                strcasecmp( $clean_dist, 'Cub' ) === 0 ||
+                stripos( $clean_div, 'Cub' ) !== false ||
+                stripos( $clean_div, 'Youth' ) !== false ||
+                stripos( $clean_div, 'Young Adult' ) !== false
+            );
+            return $is_fallback_youth ? 25.00 : 30.00;
         }
 
         if ( strcasecmp( $clean_paid, 'Field Governor' ) === 0 ) {
@@ -330,7 +340,13 @@ if ( ! function_exists( 'sywat_get_archer_individual_fee' ) ) {
 
         // 1. Check per-division override on the active pricing profile
         $div_rec = ( $clean_div !== '' && function_exists( 'sywat_find_division' ) ) ? sywat_find_division( $clean_div ) : null;
-        if ( is_array( $div_rec ) && ! empty( $div_rec['slug'] ) && isset( $profile['division_overrides'][ $div_rec['slug'] ] ) ) {
+        if (
+            is_array( $div_rec ) &&
+            ! empty( $div_rec['slug'] ) &&
+            isset( $profile['division_overrides'][ $div_rec['slug'] ] ) &&
+            $profile['division_overrides'][ $div_rec['slug'] ] !== '' &&
+            is_numeric( $profile['division_overrides'][ $div_rec['slug'] ] )
+        ) {
             return floatval( $profile['division_overrides'][ $div_rec['slug'] ] );
         }
 
@@ -341,12 +357,20 @@ if ( ! function_exists( 'sywat_get_archer_individual_fee' ) ) {
             }
         }
 
-        // 3. Resolve Youth vs. Adult tier from database-configured Age Division
+        // 3. Resolve Youth vs. Adult tier from database-configured Age Division or explicit Youth/Cub rate hint
         $is_youth = false;
         if ( is_array( $div_rec ) && isset( $div_rec['rate_tier'] ) ) {
             $is_youth = ( $div_rec['rate_tier'] === 'Youth' );
-        } elseif ( function_exists( 'sywat_waitlist_is_youth_division' ) ) {
-            $is_youth = sywat_waitlist_is_youth_division( $clean_div, $distance );
+        } elseif ( $clean_div !== '' && function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
+            $is_youth = ( sywat_shooting_styles_get_division_rate_tier( $clean_div ) === 'Youth' );
+        } elseif ( $clean_div !== '' && function_exists( 'sywat_waitlist_is_youth_division' ) ) {
+            $is_youth = sywat_waitlist_is_youth_division( $clean_div, $clean_dist );
+        } else {
+            $is_youth = (
+                strcasecmp( $clean_paid, 'Youth' ) === 0 ||
+                strcasecmp( $clean_paid, 'Cub' ) === 0 ||
+                strcasecmp( $clean_dist, 'Cub' ) === 0
+            );
         }
 
         return $is_youth
@@ -663,13 +687,16 @@ if ( ! function_exists( 'sywat_recalculate_household_fees' ) ) {
                 continue;
             }
 
-            $div_val    = isset( $reg['division'] ) ? $reg['division'] : '';
+            $div_val    = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
             $dist_val   = isset( $reg['distance'] ) ? $reg['distance'] : '20yd';
             $style_val  = isset( $reg['style'] ) ? $reg['style'] : '';
             $round_slug = isset( $reg['pricing_profile'] ) ? $reg['pricing_profile'] : '';
+            $tier_hint  = ( strcasecmp( $paid_val, 'Youth' ) === 0 || strcasecmp( $paid_val, 'Adult' ) === 0 )
+                ? $paid_val
+                : ( isset( $reg['rate_type'] ) ? trim( (string) $reg['rate_type'] ) : '' );
 
             $prof     = sywat_resolve_active_pricing_profile( $target_tourn, $round_slug );
-            $ind_rate = sywat_get_archer_individual_fee( $target_tourn, $div_val, $dist_val, $style_val, $round_slug, '' );
+            $ind_rate = sywat_get_archer_individual_fee( $target_tourn, $div_val, $dist_val, $style_val, $round_slug, $tier_hint );
 
             if ( ! empty( $prof['family_cap_enabled'] ) ) {
                 $any_cap_enabled = true;
@@ -773,12 +800,13 @@ if ( ! function_exists( 'sywat_recalculate_household_fees' ) ) {
                 $reg_copy = $registrations[ $item['index'] ];
                 unset( $reg_copy['_just_promoted'] );
 
-                $div_val  = isset( $reg_copy['division'] ) ? $reg_copy['division'] : '';
-                $dist_val = isset( $reg_copy['distance'] ) ? $reg_copy['distance'] : '20yd';
-                $ind_rate = $item['ind_rate'];
+                $div_val   = isset( $reg_copy['division'] ) ? $reg_copy['division'] : '';
+                $dist_val  = isset( $reg_copy['distance'] ) ? $reg_copy['distance'] : '20yd';
+                $tier_hint = isset( $reg_copy['paid'] ) ? $reg_copy['paid'] : ( isset( $reg_copy['rate_type'] ) ? $reg_copy['rate_type'] : '' );
+                $ind_rate  = $item['ind_rate'];
 
                 if ( function_exists( 'sywat_waitlist_get_paid_tier' ) ) {
-                    $reg_copy['paid'] = sywat_waitlist_get_paid_tier( $div_val, $dist_val );
+                    $reg_copy['paid'] = sywat_waitlist_get_paid_tier( $div_val, $dist_val, $tier_hint );
                 }
 
                 if ( $item['checked_in'] ) {
