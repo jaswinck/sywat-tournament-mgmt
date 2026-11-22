@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with one-click Unentered score filtering, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks, active line card highlighting, and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with live Active View Scope pill, one-click Show All reset, self-describing Unentered score filter toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.1.0
+ * Version: 8.2.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -66,6 +66,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
             : $tourn_registrations;
 
         $clean_search_init       = strtolower( trim( $search_query ) );
+        $total_prepared_count    = count( $prepared_rows );
         $initial_visible_count   = 0;
         $initial_unentered_count = 0;
 
@@ -87,6 +88,26 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                 }
             }
         }
+
+        $is_line_filtered    = ( $selected_line_idx !== 'all' && $selected_line_idx !== '' );
+        $is_initial_filtered = ( $is_line_filtered || $clean_search_init !== '' );
+
+        $scope_parts = array();
+        if ( $is_line_filtered ) {
+            if ( isset( $lines[ $selected_line_idx ] ) && is_array( $lines[ $selected_line_idx ] ) ) {
+                $scope_parts[] = function_exists( 'sywat_scores_resolve_line_label' )
+                    ? sywat_scores_resolve_line_label( $lines[ $selected_line_idx ], $selected_line_idx )
+                    : ( ! empty( $lines[ $selected_line_idx ]['name'] ) ? $lines[ $selected_line_idx ]['name'] : 'Line ' . ( intval( $selected_line_idx ) + 1 ) );
+            } else {
+                $scope_parts[] = 'Line ' . ( intval( $selected_line_idx ) + 1 );
+            }
+        } else {
+            $scope_parts[] = 'All Lines';
+        }
+        if ( $clean_search_init !== '' ) {
+            $scope_parts[] = 'Search: "' . trim( $search_query ) . '"';
+        }
+        $initial_scope_text = 'Viewing: ' . implode( ' · ', $scope_parts );
 
         // Enqueue client score interactive JavaScript asset with filemtime cache-busting
         $scores_js_rel  = 'assets/js/sywat-scores.js';
@@ -177,7 +198,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         <div class="sywat-tracker-grid">
                             <?php foreach ( $tracker_lines as $item ) : ?>
                                 <?php
-                                    $idx                 = $item['idx'];
+                                    $idx                 = (string) $item['idx'];
                                     $line_title          = function_exists( 'sywat_scores_resolve_line_label' )
                                         ? sywat_scores_resolve_line_label( $item['line'], $idx )
                                         : ( ! empty( $item['line']['name'] ) ? $item['line']['name'] : 'Line ' . ( intval( $idx ) + 1 ) );
@@ -185,6 +206,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     $scores_entered_line = intval( $item['entered'] );
                                     $is_line_locked      = ! empty( $item['is_locked'] );
                                     $is_complete         = ! empty( $item['is_complete'] );
+                                    $is_active_line_card = ( $selected_line_idx !== 'all' && $selected_line_idx !== '' && $selected_line_idx === $idx );
 
                                     if ( $is_line_locked ) {
                                         $status_badge = '<span class="sywat-badge sywat-badge-full">🔒 Locked</span>';
@@ -195,14 +217,17 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                         $status_badge = '<span class="sywat-badge sywat-badge-prereg">' . $pending . ' Pending</span>';
                                     }
                                 ?>
-                                <div class="sywat-tracker-card"
+                                <div class="sywat-tracker-card<?php echo $is_active_line_card ? ' sywat-tracker-card-active' : ''; ?>"
                                      data-line-idx="<?php echo esc_attr( $idx ); ?>"
                                      data-total="<?php echo intval( $total_line_shooters ); ?>"
                                      data-is-locked="<?php echo $is_line_locked ? '1' : '0'; ?>">
                                     <div>
                                         <div class="sywat-tracker-card-header">
                                             <strong class="sywat-tracker-card-title"><?php echo esc_html( $line_title ); ?></strong>
-                                            <span class="sywat-tracker-status-wrap"><?php echo $status_badge; ?></span>
+                                            <div class="sywat-tracker-header-badges">
+                                                <span class="sywat-badge sywat-badge-viewing<?php echo $is_active_line_card ? '' : ' sywat-hidden'; ?>">Viewing</span>
+                                                <span class="sywat-tracker-status-wrap"><?php echo $status_badge; ?></span>
+                                            </div>
                                         </div>
                                         <div class="sywat-tracker-card-stats">
                                             <span><strong>Scores Saved:</strong> <span class="sywat-tracker-entered-count"><?php echo intval( $scores_entered_line ); ?></span> / <?php echo intval( $total_line_shooters ); ?></span>
@@ -243,7 +268,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                         <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
 
                         <div class="sywat-table-header-bar">
-                            <h2>Archer Scores (<span id="sywat_scores_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
+                            <div class="sywat-table-header-left">
+                                <h2>Archer Scores (<span id="sywat_scores_visible_count"><?php echo intval( $initial_visible_count ); ?></span><span id="sywat_scores_total_count_wrap" class="<?php echo $is_initial_filtered ? '' : 'sywat-hidden'; ?>"> of <span id="sywat_scores_total_count"><?php echo intval( $total_prepared_count ); ?></span></span>)</h2>
+                                <span id="sywat_scores_view_scope_pill" class="sywat-view-scope-pill<?php echo $is_initial_filtered ? ' sywat-view-scope-filtered' : ''; ?>"><?php echo esc_html( $initial_scope_text ); ?></span>
+                                <button type="button" id="sywat_scores_reset_view_btn" class="sywat-btn sywat-btn-secondary sywat-btn-reset-view<?php echo $is_initial_filtered ? '' : ' sywat-hidden'; ?>" data-sywat-action="reset-scores-view">Show All</button>
+                            </div>
 
                             <div class="sywat-table-header-controls">
                                 <!-- One-Click Unentered Scores Filter Toggle -->
@@ -252,7 +281,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                         class="sywat-btn sywat-btn-secondary"
                                         data-sywat-action="toggle-scores-unentered"
                                         aria-pressed="false">
-                                    Unentered (<span id="sywat_scores_unentered_count"><?php echo intval( $initial_unentered_count ); ?></span>)
+                                    <span id="sywat_scores_unentered_label">Unentered</span> (<span id="sywat_scores_unentered_count"><?php echo intval( $initial_unentered_count ); ?></span>)
                                 </button>
 
                                 <!-- Live Search Input Group -->
