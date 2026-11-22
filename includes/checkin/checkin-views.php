@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Visual Views
  * Path: includes/checkin/checkin-views.php
- * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
+ * Description: Pure view renderer for the Check-In Desk portal. Renders role-gated desk navigation tabs with sticky tournament carryover, chronologically ordered Line Capacity Tracker with single-pass O(R) pre-indexed slot & waitlist counters and instant client-side line filter triggers, Active Registered Archers table formatted as "LastName, FirstName" consuming pre-formatted display & modal JSON payloads from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals, one-click Needs Check-In filter toggle button, responsive mobile card labels, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal) on demand.
  * Compliance: Pure view layer — zero database queries, zero business/fee calculations, zero output at include time, zero inline styles, optimizer-safe data-sywat-action triggers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.6.0
+ * Version: 7.7.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -372,7 +372,8 @@ if ( ! function_exists( 'sywat_desk_render_capacity_tracker' ) ) {
 
 /**
  * Render Active Registered Archers table consuming pre-computed presentation & modal payloads
- * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals.
+ * from includes/checkin/checkin-helpers.php for instantaneous zero-reload Check-In & Edit modals
+ * and one-click Needs Check-In status filtering.
  *
  * @param array $data Aggregated Check-In Desk dataset.
  * @return void
@@ -386,15 +387,23 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
         $selected_line_idx   = isset( $data['selected_line_idx'] ) ? (string) $data['selected_line_idx'] : 'all';
         $tournaments_map     = ! empty( $data['tournaments_full'] ) ? $data['tournaments_full'] : ( isset( $data['tournaments'] ) ? $data['tournaments'] : array() );
 
-        $clean_search_init     = strtolower( trim( $search_query ) );
-        $initial_visible_count = 0;
+        $clean_search_init         = strtolower( trim( $search_query ) );
+        $initial_visible_count     = 0;
+        $initial_needs_checkin_cnt = 0;
+
         foreach ( $active_checkins as $reg ) {
-            $r_line   = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
-            $r_tokens = isset( $reg['search_tokens'] ) ? (string) $reg['search_tokens'] : strtolower( trim( (string) ( isset( $reg['name'] ) ? $reg['name'] : '' ) ) );
-            $line_ok  = ( $selected_line_idx === 'all' || $selected_line_idx === '' || $r_line === $selected_line_idx );
-            $query_ok = ( $clean_search_init === '' || strpos( $r_tokens, $clean_search_init ) !== false );
+            $r_line        = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : ( isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0' );
+            $r_tokens      = isset( $reg['search_tokens'] ) ? (string) $reg['search_tokens'] : strtolower( trim( (string) ( isset( $reg['name'] ) ? $reg['name'] : '' ) ) );
+            $r_checked_in  = ! empty( $reg['is_checked_in'] );
+            $r_line_closed = ! empty( $reg['is_line_closed'] );
+            $line_ok       = ( $selected_line_idx === 'all' || $selected_line_idx === '' || $r_line === $selected_line_idx );
+            $query_ok      = ( $clean_search_init === '' || strpos( $r_tokens, $clean_search_init ) !== false );
+
             if ( $line_ok && $query_ok ) {
                 $initial_visible_count++;
+                if ( ! $r_checked_in && ! $r_line_closed ) {
+                    $initial_needs_checkin_cnt++;
+                }
             }
         }
 
@@ -413,6 +422,14 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
             <div class="sywat-table-header-bar">
                 <h2>Registered Archers (<span id="sywat_desk_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
                 <div class="sywat-table-header-controls">
+                    <button type="button"
+                            id="sywat_desk_needs_checkin_btn"
+                            class="sywat-btn sywat-btn-secondary"
+                            data-sywat-action="toggle-desk-needs-checkin"
+                            aria-pressed="false">
+                        Needs Check-In (<span id="sywat_desk_needs_checkin_count"><?php echo intval( $initial_needs_checkin_cnt ); ?></span>)
+                    </button>
+
                     <div class="sywat-search-input-group">
                         <input type="text" id="sywat_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search name..." autocomplete="off">
                         <button type="button" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-desk-search">Clear</button>
@@ -444,6 +461,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                     $resolved_l_idx   = isset( $reg['resolved_line_idx'] ) ? (string) $reg['resolved_line_idx'] : '0';
                                     $is_line_closed   = ! empty( $reg['is_line_closed'] );
                                     $is_checked_in    = ! empty( $reg['is_checked_in'] );
+                                    $needs_checkin    = ( ! $is_checked_in && ! $is_line_closed );
                                     $is_promo_free    = ! empty( $reg['is_promo_free'] );
                                     $round_label      = isset( $reg['round_label'] ) ? (string) $reg['round_label'] : '';
                                     $owe_badge_text   = isset( $reg['owe_badge_text'] ) ? (string) $reg['owe_badge_text'] : '';
@@ -465,6 +483,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                                 ?>
                                 <tr class="sywat-archer-row<?php echo $is_row_visible ? '' : ' sywat-hidden'; ?>"
                                     data-line-idx="<?php echo esc_attr( $resolved_l_idx ); ?>"
+                                    data-needs-checkin="<?php echo $needs_checkin ? '1' : '0'; ?>"
                                     data-name="<?php echo esc_attr( $search_tokens ); ?>"
                                     data-archer="<?php echo esc_attr( wp_json_encode( $modal_payload ) ); ?>">
                                     <td>
@@ -525,7 +544,7 @@ if ( ! function_exists( 'sywat_desk_render_archers_table' ) ) {
                         </tbody>
                     </table>
                 </div>
-                <p id="sywat_desk_empty_filter_msg" class="sywat-empty-text<?php echo ( $initial_visible_count === 0 ) ? '' : ' sywat-hidden'; ?>">No active archers match the selected line or search filter.</p>
+                <p id="sywat_desk_empty_filter_msg" class="sywat-empty-text<?php echo ( $initial_visible_count === 0 ) ? '' : ' sywat-hidden'; ?>">No active archers match the selected line, status, or search filter.</p>
             <?php else : ?>
                 <p class="sywat-empty-text">No active archers registered for this selection.</p>
             <?php endif; ?>
