@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, Needs Check-In status & live search filtering, Walk-In fast-loop intake, live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.4.0
+ * Version: 7.5.0
  */
 
 (function() {
@@ -12,6 +12,7 @@
     window.SYWAT = window.SYWAT || {};
 
     let cachedUnifiedShooters = null;
+    let needsCheckinOnly      = false;
 
     function escapeHtmlDesk(str) {
         if (!str) return '';
@@ -1499,8 +1500,26 @@
     }
 
     /**
-     * Filter Active Registered Archers Table Rows by Line & Search Query instantaneously
-     * without a full-page reload, and keep hidden form inputs synchronized.
+     * Synchronize the one-click Needs Check-In toggle button classes, count, and ARIA state.
+     */
+    function syncNeedsCheckinButton(needsCount) {
+        const btn     = document.getElementById('sywat_desk_needs_checkin_btn');
+        const countEl = document.getElementById('sywat_desk_needs_checkin_count');
+
+        if (countEl) {
+            countEl.textContent = String(needsCount);
+        }
+
+        if (btn) {
+            btn.classList.toggle('sywat-btn-primary', needsCheckinOnly);
+            btn.classList.toggle('sywat-btn-secondary', !needsCheckinOnly);
+            btn.setAttribute('aria-pressed', needsCheckinOnly ? 'true' : 'false');
+        }
+    }
+
+    /**
+     * Filter Active Registered Archers Table Rows by Line, Needs Check-In Status, & Search Query
+     * instantaneously without a full-page reload, and keep hidden form inputs synchronized.
      */
     function applyDeskLineAndSearchFilter() {
         const lineSelect   = document.getElementById('sywat_selected_line_idx');
@@ -1510,15 +1529,23 @@
         const cleanQuery   = rawQuery.trim().toLowerCase();
         const rows         = document.querySelectorAll('#sywat_desk_archers_table .sywat-archer-row');
 
-        let visibleCount = 0;
+        let visibleCount      = 0;
+        let needsCheckinCount = 0;
 
         rows.forEach(function(row) {
             const rowLine    = row.getAttribute('data-line-idx') || '';
             const archerName = row.getAttribute('data-name') || '';
+            const needsFlag  = row.getAttribute('data-needs-checkin') === '1';
             const lineOk     = (!selectedLine || selectedLine === 'all' || rowLine === selectedLine);
             const queryOk    = (!cleanQuery || archerName.includes(cleanQuery));
 
-            if (lineOk && queryOk) {
+            if (lineOk && queryOk && needsFlag) {
+                needsCheckinCount++;
+            }
+
+            const statusOk = (!needsCheckinOnly || needsFlag);
+
+            if (lineOk && queryOk && statusOk) {
                 row.classList.remove('sywat-hidden');
                 visibleCount++;
             } else {
@@ -1531,13 +1558,11 @@
             countEl.textContent = String(visibleCount);
         }
 
+        syncNeedsCheckinButton(needsCheckinCount);
+
         const emptyMsg = document.getElementById('sywat_desk_empty_filter_msg');
         if (emptyMsg) {
-            if (visibleCount === 0) {
-                emptyMsg.classList.remove('sywat-hidden');
-            } else {
-                emptyMsg.classList.add('sywat-hidden');
-            }
+            emptyMsg.classList.toggle('sywat-hidden', visibleCount > 0);
         }
 
         document.querySelectorAll('.sywat-desk-hidden-line').forEach(function(hiddenLine) {
@@ -1553,6 +1578,16 @@
         } else {
             sessionStorage.removeItem('sywat_checkin_search_query');
         }
+    }
+
+    function toggleDeskNeedsCheckinFilter() {
+        needsCheckinOnly = !needsCheckinOnly;
+        if (needsCheckinOnly) {
+            sessionStorage.setItem('sywat_checkin_needs_only', '1');
+        } else {
+            sessionStorage.removeItem('sywat_checkin_needs_only');
+        }
+        applyDeskLineAndSearchFilter();
     }
 
     function applyDeskSearchFilter(query) {
@@ -1596,6 +1631,7 @@
         openWalkinModal: openWalkinModal,
         closeWalkinModal: closeWalkinModal,
         continueFamilyLoop: continueFamilyLoop,
+        toggleNeedsCheckinFilter: toggleDeskNeedsCheckinFilter,
         applyLineAndSearchFilter: applyDeskLineAndSearchFilter,
         applySearchFilter: applyDeskSearchFilter
     };
@@ -1622,6 +1658,8 @@
      * Initializes Check-In Desk event listeners and pre-fills active forms.
      */
     function initSywatCheckin() {
+        needsCheckinOnly = (sessionStorage.getItem('sywat_checkin_needs_only') === '1');
+
         const editBalanceEl = document.getElementById('edit_balance_due');
         if (editBalanceEl && typeof editBalanceEl.dataset.origDue === 'undefined') {
             editBalanceEl.dataset.origDue = editBalanceEl.value || '0';
@@ -1719,6 +1757,10 @@
         const action = actionEl.getAttribute('data-sywat-action');
 
         switch (action) {
+            case 'toggle-desk-needs-checkin':
+                e.preventDefault();
+                toggleDeskNeedsCheckinFilter();
+                break;
             case 'open-desk-checkin-modal': {
                 e.preventDefault();
                 const archer = parseRowArcherPayload(actionEl);
