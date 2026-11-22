@@ -2,10 +2,11 @@
 /**
  * Module: Check-In Desk Portal Controller
  * Path: includes/checkin/class-sywat-checkin.php
- * Description: Main entry point and shortcode definition for the Check-In Desk portal, orchestrating raw data retrieval (checkin-data.php) and pure presentation/payload formatting (checkin-helpers.php), skipping redundant state reloads on non-mutating modal open/cancel POSTs, and enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, and active tournament pricing/promoter data.
+ * Description: Main entry point and shortcode definition for the Check-In Desk portal, orchestrating raw data retrieval (checkin-data.php), pure presentation/payload formatting (checkin-helpers.php), synchronous POST handlers (checkin-actions.php), authenticated admin-ajax.php JSON endpoints (checkin-ajax.php), skipping redundant state reloads on non-mutating modal open/cancel POSTs, and enqueueing the shared Shooting Styles & Division Rule engine, Member Directory shooter profiles, 18-month TFAA historical shooter datasets, active tournament pricing/promoter data, and zero-reload AJAX check-in controller.
+ * Compliance: Zero HTML echo at include time, SYWAT_PLUGIN_URL & filemtime() asset versioning, footer-loaded vanilla JS without jQuery, omitted closing PHP tag.
  * Shortcode: [sywat_desk]
  * Author: SYWAT Archery
- * Version: 7.2.2
+ * Version: 7.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-data.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-helpers.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-actions.php';
+require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-ajax.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-views.php';
 require_once SYWAT_PLUGIN_DIR . 'includes/checkin/checkin-modals.php';
 
@@ -78,9 +80,9 @@ if ( ! function_exists( 'render_sywat_desk_app' ) ) {
 }
 
 /**
- * Enqueues external JS asset and injects localized JSON datasets using Member Directory records,
+ * Enqueues external JS assets and injects localized JSON datasets using Member Directory records,
  * 18-month historical TFAA results, database-configured shooting styles & age divisions,
- * and active tournament pricing/promoter rules.
+ * active tournament pricing/promoter rules, and AJAX endpoint configuration.
  *
  * @param array $data Aggregated state dataset.
  * @return void
@@ -146,7 +148,7 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
 
         $handle  = 'sywat-checkin-js';
         $js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin.js';
-        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.2.2' );
+        $version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.3.0' );
         $deps    = ( wp_script_is( 'sywat-shooting-styles-js', 'registered' ) || wp_script_is( 'sywat-shooting-styles-js', 'enqueued' ) )
             ? array( 'sywat-shooting-styles-js' )
             : array();
@@ -170,5 +172,19 @@ if ( ! function_exists( 'sywat_desk_enqueue_scripts' ) ) {
                      'window.sywatDeskPricing = ' . wp_json_encode( $pricing_bundle ) . ';';
 
         wp_add_inline_script( $handle, $inline_js, 'before' );
+
+        // Enqueue zero-reload AJAX Check-In & Undo Check-In client controller
+        $ajax_handle  = 'sywat-checkin-ajax-js';
+        $ajax_js_file = SYWAT_PLUGIN_DIR . 'assets/js/sywat-checkin-ajax.js';
+        $ajax_version = file_exists( $ajax_js_file ) ? (string) filemtime( $ajax_js_file ) : ( defined( 'SYWAT_PLUGIN_VERSION' ) ? SYWAT_PLUGIN_VERSION : '7.3.0' );
+
+        wp_enqueue_script( $ajax_handle, SYWAT_PLUGIN_URL . 'assets/js/sywat-checkin-ajax.js', array( $handle ), $ajax_version, true );
+
+        $ajax_config = array(
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'sywat_desk_action' ),
+        );
+
+        wp_add_inline_script( $ajax_handle, 'window.sywatDeskAjax = ' . wp_json_encode( $ajax_config ) . ';', 'before' );
     }
 }
