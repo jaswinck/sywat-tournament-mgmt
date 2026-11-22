@@ -1,9 +1,9 @@
 /**
  * SYWAT Archery - Check-In Desk Client Engine
  * Path: assets/js/sywat-checkin.js
- * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering (persisting the active Shooting Line selection per tournament across page refreshes via sessionStorage), Walk-In fast-loop intake (automatically syncing Default Shooting Line and Line Family Group options to the active Check-In Desk Shooting Line filter), live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
+ * Description: Manages instantaneous zero-reload Check-In & Edit modal opening/population, client-side line, single-button Needs Check-In / Show All status & live search filtering (respecting the server-selected first open shooting line on initial load while persisting user-selected open line or All Lines choices per tournament across page refreshes via sessionStorage), smooth viewport orientation to #sywat_desk_archers_section with automatic search focus when clicking Check In Line on a tracker card, Walk-In fast-loop intake (automatically syncing Default Shooting Line and Line Family Group options to the active Check-In Desk Shooting Line filter), live unpaid balance synchronization on Edit/Check-In modals, live First-Time/Lapsed Shooter promo eligibility badges, unified Member Database + 18-month TFAA smart name matching with automatic canonical name enforcement, and database-driven shooting style & age division rule enforcement.
  * Compliance: Vanilla JS only (zero jQuery), zero element.style.* mutations, class-based visibility (.sywat-hidden / .active / .sywat-btn-filter-active / .sywat-btn-secondary), delegated data-sywat-action listeners, zero document-level keydown listeners.
- * Version: 7.6.4
+ * Version: 7.6.5
  */
 
 (function() {
@@ -1537,15 +1537,55 @@
     }
 
     /**
+     * Persist the active Shooting Line selection (including explicit "all") for the active tournament
+     * so browser refreshes retain the user's line view while new sessions start on the first open lane.
+     */
+    function persistDeskLinePreference(selectedLine) {
+        const tournSelect = document.getElementById('sywat_selected_tournament');
+        const activeTourn = tournSelect ? String(tournSelect.value || '').trim() : '';
+        const lineVal     = String(selectedLine || 'all');
+
+        sessionStorage.setItem('sywat_checkin_selected_line_idx', lineVal);
+        if (activeTourn) {
+            sessionStorage.setItem('sywat_checkin_selected_line_tourn', activeTourn);
+        }
+    }
+
+    /**
+     * Orient the viewport cleanly to #sywat_desk_archers_section so the search input,
+     * Needs Check-In toggle, and top rows of the roster are immediately visible without scrolling.
+     */
+    function focusDeskArchersSection() {
+        const sectionEl = document.getElementById('sywat_desk_archers_section') || document.getElementById('sywat_desk_archers_table');
+        if (sectionEl) {
+            const adminBar    = document.getElementById('wpadminbar');
+            const topClearance = (adminBar ? adminBar.offsetHeight : 0) + 16;
+            const targetTop    = Math.max(0, sectionEl.getBoundingClientRect().top + window.pageYOffset - topClearance);
+
+            if (typeof window.scrollTo === 'function') {
+                window.scrollTo({ top: targetTop, behavior: 'smooth' });
+            } else if (typeof sectionEl.scrollIntoView === 'function') {
+                sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        const searchInput = document.getElementById('sywat_search_input');
+        if (searchInput && typeof searchInput.focus === 'function') {
+            try {
+                searchInput.focus({ preventScroll: true });
+            } catch (err) {
+                searchInput.focus();
+            }
+        }
+    }
+
+    /**
      * Filter Active Registered Archers Table Rows by Line, Needs Check-In Status, & Search Query
-     * instantaneously without a full-page reload, persist active filter state in sessionStorage,
-     * and keep hidden form inputs synchronized.
+     * instantaneously without a full-page reload, and keep hidden form inputs synchronized.
      */
     function applyDeskLineAndSearchFilter() {
-        const tournSelect     = document.getElementById('sywat_selected_tournament');
         const lineSelect      = document.getElementById('sywat_selected_line_idx');
         const searchInput     = document.getElementById('sywat_search_input');
-        const activeTourn     = tournSelect ? String(tournSelect.value || '').trim() : '';
         const selectedLine    = lineSelect ? String(lineSelect.value || 'all') : 'all';
         const rawQuery        = searchInput ? String(searchInput.value || '') : '';
         const cleanQuery      = rawQuery.trim().toLowerCase();
@@ -1596,16 +1636,6 @@
         document.querySelectorAll('.sywat-hidden-search').forEach(function(hiddenInput) {
             hiddenInput.value = rawQuery;
         });
-
-        if (isLineFiltered) {
-            sessionStorage.setItem('sywat_checkin_selected_line_idx', selectedLine);
-            if (activeTourn) {
-                sessionStorage.setItem('sywat_checkin_selected_line_tourn', activeTourn);
-            }
-        } else {
-            sessionStorage.removeItem('sywat_checkin_selected_line_idx');
-            sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
-        }
 
         if (rawQuery) {
             sessionStorage.setItem('sywat_checkin_search_query', rawQuery);
@@ -1689,19 +1719,19 @@
     }
 
     /**
-     * Initializes Check-In Desk event listeners and restores saved session filter state.
+     * Initializes Check-In Desk event listeners and restores valid session filter state.
      */
     function initSywatCheckin() {
         needsCheckinOnly = (sessionStorage.getItem('sywat_checkin_needs_only') === '1');
 
         const lineSelect  = document.getElementById('sywat_selected_line_idx');
         const tournSelect = document.getElementById('sywat_selected_tournament');
-        if (lineSelect && String(lineSelect.value || 'all') === 'all') {
+        if (lineSelect) {
             const savedLineIdx   = sessionStorage.getItem('sywat_checkin_selected_line_idx');
             const savedLineTourn = sessionStorage.getItem('sywat_checkin_selected_line_tourn') || '';
             const currTourn      = tournSelect ? String(tournSelect.value || '').trim() : '';
 
-            if (savedLineIdx && savedLineIdx !== 'all' && (!savedLineTourn || !currTourn || savedLineTourn === currTourn)) {
+            if (savedLineIdx && (!savedLineTourn || !currTourn || savedLineTourn === currTourn)) {
                 let hasMatchingOpt = false;
                 for (let i = 0; i < lineSelect.options.length; i++) {
                     if (lineSelect.options[i].value === savedLineIdx) {
@@ -1709,12 +1739,26 @@
                         break;
                     }
                 }
-                if (hasMatchingOpt) {
+
+                // Verify the saved line is still open (if a tracker card exists, it must still have a Check In Line trigger)
+                let isLineStillOpen = true;
+                if (savedLineIdx !== 'all') {
+                    const cardSelector = '.sywat-tracker-card[data-tracker-line-idx="' + String(savedLineIdx).replace(/"/g, '\\"') + '"]';
+                    const trackerCard  = document.querySelector(cardSelector);
+                    if (trackerCard && !trackerCard.querySelector('[data-sywat-action="select-desk-line"]')) {
+                        isLineStillOpen = false;
+                    }
+                }
+
+                if (hasMatchingOpt && isLineStillOpen) {
                     lineSelect.value = savedLineIdx;
                 } else {
                     sessionStorage.removeItem('sywat_checkin_selected_line_idx');
                     sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
                 }
+            } else if (savedLineTourn && currTourn && savedLineTourn !== currTourn) {
+                sessionStorage.removeItem('sywat_checkin_selected_line_idx');
+                sessionStorage.removeItem('sywat_checkin_selected_line_tourn');
             }
         }
 
@@ -1849,15 +1893,14 @@
                 break;
             case 'select-desk-line': {
                 e.preventDefault();
+                const chosenLine = actionEl.getAttribute('data-line-idx') || 'all';
                 const lineSelect = document.getElementById('sywat_selected_line_idx');
                 if (lineSelect) {
-                    lineSelect.value = actionEl.getAttribute('data-line-idx') || 'all';
+                    lineSelect.value = chosenLine;
                 }
+                persistDeskLinePreference(chosenLine);
                 applyDeskLineAndSearchFilter();
-                const tableEl = document.getElementById('sywat_desk_archers_table');
-                if (tableEl && typeof tableEl.scrollIntoView === 'function') {
-                    tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+                focusDeskArchersSection();
                 break;
             }
             case 'clear-desk-search':
@@ -1912,6 +1955,7 @@
                 break;
             }
             case 'filter-desk-line':
+                persistDeskLinePreference(e.target.value);
                 applyDeskLineAndSearchFilter();
                 break;
             case 'toggle-unpaid-banner':
