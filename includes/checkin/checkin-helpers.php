@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Check-In Desk Presentation & Payload Helpers
  * Path: includes/checkin/checkin-helpers.php
- * Description: Pure presentation formatting, O(R) single-pass household balance indexing, family group label formatting, surname alphabetical sorting ("LastName, FirstName"), and normalized modal JSON payload builder for the Check-In Desk portal.
+ * Description: Pure presentation formatting, O(R) single-pass household balance indexing with Youth/Young Adult rate-tier overcharge reconciliation, family group label formatting, surname alphabetical sorting ("LastName, FirstName"), and normalized modal JSON payload builder for the Check-In Desk portal.
  * Compliance: Pure helper layer — zero database queries, zero option/meta lookups, zero HTML echo at include time, O(R) single-pass indexing, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -90,24 +90,31 @@ if ( ! function_exists( 'sywat_desk_format_family_groups' ) ) {
  * @param array  $pricing_profiles Tournament pricing profiles map.
  * @param string $default_prof_key Default pricing profile slug.
  * @param array  $div_meta_lookup  Associative division lookup indexed by lowercase label/code/alias.
+ * @param string $tier_hint        Optional explicit rate-tier or distance hint ('Youth', 'Cub', 'Adult').
  * @return float Calculated individual entry fee.
  */
 if ( ! function_exists( 'sywat_desk_compute_individual_fee_pure' ) ) {
-    function sywat_desk_compute_individual_fee_pure( $division, $style, $round_slug, $pricing_profiles, $default_prof_key, $div_meta_lookup ) {
-        $clean_div = trim( (string) $division );
-        if ( $clean_div === '' || strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+    function sywat_desk_compute_individual_fee_pure( $division, $style, $round_slug, $pricing_profiles, $default_prof_key, $div_meta_lookup, $tier_hint = '' ) {
+        $clean_div  = trim( (string) $division );
+        $clean_hint = trim( (string) $tier_hint );
+
+        if ( strcasecmp( $clean_div, 'No Show' ) === 0 ) {
+            return 0.00;
+        }
+        if ( $clean_div === '' && $clean_hint === '' ) {
             return 0.00;
         }
 
         $div_key = strtolower( $clean_div );
-        $div_cfg = isset( $div_meta_lookup[ $div_key ] ) ? $div_meta_lookup[ $div_key ] : null;
+        $div_cfg = ( $div_key !== '' && isset( $div_meta_lookup[ $div_key ] ) ) ? $div_meta_lookup[ $div_key ] : null;
 
         $is_cub   = $div_cfg
             ? ( isset( $div_cfg['distance'] ) && $div_cfg['distance'] === 'Cub' )
-            : ( stripos( $clean_div, 'Cub' ) !== false );
+            : ( stripos( $clean_div, 'Cub' ) !== false || strcasecmp( $clean_hint, 'Cub' ) === 0 );
         $is_youth = $is_cub
             || ( $div_cfg && isset( $div_cfg['rate_tier'] ) && $div_cfg['rate_tier'] === 'Youth' )
-            || ( stripos( $clean_div, 'Youth' ) !== false || stripos( $clean_div, 'Young Adult' ) !== false );
+            || ( stripos( $clean_div, 'Youth' ) !== false || stripos( $clean_div, 'Young Adult' ) !== false )
+            || ( strcasecmp( $clean_hint, 'Youth' ) === 0 );
 
         $prof = null;
         if ( is_array( $pricing_profiles ) && ! empty( $pricing_profiles ) ) {
@@ -121,7 +128,7 @@ if ( ! function_exists( 'sywat_desk_compute_individual_fee_pure' ) ) {
         }
 
         if ( is_array( $prof ) ) {
-            $div_slug = ( $div_cfg && ! empty( $div_cfg['slug'] ) ) ? $div_cfg['slug'] : sanitize_title( $clean_div );
+            $div_slug = ( $div_cfg && ! empty( $div_cfg['slug'] ) ) ? $div_cfg['slug'] : ( $clean_div !== '' ? sanitize_title( $clean_div ) : '' );
             if ( $div_slug !== '' && isset( $prof['division_overrides'][ $div_slug ] ) && $prof['division_overrides'][ $div_slug ] !== '' ) {
                 return round( floatval( $prof['division_overrides'][ $div_slug ] ), 2 );
             }
@@ -151,8 +158,9 @@ if ( ! function_exists( 'sywat_desk_compute_individual_fee_pure' ) ) {
 
 /**
  * Formats all Check-In Desk presentation fields, pre-indexes household balances in a single
- * O(R) pass, sorts registrations by line and surname ("LastName, FirstName"), and builds
- * normalized modal JSON payloads for zero-reload Check-In and Edit modals.
+ * O(R) pass, reconciles any Youth/Young Adult Adult-rate overcharge discrepancies, sorts
+ * registrations by line and surname ("LastName, FirstName"), and builds normalized modal
+ * JSON payloads for zero-reload Check-In and Edit modals.
  *
  * @param array $data Check-In Desk state dataset passed by reference.
  * @return void
@@ -240,11 +248,64 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
             ? $data['tourn_registrations']
             : array();
 
-        // 3. Single-pass O(R) household & booking group balance indexing
-        $family_index  = array();
-        $booking_index = array();
+        // Helper: Reconcile any Youth/Young Adult record overbilled at the Adult rate (e.g., $25 paid + $5 due)
+        $reconcile_record_due = function( $reg ) use ( $t_profiles, $default_prof_key, $div_meta_lookup ) {
+            $raw_due = isset( $reg['balance_due'] ) ? max( 0.00, floatval( $reg['balance_due'] ) ) : 0.00;
+            if ( $raw_due <= 0.00 ) {
+                return 0.00;
+            }
 
-        foreach ( $raw_tourn_regs as $reg ) {
+            $r_paid  = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
+            $r_rate  = isset( $reg['rate_type'] ) ? trim( (string) $reg['rate_type'] ) : '';
+            $r_dist  = isset( $reg['distance'] ) ? trim( (string) $reg['distance'] ) : '';
+            $r_div   = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+            $r_sty   = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+            $r_round = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+
+            $is_fam = ( strcasecmp( $r_paid, 'Family' ) === 0 ) || ( $r_rate !== '' && stripos( $r_rate, 'family' ) !== false );
+            if ( $is_fam || strcasecmp( $r_div, 'No Show' ) === 0 ) {
+                return round( $raw_due, 2 );
+            }
+
+            $div_key       = strtolower( $r_div );
+            $div_cfg       = ( $div_key !== '' && isset( $div_meta_lookup[ $div_key ] ) ) ? $div_meta_lookup[ $div_key ] : null;
+            $is_youth_tier = (
+                strcasecmp( $r_paid, 'Youth' ) === 0 ||
+                strcasecmp( $r_paid, 'Cub' ) === 0 ||
+                strcasecmp( $r_rate, 'Youth' ) === 0 ||
+                strcasecmp( $r_rate, 'Cub' ) === 0 ||
+                strcasecmp( $r_dist, 'Cub' ) === 0 ||
+                ( is_array( $div_cfg ) && isset( $div_cfg['rate_tier'] ) && $div_cfg['rate_tier'] === 'Youth' ) ||
+                stripos( $r_div, 'Cub' ) !== false ||
+                stripos( $r_div, 'Youth' ) !== false ||
+                stripos( $r_div, 'Young Adult' ) !== false
+            );
+
+            if ( ! $is_youth_tier ) {
+                return round( $raw_due, 2 );
+            }
+
+            $youth_fee = sywat_desk_compute_individual_fee_pure( $r_div, $r_sty, $r_round, $t_profiles, $default_prof_key, $div_meta_lookup, 'Youth' );
+            $adult_fee = sywat_desk_compute_individual_fee_pure( '', $r_sty, $r_round, $t_profiles, $default_prof_key, $div_meta_lookup, 'Adult' );
+
+            if ( isset( $reg['amount_paid'] ) ) {
+                $amt_paid = max( 0.00, floatval( $reg['amount_paid'] ) );
+                if ( $amt_paid > 0.00 && ( $amt_paid + $raw_due ) > ( $youth_fee + 0.009 ) ) {
+                    return max( 0.00, round( $youth_fee - $amt_paid, 2 ) );
+                }
+            } elseif ( $adult_fee > $youth_fee && abs( $raw_due - ( $adult_fee - $youth_fee ) ) < 0.01 ) {
+                return 0.00;
+            }
+
+            return round( $raw_due, 2 );
+        };
+
+        // 3. Single-pass O(R) household & booking group balance indexing
+        $family_index        = array();
+        $booking_index       = array();
+        $reconciled_due_list = array();
+
+        foreach ( $raw_tourn_regs as $reg_idx => $reg ) {
             if ( ! is_array( $reg ) ) {
                 continue;
             }
@@ -254,19 +315,25 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
             }
 
             $r_line    = sywat_desk_resolve_line_idx( $reg, $lines );
-            $r_due     = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.0;
+            $r_due     = $reconcile_record_due( $reg );
+            $reconciled_due_list[ $reg_idx ] = $r_due;
+
             $r_paid    = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
             $r_rate    = isset( $reg['rate_type'] ) ? trim( (string) $reg['rate_type'] ) : '';
+            $r_dist    = isset( $reg['distance'] ) ? trim( (string) $reg['distance'] ) : '';
             $is_fam    = ( strcasecmp( $r_paid, 'Family' ) === 0 ) || ( $r_rate !== '' && stripos( $r_rate, 'family' ) !== false );
             $is_exempt = ( strcasecmp( $r_paid, 'Field Governor' ) === 0 )
                 || ! empty( $reg['is_promo_free'] )
                 || ( strcasecmp( $r_paid, 'Promo (Free)' ) === 0 )
                 || ( stripos( $r_paid, 'Promo' ) === 0 );
 
-            $r_div   = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
-            $r_sty   = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
-            $r_round = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
-            $ind_fee = $is_exempt ? 0.00 : sywat_desk_compute_individual_fee_pure( $r_div, $r_sty, $r_round, $t_profiles, $default_prof_key, $div_meta_lookup );
+            $r_div     = isset( $reg['division'] ) ? trim( (string) $reg['division'] ) : '';
+            $r_sty     = isset( $reg['style'] ) ? trim( (string) $reg['style'] ) : '';
+            $r_round   = ! empty( $reg['pricing_profile'] ) ? sanitize_title( (string) $reg['pricing_profile'] ) : $default_prof_key;
+            $tier_hint = ! $is_fam
+                ? ( $r_paid !== '' ? $r_paid : ( $r_rate !== '' ? $r_rate : ( strcasecmp( $r_dist, 'Cub' ) === 0 ? 'Cub' : '' ) ) )
+                : ( $r_rate !== '' ? $r_rate : ( strcasecmp( $r_dist, 'Cub' ) === 0 ? 'Cub' : '' ) );
+            $ind_fee   = $is_exempt ? 0.00 : sywat_desk_compute_individual_fee_pure( $r_div, $r_sty, $r_round, $t_profiles, $default_prof_key, $div_meta_lookup, $tier_hint );
 
             $fam_id = ! empty( $reg['family_id'] ) ? trim( (string) $reg['family_id'] ) : '';
             if ( $fam_id !== '' ) {
@@ -309,7 +376,7 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
         $active_checkins      = array();
         $modal_round_profiles = $t_profiles;
 
-        foreach ( $raw_tourn_regs as $reg ) {
+        foreach ( $raw_tourn_regs as $reg_idx => $reg ) {
             if ( ! is_array( $reg ) ) {
                 continue;
             }
@@ -326,7 +393,9 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
 
             $reg_type       = ( isset( $reg['type'] ) && $reg['type'] === 'Walk-In' ) ? 'Walk-In' : 'Pre-Reg';
             $badge_class    = ( $reg_type === 'Walk-In' ) ? 'sywat-badge-walkin' : 'sywat-badge-prereg';
-            $balance_due    = isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.0;
+            $balance_due    = isset( $reconciled_due_list[ $reg_idx ] )
+                ? $reconciled_due_list[ $reg_idx ]
+                : ( isset( $reg['balance_due'] ) ? floatval( $reg['balance_due'] ) : 0.0 );
             $search_tokens  = strtolower( trim( $disp_archer_name . ' ' . $raw_name ) );
             $resolved_l_idx = sywat_desk_resolve_line_idx( $reg, $lines );
             $reg_line_name  = ( isset( $reg['line_name'] ) && trim( (string) $reg['line_name'] ) !== '' )
@@ -346,6 +415,8 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
             $dist_disp   = $is_no_show ? 'No Show' : ( ! empty( $reg['distance'] ) ? trim( (string) $reg['distance'] ) : 'N/A' );
 
             $raw_paid_str  = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
+            $raw_rate_str  = isset( $reg['rate_type'] ) ? trim( (string) $reg['rate_type'] ) : '';
+            $raw_dist_str  = isset( $reg['distance'] ) ? trim( (string) $reg['distance'] ) : '';
             $is_promo_free = ! $is_no_show && (
                 ! empty( $reg['is_promo_free'] )
                 || strcasecmp( $paid_disp, 'Promo (Free)' ) === 0
@@ -373,7 +444,7 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
 
             $is_family_due = ! $is_no_show && (
                 strcasecmp( $raw_paid_str, 'Family' ) === 0
-                || ( isset( $reg['rate_type'] ) && strtolower( (string) $reg['rate_type'] ) === 'family' )
+                || ( $raw_rate_str !== '' && strtolower( $raw_rate_str ) === 'family' )
             );
 
             // O(1) household balance resolution from pre-indexed lookup maps
@@ -442,13 +513,17 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
 
             $fallback_ind_fee = 0.00;
             if ( ! $is_promo_free && strcasecmp( $raw_paid_str, 'Field Governor' ) !== 0 ) {
+                $modal_tier_hint  = ! $is_family_due
+                    ? ( $raw_paid_str !== '' ? $raw_paid_str : ( $raw_rate_str !== '' ? $raw_rate_str : ( strcasecmp( $raw_dist_str, 'Cub' ) === 0 ? 'Cub' : '' ) ) )
+                    : ( $raw_rate_str !== '' ? $raw_rate_str : ( strcasecmp( $raw_dist_str, 'Cub' ) === 0 ? 'Cub' : '' ) );
                 $fallback_ind_fee = sywat_desk_compute_individual_fee_pure(
                     $norm_div,
                     $norm_sty,
                     $modal_round_slug,
                     $t_profiles,
                     $default_prof_key,
-                    $div_meta_lookup
+                    $div_meta_lookup,
+                    $modal_tier_hint
                 );
             }
 
@@ -465,6 +540,7 @@ if ( ! function_exists( 'sywat_desk_prepare_presentation_data' ) ) {
                 $pay_opt_val = 'Individual';
             }
 
+            $reg['balance_due']        = round( $balance_due, 2 );
             $reg['resolved_line_idx']  = (string) $resolved_l_idx;
             $reg['resolved_line_name'] = $reg_line_name;
             $reg['search_tokens']      = $search_tokens;
