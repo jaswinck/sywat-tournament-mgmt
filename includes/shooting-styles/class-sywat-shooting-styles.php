@@ -2,18 +2,19 @@
 /**
  * Module: Shooting Styles & Divisions Configuration Engine
  * Path: includes/shooting-styles/class-sywat-shooting-styles.php
- * Description: Central controller loader binding database storage, global style/division helpers, POST action handlers, Administration GUI shortcode ([sywat_shooting_styles]), and conditional client script localization.
+ * Description: Central controller loader binding database storage, O(1) age division lookup & rate-tier helpers, global style helpers, POST action handlers, Administration GUI shortcode ([sywat_shooting_styles]), and conditional client script localization.
  * Compliance: Zero HTML echo at include time, SYWAT_PLUGIN_URL & filemtime() asset versioning, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Load Shooting Styles Sub-Modules
+// Load Shooting Styles & Divisions Sub-Modules
 require_once __DIR__ . '/shooting-styles-data.php';
+require_once __DIR__ . '/division-helpers.php';
 require_once __DIR__ . '/shooting-styles-helpers.php';
 require_once __DIR__ . '/shooting-styles-actions.php';
 require_once __DIR__ . '/shooting-styles-views.php';
