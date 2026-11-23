@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine CSV Export Processor
  * Path: includes/scores/scores-export.php
- * Description: Generates and streams standard CSV score reports for locked lines, formatting archer names as "LastName, FirstName" via the shared identity formatter (preserving generational suffixes), resolving scores, X counts, incomplete round flags ("is_inc" -> "Incomplete (Y)"), and TFAA division/style export codes from database configuration, and tagging guest/duplicate scores.
+ * Description: Generates and streams standard CSV score reports for locked lines, formatting archer names as "LastName, FirstName" via the shared identity formatter (preserving generational suffixes), resolving scores, X counts, incomplete round flags ("is_inc" -> "Incomplete (Y)"), and TFAA division/style export codes from database configuration, tagging guest/duplicate scores, and returning cleanly when no lines are locked so the page renders an inline error notice.
  * Compliance: Pure export processor — zero output at include time, template_redirect hook before theme headers, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,6 +17,8 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
 
     /**
      * Intercepts POST requests for CSV export, formats score data, and streams downloadable CSV file.
+     * Returns early without terminating when no shooting lines are locked so the view renderer
+     * displays an inline alert banner on the Enter Scores page.
      *
      * @return void
      */
@@ -48,13 +50,16 @@ if ( ! function_exists( 'sywat_process_csv_export' ) ) {
             }
 
             $active_t_slug = sanitize_title( $selected_tournament );
-            $locked_lines  = get_option( 'sywat_locks_' . $active_t_slug, array() );
 
-            if ( empty( $locked_lines ) ) {
-                wp_die( 'Access Denied: At least one shooting line must be locked to export CSV.' );
+            wp_cache_delete( 'sywat_locks_' . $active_t_slug, 'options' );
+            $locked_lines = get_option( 'sywat_locks_' . $active_t_slug, array() );
+
+            if ( ! is_array( $locked_lines ) || empty( $locked_lines ) ) {
+                return;
             }
 
             // Fetch master score map for high-speed resolution
+            wp_cache_delete( 'sywat_scores_' . $active_t_slug, 'options' );
             $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
             if ( ! is_array( $scores_map ) ) {
                 $scores_map = array();
