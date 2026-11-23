@@ -1,7 +1,7 @@
 /* ==========================================================================
    SYWAT Archery - Unified Button System Spec
    Path: assets/css/sywat-buttons.css
-   Version: 6.8.3
+   Version: 6.8.4
    ========================================================================== */
 
 /* Universal Button Base (38px Standard Height) */
@@ -293,3 +293,22 @@
 .sywat-btn-icon-back::before        { content: "←\00a0"; }
 .sywat-btn-icon-global-push::before { content: "🚀\00a0"; }
 .sywat-btn-icon-results::before    { content: "🎯\00a0"; }
+
+/* Modal Primary Action Button Contrast & Focus Override */
+.sywat-modal-backdrop .sywat-btn-primary,
+.sywat-modal-backdrop .sywat-btn-primary:focus,
+.sywat-modal-backdrop .sywat-btn-primary:focus-visible {
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid var(--sywat-primary);
+    box-shadow: none;
+    outline: none;
+    color: var(--sywat-primary) !important;
+}
+
+.sywat-modal-backdrop .sywat-btn-primary:hover {
+    background-color: var(--sywat-primary);
+    background-image: none;
+    border-color: var(--sywat-primary);
+    color: #ffffff !important;
+}
