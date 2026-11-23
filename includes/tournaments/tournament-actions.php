@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Action Handlers & POST Request Router for Tournaments and Seasons
  * Path: includes/tournaments/tournament-actions.php
- * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, public online registration On/Off & lead-time overrides (inheriting host shop defaults), external registration links, and promoter flags, excludes historical_import archives from weekend bulk sync/push operations, ensures global_push_standings publishes only tournaments with recorded scores while keeping upcoming/unscored tournaments unpublished, avoids redundant remote TFAA scrapes during capacity/metadata-only edits, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
+ * Description: Handles tournament/season POST actions, persists season and tournament pricing/round profiles, public online registration On/Off & lead-time overrides (inheriting host shop defaults), external registration links, and promoter flags, excludes historical_import archives from weekend bulk sync/push operations, ensures global_push_standings publishes only tournaments with recorded scores while keeping upcoming/unscored tournaments unpublished, restricts single-event toggle_publish_standings strictly to unpublishing/hiding (enforcing global Push Weekend Standings for publishing), avoids redundant remote TFAA scrapes during capacity/metadata-only edits, sorts shooting lines chronologically on save with automatic registration/lock index remapping, preserves tournament keys/metadata during capacity edits, and safely migrates registrations, scores, and line locks if a tournament is explicitly renamed or re-sequenced.
  * Compliance: Pure action layer — zero HTML echo at include time, indexed active-tournament registration lookups, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.19.0
+ * Version: 7.19.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -539,22 +539,22 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
             }
         }
 
-        // Action: Toggle Push / Publish Scores to Season Standings (Single Event)
+        // Action: Hide / Unpublish Scores from Season Standings (Publishing is restricted exclusively to global_push_standings)
         if ( $action === 'toggle_publish_standings' ) {
-            $t_name = sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) );
+            if ( ! $can_manage_seasons ) {
+                return '<div id="sywat-notice" class="sywat-alert sywat-alert-danger">Access denied. Only administrators and TFAA webmasters can manage Season Standings visibility.</div>';
+            }
+
+            $t_name = isset( $_POST['tournament_name'] ) ? sanitize_text_field( wp_unslash( $_POST['tournament_name'] ) ) : '';
             if ( isset( $tournaments[ $t_name ] ) ) {
-                $is_published                               = ! empty( $tournaments[ $t_name ]['scores_published'] );
-                $tournaments[ $t_name ]['scores_published'] = ! $is_published;
-
-                if ( ! $is_published ) {
-                    $tournaments[ $t_name ]['published_at'] = current_time( 'mysql' );
-                    $notice                                 = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Scores for <strong>' . esc_html( $t_name ) . '</strong> have been 🚀 <strong>Pushed to Season Standings</strong>!</div>';
-                } else {
+                if ( ! empty( $tournaments[ $t_name ]['scores_published'] ) ) {
+                    $tournaments[ $t_name ]['scores_published'] = false;
                     unset( $tournaments[ $t_name ]['published_at'] );
+                    update_option( 'sywat_tournaments_list', $tournaments );
                     $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-success">Scores for <strong>' . esc_html( $t_name ) . '</strong> have been 🔴 <strong>Hidden from Season Standings</strong>.</div>';
+                } else {
+                    $notice = '<div id="sywat-notice" class="sywat-alert sywat-alert-info">ℹ️ Scores for <strong>' . esc_html( $t_name ) . '</strong> remain pending. Use <strong>Push Weekend Standings</strong> to publish recorded scores to Season Standings.</div>';
                 }
-
-                update_option( 'sywat_tournaments_list', $tournaments );
             }
         }
 
@@ -827,7 +827,7 @@ if ( ! function_exists( 'sywat_handle_tournament_post_actions' ) ) {
                 foreach ( $old_idx_to_key as $old_i_str => $norm_lbl ) {
                     if ( isset( $new_key_to_idx[ $norm_lbl ] ) ) {
                         $mapped_i                = $new_key_to_idx[ $norm_lbl ];
-                        $idx_remap[ $old_i_str ] = $mapped_i;
+                        $idx_remap[ $old_i_str ]   = $mapped_i;
                         if ( (string) $mapped_i !== $old_i_str ) {
                             $needs_remap = true;
                         }
