@@ -2,10 +2,10 @@
 /**
  * Module: Financial Accounting & Invoice Engine
  * Path: includes/class-sywat-accounting.php
- * Description: Host vs. TFAA 50/50 fee split math, dynamic pricing/round profile fee classes, household family cap calculations (honoring paid families even when not all family members check in), First-Time/Lapsed Shooter promoter tracking, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI with surname-sorted "LastName, FirstName" roster formatting.
+ * Description: Host vs. TFAA 50/50 fee split math, dynamic pricing/round profile fee classes with division-first rate tier resolution and qualified Pro/Custom rate labels (preventing duplicate invoice rows when archers change age divisions), household family cap calculations (honoring paid families even when not all family members check in), First-Time/Lapsed Shooter promoter tracking, Zelle QR code rendering (Base64 embedded from plugin assets), dynamic shop header metadata, and printable invoice/roster UI with surname-sorted "LastName, FirstName" roster formatting.
  * Compliance: Pure library/renderer — zero direct SQL queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.2.0
+ * Version: 7.2.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,6 +57,8 @@ if ( ! function_exists( 'sywat_get_zelle_qr_base64' ) ) {
 /**
  * Helper: Resolve an individual archer's standard rate tier, individual entry fee,
  * and pricing profile metadata using the central Pricing & Promoter engine.
+ * Evaluates the archer's active age division first so division changes do not leave
+ * stale Youth/Adult rate_type flags bucketing archers under the wrong invoice row.
  *
  * @param array  $reg                 Registration record.
  * @param string $selected_tournament Tournament name.
@@ -72,10 +74,10 @@ if ( ! function_exists( 'sywat_accounting_resolve_archer_rate_info' ) ) {
         $paid_cat   = isset( $reg['paid'] ) ? trim( (string) $reg['paid'] ) : '';
         $dist       = isset( $reg['distance'] ) ? trim( (string) $reg['distance'] ) : '';
 
-        if ( $dist === '' ) {
-            $dist = function_exists( 'sywat_shooting_styles_get_division_distance' )
-                ? sywat_shooting_styles_get_division_distance( $div )
-                : ( ( stripos( $div, 'Cub' ) !== false ) ? 'Cub' : '20yd' );
+        if ( $div !== '' && strcasecmp( $div, 'No Show' ) !== 0 && function_exists( 'sywat_shooting_styles_get_division_distance' ) ) {
+            $dist = sywat_shooting_styles_get_division_distance( $div );
+        } elseif ( $dist === '' ) {
+            $dist = ( stripos( $div, 'Cub' ) !== false ) ? 'Cub' : '20yd';
         }
 
         $default_slug = is_array( $default_prof ) && ! empty( $default_prof['slug'] ) ? $default_prof['slug'] : 'indoor';
@@ -90,12 +92,16 @@ if ( ! function_exists( 'sywat_accounting_resolve_archer_rate_info' ) ) {
             $round_slug = $default_slug;
         }
 
-        if ( $dist === 'Cub' || strcasecmp( $paid_cat, 'Youth' ) === 0 || ( isset( $reg['rate_type'] ) && strcasecmp( (string) $reg['rate_type'], 'youth' ) === 0 ) ) {
+        if ( $div !== '' && strcasecmp( $div, 'No Show' ) !== 0 ) {
+            if ( function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
+                $tier = sywat_shooting_styles_get_division_rate_tier( $div );
+            } else {
+                $tier = in_array( $div, $youth_divs, true ) ? 'Youth' : 'Adult';
+            }
+        } elseif ( $dist === 'Cub' || strcasecmp( $paid_cat, 'Youth' ) === 0 || ( isset( $reg['rate_type'] ) && strcasecmp( (string) $reg['rate_type'], 'youth' ) === 0 ) ) {
             $tier = 'Youth';
-        } elseif ( $div !== '' && function_exists( 'sywat_shooting_styles_get_division_rate_tier' ) ) {
-            $tier = sywat_shooting_styles_get_division_rate_tier( $div );
         } else {
-            $tier = in_array( $div, $youth_divs, true ) ? 'Youth' : 'Adult';
+            $tier = 'Adult';
         }
 
         if ( function_exists( 'sywat_get_archer_individual_fee' ) ) {
@@ -337,20 +343,35 @@ if ( ! function_exists( 'sywat_calculate_accounting_totals' ) ) {
             $rate_info   = sywat_accounting_resolve_archer_rate_info( $archer_rec, $selected_tournament, $t_profiles, $default_prof );
             $fee         = $rate_info['fee'];
             $tier        = $rate_info['tier'];
+            $prof        = $rate_info['profile'];
             $round_slug  = $rate_info['round_slug'];
             $round_label = $rate_info['round_label'];
             $round_tag   = ( $is_multi_round && $round_label !== '' ) ? ' — ' . $round_label : '';
 
+            $std_youth  = is_array( $prof ) && isset( $prof['youth_rate'] ) ? floatval( $prof['youth_rate'] ) : 25.00;
+            $std_adult  = is_array( $prof ) && isset( $prof['adult_rate'] ) ? floatval( $prof['adult_rate'] ) : 30.00;
+            $style_str  = isset( $archer_rec['style'] ) ? trim( (string) $archer_rec['style'] ) : '';
+            $div_str    = isset( $archer_rec['division'] ) ? trim( (string) $archer_rec['division'] ) : '';
+            $is_pro_cat = ( stripos( $style_str, 'Pro' ) !== false || stripos( $div_str, 'Pro' ) !== false );
+
             if ( $tier === 'Youth' ) {
                 $g1_youth++;
-                $tot_g1 = round( $tot_g1 + $fee, 2 );
-                $b_key  = 'youth_' . $round_slug . '_' . number_format( $fee, 2, '', '' );
-                $record_bucket( $b_key, 'Cub/Youth/Young Adult' . $round_tag, $fee, $fee );
+                $tot_g1    = round( $tot_g1 + $fee, 2 );
+                $rate_note = '';
+                if ( abs( $fee - $std_youth ) >= 0.01 ) {
+                    $rate_note = $is_pro_cat ? ' (Pro)' : ' (Custom Rate)';
+                }
+                $b_key = 'youth_' . $round_slug . '_' . number_format( $fee, 2, '', '' );
+                $record_bucket( $b_key, 'Cub/Youth/Young Adult' . $rate_note . $round_tag, $fee, $fee );
             } else {
                 $g2_adult++;
-                $tot_g2 = round( $tot_g2 + $fee, 2 );
-                $b_key  = 'adult_' . $round_slug . '_' . number_format( $fee, 2, '', '' );
-                $record_bucket( $b_key, 'Adult/Senior/Silver Senior/Master' . $round_tag, $fee, $fee );
+                $tot_g2    = round( $tot_g2 + $fee, 2 );
+                $rate_note = '';
+                if ( abs( $fee - $std_adult ) >= 0.01 ) {
+                    $rate_note = $is_pro_cat ? ' (Pro)' : ' (Custom Rate)';
+                }
+                $b_key = 'adult_' . $round_slug . '_' . number_format( $fee, 2, '', '' );
+                $record_bucket( $b_key, 'Adult/Senior/Silver Senior/Master' . $rate_note . $round_tag, $fee, $fee );
             }
         };
 
