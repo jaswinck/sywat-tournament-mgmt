@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, conditional draft-only Save Pending trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.2.2
+ * Version: 8.3.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -41,7 +41,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         $current_view_locked    = ! empty( $ctx['current_view_locked'] );
         $is_hub_enabled         = ! empty( $ctx['is_hub_enabled'] );
 
-        // Execute Batch Action Handlers prior to loading table records
+        // Execute Action Handlers (Line Lock Toggle / CSV Export Guard) prior to loading table records
         $notice = '';
         if ( function_exists( 'sywat_scores_handle_batch_actions' ) ) {
             $notice = sywat_scores_handle_batch_actions( $selected_tournament, $selected_line_idx, $is_admin, $locked_lines, $current_view_locked );
@@ -98,7 +98,7 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
         ?>
 
         <div class="sywat-wrap">
-            <?php echo $notice; ?>
+            <div id="sywat_scores_inline_notice"><?php echo $notice; ?></div>
 
             <!-- Master Navigation Tabs (Card-Docked, Role-Gated) -->
             <div class="sywat-nav-tabs no-print">
@@ -236,7 +236,11 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
 
                 <!-- Nested Section: Main Archer Scores Table -->
                 <div>
-                    <form method="post" id="sywat_batch_score_form" data-locked-lines="<?php echo esc_attr( wp_json_encode( $locked_lines ) ); ?>">
+                    <form method="post"
+                          id="sywat_batch_score_form"
+                          data-ajax-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>"
+                          data-locked-lines="<?php echo esc_attr( wp_json_encode( $locked_lines ) ); ?>"
+                          data-has-locked-lines="<?php echo ! empty( $locked_lines ) ? '1' : '0'; ?>">
                         <?php wp_nonce_field( 'sywat_scores_action', 'sywat_nonce' ); ?>
                         <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                         <input type="hidden" name="selected_line_idx" class="sywat-scores-hidden-line" value="<?php echo esc_attr( $selected_line_idx ); ?>">
@@ -261,24 +265,18 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-scores-search">Clear</button>
                                 </div>
 
-                                <!-- Export CSV Button (Admin & Shop Managers) -->
-                                <?php if ( $is_admin && ! empty( $locked_lines ) ) : ?>
-                                    <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" title="Export scores for ALL locked lines to a CSV file">Export CSV</button>
-                                <?php endif; ?>
+                                <!-- Conditional Draft-Only Flush Button (Visible only when unsaved local drafts exist) -->
+                                <button type="button"
+                                        id="sywat_scores_save_pending_btn"
+                                        class="sywat-btn sywat-btn-success sywat-btn-icon-save sywat-hidden"
+                                        data-sywat-action="flush-pending-scores">
+                                    Save Pending
+                                </button>
 
+                                <!-- Export CSV Button (Always Visible for Admins; validates locked lines before exporting) -->
                                 <?php if ( $is_admin ) : ?>
-                                    <button type="submit"
-                                            id="sywat_scores_view_lock_btn"
-                                            name="sywat_action"
-                                            value="toggle_lock"
-                                            class="sywat-btn sywat-btn-secondary <?php echo $current_view_locked ? 'sywat-btn-icon-unlock' : 'sywat-btn-icon-lock'; ?><?php echo ( $selected_line_idx === 'all' ) ? ' sywat-hidden' : ''; ?>"
-                                            title="<?php echo $current_view_locked ? 'Unlock to edit scores' : 'Lock to prevent edits'; ?>">
-                                        <?php echo $current_view_locked ? 'Unlock Line' : 'Lock Line'; ?>
-                                    </button>
-                                    <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" data-sywat-action="confirm-reset-scores">Reset All Scores to 0</button>
+                                    <button type="submit" name="sywat_action" value="export_csv" class="sywat-btn sywat-btn-primary sywat-btn-icon-export" title="Export scores for locked shooting lines to a CSV file">Export CSV</button>
                                 <?php endif; ?>
-
-                                <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
                             </div>
                         </div>
 
@@ -356,13 +354,6 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                 </table>
                             </div>
                             <p id="sywat_scores_empty_filter_msg" class="sywat-empty-text<?php echo ( $initial_visible_count === 0 ) ? '' : ' sywat-hidden'; ?>">No checked-in archers match the selected line, status, or search filter.</p>
-
-                            <div class="sywat-table-footer-controls sywat-modal-form-actions-right sywat-mt-3">
-                                <?php if ( $is_admin ) : ?>
-                                    <button type="submit" name="sywat_action" value="reset_scores" class="sywat-btn sywat-btn-danger sywat-btn-icon-reset" data-sywat-action="confirm-reset-scores">Reset All Scores to 0</button>
-                                <?php endif; ?>
-                                <button type="submit" name="sywat_action" value="save_scores" class="sywat-btn sywat-btn-success sywat-btn-icon-save">Save All Scores</button>
-                            </div>
                         <?php else : ?>
                             <p class="sywat-empty-text">No checked-in archers found for this tournament/line selection.</p>
                         <?php endif; ?>
