@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
- * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), canonical active/selected season resolution from sywat_get_master_portal_data(), explicit front-end Season filter form routing with filter_season preservation across row action links, single-pass O(R) pre-indexed tournament, line occupancy, and recorded-score counters, live Public Online Registration status indicators, score-gated Season Standings status pills (remaining Standings Pending until published via global Push Weekend Standings), clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), canonical active/selected season resolution from sywat_get_master_portal_data(), explicit front-end Season filter form routing with filter_season preservation across row action links, single-pass O(R) pre-indexed tournament, line occupancy, and recorded-score counters, live Public Online Registration status indicators, left-aligned score-gated Season Standings status pills (remaining Standings Pending until published via global Push Weekend Standings), clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
  * Compliance: Pure view layer — zero output at include time, zero inline style attributes, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.22.1
+ * Version: 7.22.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -454,7 +454,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 <?php endif; ?>
 
                                                 <!-- Volunteer Hub Toggle & Season Standings Status Pills -->
-                                                <div class="sywat-table-actions">
+                                                <div class="sywat-table-header-actions sywat-mt-3">
                                                     <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" class="sywat-table-action-form">
                                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                                         <input type="hidden" name="sywat_action" value="toggle_active_tournament">
