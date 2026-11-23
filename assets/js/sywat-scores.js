@@ -1,10 +1,10 @@
 /**
  * Client Script: Score Engine Interactivity & Isolated Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Instantaneous zero-reload shooting line (with per-tournament sessionStorage persistence), single-button Unentered / Show All score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; local draft recovery with conditional Save Pending draft-flush button; isolated per-archer serialized admin-ajax.php auto-save (on blur, Enter key, INC toggle, and page hide); offline sync; inline locked-line validation on CSV export; and optimizer-safe delegated data-sywat-action listeners.
+ * Description: Instantaneous zero-reload shooting line (with per-tournament sessionStorage persistence), single-button Unentered / Show All score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; stale-filtered local draft recovery; isolated per-archer serialized admin-ajax.php auto-save (on blur of modified rows, Enter key, INC toggle, and page hide); isolated uncommitted-only Save Scores toolbar action; offline sync; inline locked-line validation on CSV export; and optimizer-safe delegated data-sywat-action listeners.
  * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden / .sywat-btn-filter-active / .sywat-btn-secondary class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
  * Author: SYWAT Archery
- * Version: 7.7.0
+ * Version: 7.7.1
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput       = document.getElementById('sywat_score_search_input');
     const batchForm         = document.getElementById('sywat_batch_score_form');
     const inlineNoticeEl    = document.getElementById('sywat_scores_inline_notice');
-    const savePendingBtn    = document.getElementById('sywat_scores_save_pending_btn');
 
     const currentTourn = currentTournInput ? currentTournInput.value : '';
     const tournSlugKey = currentTourn.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -57,6 +56,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function showInlineNotice(type, htmlMsg) {
+        if (!inlineNoticeEl) return;
+        const alertClass = (type === 'error') ? 'sywat-alert-danger' : 'sywat-alert-success';
+        inlineNoticeEl.innerHTML = '<div class="sywat-alert ' + alertClass + '">' + htmlMsg + '</div>';
+    }
+
     // 2. Dynamic TFAA Preview Button URL Switcher
     const tfaaPreviewBtn = document.getElementById('sywat_tfaa_preview_btn');
     function updateTfaaPreviewUrl() {
@@ -75,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTfaaPreviewUrl();
     }
 
-    // 3. Helper: Row State Readers & Live Unentered Evaluator
+    // 3. Helper: Row State Readers, Uncommitted Detector & Live Unentered Evaluator
     function getRowIncValue(row) {
         if (!row) return '0';
         const incCheckbox   = row.querySelector('.sywat-inc-val');
@@ -88,6 +93,43 @@ document.addEventListener('DOMContentLoaded', function() {
             return val;
         }
         return incStateInput ? (incStateInput.value === '1' ? '1' : '0') : '0';
+    }
+
+    function getNormalizedRowValues(row) {
+        const scoreInput = row ? row.querySelector('.score-val') : null;
+        const xInput     = row ? row.querySelector('.x-val') : null;
+        const incField   = row ? (row.querySelector('.sywat-inc-state') || row.querySelector('.sywat-inc-val')) : null;
+
+        const curScore  = scoreInput ? (scoreInput.value.trim() !== '' ? String(parseInt(scoreInput.value.trim(), 10) || 0) : '0') : '0';
+        const origScore = scoreInput ? String(parseInt((scoreInput.getAttribute('data-original-val') || '0').trim(), 10) || 0) : '0';
+
+        const curX      = xInput ? (xInput.value.trim() !== '' ? String(parseInt(xInput.value.trim(), 10) || 0) : '0') : '0';
+        const origX     = xInput ? String(parseInt((xInput.getAttribute('data-original-val') || '0').trim(), 10) || 0) : '0';
+
+        const curInc    = getRowIncValue(row);
+        const origInc   = incField ? ((incField.getAttribute('data-original-val') || '0').trim() === '1' ? '1' : '0') : '0';
+
+        return {
+            curScore: curScore,
+            origScore: origScore,
+            curX: curX,
+            origX: origX,
+            curInc: curInc,
+            origInc: origInc
+        };
+    }
+
+    function isRowUncommitted(row) {
+        if (!row || row.classList.contains('locked-row')) return false;
+        const regId = row.getAttribute('data-id') || '';
+        if (!regId) return false;
+
+        if (draftRegIds.has(regId) || localStorage.getItem(getStorageKey(regId)) !== null) {
+            return true;
+        }
+
+        const vals = getNormalizedRowValues(row);
+        return (vals.curScore !== vals.origScore || vals.curX !== vals.origX || vals.curInc !== vals.origInc);
     }
 
     function isRowCurrentlyUnentered(row) {
@@ -146,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 5. Synchronize Unentered Toggle & Conditional Save Pending Draft Button
+    // 5. Synchronize Unentered Toggle Button
     function syncUnenteredButton(unenteredCount) {
         const btn = document.getElementById('sywat_scores_unentered_btn');
         if (!btn) return;
@@ -155,13 +197,6 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.classList.toggle('sywat-btn-filter-active', unenteredOnly);
         btn.classList.toggle('sywat-btn-secondary', !unenteredOnly);
         btn.setAttribute('aria-pressed', unenteredOnly ? 'true' : 'false');
-    }
-
-    function syncPendingDraftButton() {
-        if (!savePendingBtn) return;
-        const count = draftRegIds.size;
-        savePendingBtn.textContent = count > 0 ? ('Save Pending (' + count + ')') : 'Save Pending';
-        savePendingBtn.classList.toggle('sywat-hidden', count === 0);
     }
 
     // 6. Instant Client-Side Line + Unentered Status + Live Search Filter (Zero Page Reload)
@@ -267,8 +302,6 @@ document.addEventListener('DOMContentLoaded', function() {
             badge.classList.add('sywat-status-error');
             badge.textContent = customMsg || '⚠️ Invalid Range';
         }
-
-        syncPendingDraftButton();
     }
 
     // 8. Helper: Input Range & Format Validator
@@ -298,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return 'sywat_draft_' + tournSlugKey + '_' + regId;
     }
 
-    // 10. Restore Unsaved Local Drafts & Saved Line Filter on Page Load
+    // 10. Restore Unsaved Local Drafts (Purging Stale Drafts Matching Server) & Saved Line Filter on Load
     document.querySelectorAll('.sywat-score-row').forEach(function(row) {
         const regId      = row.getAttribute('data-id');
         const savedDraft = localStorage.getItem(getStorageKey(regId));
@@ -311,18 +344,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 const xInput        = row.querySelector('.x-val');
                 const incCheckbox   = row.querySelector('.sywat-inc-val');
                 const incStateInput = row.querySelector('.sywat-inc-state');
+                const serverVals    = getNormalizedRowValues(row);
 
-                if (scoreInput && data.score !== undefined) scoreInput.value = data.score;
-                if (xInput && data.x_count !== undefined)   xInput.value     = data.x_count;
+                const draftScore = (data.score !== undefined && String(data.score).trim() !== '')
+                    ? String(parseInt(data.score, 10) || 0)
+                    : serverVals.origScore;
+                const draftX = (data.x_count !== undefined && String(data.x_count).trim() !== '')
+                    ? String(parseInt(data.x_count, 10) || 0)
+                    : serverVals.origX;
+                const draftInc = (data.is_inc !== undefined)
+                    ? ((data.is_inc === 1 || data.is_inc === '1' || data.is_inc === true) ? '1' : '0')
+                    : serverVals.origInc;
 
-                if (data.is_inc !== undefined) {
-                    const incVal = (data.is_inc === 1 || data.is_inc === '1' || data.is_inc === true) ? '1' : '0';
-                    if (incCheckbox)   incCheckbox.checked = (incVal === '1');
-                    if (incStateInput) incStateInput.value = incVal;
+                // Automatically discard stale localStorage drafts that already match the server's saved values
+                if (draftScore === serverVals.origScore && draftX === serverVals.origX && draftInc === serverVals.origInc) {
+                    localStorage.removeItem(getStorageKey(regId));
+                } else {
+                    if (scoreInput && data.score !== undefined) scoreInput.value = data.score;
+                    if (xInput && data.x_count !== undefined)   xInput.value     = data.x_count;
+                    if (incCheckbox)   incCheckbox.checked = (draftInc === '1');
+                    if (incStateInput) incStateInput.value = draftInc;
+
+                    setRowStatus(regId, 'draft', '⚡ Local Draft');
                 }
-
-                setRowStatus(regId, 'draft', '⚡ Local Draft');
-            } catch (e) {}
+            } catch (e) {
+                localStorage.removeItem(getStorageKey(regId));
+            }
         } else if (isLocked && regId) {
             localStorage.removeItem(getStorageKey(regId));
         }
@@ -374,13 +421,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncLineTrackerCounts();
     applyScoresLineAndSearchFilter();
-    syncPendingDraftButton();
 
     // 11. Isolated Per-Archer Serialized Background Auto-Save (admin-ajax.php)
     function performBackgroundSave(regId, options) {
         const opts = options || {};
         const row  = document.querySelector('.sywat-score-row[data-id="' + regId + '"]');
-        if (!row || row.classList.contains('locked-row')) return;
+        if (!row || row.classList.contains('locked-row')) return Promise.resolve(false);
 
         const scoreInput    = row.querySelector('.score-val');
         const xInput        = row.querySelector('.x-val');
@@ -392,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!isScoreValid || !isXValid) {
             setRowStatus(regId, 'error', '⚠️ Range Error');
-            return;
+            return Promise.resolve(false);
         }
 
         const scoreVal = scoreInput ? (scoreInput.value.trim() !== '' ? String(parseInt(scoreInput.value.trim(), 10) || 0) : '0') : '0';
@@ -408,17 +454,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         localStorage.setItem(getStorageKey(regId), JSON.stringify({ score: scoreVal, x_count: xVal, is_inc: incVal }));
         draftRegIds.add(regId);
-        syncPendingDraftButton();
 
         if (!navigator.onLine) {
             setRowStatus(regId, 'draft', '⚠️ Offline Draft');
-            return;
+            return Promise.resolve(false);
         }
 
         // Queue follow-up save if an auto-save for this archer is already in flight
         if (inFlightSaves.has(regId)) {
             queuedSaves.add(regId);
-            return;
+            return Promise.resolve(true);
         }
 
         inFlightSaves.add(regId);
@@ -434,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('x_count', xVal);
         formData.append('is_inc', incVal);
 
-        fetch(ajaxUrl, {
+        return fetch(ajaxUrl, {
             method: 'POST',
             credentials: 'same-origin',
             keepalive: Boolean(opts.keepalive),
@@ -459,12 +504,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     queuedSaves.add(regId);
                 }
+                return true;
             } else {
                 setRowStatus(regId, 'draft', '⚡ Local Draft');
+                return false;
             }
         })
         .catch(function() {
             setRowStatus(regId, 'draft', '⚠️ Offline Draft');
+            return false;
         })
         .finally(function() {
             inFlightSaves.delete(regId);
@@ -475,13 +523,66 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function flushAllPendingDrafts(options) {
-        const opts = options || {};
+    function saveUncommittedScores(options) {
+        const opts        = options || {};
+        const interactive = Boolean(opts.interactive);
+        const rowsToSave  = [];
+        let firstInvalid  = null;
+
         document.querySelectorAll('.sywat-score-row:not(.locked-row)').forEach(function(row) {
-            const regId = row.getAttribute('data-id');
-            if (regId && (draftRegIds.has(regId) || localStorage.getItem(getStorageKey(regId)))) {
-                performBackgroundSave(regId, opts);
+            if (!isRowUncommitted(row)) return;
+
+            const scoreInput = row.querySelector('.score-val');
+            const xInput     = row.querySelector('.x-val');
+            const validScore = validateInput(scoreInput);
+            const validX     = validateInput(xInput);
+
+            if (!validScore || !validX) {
+                const regId = row.getAttribute('data-id');
+                if (regId) setRowStatus(regId, 'error', '⚠️ Range Error');
+                if (!firstInvalid) {
+                    firstInvalid = !validScore ? scoreInput : xInput;
+                }
+                return;
             }
+
+            rowsToSave.push(row);
+        });
+
+        if (firstInvalid) {
+            if (interactive) {
+                showInlineNotice('error', '⚠️ Please fix the highlighted out-of-range score (0–300) or X count (0–60) before saving.');
+                firstInvalid.focus();
+            }
+            return Promise.resolve(0);
+        }
+
+        if (rowsToSave.length === 0) {
+            if (interactive) {
+                if (inFlightSaves.size > 0) {
+                    showInlineNotice('success', '⏳ Finishing background save for your entered score(s)...');
+                } else {
+                    showInlineNotice('success', '✓ All your entered scores are already saved.');
+                }
+            }
+            return Promise.resolve(0);
+        }
+
+        const savePromises = rowsToSave.map(function(row) {
+            const regId = row.getAttribute('data-id');
+            return regId ? performBackgroundSave(regId, opts) : Promise.resolve(false);
+        });
+
+        return Promise.all(savePromises).then(function(results) {
+            const succeeded = results.filter(Boolean).length;
+            if (interactive) {
+                if (!navigator.onLine) {
+                    showInlineNotice('error', '⚠️ Offline — your changes are stored locally and will sync automatically when reconnected.');
+                } else if (succeeded > 0) {
+                    showInlineNotice('success', '✓ Saved uncommitted score changes for <strong>' + succeeded + '</strong> archer(s).');
+                }
+            }
+            return succeeded;
         });
     }
 
@@ -564,34 +665,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyScoresLineAndSearchFilter();
                 searchInput.focus();
             }
-        } else if (action === 'flush-pending-scores') {
+        } else if (action === 'save-uncommitted-scores') {
             e.preventDefault();
-            flushAllPendingDrafts();
+            saveUncommittedScores({ interactive: true });
         }
     });
 
     document.addEventListener('focusout', function(e) {
         if (e.target && e.target.classList.contains('sywat-score-input') && !e.target.disabled) {
             const regId = e.target.getAttribute('data-id');
-            if (regId) performBackgroundSave(regId);
+            const row   = regId ? document.querySelector('.sywat-score-row[data-id="' + regId + '"]') : null;
+            if (regId && row && isRowUncommitted(row)) {
+                performBackgroundSave(regId);
+            }
         }
     });
 
-    // 13. Auto-Flush Pending Drafts When Reconnecting Online or Leaving/Hiding Tab
+    // 13. Auto-Flush Uncommitted Rows When Reconnecting Online or Leaving/Hiding Tab
     window.addEventListener('online', function() {
-        flushAllPendingDrafts();
+        saveUncommittedScores({ interactive: false });
     });
 
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'hidden') {
-            const activeEl = document.activeElement;
-            if (activeEl && activeEl.classList && activeEl.classList.contains('sywat-score-input') && !activeEl.disabled) {
-                const activeRegId = activeEl.getAttribute('data-id');
-                if (activeRegId) {
-                    performBackgroundSave(activeRegId, { keepalive: true });
-                }
-            }
-            flushAllPendingDrafts({ keepalive: true });
+            saveUncommittedScores({ interactive: false, keepalive: true });
         }
     });
 
@@ -603,11 +700,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (submitterVal === 'export_csv') {
                 if (!hasAnyLockedLine()) {
                     e.preventDefault();
-                    if (inlineNoticeEl) {
-                        inlineNoticeEl.innerHTML = '<div class="sywat-alert sywat-alert-danger">⚠️ At least one shooting line must be locked before exporting CSV.</div>';
-                        if (typeof inlineNoticeEl.scrollIntoView === 'function') {
-                            inlineNoticeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
+                    showInlineNotice('error', '⚠️ At least one shooting line must be locked before exporting CSV.');
+                    if (inlineNoticeEl && typeof inlineNoticeEl.scrollIntoView === 'function') {
+                        inlineNoticeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
                     return false;
                 }
@@ -624,6 +719,6 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleUnenteredFilter: toggleScoresUnenteredFilter,
         syncLineTrackerCounts: syncLineTrackerCounts,
         performBackgroundSave: performBackgroundSave,
-        flushPendingDrafts: flushAllPendingDrafts
+        saveUncommittedScores: saveUncommittedScores
     };
 });
