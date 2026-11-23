@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Data Access & Metric Engine
  * Path: includes/scores/scores-data.php
- * Description: Pure data access and metric aggregation engine for the Batch Score Entry application ([sywat_scores]). Resolves staff capabilities, filters tournaments to active-season and non-historical events (excluding archived historical_import records), executes indexed single-tournament wp_options queries, returns all checked-in tournament registrations with resolved line indices for zero-reload client-side line filtering, and computes O(R) line score completion counters.
+ * Description: Pure data access and metric aggregation engine for the Batch Score Entry application ([sywat_scores]). Resolves staff capabilities, filters tournaments to active-season and non-historical events (excluding archived historical_import records), executes indexed single-tournament wp_options queries with explicit object-cache invalidation on sywat_scores_{slug} prior to reading, returns all checked-in tournament registrations with resolved line indices for zero-reload client-side line filtering, and computes O(R) line score completion counters.
  * Compliance: Pure data layer — zero HTML rendering, zero presentation formatting strings, zero output at include time, indexed single-tournament option queries, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 1.1.0
+ * Version: 1.1.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -276,6 +276,8 @@ if ( ! function_exists( 'sywat_scores_get_records_and_tracker' ) ) {
                     }
                 }
             }
+
+            wp_cache_delete( 'sywat_scores_' . $active_t_slug, 'options' );
         }
 
         $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
