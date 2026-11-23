@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Master Admin Portal Views & Navigation Tabs
  * Path: includes/tournaments/tournament-views.php
- * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), canonical active/selected season resolution from sywat_get_master_portal_data(), explicit front-end Season filter form routing with filter_season preservation across row action links, single-pass O(R) pre-indexed tournament and line occupancy counters, live Public Online Registration status indicators, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
+ * Description: Renders the Manage Tournaments & Seasons portal with deferred POST-only pre-action registration loading (eliminating duplicate full-table scans on GET requests), canonical active/selected season resolution from sywat_get_master_portal_data(), explicit front-end Season filter form routing with filter_season preservation across row action links, single-pass O(R) pre-indexed tournament and line occupancy counters, live Public Online Registration status indicators, per-tournament Season Standings publish status toggles (toggle_publish_standings), season-scoped Push Weekend Standings trigger, clickable Waitlist pills, tournament-level Waitlist action buttons, and the dedicated Waitlist Management Modal (#sywat_waitlist_modal).
  * Compliance: Pure view layer — zero output at include time, zero inline style attributes, O(R) pre-indexed counters, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 7.21.1
+ * Version: 7.22.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -340,9 +340,10 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
 
                                 <!-- Push Standings Form -->
                                 <?php if ( $can_manage_seasons ) : ?>
-                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" onsubmit="return confirm('Are you sure you want to push all weekend scores to Season Standings? This will aggregate recorded scores across all active tournaments into the public leaderboard.');">
+                                    <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" onsubmit="return confirm('Are you sure you want to push recorded weekend scores for this season to Season Standings? Tournaments with recorded scores will be published to the public leaderboard.');">
                                         <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
                                         <input type="hidden" name="sywat_action" value="global_push_standings">
+                                        <input type="hidden" name="season_slug" value="<?php echo esc_attr( $selected_season ); ?>">
                                         <button type="submit" class="sywat-btn sywat-btn-global-push sywat-btn-icon-global-push">Push Weekend Standings</button>
                                     </form>
                                 <?php endif; ?>
@@ -398,6 +399,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                             $reg_count            = isset( $tourn_counts[ $t_key ]['active'] ) ? $tourn_counts[ $t_key ]['active'] : 0;
                                             $total_tourn_waitlist = isset( $tourn_counts[ $t_key ]['waitlist'] ) ? $tourn_counts[ $t_key ]['waitlist'] : 0;
                                             $is_active_hub        = in_array( $t_name, $active_tournaments, true );
+                                            $is_scores_published  = is_array( $t_data ) && ! empty( $t_data['scores_published'] );
 
                                             // Resolve TFAA Link Status Indicator
                                             $tfaa_link = ! empty( $t_data['tfaa_results_url'] ) ? $t_data['tfaa_results_url'] : '';
@@ -421,7 +423,7 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                 : '';
                                         ?>
                                         <tr class="sywat-tournament-row" data-name="<?php echo esc_attr( strtolower( $t_name ) ); ?>" data-shop="<?php echo esc_attr( strtolower( $t_shop_name ) ); ?>" data-district="<?php echo esc_attr( strtolower( $t_district ) ); ?>">
-                                            <!-- Column 1: Metadata & Volunteer Hub Toggle -->
+                                            <!-- Column 1: Metadata, Volunteer Hub Toggle & Season Standings Publish Toggle -->
                                             <td>
                                                 <strong class="sywat-tourn-title"><?php echo esc_html( $t_name ); ?></strong>
                                                 <div class="sywat-tourn-season">🏆 <?php echo esc_html( $t_season_name ); ?></div>
@@ -457,6 +459,19 @@ if ( ! function_exists( 'render_sywat_master_portal' ) ) {
                                                             <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" title="Click to activate in Volunteer Hub">⚪ Hub Hidden</button>
                                                         <?php endif; ?>
                                                     </form>
+
+                                                    <?php if ( $can_manage_seasons ) : ?>
+                                                        <form method="post" action="<?php echo esc_url( $manage_base_url ); ?>" class="sywat-table-action-form">
+                                                            <?php wp_nonce_field( 'sywat_desk_action', 'sywat_nonce' ); ?>
+                                                            <input type="hidden" name="sywat_action" value="toggle_publish_standings">
+                                                            <input type="hidden" name="tournament_name" value="<?php echo esc_attr( $t_name ); ?>">
+                                                            <?php if ( $is_scores_published ) : ?>
+                                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-sm" title="Included in Season Standings — click to hide from Season Standings">🟢 In Standings</button>
+                                                            <?php else : ?>
+                                                                <button type="submit" class="sywat-btn sywat-btn-secondary sywat-btn-sm" title="Hidden from Season Standings — click to push this tournament to Season Standings">⚪ Standings Pending</button>
+                                                            <?php endif; ?>
+                                                        </form>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
 
