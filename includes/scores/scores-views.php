@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards matching Check-In's side-by-side / full-width locked button layout (hiding Enter Scores when locked), surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, isolated uncommitted-only Save Scores trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards matching Check-In's sibling-form side-by-side / full-width locked button layout (hiding Enter Scores when locked), surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, isolated uncommitted-only Save Scores trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.3.1
+ * Version: 8.3.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -211,7 +211,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
 
                                     <div class="sywat-tracker-card-actions">
                                         <?php if ( ! $is_line_locked ) : ?>
-                                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" data-sywat-action="select-scores-line" data-line-idx="<?php echo esc_attr( $idx ); ?>">Enter Scores</button>
+                                            <form method="post" class="sywat-scores-line-filter-form">
+                                                <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
+                                                <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $idx ); ?>">
+                                                <input type="hidden" name="search_query" class="sywat-hidden-search" value="<?php echo esc_attr( $search_query ); ?>">
+                                                <button type="submit" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" data-sywat-action="select-scores-line" data-line-idx="<?php echo esc_attr( $idx ); ?>">Enter Scores</button>
+                                            </form>
                                         <?php endif; ?>
 
                                         <?php if ( $is_admin ) : ?>
