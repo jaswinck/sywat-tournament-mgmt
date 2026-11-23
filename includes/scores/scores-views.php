@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards matching Check-In's sibling-form side-by-side / full-width locked button layout (hiding Enter Scores when locked), surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, isolated uncommitted-only Save Scores trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards matching Check-In's sibling-form side-by-side / full-width locked button layout (hiding Enter Scores when locked), surname-sorted ("LastName, FirstName") archer score entry table with pre-indexed live search tokens followed by a single-button Unentered / Show All view toggle, per-archer "INC" incomplete-round toggle, isolated uncommitted-only Save Scores trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.3.2
+ * Version: 8.3.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -257,6 +257,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                             <h2>Archer Scores (<span id="sywat_scores_visible_count"><?php echo intval( $initial_visible_count ); ?></span>)</h2>
 
                             <div class="sywat-table-header-controls">
+                                <!-- Live Search Input Group -->
+                                <div class="sywat-search-input-group">
+                                    <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off">
+                                    <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-scores-search">Clear</button>
+                                </div>
+
                                 <!-- Single-Button Unentered / Show All View Toggle -->
                                 <button type="button"
                                         id="sywat_scores_unentered_btn"
@@ -265,12 +271,6 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                         aria-pressed="false">
                                     Unentered (<?php echo intval( $initial_unentered_count ); ?>)
                                 </button>
-
-                                <!-- Live Search Input Group -->
-                                <div class="sywat-search-input-group">
-                                    <input type="text" id="sywat_score_search_input" value="<?php echo esc_attr( $search_query ); ?>" placeholder="Search archer name..." autocomplete="off">
-                                    <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-scores-search">Clear</button>
-                                </div>
 
                                 <!-- Isolated Save Scores Button (Saves only uncommitted rows edited in this session) -->
                                 <button type="button"
