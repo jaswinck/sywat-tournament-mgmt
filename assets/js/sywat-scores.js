@@ -1,10 +1,10 @@
 /**
  * Client Script: Score Engine Interactivity & Isolated Real-Time Auto-Save
  * Path: assets/js/sywat-scores.js
- * Description: Instantaneous zero-reload shooting line (with per-tournament sessionStorage persistence), single-button Unentered / Show All score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; stale-filtered local draft recovery; isolated per-archer serialized admin-ajax.php auto-save (on blur of modified rows, Enter key, INC toggle, and page hide); isolated uncommitted-only Save Scores toolbar action; offline sync; inline locked-line validation on CSV export; and optimizer-safe delegated data-sywat-action listeners.
+ * Description: Instantaneous zero-reload shooting line (with per-tournament sessionStorage persistence), single-button Unentered / Show All score status (pinning active mid-entry rows so keyboard flow never jumps), and live search filtering; live Line Score Tracker counter & badge synchronization (counting scores, X counts, and incomplete round "INC" flags in real time); dynamic TFAA target URL switcher; range validation; stale-filtered local draft recovery; isolated per-archer serialized admin-ajax.php auto-save (on blur of modified rows, Enter key, INC toggle, and page hide); isolated uncommitted-only Save Scores toolbar action; offline sync; inline locked-line validation on CSV export; automatic 4.5-second dismissal for all server-rendered and client-side success/error notices; and optimizer-safe delegated data-sywat-action listeners.
  * Compliance: Pure vanilla JS — zero jQuery dependency, zero inline style mutations (uses .sywat-hidden / .sywat-btn-filter-active / .sywat-btn-secondary class toggling), zero document-level keydown listeners, delegated data-sywat-action handlers.
  * Author: SYWAT Archery
- * Version: 7.7.1
+ * Version: 7.7.2
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -29,8 +29,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const nonceVal     = nonceInput ? nonceInput.value : '';
     const ajaxUrl      = (batchForm && batchForm.dataset.ajaxUrl) ? batchForm.dataset.ajaxUrl : window.location.href;
 
-    // Filter & concurrency state
+    // Filter, concurrency & notice timer state
     let unenteredOnly        = (sessionStorage.getItem('sywat_scores_unentered_only') === '1');
+    let inlineNoticeTimer    = null;
     const editedInActivePass = new Set();
     const inFlightSaves      = new Set();
     const queuedSaves        = new Set();
@@ -56,11 +57,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function scheduleInlineNoticeDismiss(delayMs) {
+        if (!inlineNoticeEl) return;
+        if (inlineNoticeTimer) {
+            clearTimeout(inlineNoticeTimer);
+            inlineNoticeTimer = null;
+        }
+        if (inlineNoticeEl.innerHTML.trim() !== '') {
+            inlineNoticeTimer = setTimeout(function() {
+                inlineNoticeEl.innerHTML = '';
+                inlineNoticeTimer = null;
+            }, typeof delayMs === 'number' ? delayMs : 4500);
+        }
+    }
+
     function showInlineNotice(type, htmlMsg) {
         if (!inlineNoticeEl) return;
         const alertClass = (type === 'error') ? 'sywat-alert-danger' : 'sywat-alert-success';
         inlineNoticeEl.innerHTML = '<div class="sywat-alert ' + alertClass + '">' + htmlMsg + '</div>';
+        scheduleInlineNoticeDismiss(4500);
     }
+
+    // Auto-dismiss any server-rendered banner (e.g., line lock/unlock or server validation notice) after 4.5s
+    scheduleInlineNoticeDismiss(4500);
 
     // 2. Dynamic TFAA Preview Button URL Switcher
     const tfaaPreviewBtn = document.getElementById('sywat_tfaa_preview_btn');
