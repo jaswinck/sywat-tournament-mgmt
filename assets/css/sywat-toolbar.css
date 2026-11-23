@@ -1,396 +1,379 @@
 /* ==========================================================================
-   SYWAT Archery - Unified Button System Spec
-   Path: assets/css/sywat-buttons.css
-   Description: Scoped button base, color tier variants, hover states, and
-                keyboard-accessible focus rings under SYWAT wrappers and
-                modal backdrops ((0, 2, 0)+ specificity) to prevent Astra
-                and Divi <button> background, border, and double-outline bleed.
-   Version: 6.8.4
+   SYWAT Archery - Toolbars, Auth Header & Inline Filter Controls
+   Path: assets/css/sywat-toolbar.css
+   Version: 7.1.1
    ========================================================================== */
 
-/* Universal Button Base (38px Standard Height) */
-.sywat-btn,
-.sywat-btn-primary,
-.sywat-btn-secondary,
-.sywat-btn-success,
-.sywat-btn-success-solid,
-.sywat-btn-danger,
-.sywat-btn-gray,
-.sywat-btn-checkedin,
-.sywat-btn-push,
-.sywat-btn-live,
-.sywat-btn-global-push,
-.sywat-btn-warning,
-.sywat-btn-warning-solid,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) :is(
-    .sywat-btn,
-    .sywat-btn-primary,
-    .sywat-btn-secondary,
-    .sywat-btn-success,
-    .sywat-btn-success-solid,
-    .sywat-btn-danger,
-    .sywat-btn-gray,
-    .sywat-btn-checkedin,
-    .sywat-btn-push,
-    .sywat-btn-live,
-    .sywat-btn-global-push,
-    .sywat-btn-warning,
-    .sywat-btn-warning-solid
-) {
-    box-sizing: border-box;
-    display: inline-flex;
+/* Master Card Viewport Clearance (Prevents Upward Dropdown Flipping) */
+.sywat-card {
+    min-height: 520px;
+}
+
+/* Top Full-Width Authentication Header */
+.sywat-auth-bar { width: 100%; background: var(--sywat-navy); color: #ffffff; margin: 0 0 24px 0; padding: 14px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); box-sizing: border-box; }
+.sywat-auth-bar-inner { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; flex-wrap: wrap; gap: 10px; }
+.sywat-auth-brand-wrapper { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.sywat-auth-logo, .sywat-auth-logo-sm { height: 40px !important; width: auto !important; display: block; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
+.sywat-auth-brand-title { font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 0.3px; white-space: nowrap; }
+
+/* Mobile Hamburger Toggle (Hidden on Desktop, Shown <= 768px) */
+.sywat-auth-menu-toggle {
+    display: none;
     align-items: center;
     justify-content: center;
-    height: 38px;
-    padding: 6px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-    border-radius: 4px;
-    background-image: none;
-    box-shadow: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    background-color: var(--sywat-navy-soft);
+    color: #ffffff;
+    border: 1px solid var(--sywat-text);
+    border-radius: 6px;
     cursor: pointer;
-    text-decoration: none !important;
-    white-space: nowrap;
+    box-shadow: none;
+    flex-shrink: 0;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Color Tier Variants (SYWAT Action Blue Design Tokens - Outline Default) */
-.sywat-btn-primary,
-.sywat-btn-secondary,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary:focus:not(:focus-visible),
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid var(--sywat-primary);
-    box-shadow: none;
-    outline: none;
-    color: var(--sywat-primary) !important;
-}
-.sywat-btn-primary:hover,
-.sywat-btn-secondary:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary:hover {
+.sywat-auth-menu-toggle:hover,
+.sywat-auth-menu-toggle.is-open {
     background-color: var(--sywat-primary);
-    background-image: none;
     border-color: var(--sywat-primary);
-    color: #ffffff !important;
+    color: #ffffff;
 }
 
-/* Outline Success Button (Default for Add Walk-In & Check In Line) */
-.sywat-btn-success,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid #008a20;
-    box-shadow: none;
-    outline: none;
-    color: #008a20 !important;
-}
-.sywat-btn-success:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success:hover {
-    background-color: #008a20;
-    background-image: none;
-    border-color: #008a20;
-    color: #ffffff !important;
+/* Collapsible Drawer Wrapper (Transparent to Desktop Flex Layout via display: contents) */
+.sywat-auth-drawer {
+    display: contents;
 }
 
-/* Solid Success Button (Dedicated Primary CTA for Check In Archer) */
-.sywat-btn-success-solid,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid:focus:not(:focus-visible) {
-    background-color: #008a20;
-    background-image: none;
-    border: 1px solid #008a20;
-    box-shadow: none;
-    outline: none;
-    color: #ffffff !important;
-}
-.sywat-btn-success-solid:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid:hover {
-    background-color: #006e19;
-    background-image: none;
-    border-color: #006e19;
-    color: #ffffff !important;
-}
+.sywat-auth-nav-track { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sywat-auth-user-controls { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
-/* Warning Buttons (Capacity Overflows & Waitlists) */
-.sywat-btn-warning,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid #d97706;
-    box-shadow: none;
-    outline: none;
-    color: #d97706 !important;
-}
-.sywat-btn-warning:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning:hover {
-    background-color: #d97706;
-    background-image: none;
-    border-color: #d97706;
-    color: #ffffff !important;
-}
-
-.sywat-btn-warning-solid,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid:focus:not(:focus-visible) {
-    background-color: #d97706;
-    background-image: none;
-    border: 1px solid #d97706;
-    box-shadow: none;
-    outline: none;
-    color: #ffffff !important;
-}
-.sywat-btn-warning-solid:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid:hover {
-    background-color: #b45309;
-    background-image: none;
-    border-color: #b45309;
-    color: #ffffff !important;
-}
-
-.sywat-btn-danger,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid #dc3545;
-    box-shadow: none;
-    outline: none;
-    color: #dc3545 !important;
-}
-.sywat-btn-danger:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger:hover {
-    background-color: #dc3545;
-    background-image: none;
-    border-color: #dc3545;
-    color: #ffffff !important;
-}
-
-.sywat-btn-checkedin,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin:focus:not(:focus-visible) {
-    background-color: #d4edda;
-    background-image: none;
-    border: 1px solid #c3e6cb;
-    box-shadow: none;
-    outline: none;
-    color: #155724 !important;
-}
-.sywat-btn-checkedin:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin:hover {
-    background-color: #c3e6cb;
-    background-image: none;
-    border-color: #b1dfbb;
-    color: #155724 !important;
-}
-
-.sywat-btn-push,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid var(--sywat-text-muted);
-    box-shadow: none;
-    outline: none;
-    color: var(--sywat-text-muted) !important;
-}
-.sywat-btn-push:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push:hover {
-    background-color: var(--sywat-text-muted);
-    background-image: none;
-    border-color: var(--sywat-text-muted);
-    color: #ffffff !important;
-}
-
-.sywat-btn-global-push,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid var(--sywat-navy);
-    box-shadow: none;
-    outline: none;
-    color: var(--sywat-navy) !important;
-}
-.sywat-btn-global-push:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push:hover {
-    background-color: var(--sywat-navy);
-    background-image: none;
-    border-color: var(--sywat-navy);
-    color: #ffffff !important;
-}
-
-.sywat-btn-live,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live:focus:not(:focus-visible) {
-    background-color: #ffffff;
-    background-image: none;
-    border: 1px solid #008a20;
-    box-shadow: none;
-    outline: none;
-    color: #008a20 !important;
-}
-.sywat-btn-live:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live:hover {
-    background-color: #008a20;
-    background-image: none;
-    border-color: #008a20;
-    color: #ffffff !important;
-}
-
-.sywat-btn-gray,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray:focus:not(:focus-visible) {
-    background-color: #6c757d;
-    background-image: none;
-    border: 1px solid #6c757d;
-    box-shadow: none;
-    outline: none;
-    color: #ffffff !important;
-}
-.sywat-btn-gray:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray:hover {
-    background-color: #5a6268;
-    background-image: none;
-    border-color: #545b62;
-    color: #ffffff !important;
-}
-
-/* Special Pill Buttons & Action Triggers */
-.sywat-btn-pill,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill:focus:not(:focus-visible) {
-    background-color: var(--sywat-primary);
-    background-image: none;
-    color: #ffffff !important;
+.sywat-auth-nav-link,
+.sywat-auth-bar button.sywat-auth-dropdown-toggle {
+    color: var(--sywat-border-light);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    background: transparent;
     border: none;
     box-shadow: none;
-    outline: none;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-}
-.sywat-btn-pill:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill:hover {
-    background-color: var(--sywat-primary-dark);
-    background-image: none;
-}
-
-.sywat-btn-use-official,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official:focus:not(:focus-visible) {
-    background-color: #0d9488;
-    background-image: none;
-    color: #ffffff !important;
-    border: none;
-    box-shadow: none;
-    outline: none;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-left: 6px;
-    transition: background-color 0.15s ease;
-}
-.sywat-btn-use-official:hover,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official:hover {
-    background-color: #0f766e;
-    background-image: none;
-}
-
-/* Accessible Keyboard Focus Ring (Preserves :focus-visible Outlines) */
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-primary:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-secondary:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-success-solid:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-danger:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-gray:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-checkedin:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-push:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-live:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-global-push:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-warning-solid:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-pill:focus-visible,
-:is(.sywat-wrap, .sywat-app, .sywat-scope, .sywat-modal-backdrop) .sywat-btn-use-official:focus-visible {
-    outline: 2px solid var(--sywat-primary);
-    outline-offset: 2px;
-}
-
-/* Sizing Helpers */
-.sywat-btn-full {
-    width: 100%;
-    max-width: 140px;
-}
-
-/* Multi-Line Full-Width Block Button (For Modal Dialog Actions & Responsive Stacks) */
-.sywat-btn-block {
-    width: 100% !important;
-    max-width: none !important;
-    height: auto !important;
-    min-height: 42px !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    line-height: 1.4 !important;
-    padding: 10px 16px !important;
-    text-align: center !important;
-}
-
-.sywat-btn-sm {
-    font-size: 11px !important;
-}
-
-.sywat-btn-sm:not(.sywat-btn-full) {
-    padding: 2px 6px !important;
-    margin-left: 8px !important;
-    height: 24px !important;
-}
-
-.sywat-table-action-form {
     margin: 0;
-    width: 100%;
-    max-width: 140px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
-/* Automated Icon Pseudo-Elements */
-.sywat-tab-icon-tournament::before { content: "🎯\00a0"; }
-.sywat-tab-icon-register::before   { content: "📝\00a0"; }
-.sywat-tab-icon-checkin::before    { content: "📋\00a0"; }
-.sywat-tab-icon-edit::before       { content: "✏️\00a0"; }
-.sywat-tab-icon-member::before     { content: "👤\00a0"; }
-.sywat-tab-icon-board::before      { content: "🏛️\00a0"; }
-.sywat-tab-icon-season::before     { content: "🏆\00a0"; }
-.sywat-tab-icon-shop::before       { content: "🏪\00a0"; }
-.sywat-tab-icon-standings::before  { content: "🏆\00a0"; }
-.sywat-tab-icon-results::before    { content: "🎯\00a0"; }
+.sywat-auth-nav-link:hover,
+.sywat-auth-bar button.sywat-auth-dropdown-toggle:hover,
+.sywat-auth-dropdown.is-open > .sywat-auth-dropdown-toggle {
+    background-color: var(--sywat-navy-soft);
+    color: var(--sywat-accent);
+}
 
-.sywat-btn-icon-save::before        { content: "💾\00a0"; }
-.sywat-btn-icon-edit::before        { content: "✏️\00a0"; }
-.sywat-btn-icon-manage::before      { content: "👥\00a0"; }
-.sywat-btn-icon-add::before         { content: "➕\00a0"; }
-.sywat-btn-icon-delete::before      { content: "🗑️\00a0"; }
-.sywat-btn-icon-checkin::before     { content: "📋\00a0"; }
-.sywat-btn-icon-checkedin::before   { content: "✓\00a0"; }
-.sywat-btn-icon-export::before      { content: "📥\00a0"; }
-.sywat-btn-icon-import::before      { content: "📁\00a0"; }
-.sywat-btn-icon-invoice::before     { content: "📄\00a0"; }
-.sywat-btn-icon-print::before       { content: "🖨️\00a0"; }
-.sywat-btn-icon-lock::before        { content: "🔒\00a0"; }
-.sywat-btn-icon-unlock::before      { content: "🔓\00a0"; }
-.sywat-btn-icon-sync::before        { content: "🔄\00a0"; }
-.sywat-btn-icon-reset::before       { content: "↺\00a0"; }
-.sywat-btn-icon-clear::before       { content: "✕\00a0"; }
-.sywat-btn-icon-back::before        { content: "←\00a0"; }
-.sywat-btn-icon-global-push::before { content: "🚀\00a0"; }
-.sywat-btn-icon-results::before    { content: "🎯\00a0"; }
+.sywat-auth-dropdown { position: relative; display: inline-block; }
+.sywat-dropdown-caret { display: inline-block; font-size: 10px; margin-left: 5px; color: var(--sywat-accent); transition: transform 0.2s ease, color 0.2s ease; }
+
+.sywat-auth-dropdown.is-open .sywat-dropdown-caret {
+    transform: rotate(180deg);
+    color: var(--sywat-accent);
+}
+
+.sywat-auth-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: var(--sywat-navy);
+    min-width: 210px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--sywat-text);
+    border-radius: 8px;
+    padding: 6px 0;
+    z-index: var(--sywat-z-modal-dropdown, 1000100);
+    margin-top: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    transition-delay: 0.15s;
+}
+
+.sywat-auth-user-controls .sywat-auth-dropdown-menu {
+    left: auto;
+    right: 0;
+}
+
+.sywat-auth-dropdown-menu::before { content: ""; position: absolute; top: -12px; left: 0; width: 100%; height: 12px; background: transparent; }
+.sywat-auth-dropdown-menu a { color: var(--sywat-border-light); padding: 10px 16px; text-decoration: none; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; transition: background 0.15s ease, color 0.15s ease; }
+.sywat-auth-dropdown-menu a:hover { background-color: var(--sywat-navy-soft); color: var(--sywat-accent); }
+
+.sywat-auth-dropdown.is-open .sywat-auth-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition-delay: 0s;
+}
+
+@media (min-width: 769px) {
+    .sywat-auth-nav-link,
+    .sywat-auth-bar button.sywat-auth-dropdown-toggle,
+    .sywat-auth-dropdown-menu a {
+        white-space: nowrap;
+    }
+
+    .sywat-auth-dropdown:hover .sywat-dropdown-caret {
+        transform: rotate(180deg);
+        color: var(--sywat-accent);
+    }
+
+    .sywat-auth-dropdown:hover .sywat-auth-dropdown-menu {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        transition-delay: 0s;
+    }
+}
+
+/* Header Inline Controls Bar (Bottom-Baseline Locked & Flush-Left Labels) */
+.sywat-card-header-bar { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; width: 100%; box-sizing: border-box; }
+.sywat-card-header-bar > h2,
+.sywat-card-header-bar > div:first-child { align-self: center; }
+
+.sywat-header-inline-controls { display: flex !important; align-items: flex-end !important; justify-content: flex-end !important; gap: 10px !important; flex-wrap: wrap !important; margin-left: auto !important; box-sizing: border-box !important; }
+.sywat-header-inline-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: flex-end !important; gap: 10px !important; flex-wrap: wrap !important; }
+.sywat-header-inline-controls .sywat-field-group { width: auto !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+.sywat-header-inline-controls .sywat-field-group label { display: block !important; width: 100% !important; text-align: left !important; margin: 0 !important; font-size: 12px !important; font-weight: 700 !important; color: var(--sywat-navy-soft) !important; line-height: 1.2 !important; white-space: nowrap !important; }
+
+.sywat-search-input-group { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 0; }
+.sywat-filter-select-md { min-width: 190px; }
+.sywat-filter-input-md { min-width: 210px; }
+
+/* Unified 36px Baseline Height Parity Across Header Selects, Text Inputs & Buttons */
+.sywat-header-inline-controls select,
+.sywat-header-inline-controls input[type="text"],
+.sywat-header-inline-controls input[type="search"] { height: 36px !important; min-height: 36px !important; box-sizing: border-box !important; margin: 0 !important; font-size: 13px !important; padding: 5px 10px !important; border: 1px solid var(--sywat-border) !important; border-radius: 4px !important; background-color: #ffffff !important; line-height: 1.3 !important; }
+.sywat-header-inline-controls .sywat-btn { height: 36px !important; min-height: 36px !important; box-sizing: border-box !important; margin: 0 !important; padding: 6px 14px !important; font-size: 13px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
+
+/* Table Sub-Header Toolbar & Control Alignment Blueprint */
+.sywat-table-header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; margin-bottom: 16px; padding-top: 16px; border-top: 1px solid var(--sywat-border-light); width: 100%; box-sizing: border-box; }
+.sywat-table-header-bar h2 { margin: 0; white-space: nowrap; }
+
+/* Left Toolbar Group (Stacked Status Filter + Inline Stat Badges) */
+.sywat-table-header-left { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Right Toolbar Group (Search Input + Action Buttons) */
+.sywat-table-header-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-left: auto; box-sizing: border-box; }
+.sywat-table-header-controls .sywat-field-group, .sywat-table-header-controls form { width: auto !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; }
+.sywat-table-header-actions { display: inline-flex !important; align-items: flex-end !important; gap: 8px !important; }
+
+/* Exact Baseline Height Parity (34px) for Right Controls */
+.sywat-table-header-controls input[type="text"], 
+.sywat-table-header-controls select, 
+.sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync), 
+.sywat-table-header-controls .sywat-sync-pill { 
+    height: 34px !important; 
+    min-height: 34px !important; 
+    box-sizing: border-box !important; 
+    margin: 0 !important; 
+}
+.sywat-table-header-controls input[type="text"] { font-size: 13px !important; padding: 4px 10px !important; border: 1px solid var(--sywat-border) !important; border-radius: 4px !important; background-color: #ffffff !important; }
+.sywat-table-header-controls .sywat-btn:not(.sywat-btn-pill-sync) { padding: 4px 12px !important; font-size: 13px !important; line-height: 1 !important; display: inline-flex !important; align-items: center !important; }
+
+/* Solid Engaged Toggle State for Quick-Filter Buttons (Needs Check-In / Unentered) */
+:is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active,
+:is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active:focus:not(:focus-visible) {
+    background-color: var(--sywat-primary);
+    border: 1px solid var(--sywat-primary);
+    color: #ffffff;
+}
+
+:is(.sywat-wrap, .sywat-app, .sywat-scope) .sywat-table-header-controls .sywat-btn.sywat-btn-filter-active:hover {
+    background-color: var(--sywat-primary-dark);
+    border-color: var(--sywat-primary-dark);
+    color: #ffffff;
+}
+
+@media (min-width: 769px) {
+    .sywat-table-header-controls input[type="text"] {
+        width: 160px;
+    }
+}
+
+/* Clean Left-Side In-Line Stat Badges (Zero Container Boxes) */
+.sywat-stats-inline-pills { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 2px; }
+.sywat-inline-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--sywat-text); white-space: nowrap; background: transparent; border: none; padding: 0; }
+.sywat-inline-pill-active { color: #166534; }
+.sywat-inline-pill-expired { color: var(--sywat-text-subtle); }
+.sywat-inline-pill-unassigned { color: var(--sywat-primary); }
+
+/* Desk Toolbar & Filter Controls */
+.sywat-filter-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.sywat-filter-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--sywat-navy); white-space: nowrap; }
+.sywat-filter-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin: 0; background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border-light); border-radius: 6px; padding: 8px 14px; }
+.sywat-filter-bar-form { display: flex !important; align-items: flex-end !important; gap: 12px !important; flex-wrap: wrap !important; margin: 0 !important; }
+.sywat-filter-field { display: flex; flex-direction: column; gap: 4px; }
+.sywat-field-auto { width: auto !important; }
+
+/* Bolder, crisper STATUS heading */
+.sywat-filter-field label { font-size: 11px; font-weight: 800; color: var(--sywat-navy); text-transform: uppercase; letter-spacing: 0.6px; line-height: 1; }
+
+.sywat-wrap .sywat-filter-field select, .sywat-app .sywat-filter-field select, .sywat-filter-field select { height: 34px !important; font-size: 13px !important; font-weight: 600 !important; padding: 4px 10px !important; border: 1px solid var(--sywat-border) !important; border-radius: 4px !important; background-color: #ffffff !important; box-sizing: border-box !important; }
+
+@media (min-width: 769px) {
+    .sywat-wrap .sywat-filter-field select,
+    .sywat-app .sywat-filter-field select,
+    .sywat-filter-field select {
+        min-width: 170px;
+    }
+
+    .sywat-select-tournament {
+        min-width: 200px;
+    }
+
+    .sywat-select-line {
+        min-width: 160px;
+    }
+}
+
+/* Line Capacity Tracker Grid */
+.sywat-tracker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 10px; }
+.sywat-tracker-card { background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border-light); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-sizing: border-box; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+.sywat-tracker-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--sywat-border-light); padding-bottom: 6px; }
+.sywat-tracker-card-title { color: var(--sywat-navy); font-size: 14px; font-weight: 700; }
+.sywat-tracker-header-badges { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.sywat-tracker-header-badges .sywat-badge { margin: 0 !important; }
+.sywat-tracker-card-stats { display: flex; justify-content: space-between; font-size: 13px; color: var(--sywat-text-muted); }
+.sywat-tracker-card-actions { margin-top: 4px; border-top: 1px dashed var(--sywat-border); padding-top: 8px; display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.sywat-tracker-card-actions form,
+.sywat-tracker-card-actions > a.sywat-btn { margin: 0; flex: 1 1 100px; min-width: 100px; }
+.sywat-tracker-card-actions .sywat-btn { width: 100%; justify-content: center; padding: 6px 8px; font-size: 12px; height: 34px; }
+
+/* TFAA Sync Pill Component */
+.sywat-sync-pill { margin: 0 !important; display: inline-flex !important; align-items: center !important; background: var(--sywat-surface-alt); border: 1px solid var(--sywat-border); border-radius: 18px; padding: 2px 4px 2px 8px !important; gap: 6px; height: 32px !important; box-sizing: border-box !important; }
+.sywat-sync-pill-count { font-size: 11px; color: var(--sywat-text-muted); font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; line-height: 1; }
+.sywat-btn-pill-sync { height: 24px !important; min-height: 24px !important; max-height: 24px !important; padding: 2px 8px !important; font-size: 10px !important; font-weight: 700 !important; border-radius: 12px !important; background: #ffffff !important; border: 1px solid var(--sywat-border) !important; color: var(--sywat-text) !important; margin: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; line-height: 1 !important; }
+
+@media (max-width: 768px) {
+    .sywat-auth-bar { margin: 0 0 16px 0; padding: 10px 0; }
+    .sywat-auth-bar-inner { padding: 0 12px; gap: 8px; }
+    .sywat-auth-menu-toggle { display: inline-flex; }
+
+    .sywat-auth-drawer {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding-top: 12px;
+        margin-top: 4px;
+        border-top: 1px solid var(--sywat-navy-soft);
+    }
+
+    .sywat-auth-drawer.is-open {
+        display: flex;
+    }
+
+    .sywat-auth-nav-track {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: 4px;
+    }
+
+    .sywat-auth-dropdown {
+        display: block;
+        width: 100%;
+    }
+
+    .sywat-auth-bar .sywat-auth-drawer .sywat-auth-nav-link,
+    .sywat-auth-bar .sywat-auth-drawer button.sywat-auth-dropdown-toggle {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        padding: 10px 12px;
+        box-sizing: border-box;
+        text-align: left;
+    }
+
+    .sywat-auth-bar .sywat-auth-drawer .sywat-dropdown-caret {
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    .sywat-auth-dropdown-menu {
+        position: static;
+        display: none;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        background-color: var(--sywat-navy-soft);
+        border: none;
+        border-left: 2px solid var(--sywat-accent);
+        border-radius: 0 6px 6px 0;
+        box-shadow: none;
+        margin: 2px 0 6px 10px;
+        padding: 4px 0;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        transition: none;
+    }
+
+    .sywat-auth-dropdown-menu::before {
+        display: none;
+    }
+
+    .sywat-auth-dropdown.is-open .sywat-auth-dropdown-menu {
+        display: block;
+    }
+
+    .sywat-auth-dropdown-menu a {
+        justify-content: flex-start;
+        text-align: left;
+        padding: 10px 14px;
+        white-space: normal;
+    }
+
+    .sywat-auth-user-controls {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--sywat-navy-soft);
+    }
+
+    .sywat-auth-user-controls .sywat-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .sywat-card-header-bar { align-items: flex-start; }
+    .sywat-header-inline-controls, .sywat-table-header-controls { width: 100%; justify-content: flex-start; margin-left: 0 !important; }
+    .sywat-header-inline-controls form,
+    .sywat-header-inline-controls .sywat-field-group,
+    .sywat-header-inline-controls select,
+    .sywat-header-inline-controls input[type="text"],
+    .sywat-header-inline-controls input[type="search"],
+    .sywat-table-header-controls .sywat-search-input-group {
+        width: 100%;
+    }
+    .sywat-table-header-controls input[type="text"] {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+}
+
+/* Theme mode: the top bar sits at the top of the plugin content instead of the page. */
+.sywat-auth-bar-inline { max-width: 1200px; margin: 0 auto; padding: 0 16px; box-sizing: border-box; }
+.sywat-auth-bar-inline .sywat-auth-bar { border-radius: 8px; margin-bottom: 20px; }
+.sywat-auth-bar-inline .sywat-auth-bar-inner { max-width: none; }
