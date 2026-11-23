@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Action Handlers
  * Path: includes/scores/scores-actions.php
- * Description: Pure POST request processing, early template_redirect JSON AJAX autosave endpoints, bulk-indexed transaction-batched score saves (eliminating N+1 option lookups while preserving multi-scorekeeper concurrency protection and incomplete round "is_inc" persistence), transaction-batched score resets, and line lock management.
- * Compliance: Pure action layer — zero output at include time, early template_redirect JSON handling before theme headers, bulk single-tournament option pre-fetch + atomic MySQL transaction batching on multi-row option writes, omitted closing PHP tag.
+ * Description: Isolated per-archer JSON AJAX autosave endpoints (admin-ajax.php primary + template_redirect fallback) serialized with per-tournament MySQL advisory locks and explicit object-cache invalidation to eliminate multi-scorekeeper and rapid-tabbing overwrites, line lock toggles for the Line Score Tracker, and inline validation feedback when CSV export is requested with no locked lines.
+ * Compliance: Pure action layer — zero output at include time, atomic per-tournament advisory locking + object cache invalidation on option read-modify-write, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 11.3.2
+ * Version: 11.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,88 +14,129 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Handles real-time single-score (and incomplete round "INC") AJAX auto-save request from client.
+ * Uses a per-tournament MySQL advisory lock and explicit WordPress object cache invalidation
+ * before reading and updating options so concurrent scorekeepers or rapid field transitions
+ * never overwrite another archer's saved score.
  *
  * @return void
  */
 if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
     function sywat_scores_handle_ajax_autosave() {
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['sywat_action'] ) && $_POST['sywat_action'] === 'autosave_single_score' ) {
-            if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) ) {
-                wp_send_json_error( array( 'message' => 'Security token expired' ) );
-            }
+        $req_method = isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '';
+        $post_act   = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
+        $ajax_act   = isset( $_POST['action'] ) ? sanitize_text_field( wp_unslash( $_POST['action'] ) ) : '';
 
-            $clean_id   = isset( $_POST['reg_id'] ) ? sanitize_text_field( wp_unslash( $_POST['reg_id'] ) ) : '';
-            $score_str  = isset( $_POST['score'] ) ? trim( wp_unslash( $_POST['score'] ) ) : '';
-            $x_str      = isset( $_POST['x_count'] ) ? trim( wp_unslash( $_POST['x_count'] ) ) : '';
-            $tourn_name = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : '';
-
-            if ( $score_str !== '' && ( intval( $score_str ) < 0 || intval( $score_str ) > 300 ) ) {
-                wp_send_json_error( array( 'message' => 'Score out of range (0-300)' ) );
-            }
-            if ( $x_str !== '' && ( intval( $x_str ) < 0 || intval( $x_str ) > 60 ) ) {
-                wp_send_json_error( array( 'message' => 'X count out of range (0-60)' ) );
-            }
-
-            $active_t_slug = sanitize_title( $tourn_name );
-            $opt_key       = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
-            $reg           = get_option( $opt_key );
-
-            wp_cache_delete( 'sywat_locks_' . $active_t_slug, 'options' );
-            $locked_lines = get_option( 'sywat_locks_' . $active_t_slug, array() );
-
-            if ( $reg && is_array( $reg ) ) {
-                $line_idx = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
-                if ( ! empty( $locked_lines[ $line_idx ] ) ) {
-                    wp_send_json_error( array( 'message' => 'Line is locked' ) );
-                }
-
-                $reg['score']   = ( $score_str !== '' ) ? intval( $score_str ) : 0;
-                $reg['x_count'] = ( $x_str !== '' ) ? intval( $x_str ) : 0;
-
-                if ( isset( $_POST['is_inc'] ) ) {
-                    $raw_inc       = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['is_inc'] ) ) ) );
-                    $reg['is_inc'] = ( '1' === $raw_inc || 'true' === $raw_inc ) ? 1 : 0;
-                } else {
-                    $reg['is_inc'] = ! empty( $reg['is_inc'] ) ? 1 : 0;
-                }
-
-                update_option( $opt_key, $reg, false );
-
-                $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
-                if ( ! is_array( $scores_map ) ) {
-                    $scores_map = array();
-                }
-                $scores_map[ $clean_id ] = array(
-                    'score'    => $reg['score'],
-                    'xs'       => $reg['x_count'],
-                    'is_inc'   => $reg['is_inc'],
-                    'saved_at' => current_time( 'mysql' ),
-                );
-                update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
-
-                $master_regs = get_option( 'sywat_registrations_' . $active_t_slug, array() );
-                if ( is_array( $master_regs ) && isset( $master_regs[ $clean_id ] ) ) {
-                    $master_regs[ $clean_id ] = $reg;
-                    update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
-                }
-
-                wp_send_json_success(
-                    array(
-                        'reg_id'  => $clean_id,
-                        'is_inc'  => $reg['is_inc'],
-                        'message' => 'Saved',
-                    )
-                );
-            }
-
-            wp_send_json_error( array( 'message' => 'Archer record not found' ) );
+        if ( 'POST' !== $req_method || ( 'autosave_single_score' !== $post_act && 'sywat_autosave_single_score' !== $ajax_act ) ) {
+            return;
         }
+
+        if ( ! isset( $_POST['sywat_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) ) {
+            wp_send_json_error( array( 'message' => 'Security token expired' ), 403 );
+        }
+
+        if ( ! function_exists( 'sywat_can_edit_scores' ) || ! sywat_can_edit_scores() ) {
+            wp_send_json_error( array( 'message' => 'Access denied' ), 403 );
+        }
+
+        $clean_id   = isset( $_POST['reg_id'] ) ? sanitize_text_field( wp_unslash( $_POST['reg_id'] ) ) : '';
+        $score_str  = isset( $_POST['score'] ) ? trim( wp_unslash( $_POST['score'] ) ) : '';
+        $x_str      = isset( $_POST['x_count'] ) ? trim( wp_unslash( $_POST['x_count'] ) ) : '';
+        $tourn_name = isset( $_POST['selected_tournament'] ) ? sanitize_text_field( wp_unslash( $_POST['selected_tournament'] ) ) : '';
+
+        if ( '' === $clean_id || '' === $tourn_name ) {
+            wp_send_json_error( array( 'message' => 'Missing archer or tournament identifier' ), 400 );
+        }
+
+        if ( '' !== $score_str && ( intval( $score_str ) < 0 || intval( $score_str ) > 300 ) ) {
+            wp_send_json_error( array( 'message' => 'Score out of range (0-300)' ), 400 );
+        }
+        if ( '' !== $x_str && ( intval( $x_str ) < 0 || intval( $x_str ) > 60 ) ) {
+            wp_send_json_error( array( 'message' => 'X count out of range (0-60)' ), 400 );
+        }
+
+        global $wpdb;
+
+        $active_t_slug = sanitize_title( $tourn_name );
+        $opt_key       = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
+        $scores_key    = 'sywat_scores_' . $active_t_slug;
+        $locks_key     = 'sywat_locks_' . $active_t_slug;
+        $master_key    = 'sywat_registrations_' . $active_t_slug;
+        $lock_name     = 'sywat_score_lock_' . substr( md5( $active_t_slug ), 0, 24 );
+
+        $lock_acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 5 )', $lock_name ) );
+        if ( null !== $lock_acquired && '1' !== (string) $lock_acquired ) {
+            wp_send_json_error( array( 'message' => 'Server busy saving another score, please retry' ), 409 );
+        }
+
+        try {
+            wp_cache_delete( $opt_key, 'options' );
+            wp_cache_delete( $locks_key, 'options' );
+            wp_cache_delete( $scores_key, 'options' );
+            wp_cache_delete( $master_key, 'options' );
+
+            $reg          = get_option( $opt_key );
+            $locked_lines = get_option( $locks_key, array() );
+            if ( ! is_array( $locked_lines ) ) {
+                $locked_lines = array();
+            }
+
+            if ( ! $reg || ! is_array( $reg ) ) {
+                wp_send_json_error( array( 'message' => 'Archer record not found' ), 404 );
+            }
+
+            $line_idx = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '';
+            if ( ! empty( $locked_lines[ $line_idx ] ) ) {
+                wp_send_json_error( array( 'message' => 'Line is locked' ), 423 );
+            }
+
+            $reg['score']   = ( '' !== $score_str ) ? intval( $score_str ) : 0;
+            $reg['x_count'] = ( '' !== $x_str ) ? intval( $x_str ) : 0;
+
+            if ( isset( $_POST['is_inc'] ) ) {
+                $raw_inc       = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['is_inc'] ) ) ) );
+                $reg['is_inc'] = ( '1' === $raw_inc || 'true' === $raw_inc ) ? 1 : 0;
+            } else {
+                $reg['is_inc'] = ! empty( $reg['is_inc'] ) ? 1 : 0;
+            }
+
+            update_option( $opt_key, $reg, false );
+
+            $scores_map = get_option( $scores_key, array() );
+            if ( ! is_array( $scores_map ) ) {
+                $scores_map = array();
+            }
+            $scores_map[ $clean_id ] = array(
+                'score'    => $reg['score'],
+                'xs'       => $reg['x_count'],
+                'is_inc'   => $reg['is_inc'],
+                'saved_at' => current_time( 'mysql' ),
+            );
+            update_option( $scores_key, $scores_map, false );
+
+            $master_regs = get_option( $master_key, array() );
+            if ( is_array( $master_regs ) && isset( $master_regs[ $clean_id ] ) ) {
+                $master_regs[ $clean_id ] = $reg;
+                update_option( $master_key, $master_regs, false );
+            }
+
+            $response_payload = array(
+                'reg_id'  => $clean_id,
+                'score'   => $reg['score'],
+                'x_count' => $reg['x_count'],
+                'is_inc'  => $reg['is_inc'],
+                'message' => 'Saved',
+            );
+        } finally {
+            $wpdb->query( $wpdb->prepare( 'DO RELEASE_LOCK( %s )', $lock_name ) );
+        }
+
+        wp_send_json_success( $response_payload );
     }
 }
 
 /**
- * Processes batch score save, incomplete round flags, line locks, and score reset POST requests
- * using a single bulk option pre-fetch and explicit MySQL transactions for multi-row disk writes.
+ * Processes shooting line lock toggles from the Line Score Tracker and returns an inline
+ * error banner when CSV export is requested with no locked shooting lines.
  *
  * @param string $selected_tournament Active tournament name.
  * @param string $selected_line_idx   Active shooting line index or 'all'.
@@ -106,25 +147,33 @@ if ( ! function_exists( 'sywat_scores_handle_ajax_autosave' ) ) {
  */
 if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
     function sywat_scores_handle_batch_actions( $selected_tournament, $selected_line_idx, $is_admin, &$locked_lines, &$current_view_locked ) {
-        global $wpdb;
         $notice = '';
 
         $is_valid_nonce = ( isset( $_POST['sywat_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sywat_nonce'] ) ), 'sywat_scores_action' ) );
         $action         = isset( $_POST['sywat_action'] ) ? sanitize_text_field( wp_unslash( $_POST['sywat_action'] ) ) : '';
 
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && $action !== 'autosave_single_score' ) {
+        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $action && ! $is_valid_nonce && 'autosave_single_score' !== $action ) {
             return '<div class="sywat-alert sywat-alert-danger">Security token expired. Please refresh and try again.</div>';
         }
 
         if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $is_valid_nonce ) {
             $active_t_slug = sanitize_title( $selected_tournament );
 
-            // Action: Toggle Line Lock
-            if ( $action === 'toggle_lock' ) {
+            // Action: Export CSV requested with no locked lines (early exporter returned without streaming)
+            if ( 'export_csv' === $action ) {
+                if ( ! $is_admin ) {
+                    $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator or Shop Manager privileges required to export CSV.</div>';
+                } elseif ( empty( $locked_lines ) ) {
+                    $notice = '<div class="sywat-alert sywat-alert-danger">⚠️ At least one shooting line must be locked before exporting CSV.</div>';
+                }
+            }
+
+            // Action: Toggle Line Lock (from Line Score Tracker cards)
+            if ( 'toggle_lock' === $action ) {
                 if ( ! $is_admin ) {
                     $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator privileges required to lock/unlock lines.</div>';
-                } elseif ( $selected_line_idx === 'all' ) {
-                    $notice = '<div class="sywat-alert sywat-alert-danger">Please filter to a specific shooting line first to lock or unlock it.</div>';
+                } elseif ( 'all' === $selected_line_idx || '' === $selected_line_idx ) {
+                    $notice = '<div class="sywat-alert sywat-alert-danger">Please select a specific shooting line to lock or unlock.</div>';
                 } else {
                     if ( ! empty( $locked_lines[ $selected_line_idx ] ) ) {
                         unset( $locked_lines[ $selected_line_idx ] );
@@ -136,223 +185,10 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
 
                     delete_option( 'sywat_locks_' . $active_t_slug );
                     add_option( 'sywat_locks_' . $active_t_slug, $locked_lines, '', 'no' );
+                    wp_cache_delete( 'sywat_locks_' . $active_t_slug, 'options' );
 
                     update_option( 'sywat_current_tournament', $selected_tournament, false );
                     $current_view_locked = ! empty( $locked_lines[ $selected_line_idx ] );
-                }
-            }
-
-            // Action: Reset All Scores to 0 (and clear INC flags) inside an atomic transaction
-            if ( $action === 'reset_scores' ) {
-                if ( ! $is_admin ) {
-                    $notice = '<div class="sywat-alert sywat-alert-danger">Access denied. Administrator privileges required to reset scores.</div>';
-                } else {
-                    $reset_count = 0;
-                    $all_rows    = $wpdb->get_results(
-                        $wpdb->prepare(
-                            "SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-                            $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
-                        )
-                    );
-
-                    $scores_map = get_option( 'sywat_scores_' . $active_t_slug, array() );
-                    if ( ! is_array( $scores_map ) ) {
-                        $scores_map = array();
-                    }
-
-                    $master_regs = get_option( 'sywat_registrations_' . $active_t_slug, array() );
-                    if ( ! is_array( $master_regs ) ) {
-                        $master_regs = array();
-                    }
-
-                    $now_mysql = current_time( 'mysql' );
-                    $wpdb->query( 'START TRANSACTION' );
-
-                    try {
-                        if ( is_array( $all_rows ) ) {
-                            foreach ( $all_rows as $row ) {
-                                $reg = maybe_unserialize( $row->option_value );
-                                if ( is_array( $reg ) && isset( $reg['id'] ) ) {
-                                    $r_line        = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
-                                    $match_tourn   = isset( $reg['tournament'] ) && $reg['tournament'] === $selected_tournament;
-                                    $match_line    = ( $selected_line_idx === 'all' ) || ( $r_line === (string) $selected_line_idx );
-                                    $is_checked_in = ! empty( $reg['checked_in'] );
-                                    $is_locked     = ! empty( $locked_lines[ $r_line ] );
-
-                                    if ( $match_tourn && $match_line && $is_checked_in && ! $is_locked ) {
-                                        $opt_key        = 'sywat_t_' . $active_t_slug . '_' . $reg['id'];
-                                        $reg['score']   = 0;
-                                        $reg['x_count'] = 0;
-                                        $reg['is_inc']  = 0;
-                                        update_option( $opt_key, $reg, false );
-
-                                        $scores_map[ $reg['id'] ] = array(
-                                            'score'    => 0,
-                                            'xs'       => 0,
-                                            'is_inc'   => 0,
-                                            'saved_at' => $now_mysql,
-                                        );
-
-                                        if ( isset( $master_regs[ $reg['id'] ] ) ) {
-                                            $master_regs[ $reg['id'] ] = $reg;
-                                        }
-
-                                        $reset_count++;
-                                    }
-                                }
-                            }
-                        }
-
-                        update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
-                        if ( ! empty( $master_regs ) ) {
-                            update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
-                        }
-
-                        $wpdb->query( 'COMMIT' );
-                    } catch ( \Throwable $e ) {
-                        $wpdb->query( 'ROLLBACK' );
-                        throw $e;
-                    }
-
-                    $notice = '<div class="sywat-alert sywat-alert-success">Successfully reset scores, X counts, and INC flags to 0 for <strong>' . $reset_count . '</strong> unlocked, checked-in archer(s).</div>';
-                }
-            }
-
-            // Action: Save Batch Scores & INC Flags using single bulk pre-fetch + atomic transaction
-            if ( $action === 'save_scores' ) {
-                $has_invalid_data = false;
-
-                $submitted_ids = array_unique(
-                    array_merge(
-                        isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? array_keys( $_POST['scores'] ) : array(),
-                        isset( $_POST['x_counts'] ) && is_array( $_POST['x_counts'] ) ? array_keys( $_POST['x_counts'] ) : array(),
-                        isset( $_POST['inc_state'] ) && is_array( $_POST['inc_state'] ) ? array_keys( $_POST['inc_state'] ) : array(),
-                        isset( $_POST['is_inc'] ) && is_array( $_POST['is_inc'] ) ? array_keys( $_POST['is_inc'] ) : array()
-                    )
-                );
-
-                foreach ( $submitted_ids as $id ) {
-                    if ( isset( $_POST['scores'][ $id ] ) ) {
-                        $score_str = trim( wp_unslash( $_POST['scores'][ $id ] ) );
-                        if ( $score_str !== '' ) {
-                            $s_val = intval( $score_str );
-                            if ( $s_val < 0 || $s_val > 300 ) {
-                                $has_invalid_data = true;
-                                break;
-                            }
-                        }
-                    }
-                    if ( isset( $_POST['x_counts'][ $id ] ) ) {
-                        $x_str = trim( wp_unslash( $_POST['x_counts'][ $id ] ) );
-                        if ( $x_str !== '' ) {
-                            $x_val = intval( $x_str );
-                            if ( $x_val < 0 || $x_val > 60 ) {
-                                $has_invalid_data = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if ( $has_invalid_data ) {
-                    $notice = '<div class="sywat-alert sywat-alert-danger">⚠️ <strong>Save Rejected!</strong> One or more values were invalid. Scores must be 0–300 and X Counts 0–60. Please correct highlighted fields and save again.</div>';
-                } elseif ( empty( $submitted_ids ) ) {
-                    $notice = '<div class="sywat-alert sywat-alert-success">No changes were made.</div>';
-                } else {
-                    // Single bulk query pre-fetching all tournament registrations to eliminate N+1 get_option() calls
-                    $prefetched_regs = array();
-                    if ( $active_t_slug !== '' ) {
-                        $bulk_rows = $wpdb->get_results(
-                            $wpdb->prepare(
-                                "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
-                                $wpdb->esc_like( 'sywat_t_' . $active_t_slug . '_' ) . '%'
-                            )
-                        );
-                        if ( is_array( $bulk_rows ) ) {
-                            foreach ( $bulk_rows as $brow ) {
-                                $unser = maybe_unserialize( $brow->option_value );
-                                if ( is_array( $unser ) && isset( $unser['id'] ) ) {
-                                    $prefetched_regs[ (string) $unser['id'] ] = $unser;
-                                }
-                            }
-                        }
-                    }
-
-                    $saved_count = 0;
-                    $scores_map  = get_option( 'sywat_scores_' . $active_t_slug, array() );
-                    if ( ! is_array( $scores_map ) ) {
-                        $scores_map = array();
-                    }
-
-                    $master_regs = get_option( 'sywat_registrations_' . $active_t_slug, array() );
-                    if ( ! is_array( $master_regs ) ) {
-                        $master_regs = array();
-                    }
-
-                    $now_mysql = current_time( 'mysql' );
-                    $wpdb->query( 'START TRANSACTION' );
-
-                    try {
-                        foreach ( $submitted_ids as $id ) {
-                            $clean_id = sanitize_text_field( wp_unslash( $id ) );
-                            $opt_key  = 'sywat_t_' . $active_t_slug . '_' . $clean_id;
-                            $reg      = isset( $prefetched_regs[ $clean_id ] ) ? $prefetched_regs[ $clean_id ] : get_option( $opt_key );
-
-                            if ( $reg && is_array( $reg ) ) {
-                                $r_line = isset( $reg['line_index'] ) ? (string) $reg['line_index'] : '0';
-                                if ( ! empty( $locked_lines[ $r_line ] ) ) {
-                                    continue;
-                                }
-
-                                if ( isset( $_POST['scores'][ $id ] ) ) {
-                                    $raw_score    = trim( wp_unslash( $_POST['scores'][ $id ] ) );
-                                    $reg['score'] = ( $raw_score !== '' ) ? intval( $raw_score ) : 0;
-                                }
-                                if ( isset( $_POST['x_counts'][ $id ] ) ) {
-                                    $raw_x          = trim( wp_unslash( $_POST['x_counts'][ $id ] ) );
-                                    $reg['x_count'] = ( $raw_x !== '' ) ? intval( $raw_x ) : 0;
-                                }
-
-                                if ( ! empty( $_POST['is_inc'][ $id ] ) ) {
-                                    $reg['is_inc'] = 1;
-                                } elseif ( isset( $_POST['inc_state'][ $id ] ) ) {
-                                    $raw_inc       = sanitize_text_field( wp_unslash( $_POST['inc_state'][ $id ] ) );
-                                    $reg['is_inc'] = ( '1' === $raw_inc ) ? 1 : 0;
-                                } else {
-                                    $reg['is_inc'] = ! empty( $reg['is_inc'] ) ? 1 : 0;
-                                }
-
-                                update_option( $opt_key, $reg, false );
-
-                                $scores_map[ $clean_id ] = array(
-                                    'score'    => isset( $reg['score'] ) ? intval( $reg['score'] ) : 0,
-                                    'xs'       => isset( $reg['x_count'] ) ? intval( $reg['x_count'] ) : 0,
-                                    'is_inc'   => isset( $reg['is_inc'] ) ? intval( $reg['is_inc'] ) : 0,
-                                    'saved_at' => $now_mysql,
-                                );
-
-                                if ( isset( $master_regs[ $clean_id ] ) ) {
-                                    $master_regs[ $clean_id ] = $reg;
-                                }
-
-                                $saved_count++;
-                            }
-                        }
-
-                        update_option( 'sywat_scores_' . $active_t_slug, $scores_map, false );
-                        if ( ! empty( $master_regs ) ) {
-                            update_option( 'sywat_registrations_' . $active_t_slug, $master_regs, false );
-                        }
-
-                        $wpdb->query( 'COMMIT' );
-                    } catch ( \Throwable $e ) {
-                        $wpdb->query( 'ROLLBACK' );
-                        throw $e;
-                    }
-
-                    if ( $saved_count > 0 ) {
-                        $notice = '<div class="sywat-alert sywat-alert-success">Successfully updated scores for <strong>' . $saved_count . '</strong> unlocked archer(s)!</div>';
-                    }
                 }
             }
         }
@@ -361,26 +197,16 @@ if ( ! function_exists( 'sywat_scores_handle_batch_actions' ) ) {
     }
 }
 
-/**
- * Run the single-score autosave before the theme starts output.
- *
- * The autosave is POSTed to the Enter Scores page itself. It used to be handled
- * inside the shortcode, after the theme had already printed the page header,
- * so the JSON reply arrived wrapped in HTML and the browser kept the score as a
- * local draft. Handling it on template_redirect returns clean JSON.
- */
+// Primary WordPress AJAX endpoint for isolated per-archer score saves
+add_action( 'wp_ajax_sywat_autosave_single_score', 'sywat_scores_handle_ajax_autosave' );
+
+// Front-end template_redirect fallback endpoint for backward compatibility
 add_action(
     'template_redirect',
     function () {
         if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' )
             || ! isset( $_POST['sywat_action'] ) || 'autosave_single_score' !== $_POST['sywat_action'] ) {
             return;
-        }
-        if ( function_exists( 'sywat_is_plugin_page' ) && ! sywat_is_plugin_page() ) {
-            return;
-        }
-        if ( ! function_exists( 'sywat_can_edit_scores' ) || ! sywat_can_edit_scores() ) {
-            wp_send_json_error( array( 'message' => 'Access denied' ), 403 );
         }
         sywat_scores_handle_ajax_autosave();
     },
