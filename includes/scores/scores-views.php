@@ -2,10 +2,10 @@
 /**
  * Sub-Module: Scores Engine Visual Views & Shortcode Renderer
  * Path: includes/scores/scores-views.php
- * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards with live entered/INC counter hooks and instant client-side line filtering, surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, conditional draft-only Save Pending trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
+ * Description: Pure presentation renderer for the Batch Score Entry application ([sywat_scores]), consuming pre-scoped active-season/non-historical tournament context and O(R) line score metrics from includes/scores/scores-data.php and pre-formatted surname-sorted rows from includes/scores/scores-helpers.php. Renders role-gated desk navigation tabs, canonical shooting line labels, line score tracker cards matching Check-In's side-by-side / full-width locked button layout (hiding Enter Scores when locked), surname-sorted ("LastName, FirstName") archer score entry table with a single-button Unentered / Show All view toggle, pre-indexed live search tokens, per-archer "INC" incomplete-round toggle, isolated uncommitted-only Save Scores trigger, always-visible admin Export CSV trigger with locked-line validation, responsive mobile card labels, and optimizer-safe delegated control toolbars.
  * Compliance: Pure view layer — zero database queries, zero option/meta lookups, zero output at include time, zero inline styles, zero inline JS attributes (data-sywat-action delegation only), filemtime() cache-busted external JS asset, omitted closing PHP tag.
  * Author: SYWAT Archery
- * Version: 8.3.0
+ * Version: 8.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -210,10 +210,12 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     </div>
 
                                     <div class="sywat-tracker-card-actions">
-                                        <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" data-sywat-action="select-scores-line" data-line-idx="<?php echo esc_attr( $idx ); ?>">Enter Scores</button>
+                                        <?php if ( ! $is_line_locked ) : ?>
+                                            <button type="button" class="sywat-btn sywat-btn-success sywat-btn-icon-edit" data-sywat-action="select-scores-line" data-line-idx="<?php echo esc_attr( $idx ); ?>">Enter Scores</button>
+                                        <?php endif; ?>
 
                                         <?php if ( $is_admin ) : ?>
-                                            <form method="post" class="sywat-form-inline">
+                                            <form method="post">
                                                 <?php wp_nonce_field( 'sywat_scores_action', 'sywat_nonce' ); ?>
                                                 <input type="hidden" name="selected_tournament" value="<?php echo esc_attr( $selected_tournament ); ?>">
                                                 <input type="hidden" name="selected_line_idx" value="<?php echo esc_attr( $idx ); ?>">
@@ -265,12 +267,13 @@ if ( ! function_exists( 'render_sywat_scores_app' ) ) {
                                     <button type="button" id="sywat_score_search_clear" class="sywat-btn sywat-btn-secondary sywat-btn-icon-clear" data-sywat-action="clear-scores-search">Clear</button>
                                 </div>
 
-                                <!-- Conditional Draft-Only Flush Button (Visible only when unsaved local drafts exist) -->
+                                <!-- Isolated Save Scores Button (Saves only uncommitted rows edited in this session) -->
                                 <button type="button"
-                                        id="sywat_scores_save_pending_btn"
-                                        class="sywat-btn sywat-btn-success sywat-btn-icon-save sywat-hidden"
-                                        data-sywat-action="flush-pending-scores">
-                                    Save Pending
+                                        id="sywat_scores_save_btn"
+                                        class="sywat-btn sywat-btn-success sywat-btn-icon-save"
+                                        data-sywat-action="save-uncommitted-scores"
+                                        title="Save any uncommitted score changes you entered">
+                                    Save Scores
                                 </button>
 
                                 <!-- Export CSV Button (Always Visible for Admins; validates locked lines before exporting) -->
